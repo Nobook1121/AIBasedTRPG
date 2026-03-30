@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI TRPG 系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="notification-container"></div>
+    <div class="container-fluid">
+        <div class="row h-100">
+            <!-- 左侧导航栏 -->
+            <div class="col-2 bg-dark text-white" id="sidebar">
+                <div class="d-flex flex-column h-100 p-3">
+                    <h2 class="text-center">AI TRPG</h2>
+                    <ul class="nav flex-column mt-4">
+                        <li class="nav-item">
+                            <a class="nav-link active" href="#home" data-tab="home">主页</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#scenario" data-tab="scenario">剧本管理</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#character" data-tab="character">角色卡管理</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#save" data-tab="save">存档管理</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#tools" data-tab="tools">小工具</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#settings" data-tab="settings">设置</a>
+                        </li>
+                    </ul>
+                    <!-- 用户信息区域 -->
+                    <div class="user-info mt-auto" id="userInfo">
+                        <div class="user-avatar" id="userAvatar">
+                            <img src="https://via.placeholder.com/40" alt="用户头像">
+                        </div>
+                        <div class="user-details">
+                            <div class="user-name" id="userName">未登录</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 中间内容区 -->
+            <div class="col-8">
+                <!-- 主页内容 -->
+                <div id="home" class="tab-content active">
+                    <!-- 对话记录区 -->
+                    <div class="chat-history p-4" id="chatHistory">
+                        <div class="message kp-message">
+                            <div class="message-header">
+                                <span class="sender">KP</span>
+                                <span class="time">10:00</span>
+                            </div>
+                            <div class="message-content">欢迎来到AI TRPG系统！请选择一个剧本开始游戏。</div>
+                        </div>
+                    </div>
+
+                    <!-- 对话输入区 -->
+                    <div class="chat-input p-3 border-top">
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="chatInput" placeholder="输入消息或指令...">
+                            <button class="btn btn-primary" id="sendButton">发送</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 剧本管理内容 -->
+                <div id="scenario" class="tab-content">
+                    <div class="p-4">
+                        <h2>剧本管理</h2>
+                        <div class="mb-4">
+                            <button class="btn btn-primary" id="createScenario">创建剧本</button>
+                            <button class="btn btn-secondary" id="importScenario">导入剧本</button>
+                            <input type="file" id="importScenarioFile" accept=".json" style="display: none;" multiple>
+                        </div>
+                        <div class="scenario-list" id="scenarioList">
+                            <!-- 剧本卡片将在这里动态生成 -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 角色卡管理内容 -->
+                <div id="character" class="tab-content">
+                    <div class="p-4">
+                        <h2>角色卡管理</h2>
+                        <div class="mb-4">
+                            <button class="btn btn-primary" id="createCharacter">创建角色卡</button>
+                        </div>
+                        <div class="character-list" id="characterList">
+                            <!-- 角色卡将在这里动态生成 -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 存档管理内容 -->
+                <div id="save" class="tab-content">
+                    <div class="p-4">
+                        <h2>存档管理</h2>
+                        <p class="text-muted">功能开发中...</p>
+                    </div>
+                </div>
+
+                <!-- 小工具内容 -->
+                <div id="tools" class="tab-content">
+                    <div class="p-4">
+                        <h2>小工具</h2>
+                        <div class="mb-4">
+                            <h3>骰子工具</h3>
+                            <div class="dice-tool">
+                                <select class="form-select" id="diceType">
+                                    <option value="d4">D4</option>
+                                    <option value="d6">D6</option>
+                                    <option value="d8">D8</option>
+                                    <option value="d10">D10</option>
+                                    <option value="d12">D12</option>
+                                    <option value="d20">D20</option>
+                                    <option value="d100">D100</option>
+                                </select>
+                                <button class="btn btn-primary" id="rollDice">投掷</button>
+                                <div class="dice-result mt-2" id="diceResult"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 登录/注册中央弹窗 -->
+                <div id="auth-modal" class="auth-modal">
+                    <div class="auth-modal-content">
+                        <div class="auth-modal-header">
+                            <h2>用户认证</h2>
+                            <button id="close-auth-modal" class="close-btn">&times;</button>
+                        </div>
+                        <div class="auth-modal-body">
+                            <!-- 登录/注册切换 -->
+                            <div class="auth-tabs">
+                                <button class="auth-tab active" data-tab="login">登录</button>
+                                <button class="auth-tab" data-tab="register">注册</button>
+                            </div>
+                            
+                            <!-- 登录表单 -->
+                            <div id="login-form" class="auth-form active">
+                                <div class="form-group">
+                                    <label>用户名</label>
+                                    <input type="text" class="form-control" id="loginUsername" placeholder="请输入用户名">
+                                </div>
+                                <div class="form-group mt-2">
+                                    <label>密码</label>
+                                    <input type="password" class="form-control" id="loginPassword" placeholder="请输入密码">
+                                </div>
+                                <div class="form-group mt-2">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="rememberMe">
+                                        <label class="form-check-label" for="rememberMe">记住密码</label>
+                                    </div>
+                                </div>
+                                <div class="form-group mt-2">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="stayLoggedIn">
+                                        <label class="form-check-label" for="stayLoggedIn">短期免登录</label>
+                                    </div>
+                                </div>
+                                <button class="btn btn-primary mt-3 w-100" id="loginButton">登录</button>
+                                <div class="login-message mt-2" id="loginMessage"></div>
+                            </div>
+                            
+                            <!-- 注册表单 -->
+                            <div id="register-form" class="auth-form">
+                                <div class="form-group">
+                                    <label>用户名</label>
+                                    <input type="text" class="form-control" id="registerUsername" placeholder="请输入用户名">
+                                </div>
+                                <div class="form-group mt-2">
+                                    <label>密码</label>
+                                    <input type="password" class="form-control" id="registerPassword" placeholder="请输入密码">
+                                </div>
+                                <div class="form-group mt-2">
+                                    <label>邮箱</label>
+                                    <input type="email" class="form-control" id="registerEmail" placeholder="请输入邮箱">
+                                </div>
+                                <button class="btn btn-primary mt-3 w-100" id="registerButton">注册</button>
+                                <div class="register-message mt-2" id="registerMessage"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 用户信息设置面板 -->
+                <div id="user-settings-panel" class="user-settings-panel">
+                    <div class="user-settings-content">
+                        <div class="user-settings-header">
+                            <h3>用户设置</h3>
+                            <button id="close-settings-panel" class="close-btn">&times;</button>
+                        </div>
+                        <div class="user-settings-body">
+                            <div class="form-group text-center">
+                                <label>头像</label>
+                                <div class="avatar-upload-container">
+                                    <div class="avatar-preview">
+                                        <img id="avatarPreview" src="https://via.placeholder.com/100" alt="用户头像">
+                                    </div>
+                                    <input type="file" id="avatarUpload" class="avatar-upload-input" accept="image/*">
+                                    <label for="avatarUpload" class="avatar-upload-label">更换头像</label>
+                                </div>
+                            </div>
+                            <div class="form-group mt-2">
+                                <label>用户名</label>
+                                <input type="text" class="form-control" id="editUsername" placeholder="请输入用户名">
+                            </div>
+                            <div class="form-group mt-2">
+                                <label>昵称</label>
+                                <input type="text" class="form-control" id="editNickname" placeholder="请输入昵称">
+                            </div>
+                            <div class="form-group mt-2">
+                                <label>邮箱</label>
+                                <input type="email" class="form-control" id="editEmail" placeholder="请输入邮箱">
+                            </div>
+                            <div class="form-group mt-2">
+                                <label>新密码</label>
+                                <input type="password" class="form-control" id="editPassword" placeholder="请输入新密码">
+                            </div>
+                            <div class="form-group mt-2">
+                                <label>确认新密码</label>
+                                <input type="password" class="form-control" id="confirmPassword" placeholder="请确认新密码">
+                            </div>
+                            <button class="btn btn-primary mt-3 w-100" id="saveUserSettings">保存设置</button>
+                            <button class="btn btn-danger mt-2 w-100" id="logoutButton">登出</button>
+                            <div class="settings-message mt-2" id="settingsMessage"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 设置内容 -->
+                <div id="settings" class="tab-content">
+                    <div class="p-4">
+                        <h2>设置</h2>
+                        <div class="mb-4">
+                            <h3>常规设置</h3>
+                            <div class="form-group">
+                                <label>主题</label>
+                                <select class="form-select">
+                                    <option>浅色</option>
+                                    <option>深色</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-4">
+                            <h3>网络设置</h3>
+                            <div class="form-group">
+                                <label>端口号</label>
+                                <input type="number" class="form-control" value="8080">
+                            </div>
+                            <div class="form-group">
+                                <label>局域网访问</label>
+                                <input type="checkbox" class="form-check-input">
+                            </div>
+                        </div>
+                        <div class="mb-4">
+                            <h3>模型设置</h3>
+                            <div class="form-group">
+                                <label>API Key</label>
+                                <input type="password" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label>模型选择</label>
+                                <select class="form-select">
+                                    <option>GPT-3.5</option>
+                                    <option>GPT-4</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧辅助信息面板 -->
+            <div class="col-2 bg-light border-left" id="sidePanel">
+                <!-- 参与者列表 -->
+                <div class="p-3">
+                    <h4>参与用户</h4>
+                    <ul class="list-group" id="playerList">
+                        <li class="list-group-item">玩家1 - 角色名</li>
+                        <li class="list-group-item">玩家2 - 角色名</li>
+                    </ul>
+                </div>
+
+                <!-- 角色数据面板 -->
+                <div class="p-3 border-top">
+                    <h4>角色数据</h4>
+                    <div id="characterData">
+                        <p>请选择一个玩家查看角色数据</p>
+                    </div>
+                </div>
+            </div>
+
+
+        </div>
+    </div>
+
+    <!-- 模态框 -->
+    <div class="modal fade" id="scenarioModal" tabindex="-1" aria-labelledby="scenarioModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="scenarioModalLabel">创建剧本</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>剧本标题 *</label>
+                        <input type="text" class="form-control" id="scenarioTitle" required>
+                    </div>
+                    <div class="form-group">
+                        <label>作者 *</label>
+                        <input type="text" class="form-control" id="scenarioAuthor" required>
+                    </div>
+                    <div class="form-group">
+                        <label>推荐人数 *</label>
+                        <input type="number" class="form-control" id="scenarioPlayerCount" value="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label>备注</label>
+                        <textarea class="form-control" id="scenarioNotes" rows="2"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>背景/引入</label>
+                        <textarea class="form-control" id="scenarioBackground" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>游戏准备</label>
+                        <textarea class="form-control" id="scenarioPreparation" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>场景</label>
+                        <div id="scenarioScenes">
+                            <div class="scene-item mb-3 p-3 border rounded">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6>场景 1</h6>
+                                    <button type="button" class="btn btn-sm btn-danger remove-scene">删除</button>
+                                </div>
+                                <div class="form-group">
+                                    <label>场景内容</label>
+                                    <textarea class="form-control" rows="3"></textarea>
+                                </div>
+                                <div class="form-group mt-2">
+                                    <label>场景标记</label>
+                                    <textarea class="form-control" rows="2" placeholder="AI总结内容将显示在这里"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-primary mt-2" id="addScene">添加场景</button>
+                    </div>
+                    <div class="form-group">
+                        <label>结局</label>
+                        <div id="scenarioEndings">
+                            <div class="ending-item mb-3 p-3 border rounded">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6>结局 1</h6>
+                                    <button type="button" class="btn btn-sm btn-danger remove-ending">删除</button>
+                                </div>
+                                <div class="form-group">
+                                    <label>结局内容</label>
+                                    <textarea class="form-control" rows="3"></textarea>
+                                </div>
+                                <div class="form-group mt-2">
+                                    <label>结局标记</label>
+                                    <textarea class="form-control" rows="2" placeholder="AI总结内容将显示在这里"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-primary mt-2" id="addEnding">添加结局</button>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="saveScenario">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="characterModal" tabindex="-1" aria-labelledby="characterModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="characterModalLabel">创建角色卡</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>角色名称</label>
+                        <input type="text" class="form-control" id="characterName">
+                    </div>
+                    <div class="form-group">
+                        <label>玩家ID</label>
+                        <input type="text" class="form-control" id="playerId">
+                    </div>
+                    <div class="form-group">
+                        <label>简介</label>
+                        <textarea class="form-control" id="characterBio" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>属性</label>
+                        <div class="row">
+                            <div class="col-6">
+                                <label>力量</label>
+                                <input type="number" class="form-control" id="strength">
+                            </div>
+                            <div class="col-6">
+                                <label>体质</label>
+                                <input type="number" class="form-control" id="constitution">
+                            </div>
+                            <div class="col-6">
+                                <label>敏捷</label>
+                                <input type="number" class="form-control" id="dexterity">
+                            </div>
+                            <div class="col-6">
+                                <label>智力</label>
+                                <input type="number" class="form-control" id="intelligence">
+                            </div>
+                            <div class="col-6">
+                                <label>意志</label>
+                                <input type="number" class="form-control" id="willpower">
+                            </div>
+                            <div class="col-6">
+                                <label>幸运</label>
+                                <input type="number" class="form-control" id="luck">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>技能</label>
+                        <textarea class="form-control" id="characterSkills" rows="3" placeholder="技能1:数值,技能2:数值..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="saveCharacter">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "username": "owner",
+      "password": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW",
+      "email": "owner@example.com",
+      "ip_addresses": [],
+      "role": "OWNER",
+      "created_at": "2026-03-30T00:00:00.000Z",
+      "last_login": "2026-03-30T00:00:00.000Z",
+      "character_cards": [],
+      "status": "active"
+    }
+  ]
+}

@@ -1,0 +1,534 @@
+/* 通知框样式 */
+.notification-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1050;
+    display: flex;
+    justify-content: center;
+    padding: 10px;
+    pointer-events: none;
+}
+
+.notification {
+    padding: 12px 24px;
+    border-radius: 4px;
+    color: white;
+    font-weight: 500;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    animation: slideDown 0.3s ease-out, fadeOut 0.3s ease-in 2.7s;
+    pointer-events: auto;
+}
+
+.notification-success {
+    background-color: rgba(40, 167, 69, 0.8);
+    border-left: 4px solid #1e7e34;
+}
+
+.notification-error {
+    background-color: #dc3545;
+    border-left: 4px solid #c82333;
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+body, html {
+    height: 100%;
+    margin: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.container-fluid {
+    height: 100%;
+}
+
+#sidebar {
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1000;
+    overflow-y: auto;
+}
+
+#sidebar .nav-link {
+    color: #ccc;
+    transition: all 0.3s ease;
+}
+
+#sidebar .nav-link:hover {
+    color: white;
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+#sidebar .nav-link.active {
+    color: white;
+    background-color: rgba(255, 255, 255, 0.2);
+    border-left: 4px solid #0d6efd;
+}
+
+.col-8 {
+    margin-left: 16.666667%;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.col-2:last-child {
+    margin-left: 83.333333%;
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    right: 0;
+    z-index: 999;
+    overflow-y: auto;
+}
+
+.tab-content {
+    display: none;
+    height: 100%;
+    flex-direction: column;
+}
+
+.tab-content.active {
+    display: flex;
+}
+
+/* 主页样式 */
+.chat-history {
+    flex: 1;
+    overflow-y: auto;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.message {
+    margin-bottom: 15px;
+    padding: 10px;
+    border-radius: 8px;
+    max-width: 80%;
+}
+
+.kp-message {
+    background-color: #e3f2fd;
+    align-self: flex-start;
+    margin-right: auto;
+}
+
+.player-message {
+    background-color: #e8f5e8;
+    align-self: flex-end;
+    margin-left: auto;
+}
+
+.message-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 5px;
+    font-size: 0.8em;
+    color: #666;
+}
+
+.message-content {
+    word-wrap: break-word;
+}
+
+.chat-input {
+    background-color: white;
+}
+
+/* 剧本管理样式 */
+.scenario-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.scenario-card {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    overflow: hidden;
+    transition: transform 0.3s ease;
+}
+
+.scenario-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.scenario-card img {
+    width: 100%;
+    height: 150px;
+    object-fit: cover;
+}
+
+.scenario-card-body {
+    padding: 15px;
+}
+
+.scenario-card-title {
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.scenario-card-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+/* 角色卡管理样式 */
+.character-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.character-card {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 15px;
+    transition: transform 0.3s ease;
+}
+
+.character-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.character-card h5 {
+    margin-bottom: 10px;
+}
+
+.character-card-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+/* 小工具样式 */
+.dice-tool {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#diceType {
+    flex: 1;
+    max-width: 150px;
+}
+
+.dice-result {
+    font-weight: bold;
+    font-size: 1.2em;
+}
+
+/* 右侧面板样式 */
+#sidePanel {
+    background-color: #f8f9fa;
+}
+
+#playerList .list-group-item {
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+#playerList .list-group-item:hover {
+    background-color: #e9ecef;
+}
+
+#characterData {
+    padding: 10px;
+    background-color: white;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+/* 模态框样式 */
+.modal-body {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    #sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+    }
+    
+    .col-8 {
+        margin-left: 0;
+        width: 100%;
+    }
+    
+    .col-2:last-child {
+        margin-left: 0;
+        width: 100%;
+        position: relative;
+    }
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* 登录/注册弹窗样式 */
+.auth-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    animation: fadeIn 0.3s ease;
+}
+
+.auth-modal-content {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    width: 100%;
+    max-width: 400px;
+    overflow: hidden;
+    animation: slideIn 0.3s ease;
+}
+
+.auth-modal-header {
+    background-color: #f8f9fa;
+    padding: 20px;
+    border-bottom: 1px solid #dee2e6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.auth-modal-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #6c757d;
+}
+
+.close-btn:hover {
+    color: #343a40;
+}
+
+.auth-modal-body {
+    padding: 20px;
+}
+
+.auth-tabs {
+    display: flex;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.auth-tab {
+    flex: 1;
+    padding: 10px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.auth-tab.active {
+    border-bottom-color: #007bff;
+    color: #007bff;
+    font-weight: bold;
+}
+
+.auth-form {
+    display: none;
+}
+
+.auth-form.active {
+    display: block;
+    animation: fadeIn 0.3s ease;
+}
+
+/* 用户信息区域样式 */
+.user-info {
+    margin-top: auto;
+    background-color: rgba(255, 255, 255, 0.1);
+    color: white;
+    border-radius: 8px;
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.user-info:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.user-avatar {
+    margin-right: 10px;
+}
+
+.user-avatar img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 2px solid white;
+}
+
+.user-details {
+    flex: 1;
+}
+
+.user-name {
+    font-weight: bold;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 用户设置面板样式 */
+.user-settings-panel {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1001;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    width: 400px;
+    max-width: 90%;
+    overflow: hidden;
+    animation: fadeIn 0.3s ease;
+}
+
+/* 头像上传样式 */
+.avatar-upload-container {
+    position: relative;
+    display: inline-block;
+    margin-top: 10px;
+}
+
+.avatar-preview {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 2px solid #ddd;
+    margin: 0 auto 10px;
+}
+
+.avatar-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.avatar-upload-input {
+    display: none;
+}
+
+.avatar-upload-label {
+    display: block;
+    width: 120px;
+    margin: 0 auto;
+    padding: 8px 16px;
+    background-color: #007bff;
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+.avatar-upload-label:hover {
+    background-color: #0056b3;
+}
+
+.user-settings-content {
+    width: 100%;
+}
+
+.user-settings-header {
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-bottom: 1px solid #dee2e6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.user-settings-header h3 {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.user-settings-body {
+    padding: 20px;
+}
+
+/* 动画效果 */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideIn {
+    from { transform: translateY(-20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slideUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
