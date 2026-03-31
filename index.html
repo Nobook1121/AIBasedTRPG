@@ -48,7 +48,7 @@
             </div>
 
             <!-- 中间内容区 -->
-            <div class="col-8">
+            <div class="col-10">
                 <!-- 主页内容 -->
                 <div id="home" class="tab-content active">
                     <!-- 对话记录区 -->
@@ -279,27 +279,6 @@
                 </div>
             </div>
 
-            <!-- 右侧辅助信息面板 -->
-            <div class="col-2 bg-light border-left" id="sidePanel">
-                <!-- 参与者列表 -->
-                <div class="p-3">
-                    <h4>参与用户</h4>
-                    <ul class="list-group" id="playerList">
-                        <li class="list-group-item">玩家1 - 角色名</li>
-                        <li class="list-group-item">玩家2 - 角色名</li>
-                    </ul>
-                </div>
-
-                <!-- 角色数据面板 -->
-                <div class="p-3 border-top">
-                    <h4>角色数据</h4>
-                    <div id="characterData">
-                        <p>请选择一个玩家查看角色数据</p>
-                    </div>
-                </div>
-            </div>
-
-
         </div>
     </div>
 
@@ -315,6 +294,17 @@
                     <div class="form-group">
                         <label>剧本标题 *</label>
                         <input type="text" class="form-control" id="scenarioTitle" required>
+                    </div>
+                    <div class="form-group">
+                        <label>封面图片</label>
+                        <div class="cover-upload-container">
+                            <div class="cover-preview">
+                                <img id="coverPreview" src="https://via.placeholder.com/200x300?text=封面图片" alt="剧本封面">
+                            </div>
+                            <input type="file" id="coverUpload" class="cover-upload-input" accept="image/*">
+                            <label for="coverUpload" class="cover-upload-label">上传封面</label>
+                        </div>
+                        <input type="hidden" id="scenarioCoverUrl" value="">
                     </div>
                     <div class="form-group">
                         <label>作者 *</label>

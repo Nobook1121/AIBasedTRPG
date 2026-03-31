@@ -18,9 +18,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // 初始化骰子工具
     initDiceTool();
     
-    // 初始化玩家列表
-    initPlayerList();
-    
     // 初始化用户认证功能
     initAuth();
 });
@@ -146,6 +143,67 @@ function initChat() {
 function initScenarioManagement() {
     // 创建剧本控制器实例
     new ScenarioController();
+    
+    // 绑定封面上传事件
+    const coverUpload = document.getElementById('coverUpload');
+    if (coverUpload) {
+        coverUpload.addEventListener('change', handleCoverUpload);
+    }
+}
+
+// 处理封面上传
+function handleCoverUpload(e) {
+    const file = e.target.files[0];
+    if (file) {
+        // 检查文件大小（限制为5MB）
+        if (file.size > 5 * 1024 * 1024) {
+            showNotification('封面文件大小不能超过5MB', 'error');
+            return;
+        }
+        
+        // 检查文件类型
+        if (!file.type.startsWith('image/')) {
+            showNotification('请上传图片文件', 'error');
+            return;
+        }
+        
+        // 预览封面
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('coverPreview').src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+        
+        // 上传封面到服务器
+        const formData = new FormData();
+        formData.append('cover', file);
+        
+        fetch('/api/scenarios/cover', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => {
+                    throw new Error(err.message || '上传失败');
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                showNotification('封面上传成功', 'success');
+                // 保存封面URL到隐藏字段，以便在保存剧本时使用
+                document.getElementById('scenarioCoverUrl').value = data.data.cover_url;
+            } else {
+                showNotification(data.message, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('上传封面失败:', error);
+            showNotification('上传封面失败: ' + error.message, 'error');
+        });
+    }
 }
 
 // 初始化角色卡管理
@@ -269,33 +327,6 @@ function initDiceTool() {
         const result = Math.floor(Math.random() * sides) + 1;
         
         diceResult.textContent = `结果: ${result}`;
-    });
-}
-
-// 初始化玩家列表
-function initPlayerList() {
-    const playerList = document.getElementById('playerList');
-    const characterData = document.getElementById('characterData');
-    
-    playerList.addEventListener('click', function(e) {
-        if (e.target.tagName === 'LI') {
-            // 移除其他选中状态
-            playerList.querySelectorAll('li').forEach(li => li.classList.remove('active'));
-            // 添加当前选中状态
-            e.target.classList.add('active');
-            
-            // 显示角色数据
-            characterData.innerHTML = `
-                <h5>角色信息</h5>
-                <p><strong>名称:</strong> 角色名</p>
-                <p><strong>力量:</strong> 50</p>
-                <p><strong>体质:</strong> 45</p>
-                <p><strong>敏捷:</strong> 60</p>
-                <p><strong>智力:</strong> 70</p>
-                <p><strong>意志:</strong> 55</p>
-                <p><strong>幸运:</strong> 40</p>
-            `;
-        }
     });
 }
 

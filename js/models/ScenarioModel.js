@@ -4,17 +4,8 @@ class ScenarioModel {
         this.scenarios = [];
         this.apiBaseUrl = '/api';
         this.scenariosDir = 'scenarios';
-        this.userId = this.getUserId();
-    }
-    
-    // 获取或生成用户ID
-    getUserId() {
-        let userId = localStorage.getItem('trpg_user_id');
-        if (!userId) {
-            userId = 'user_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
-            localStorage.setItem('trpg_user_id', userId);
-        }
-        return userId;
+        this.userId = null;
+        this.isAuthenticated = false;
     }
     
     // 获取当前用户ID
@@ -22,8 +13,28 @@ class ScenarioModel {
         return this.userId;
     }
 
+    // 检查认证状态
+    async checkAuthStatus() {
+        try {
+            const response = await fetch('/api/auth/status');
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success) {
+                    this.userId = data.data.user_id;
+                    this.isAuthenticated = true;
+                    return true;
+                }
+            }
+        } catch (error) {
+            console.error('检查认证状态失败:', error);
+        }
+        this.isAuthenticated = false;
+        return false;
+    }
+
     // 初始化
-    init() {
+    async init() {
+        await this.checkAuthStatus();
         return this.loadScenarios();
     }
 
@@ -164,47 +175,37 @@ class ScenarioModel {
     // 创建剧本
     async createScenario(scenarioData) {
         try {
-            // 尝试通过API创建剧本
-            try {
-                const response = await fetch(`${this.apiBaseUrl}/scenarios`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        ...scenarioData,
-                        user_id: this.userId
-                    })
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.success) {
-                        const scenario = data.data;
-                        this.scenarios.push(scenario);
-                        this.saveScenarios();
-                        console.log('剧本创建成功');
-                        return scenario;
-                    } else {
-                        throw new Error(data.message);
-                    }
-                } else {
-                    throw new Error(`API请求失败: ${response.status}`);
+            // 检查认证状态
+            if (!this.isAuthenticated) {
+                const authStatus = await this.checkAuthStatus();
+                if (!authStatus) {
+                    throw new Error('请先登录');
                 }
-            } catch (apiError) {
-                console.log('API创建剧本失败，使用本地创建:', apiError);
-                
-                // 本地创建作为备份
-                const scenario = {
-                    id: Date.now(),
-                    ...scenarioData,
-                    createdAt: new Date().toISOString()
-                };
-
-                this.scenarios.push(scenario);
-                this.saveScenarios();
-                return scenario;
             }
+
+            // 通过API创建剧本
+            const response = await fetch(`${this.apiBaseUrl}/scenarios`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    ...scenarioData,
+                    user_id: this.userId
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || `API请求失败: ${response.status}`);
+            }
+            
+            const scenario = data.data;
+            this.scenarios.push(scenario);
+            this.saveScenarios();
+            console.log('剧本创建成功');
+            return scenario;
         } catch (error) {
             console.error('创建剧本时出错:', error);
             throw error;
@@ -214,52 +215,41 @@ class ScenarioModel {
     // 更新剧本
     async updateScenario(id, scenarioData) {
         try {
-            // 尝试通过API更新剧本
-            try {
-                const response = await fetch(`${this.apiBaseUrl}/scenarios/${id}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        ...scenarioData,
-                        user_id: this.userId
-                    })
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.success) {
-                        const updatedScenario = data.data;
-                        const index = this.scenarios.findIndex(s => s.id === id);
-                        if (index !== -1) {
-                            this.scenarios[index] = updatedScenario;
-                            this.saveScenarios();
-                            console.log('剧本更新成功');
-                            return updatedScenario;
-                        }
-                    } else {
-                        throw new Error(data.message);
-                    }
-                } else {
-                    throw new Error(`API请求失败: ${response.status}`);
+            // 检查认证状态
+            if (!this.isAuthenticated) {
+                const authStatus = await this.checkAuthStatus();
+                if (!authStatus) {
+                    throw new Error('请先登录');
                 }
-            } catch (apiError) {
-                console.log('API更新剧本失败，使用本地更新:', apiError);
-                
-                // 本地更新作为备份
-                const index = this.scenarios.findIndex(s => s.id === id);
-                if (index !== -1) {
-                    this.scenarios[index] = {
-                        ...this.scenarios[index],
-                        ...scenarioData,
-                        updatedAt: new Date().toISOString()
-                    };
-                    this.saveScenarios();
-                    return this.scenarios[index];
-                }
-                throw new Error('剧本不存在');
             }
+
+            // 通过API更新剧本
+            const response = await fetch(`${this.apiBaseUrl}/scenarios/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    ...scenarioData,
+                    user_id: this.userId
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || `API请求失败: ${response.status}`);
+            }
+            
+            const updatedScenario = data.data;
+            const index = this.scenarios.findIndex(s => s.id === id);
+            if (index !== -1) {
+                this.scenarios[index] = updatedScenario;
+                this.saveScenarios();
+                console.log('剧本更新成功');
+                return updatedScenario;
+            }
+            throw new Error('剧本不存在');
         } catch (error) {
             console.error('更新剧本时出错:', error);
             throw error;
@@ -269,46 +259,39 @@ class ScenarioModel {
     // 删除剧本
     async deleteScenario(id) {
         try {
-            // 尝试通过API删除剧本
-            try {
-                const response = await fetch(`${this.apiBaseUrl}/scenarios/${id}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        user_id: this.userId
-                    })
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.success) {
-                        const index = this.scenarios.findIndex(s => s.id === id);
-                        if (index !== -1) {
-                            this.scenarios.splice(index, 1);
-                            this.saveScenarios();
-                            console.log('剧本删除成功');
-                            return true;
-                        }
-                    } else {
-                        throw new Error(data.message);
-                    }
-                } else {
-                    throw new Error(`API请求失败: ${response.status}`);
+            // 检查认证状态
+            if (!this.isAuthenticated) {
+                const authStatus = await this.checkAuthStatus();
+                if (!authStatus) {
+                    throw new Error('请先登录');
                 }
-            } catch (apiError) {
-                console.log('API删除剧本失败，使用本地删除:', apiError);
-                
-                // 本地删除作为备份
-                const index = this.scenarios.findIndex(s => s.id === id);
-                if (index !== -1) {
-                    this.scenarios.splice(index, 1);
-                    this.saveScenarios();
-                    return true;
-                }
-                throw new Error('剧本不存在');
             }
+
+            // 通过API删除剧本
+            const response = await fetch(`${this.apiBaseUrl}/scenarios/${id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    user_id: this.userId
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || `API请求失败: ${response.status}`);
+            }
+            
+            const index = this.scenarios.findIndex(s => s.id === id);
+            if (index !== -1) {
+                this.scenarios.splice(index, 1);
+                this.saveScenarios();
+                console.log('剧本删除成功');
+                return true;
+            }
+            throw new Error('剧本不存在');
         } catch (error) {
             console.error('删除剧本时出错:', error);
             throw error;

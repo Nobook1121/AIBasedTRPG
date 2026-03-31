@@ -1,5 +1,4 @@
 {
-  "id": 1,
   "title": "古宅奇案",
   "author": "匿名",
   "playerCount": 4,
@@ -35,5 +34,9 @@
       "marker": ""
     }
   ],
+  "cover": "",
+  "user_id": 1,
+  "id": 1,
+  "updatedAt": "2026-03-31T16:06:34.000Z",
   "createdAt": "2026-03-25T00:00:00.000Z"
 }

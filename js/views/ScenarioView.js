@@ -54,7 +54,7 @@ class ScenarioView {
             const card = document.createElement('div');
             card.className = 'scenario-card';
             card.innerHTML = `
-                <img src="https://via.placeholder.com/250x150?text=${scenario.title}" alt="${scenario.title}">
+                <img src="${scenario.cover || `https://via.placeholder.com/250x150?text=${scenario.title}`}" alt="${scenario.title}">
                 <div class="scenario-card-body">
                     <div class="scenario-card-title">${scenario.title}</div>
                     <p>作者: ${scenario.author}</p>
@@ -176,6 +176,8 @@ class ScenarioView {
         document.getElementById('scenarioNotes').value = scenario.notes || '';
         document.getElementById('scenarioBackground').value = scenario.background || '';
         document.getElementById('scenarioPreparation').value = scenario.preparation || '';
+        document.getElementById('scenarioCoverUrl').value = scenario.cover || '';
+        document.getElementById('coverPreview').src = scenario.cover || 'https://via.placeholder.com/200x300?text=封面图片';
         
         // 填充场景
         const scenesContainer = document.getElementById('scenarioScenes');
@@ -357,7 +359,8 @@ class ScenarioView {
             background: document.getElementById('scenarioBackground').value,
             preparation: document.getElementById('scenarioPreparation').value,
             scenes: scenes,
-            endings: endings
+            endings: endings,
+            cover: document.getElementById('scenarioCoverUrl').value
         };
     }
 

@@ -36,6 +36,14 @@ def require_permission(required_role):
     return decorator
 
 # 日志功能实现
+# 服务器启动时创建固定的日志文件名
+SERVER_START_TIME = time.strftime('%Y%m%d_%H%M%S')
+CURRENT_LOG_FILE = f'logs/ai_trpg_{SERVER_START_TIME}.log'
+
+def get_log_file():
+    """获取服务器启动时创建的固定日志文件名"""
+    return CURRENT_LOG_FILE
+
 def log_info(message):
     timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
     log_message = f'[{timestamp}][MainProcess][INFO] {message}'
@@ -45,7 +53,7 @@ def log_info(message):
         os.makedirs('logs')
     # 写入日志文件
     try:
-        log_file = f'logs/ai_trpg_{time.strftime("%Y%m%d_%H%M%S")}.log'
+        log_file = get_log_file()
         with open(log_file, 'a', encoding='utf-8') as f:
             f.write(log_message + '\n')
     except Exception as e:
@@ -60,7 +68,7 @@ def log_warning(message):
         os.makedirs('logs')
     # 写入日志文件
     try:
-        log_file = f'logs/ai_trpg_{time.strftime("%Y%m%d_%H%M%S")}.log'
+        log_file = get_log_file()
         with open(log_file, 'a', encoding='utf-8') as f:
             f.write(log_message + '\n')
     except Exception as e:
@@ -75,7 +83,7 @@ def log_error(message):
         os.makedirs('logs')
     # 写入日志文件
     try:
-        log_file = f'logs/ai_trpg_{time.strftime("%Y%m%d_%H%M%S")}.log'
+        log_file = get_log_file()
         with open(log_file, 'a', encoding='utf-8') as f:
             f.write(log_message + '\n')
     except Exception as e:
@@ -94,11 +102,17 @@ log.setLevel(logging.ERROR)
 
 # 配置
 SCENARIOS_DIR = 'scenarios'
+SCENARIO_COVERS_DIR = 'scenario_covers'
 
 # 确保scenarios目录存在
 if not os.path.exists(SCENARIOS_DIR):
     os.makedirs(SCENARIOS_DIR)
     log_info(f"创建scenarios目录: {SCENARIOS_DIR}")
+
+# 确保scenario_covers目录存在
+if not os.path.exists(SCENARIO_COVERS_DIR):
+    os.makedirs(SCENARIO_COVERS_DIR)
+    log_info(f"创建scenario_covers目录: {SCENARIO_COVERS_DIR}")
 
 # 缓存机制
 scenarios_cache = {}
@@ -206,6 +220,7 @@ def get_scenario(scenario_id):
 
 
 @app.route('/api/scenarios', methods=['POST'])
+@require_permission('ADMIN')
 def create_scenario():
     """
     创建新剧本
@@ -246,7 +261,7 @@ def create_scenario():
         scenarios_cache = {}
         cache_timestamp = 0
         
-        log_info(f"用户{user_id}成功创建剧本{scenario_id}")
+        log_info(f"[剧本操作] 用户{user_id}成功创建剧本，ID: {scenario_id}, 标题: {title}")
         return jsonify({
             'success': True,
             'data': scenario_data,
@@ -262,6 +277,7 @@ def create_scenario():
 
 
 @app.route('/api/scenarios/<int:scenario_id>', methods=['PUT'])
+@require_permission('ADMIN')
 def update_scenario(scenario_id):
     """
     更新剧本
@@ -330,7 +346,7 @@ def update_scenario(scenario_id):
         scenarios_cache = {}
         cache_timestamp = 0
         
-        log_info(f"用户{user_id}成功更新剧本{scenario_id}")
+        log_info(f"[剧本操作] 用户{user_id}成功更新剧本，ID: {scenario_id}, 标题: {scenario_data.get('title', '未知')}")
         return jsonify({
             'success': True,
             'data': scenario_data,
@@ -346,6 +362,7 @@ def update_scenario(scenario_id):
 
 
 @app.route('/api/scenarios/<int:scenario_id>', methods=['DELETE'])
+@require_permission('ADMIN')
 def delete_scenario(scenario_id):
     """
     删除剧本
@@ -400,7 +417,7 @@ def delete_scenario(scenario_id):
         scenarios_cache = {}
         cache_timestamp = 0
         
-        log_info(f"用户{user_id}成功删除剧本{scenario_id}")
+        log_info(f"[剧本操作] 用户{user_id}成功删除剧本，ID: {scenario_id}, 标题: {scenario_title}")
         return jsonify({
             'success': True,
             'message': '剧本删除成功'
@@ -411,6 +428,79 @@ def delete_scenario(scenario_id):
             'success': False,
             'error': str(e),
             'message': '删除剧本失败'
+        }), 500
+
+
+@app.route('/api/scenarios/cover', methods=['POST'])
+@require_permission('ADMIN')
+def upload_scenario_cover():
+    """
+    上传剧本封面图片
+    """
+    try:
+        log_info("接收到上传剧本封面的请求")
+        
+        # 获取用户ID
+        user_id = 'unknown'
+        if 'user_id' in session:
+            user_id = session['user_id']
+        elif request.form.get('user_id'):
+            user_id = request.form.get('user_id')
+        
+        # 检查是否有文件
+        if 'cover' not in request.files:
+            log_warning("上传封面失败：无文件")
+            return jsonify({
+                'success': False,
+                'error': '无文件',
+                'message': '请选择要上传的封面图片'
+            }), 400
+        
+        cover = request.files['cover']
+        
+        # 检查文件类型
+        if not cover.filename.endswith(('.png', '.jpg', '.jpeg', '.gif')):
+            log_warning("上传封面失败：文件类型错误")
+            return jsonify({
+                'success': False,
+                'error': '文件类型错误',
+                'message': '请上传图片文件（PNG、JPG、JPEG、GIF）'
+            }), 400
+        
+        # 检查文件大小（限制为5MB）
+        if cover.content_length > 5 * 1024 * 1024:
+            log_warning("上传封面失败：文件过大")
+            return jsonify({
+                'success': False,
+                'error': '文件过大',
+                'message': '封面文件大小不能超过5MB'
+            }), 400
+        
+        # 生成唯一的文件名
+        filename = f"{user_id}_{int(time.time())}_{cover.filename}"
+        file_path = os.path.join(SCENARIO_COVERS_DIR, filename)
+        
+        # 保存文件
+        cover.save(file_path)
+        log_info(f"[剧本操作] 封面文件保存成功: {file_path}")
+        
+        # 返回文件路径
+        cover_url = f"/scenario_covers/{filename}"
+        
+        log_info(f"用户{user_id}成功上传剧本封面")
+        return jsonify({
+            'success': True,
+            'data': {
+                'cover_url': cover_url
+            },
+            'message': '封面上传成功'
+        })
+    except Exception as e:
+        log_error(f"上传封面时出错: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '上传封面失败'
         }), 500
 
 
@@ -798,6 +888,14 @@ def serve_avatar(filename):
     return send_from_directory('avatars', filename)
 
 
+@app.route('/scenario_covers/<path:filename>')
+def serve_scenario_cover(filename):
+    """
+    提供剧本封面文件服务
+    """
+    return send_from_directory('scenario_covers', filename)
+
+
 @app.route('/api/users', methods=['GET'])
 @require_permission('ADMIN')
 def get_users():
@@ -1057,16 +1155,10 @@ def serve_static(path):
 
 
 if __name__ == '__main__':
-    port = 9090
+    port = 8085
     print(f"启动服务器，监听端口：{port}")
-    log_info(f"启动服务器，监听端口：{port}")
+    print("服务器启动中...")
     try:
-        print("服务器启动中...")
-        log_info("服务器启动中...")
         app.run(debug=True, host='127.0.0.1', port=port)
     except Exception as e:
         print(f"服务器启动失败: {e}")
-        log_error(f"服务器启动失败: {e}")
-    finally:
-        print("服务器正常关闭")
-        log_info("服务器正常关闭")
