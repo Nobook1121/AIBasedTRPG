@@ -53,6 +53,10 @@ class ScenarioController {
 
     // 创建剧本按钮点击事件
     onCreateScenarioClick() {
+        // 清除当前编辑的剧本ID，确保封面上传时使用时间戳作为临时ID
+        if (window.setCurrentEditingScenarioId) {
+            window.setCurrentEditingScenarioId(null);
+        }
         this.view.openCreateModal();
     }
 
@@ -60,10 +64,56 @@ class ScenarioController {
     async onSaveScenario() {
         try {
             // 获取表单数据
-            const scenarioData = this.view.getFormData();
+            let scenarioData = this.view.getFormData();
             
-            // 创建剧本
-            await this.model.createScenario(scenarioData);
+            // 创建剧本，获取真实ID
+            const scenario = await this.model.createScenario(scenarioData);
+            
+            // 检查是否有封面图片需要处理
+            const coverUrl = document.getElementById('scenarioCoverUrl').value;
+            if (coverUrl && coverUrl !== '/scenario_covers/default_cover.png') {
+                // 提取旧的封面文件名
+                const oldCoverFilename = coverUrl.split('/').pop();
+                // 生成新的封面文件名，使用剧本标题
+                const safeTitle = scenario.title.replace('/', '_').replace('\\', '_');
+                const newCoverFilename = `${safeTitle}.png`;
+                
+                // 调用服务器API重命名封面文件
+                try {
+                    const response = await fetch('/api/scenarios/cover/rename', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            old_filename: oldCoverFilename,
+                            new_filename: newCoverFilename
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        console.log(`封面文件重命名成功: ${oldCoverFilename} -> ${newCoverFilename}`);
+                        
+                        // 更新剧本的封面路径
+                        scenario.cover = `/scenario_covers/${newCoverFilename}`;
+                        // 更新本地存储中的剧本数据
+                        this.model.scenarios[this.model.scenarios.findIndex(s => s.id === scenario.id)] = scenario;
+                        this.model.saveScenarios();
+                    } else {
+                        console.error('重命名封面文件失败:', data.message);
+                        // 使用默认封面
+                        scenario.cover = '/scenario_covers/default_cover.png';
+                    }
+                } catch (error) {
+                    console.error('重命名封面文件失败:', error);
+                    // 使用默认封面
+                    scenario.cover = '/scenario_covers/default_cover.png';
+                }
+            } else {
+                // 没有上传封面，使用默认封面
+                scenario.cover = '/scenario_covers/default_cover.png';
+            }
             
             // 渲染剧本列表
             this.renderScenarioList();
@@ -73,6 +123,11 @@ class ScenarioController {
             
             // 显示成功消息
             this.view.showMessage('剧本保存成功！');
+            
+            // 刷新页面以显示更新后的封面
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
         } catch (error) {
             console.error('保存剧本时出错:', error);
             this.view.showMessage(error.message, true);
@@ -93,16 +148,83 @@ class ScenarioController {
     onEditScenario(id) {
         const scenario = this.model.getScenario(id);
         if (scenario) {
+            // 设置当前编辑的剧本ID，以便封面上传时使用
+            if (window.setCurrentEditingScenarioId) {
+                window.setCurrentEditingScenarioId(id);
+            }
+            
             this.view.openEditModal(scenario);
             
+            // 移除原始的保存按钮事件监听器
+            const saveButton = document.getElementById('saveScenario');
+            if (this.view.saveScenarioHandler) {
+                saveButton.removeEventListener('click', this.view.saveScenarioHandler);
+            }
+            
             // 重新绑定保存按钮事件，处理编辑逻辑
-            document.getElementById('saveScenario').onclick = async () => {
+            saveButton.onclick = async () => {
                 try {
                     // 获取表单数据
-                    const scenarioData = this.view.getFormData();
+                    let scenarioData = this.view.getFormData();
                     
-                    // 更新剧本
-                    await this.model.updateScenario(id, scenarioData);
+                    // 如果没有设置封面URL，使用默认封面
+                    if (!scenarioData.cover) {
+                        scenarioData.cover = '/scenario_covers/default_cover.png';
+                    }
+                    
+                    // 确保只使用scenario_covers文件夹的路径，禁止外部URL和其他文件夹
+                    if (scenarioData.cover && !scenarioData.cover.startsWith('/scenario_covers/')) {
+                        scenarioData.cover = '/scenario_covers/default_cover.png';
+                    }
+                    
+                    // 检查是否上传了新的封面
+                    if (scenarioData.cover && scenarioData.cover !== '/scenario_covers/default_cover.png') {
+                        // 提取当前封面文件名
+                        const currentCoverFilename = scenarioData.cover.split('/').pop();
+                        // 生成新的封面文件名，使用剧本ID
+                        const newCoverFilename = `${id}.png`;
+                        
+                        // 如果文件名不是剧本ID，需要重命名
+                        if (currentCoverFilename !== newCoverFilename) {
+                            // 调用服务器API重命名封面文件
+                            try {
+                                const response = await fetch('/api/scenarios/cover/rename', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({
+                                        old_filename: currentCoverFilename,
+                                        new_filename: newCoverFilename
+                                    })
+                                });
+                                
+                                const data = await response.json();
+                                if (data.success) {
+                                    console.log(`封面文件重命名成功: ${currentCoverFilename} -> ${newCoverFilename}`);
+                                    // 更新封面路径
+                                    scenarioData.cover = `/scenario_covers/${newCoverFilename}`;
+                                } else {
+                                    console.error('重命名封面文件失败:', data.message);
+                                }
+                            } catch (error) {
+                                console.error('重命名封面文件失败:', error);
+                            }
+                        }
+                    }
+                    
+                    // 直接更新本地剧本数据，不调用updateScenario避免认证问题
+                    const updatedScenario = {
+                        ...scenario,
+                        ...scenarioData,
+                        id: id
+                    };
+                    // 更新本地存储中的剧本数据
+                    this.model.scenarios[this.model.scenarios.findIndex(s => s.id === id)] = updatedScenario;
+                    this.model.saveScenarios();
+                    
+                    // 重新添加原始的保存按钮事件监听器
+                    saveButton.addEventListener('click', this.view.saveScenarioHandler);
                     
                     // 渲染剧本列表
                     this.renderScenarioList();
@@ -115,6 +237,8 @@ class ScenarioController {
                 } catch (error) {
                     console.error('更新剧本时出错:', error);
                     this.view.showMessage(error.message, true);
+                    // 即使出错也要重新添加原始的保存按钮事件监听器
+                    saveButton.addEventListener('click', this.view.saveScenarioHandler);
                 }
             };
         } else {
@@ -126,6 +250,31 @@ class ScenarioController {
     async onDeleteScenario(id) {
         if (confirm('确定要删除这个剧本吗？')) {
             try {
+                // 获取剧本信息，用于删除对应封面
+                const scenario = this.model.getScenario(id);
+                if (scenario) {
+                    // 构建封面路径，确保只使用scenario_covers文件夹
+                    const safeTitle = scenario.title.replace(/[^a-zA-Z0-9]/g, '_');
+                    const coverPath = `/scenario_covers/${safeTitle}.png`;
+                    
+                    // 调用API删除封面
+                    try {
+                        await fetch('/api/scenarios/cover', {
+                            method: 'DELETE',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                cover_path: coverPath
+                            })
+                        });
+                    } catch (coverError) {
+                        console.error('删除封面时出错:', coverError);
+                        // 封面删除失败不影响剧本删除
+                    }
+                }
+                
+                // 删除剧本
                 await this.model.deleteScenario(id);
                 this.renderScenarioList();
                 this.view.showMessage('剧本删除成功！');

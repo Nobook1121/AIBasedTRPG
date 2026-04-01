@@ -47,7 +47,7 @@ def get_log_file():
 def log_info(message):
     timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
     log_message = f'[{timestamp}][MainProcess][INFO] {message}'
-    print(log_message)
+    print(log_message, flush=True)
     # 确保logs目录存在
     if not os.path.exists('logs'):
         os.makedirs('logs')
@@ -56,13 +56,14 @@ def log_info(message):
         log_file = get_log_file()
         with open(log_file, 'a', encoding='utf-8') as f:
             f.write(log_message + '\n')
+            f.flush()
     except Exception as e:
-        print(f"写入日志文件失败: {e}")
+        print(f"写入日志文件失败: {e}", flush=True)
 
 def log_warning(message):
     timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
     log_message = f'[{timestamp}][MainProcess][WARNING] {message}'
-    print(log_message)
+    print(log_message, flush=True)
     # 确保logs目录存在
     if not os.path.exists('logs'):
         os.makedirs('logs')
@@ -71,13 +72,14 @@ def log_warning(message):
         log_file = get_log_file()
         with open(log_file, 'a', encoding='utf-8') as f:
             f.write(log_message + '\n')
+            f.flush()
     except Exception as e:
-        print(f"写入日志文件失败: {e}")
+        print(f"写入日志文件失败: {e}", flush=True)
 
 def log_error(message):
     timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
     log_message = f'[{timestamp}][MainProcess][ERROR] {message}'
-    print(log_message)
+    print(log_message, flush=True)
     # 确保logs目录存在
     if not os.path.exists('logs'):
         os.makedirs('logs')
@@ -86,8 +88,9 @@ def log_error(message):
         log_file = get_log_file()
         with open(log_file, 'a', encoding='utf-8') as f:
             f.write(log_message + '\n')
+            f.flush()
     except Exception as e:
-        print(f"写入日志文件失败: {e}")
+        print(f"写入日志文件失败: {e}", flush=True)
 
 app = Flask(__name__)
 CORS(app)  # 允许跨域请求
@@ -102,16 +105,26 @@ log.setLevel(logging.ERROR)
 
 # 配置
 SCENARIOS_DIR = 'scenarios'
-SCENARIO_COVERS_DIR = 'scenario_covers'
+SCENARIO_COVERS_DIR = 'assets/scenario_covers'
+AVATARS_DIR = 'assets/avatars'
 
 # 确保scenarios目录存在
 if not os.path.exists(SCENARIOS_DIR):
     os.makedirs(SCENARIOS_DIR)
     log_info(f"创建scenarios目录: {SCENARIOS_DIR}")
 
+# 确保assets目录存在
+if not os.path.exists('assets'):
+    os.makedirs('assets')
+    log_info(f"创建assets目录: assets")
+
 # 确保scenario_covers目录存在
 if not os.path.exists(SCENARIO_COVERS_DIR):
     os.makedirs(SCENARIO_COVERS_DIR)
+
+# 确保avatars目录存在
+if not os.path.exists(AVATARS_DIR):
+    os.makedirs(AVATARS_DIR)
     log_info(f"创建scenario_covers目录: {SCENARIO_COVERS_DIR}")
 
 # 缓存机制
@@ -146,7 +159,13 @@ def get_scenarios():
                         # 确保剧本有必要的字段
                         if 'id' not in scenario:
                             # 从文件名提取ID或生成新ID
-                            scenario['id'] = int(filename.split('_')[-1].split('.')[0])
+                            try:
+                                # 尝试从文件名提取ID
+                                scenario['id'] = int(filename.split('_')[-1].split('.')[0])
+                            except (ValueError, IndexError):
+                                # 如果提取失败，生成新ID
+                                scenario['id'] = int(time.time() * 1000)
+                                log_warning(f"从文件名 {filename} 提取ID失败，生成新ID: {scenario['id']}")
                         scenarios.append(scenario)
                 except json.JSONDecodeError as e:
                     log_error(f"解析文件 {filename} 时出错: {e}")
@@ -220,7 +239,6 @@ def get_scenario(scenario_id):
 
 
 @app.route('/api/scenarios', methods=['POST'])
-@require_permission('ADMIN')
 def create_scenario():
     """
     创建新剧本
@@ -240,16 +258,43 @@ def create_scenario():
         # 获取用户ID
         user_id = scenario_data.get('user_id', 'unknown')
         
-        # 生成唯一ID
+        # 获取剧本标题
+        title = scenario_data.get('title', 'unnamed')
+        
+        # 检查剧本标题是否已存在
+        try:
+            for filename in os.listdir(SCENARIOS_DIR):
+                if filename.endswith('.json'):
+                    file_path = os.path.join(SCENARIOS_DIR, filename)
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            existing_data = json.load(f)
+                            if existing_data.get('title') == title:
+                                log_warning(f"创建剧本失败：剧本标题 '{title}' 已存在")
+                                return jsonify({
+                                    'success': False,
+                                    'error': '剧本标题已存在',
+                                    'message': f'剧本标题 "{title}" 已存在，请使用其他标题'
+                                }), 400
+                    except Exception as e:
+                        log_error(f"检查剧本标题时出错: {e}")
+                        continue
+        except Exception as e:
+            log_error(f"读取scenarios目录时出错: {e}")
+            # 继续执行，不阻止剧本创建
+        
+        # 生成唯一ID（保留ID字段以保持兼容性）
         scenario_id = int(time.time() * 1000)
         scenario_data['id'] = scenario_id
         scenario_data['createdAt'] = time.strftime('%Y-%m-%dT%H:%M:%S') + '.000Z'
         
-        # 生成文件名
-        title = scenario_data.get('title', 'unnamed')
-        # 清理文件名，只保留字母、数字和下划线
-        safe_title = ''.join(c if c.isalnum() else '_' for c in title)
-        filename = f"{safe_title}_{scenario_id}.json"
+        # 确保封面路径正确
+        if 'cover' not in scenario_data or not scenario_data['cover']:
+            scenario_data['cover'] = '/scenario_covers/default_cover.png'
+        
+        # 生成文件名，使用剧本标题作为唯一标识
+        safe_title = title.replace('/', '_').replace('\\', '_')
+        filename = f"{safe_title}.json"
         file_path = os.path.join(SCENARIOS_DIR, filename)
         
         # 写入文件
@@ -277,7 +322,6 @@ def create_scenario():
 
 
 @app.route('/api/scenarios/<int:scenario_id>', methods=['PUT'])
-@require_permission('ADMIN')
 def update_scenario(scenario_id):
     """
     更新剧本
@@ -362,7 +406,6 @@ def update_scenario(scenario_id):
 
 
 @app.route('/api/scenarios/<int:scenario_id>', methods=['DELETE'])
-@require_permission('ADMIN')
 def delete_scenario(scenario_id):
     """
     删除剧本
@@ -403,6 +446,16 @@ def delete_scenario(scenario_id):
         if target_file:
             os.remove(target_file)
             file_deleted = True
+            
+            # 删除对应的封面文件
+            cover_filename = f"{scenario_id}.png"
+            cover_path = os.path.join(SCENARIO_COVERS_DIR, cover_filename)
+            if os.path.exists(cover_path):
+                try:
+                    os.remove(cover_path)
+                    log_info(f"[剧本操作] 成功删除剧本封面: {cover_path}")
+                except Exception as e:
+                    log_error(f"删除封面文件时出错: {e}")
         
         if not file_deleted:
             log_warning(f"删除剧本失败，ID: {scenario_id} 不存在")
@@ -432,7 +485,6 @@ def delete_scenario(scenario_id):
 
 
 @app.route('/api/scenarios/cover', methods=['POST'])
-@require_permission('ADMIN')
 def upload_scenario_cover():
     """
     上传剧本封面图片
@@ -476,16 +528,24 @@ def upload_scenario_cover():
                 'message': '封面文件大小不能超过5MB'
             }), 400
         
-        # 生成唯一的文件名
-        filename = f"{user_id}_{int(time.time())}_{cover.filename}"
+        # 使用剧本标题作为唯一标识命名封面图片
+        # 从表单中获取剧本标题，或使用时间戳作为临时标题
+        scenario_title = request.form.get('scenario_title', str(int(time.time() * 1000)))
+        safe_title = scenario_title.replace('/', '_').replace('\\', '_')
+        filename = f"{safe_title}.png"
         file_path = os.path.join(SCENARIO_COVERS_DIR, filename)
+        
+        # 如果文件已存在，删除旧文件
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            log_info(f"删除旧封面文件: {file_path}")
         
         # 保存文件
         cover.save(file_path)
         log_info(f"[剧本操作] 封面文件保存成功: {file_path}")
         
         # 返回文件路径
-        cover_url = f"/scenario_covers/{filename}"
+        cover_url = f"/assets/scenario_covers/{filename}"
         
         log_info(f"用户{user_id}成功上传剧本封面")
         return jsonify({
@@ -501,6 +561,136 @@ def upload_scenario_cover():
             'success': False,
             'error': str(e),
             'message': '上传封面失败'
+        }), 500
+
+@app.route('/api/scenarios/cover', methods=['DELETE'])
+def delete_scenario_cover():
+    """
+    删除剧本封面图片
+    """
+    try:
+        log_info("接收到删除剧本封面的请求")
+        
+        # 获取用户ID
+        user_id = 'unknown'
+        if 'user_id' in session:
+            user_id = session['user_id']
+        
+        # 获取封面路径
+        data = request.get_json()
+        if not data or 'cover_path' not in data:
+            log_warning("删除封面失败：无数据")
+            return jsonify({
+                'success': False,
+                'error': '无数据',
+                'message': '请提供封面路径'
+            }), 400
+        
+        cover_path = data['cover_path']
+        # 提取文件名
+        filename = os.path.basename(cover_path)
+        file_path = os.path.join(SCENARIO_COVERS_DIR, filename)
+        
+        # 检查文件是否存在
+        if os.path.exists(file_path):
+            # 确保不是默认封面
+            if filename != 'default_cover.png':
+                os.remove(file_path)
+                log_info(f"[剧本操作] 封面文件删除成功: {file_path}")
+                log_info(f"用户{user_id}成功删除剧本封面")
+                return jsonify({
+                    'success': True,
+                    'message': '封面删除成功'
+                })
+            else:
+                log_warning("删除封面失败：默认封面不能删除")
+                return jsonify({
+                    'success': False,
+                    'error': '默认封面不能删除',
+                    'message': '默认封面不能删除'
+                }), 400
+        else:
+            log_warning(f"删除封面失败：文件不存在，路径: {file_path}")
+            return jsonify({
+                'success': False,
+                'error': '文件不存在',
+                'message': '封面文件不存在'
+            }), 404
+    except Exception as e:
+        log_error(f"删除封面时出错: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '删除封面失败'
+        }), 500
+
+@app.route('/api/scenarios/cover/rename', methods=['POST'])
+def rename_scenario_cover():
+    """
+    重命名剧本封面图片
+    """
+    try:
+        log_info("接收到重命名剧本封面的请求")
+        
+        # 获取用户ID
+        user_id = 'unknown'
+        if 'user_id' in session:
+            user_id = session['user_id']
+        
+        # 获取重命名信息
+        data = request.get_json()
+        if not data or 'old_filename' not in data or 'new_filename' not in data:
+            log_warning("重命名封面失败：无数据")
+            return jsonify({
+                'success': False,
+                'error': '无数据',
+                'message': '请提供旧文件名和新文件名'
+            }), 400
+        
+        old_filename = data['old_filename']
+        new_filename = data['new_filename']
+        
+        # 构建文件路径
+        old_file_path = os.path.join(SCENARIO_COVERS_DIR, old_filename)
+        new_file_path = os.path.join(SCENARIO_COVERS_DIR, new_filename)
+        
+        # 检查旧文件是否存在
+        if os.path.exists(old_file_path):
+            # 确保不是默认封面
+            if old_filename != 'default_cover.png':
+                # 如果新文件已存在，删除它
+                if os.path.exists(new_file_path):
+                    os.remove(new_file_path)
+                    log_info(f"删除已存在的新封面文件: {new_file_path}")
+                
+                # 重命名文件
+                os.rename(old_file_path, new_file_path)
+                log_info(f"[剧本操作] 封面文件重命名成功: {old_filename} -> {new_filename}")
+                log_info(f"用户{user_id}成功重命名剧本封面")
+                return jsonify({
+                    'success': True,
+                    'message': '封面重命名成功'
+                })
+            else:
+                log_warning("重命名封面失败：默认封面不能重命名")
+                return jsonify({
+                    'success': False,
+                    'error': '默认封面不能重命名',
+                    'message': '默认封面不能重命名'
+                }), 400
+        else:
+            log_warning(f"重命名封面失败：文件不存在，路径: {old_file_path}")
+            return jsonify({
+                'success': False,
+                'error': '文件不存在',
+                'message': '封面文件不存在'
+            }), 404
+    except Exception as e:
+        log_error(f"重命名封面时出错: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '重命名封面失败'
         }), 500
 
 
@@ -795,7 +985,7 @@ def update_user():
                     }), 400
                 
                 # 确保avatars目录存在
-                avatars_dir = 'avatars'
+                avatars_dir = AVATARS_DIR
                 if not os.path.exists(avatars_dir):
                     os.makedirs(avatars_dir)
                 
@@ -807,7 +997,7 @@ def update_user():
                 avatar.save(file_path)
                 log_info(f"[用户操作] 头像文件保存成功: {file_path}")
                 # 更新头像路径
-                avatar_path = f"/avatars/{filename}"
+                avatar_path = f"/assets/avatars/{filename}"
             except Exception as e:
                 log_error(f"保存头像文件失败: {e}")
                 return jsonify({
@@ -880,20 +1070,20 @@ def update_user():
         }), 500
 
 
-@app.route('/avatars/<path:filename>')
+@app.route('/assets/avatars/<path:filename>')
 def serve_avatar(filename):
     """
     提供头像文件服务
     """
-    return send_from_directory('avatars', filename)
+    return send_from_directory('assets/avatars', filename)
 
 
-@app.route('/scenario_covers/<path:filename>')
+@app.route('/assets/scenario_covers/<path:filename>')
 def serve_scenario_cover(filename):
     """
     提供剧本封面文件服务
     """
-    return send_from_directory('scenario_covers', filename)
+    return send_from_directory('assets/scenario_covers', filename)
 
 
 @app.route('/api/users', methods=['GET'])
@@ -1155,7 +1345,7 @@ def serve_static(path):
 
 
 if __name__ == '__main__':
-    port = 8085
+    port = 8086
     print(f"启动服务器，监听端口：{port}")
     print("服务器启动中...")
     try:

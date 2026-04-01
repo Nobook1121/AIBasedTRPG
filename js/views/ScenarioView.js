@@ -28,12 +28,13 @@ class ScenarioView {
             e.target.value = '';
         });
 
-        // 保存剧本按钮
-        document.getElementById('saveScenario').addEventListener('click', async () => {
+        // 保存剧本按钮 - 使用函数引用以便后续可以移除
+        this.saveScenarioHandler = async () => {
             if (this.onSaveScenario) {
                 await this.onSaveScenario();
             }
-        });
+        };
+        document.getElementById('saveScenario').addEventListener('click', this.saveScenarioHandler);
 
         // 添加场景按钮
         document.getElementById('addScene').addEventListener('click', () => {
@@ -53,8 +54,18 @@ class ScenarioView {
         scenarios.forEach(scenario => {
             const card = document.createElement('div');
             card.className = 'scenario-card';
+            // 构建封面图片路径 - 只使用scenario_covers文件夹
+            const defaultCoverPath = '/assets/scenario_covers/default_cover.png';
+            
+            // 优先使用以剧本标题命名的封面图片
+            const safeTitle = scenario.title.replace('/', '_').replace('\\', '_');
+            const titleBasedCoverPath = `/assets/scenario_covers/${safeTitle}.png`;
+            
+            // 直接使用标题命名的封面路径
+            let coverPath = titleBasedCoverPath;
+            
             card.innerHTML = `
-                <img src="${scenario.cover || `https://via.placeholder.com/250x150?text=${scenario.title}`}" alt="${scenario.title}">
+                <img src="${coverPath}" alt="${scenario.title}" onerror="this.src='/assets/scenario_covers/default_cover.png'">
                 <div class="scenario-card-body">
                     <div class="scenario-card-title">${scenario.title}</div>
                     <p>作者: ${scenario.author}</p>
@@ -130,6 +141,8 @@ class ScenarioView {
         document.getElementById('scenarioNotes').value = '';
         document.getElementById('scenarioBackground').value = '';
         document.getElementById('scenarioPreparation').value = '';
+        document.getElementById('scenarioCoverUrl').value = '';
+        document.getElementById('coverPreview').src = '/scenario_covers/default_cover.png';
         
         // 重置场景和结局
         const scenesContainer = document.getElementById('scenarioScenes');
@@ -177,7 +190,12 @@ class ScenarioView {
         document.getElementById('scenarioBackground').value = scenario.background || '';
         document.getElementById('scenarioPreparation').value = scenario.preparation || '';
         document.getElementById('scenarioCoverUrl').value = scenario.cover || '';
-        document.getElementById('coverPreview').src = scenario.cover || 'https://via.placeholder.com/200x300?text=封面图片';
+        // 确保只使用scenario_covers文件夹的路径，禁止外部URL和其他文件夹
+        let coverSrc = scenario.cover;
+        if (!coverSrc || !coverSrc.startsWith('/scenario_covers/')) {
+            coverSrc = '/scenario_covers/default_cover.png';
+        }
+        document.getElementById('coverPreview').src = coverSrc;
         
         // 填充场景
         const scenesContainer = document.getElementById('scenarioScenes');

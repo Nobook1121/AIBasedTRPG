@@ -144,11 +144,20 @@ function initScenarioManagement() {
     // 创建剧本控制器实例
     new ScenarioController();
     
-    // 绑定封面上传事件
-    const coverUpload = document.getElementById('coverUpload');
-    if (coverUpload) {
-        coverUpload.addEventListener('change', handleCoverUpload);
-    }
+    // 绑定封面上传事件 - 使用事件委托，确保动态添加的元素也能响应
+    document.addEventListener('change', function(e) {
+        if (e.target.id === 'coverUpload') {
+            handleCoverUpload(e);
+        }
+    });
+}
+
+// 全局变量，用于存储当前编辑的剧本ID
+let currentEditingScenarioId = null;
+
+// 设置当前编辑的剧本ID
+function setCurrentEditingScenarioId(id) {
+    currentEditingScenarioId = id;
 }
 
 // 处理封面上传
@@ -174,9 +183,15 @@ function handleCoverUpload(e) {
         };
         reader.readAsDataURL(file);
         
+        // 保存文件到隐藏字段，以便在保存剧本时使用
+        window.uploadedCoverFile = file;
+        
         // 上传封面到服务器
         const formData = new FormData();
         formData.append('cover', file);
+        // 传递剧本标题到服务器
+        const scenarioTitle = document.getElementById('scenarioTitle').value.trim() || 'unknown_scenario';
+        formData.append('scenario_title', scenarioTitle);
         
         fetch('/api/scenarios/cover', {
             method: 'POST',

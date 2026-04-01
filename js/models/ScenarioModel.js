@@ -126,6 +126,7 @@ class ScenarioModel {
                         marker: ''
                     }
                 ],
+                cover: "/scenario_covers/古宅奇案_cover.png",
                 createdAt: new Date().toISOString()
             },
             {
@@ -165,6 +166,7 @@ class ScenarioModel {
                         marker: ''
                     }
                 ],
+                cover: "/scenario_covers/星际探索_cover.png",
                 createdAt: new Date().toISOString()
             }
         ];
@@ -175,12 +177,9 @@ class ScenarioModel {
     // 创建剧本
     async createScenario(scenarioData) {
         try {
-            // 检查认证状态
+            // 检查认证状态（但不强制要求登录）
             if (!this.isAuthenticated) {
-                const authStatus = await this.checkAuthStatus();
-                if (!authStatus) {
-                    throw new Error('请先登录');
-                }
+                await this.checkAuthStatus();
             }
 
             // 通过API创建剧本
@@ -191,7 +190,7 @@ class ScenarioModel {
                 },
                 body: JSON.stringify({
                     ...scenarioData,
-                    user_id: this.userId
+                    user_id: this.userId || 'anonymous'
                 })
             });
             
