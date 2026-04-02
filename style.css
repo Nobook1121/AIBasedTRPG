@@ -155,8 +155,8 @@ body, html {
 }
 
 .message.player-message .message-avatar {
-    margin-left: 0;
-    margin-right: 20px;
+    margin-left: 20px;
+    margin-right: 0;
 }
 
 .message.player-message .message-content-container {
@@ -192,7 +192,6 @@ body, html {
     height: 48px;
     border-radius: 50%;
     overflow: hidden;
-    margin: 0 12px;
     flex-shrink: 0;
 }
 

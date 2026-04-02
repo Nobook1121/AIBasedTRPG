@@ -164,8 +164,8 @@ function initChat() {
                 break;
             case 'dice':
                 messageClass = 'dice-message';
-                // 使用骰娘的专属头像
-                avatarSrc = '/assets/avatars/default_dice.jpg';
+                // 使用骰娘的专属头像，添加时间戳避免缓存
+                avatarSrc = `/assets/avatars/default_dice.jpg?t=${Date.now()}`;
                 // 强制设置发送者为骰娘
                 sender = '骰娘';
                 break;
