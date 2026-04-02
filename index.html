@@ -111,8 +111,13 @@
                 <div id="tools" class="tab-content">
                     <div class="p-4">
                         <h2>小工具</h2>
-                        <div class="mb-4">
-                            <h3>骰子工具</h3>
+                        <!-- 工具子标签页 -->
+                        <div class="tool-tabs mb-4">
+                            <button class="tool-tab active" data-tool="dice">骰子工具</button>
+                        </div>
+                        
+                        <!-- 骰子工具内容 -->
+                        <div id="dice-tool-content" class="tool-content active">
                             <div class="dice-tool">
                                 <select class="form-select" id="diceType">
                                     <option value="d4">D4</option>

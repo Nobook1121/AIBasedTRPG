@@ -1,8 +1,15 @@
 // 主脚本文件
 import ScenarioController from './controllers/ScenarioController.js';
+import ToolManager from '../tools/toolManager.js';
+
+// 全局工具管理器
+let toolManager;
 
 // DOM 加载完成后执行
 document.addEventListener('DOMContentLoaded', function() {
+    // 初始化工具管理器
+    toolManager = new ToolManager();
+    
     // 初始化选项卡切换
     initTabs();
     
@@ -17,6 +24,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 初始化骰子工具
     initDiceTool();
+    
+    // 初始化工具标签页
+    initToolTabs();
     
     // 初始化用户认证功能
     initAuth();
@@ -77,57 +87,127 @@ function initChat() {
     function sendMessage() {
         const message = chatInput.value.trim();
         if (message) {
-            // 添加玩家消息
-            addMessage('player', '我', message);
-            chatInput.value = '';
+            // 检查是否是命令
+            const commandResult = toolManager.handleCommand(message);
             
-            // 发送消息到后端API
-            fetch('/api/messages', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    content: message,
-                    user_id: 'user_' + Date.now()
+            if (commandResult) {
+                // 处理命令
+                addMessage('player', '我', message);
+                chatInput.value = '';
+                
+                // 检查是否是骰子命令
+                if (message.toLowerCase().startsWith('/dice')) {
+                    // 显示骰娘的回复
+                    setTimeout(() => {
+                        addMessage('dice', '骰娘', commandResult);
+                    }, 500);
+                } else {
+                    // 显示系统回复
+                    setTimeout(() => {
+                        addMessage('system', '系统', commandResult);
+                    }, 500);
+                }
+            } else {
+                // 添加玩家消息
+                addMessage('player', '我', message);
+                chatInput.value = '';
+                
+                // 发送消息到后端API
+                fetch('/api/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        content: message,
+                        user_id: 'user_' + Date.now()
+                    })
                 })
-            })
-            .then(response => response.json())
-            .then(data => {
-                console.log('消息发送成功:', data);
-                // 模拟 AI 回复
-                setTimeout(() => {
-                    addMessage('kp', 'KP', '这是 AI 的回复...');
-                }, 1000);
-            })
-            .catch(error => {
-                console.error('消息发送失败:', error);
-                // 即使发送失败，也显示模拟回复
-                setTimeout(() => {
-                    addMessage('kp', 'KP', '这是 AI 的回复...');
-                }, 1000);
-            });
+                .then(response => response.json())
+                .then(data => {
+                    console.log('消息发送成功:', data);
+                    // 模拟 AI 回复
+                    setTimeout(() => {
+                        addMessage('kp', 'KP', '这是 AI 的回复...');
+                    }, 1000);
+                })
+                .catch(error => {
+                    console.error('消息发送失败:', error);
+                    // 即使发送失败，也显示模拟回复
+                    setTimeout(() => {
+                        addMessage('kp', 'KP', '这是 AI 的回复...');
+                    }, 1000);
+                });
+            }
         }
     }
     
     // 添加消息到聊天历史
     function addMessage(type, sender, content) {
         const messageDiv = document.createElement('div');
-        messageDiv.className = `message ${type}-message`;
+        
+        // 根据消息类型设置不同的样式类
+        let messageClass = '';
+        let avatarSrc = '';
+        
+        switch (type) {
+            case 'player':
+                messageClass = 'player-message';
+                // 使用当前用户的头像，如果没有则使用默认头像
+                const userAvatar = document.querySelector('.user-avatar img')?.src || 'https://via.placeholder.com/40';
+                avatarSrc = userAvatar;
+                break;
+            case 'kp':
+                messageClass = 'kp-message';
+                // 使用KP的专属默认头像
+                avatarSrc = '/assets/avatars/default_kp.jpg';
+                break;
+            case 'dice':
+                messageClass = 'dice-message';
+                // 使用骰娘的专属头像
+                avatarSrc = '/assets/avatars/default_dice.jpg';
+                // 强制设置发送者为骰娘
+                sender = '骰娘';
+                break;
+            case 'system':
+                messageClass = 'other-message';
+                // 使用系统的专属默认头像
+                avatarSrc = '/assets/avatars/default_system.jpg';
+                break;
+            case 'other':
+                messageClass = 'other-message';
+                avatarSrc = 'https://via.placeholder.com/40';
+                break;
+            default:
+                messageClass = 'other-message';
+                avatarSrc = 'https://via.placeholder.com/40';
+        }
+        
+        messageDiv.className = `message ${messageClass}`;
         
         const now = new Date();
         const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
         
+        // 构建消息HTML，包含头像、发送者、时间和内容
         messageDiv.innerHTML = `
-            <div class="message-header">
-                <span class="sender">${sender}</span>
-                <span class="time">${time}</span>
+            <div class="message-avatar">
+                <img src="${avatarSrc}" alt="${sender}">
             </div>
-            <div class="message-content">${content}</div>
+            <div class="message-content-container">
+                <div class="message-header">
+                    <span class="message-sender">${sender}</span>
+                    <span class="message-time">${time}</span>
+                </div>
+                <div class="message-content">${content}</div>
+            </div>
         `;
         
         chatHistory.appendChild(messageDiv);
-        chatHistory.scrollTop = chatHistory.scrollHeight;
+        
+        // 自动滚动到最新消息
+        setTimeout(() => {
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }, 100);
     }
     
     // 绑定事件
@@ -343,6 +423,36 @@ function initDiceTool() {
         
         diceResult.textContent = `结果: ${result}`;
     });
+}
+
+// 初始化工具标签页
+function initToolTabs() {
+    const toolTabs = document.querySelectorAll('.tool-tab');
+    const toolContents = document.querySelectorAll('.tool-content');
+    
+    if (toolTabs.length === 0 || toolContents.length === 0) {
+        console.error('无法找到工具标签或工具内容');
+        return;
+    }
+    
+    toolTabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+            const toolName = this.getAttribute('data-tool');
+            
+            // 移除所有活动状态
+            toolTabs.forEach(t => t.classList.remove('active'));
+            toolContents.forEach(content => content.classList.remove('active'));
+            
+            // 添加当前活动状态
+            this.classList.add('active');
+            const targetContent = document.getElementById(`${toolName}-tool-content`);
+            if (targetContent) {
+                targetContent.classList.add('active');
+            }
+        });
+    });
+    
+    console.log('工具标签页初始化成功');
 }
 
 // 初始化用户认证功能

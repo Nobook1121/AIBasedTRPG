@@ -95,6 +95,10 @@ def log_error(message):
 app = Flask(__name__)
 CORS(app)  # 允许跨域请求
 
+# 设置静态文件服务
+app.static_folder = 'assets'
+app.static_url_path = '/assets'
+
 # 设置secret_key用于session管理
 app.secret_key = 'your-secret-key-here'
 
@@ -1075,7 +1079,12 @@ def serve_avatar(filename):
     """
     提供头像文件服务
     """
-    return send_from_directory('assets/avatars', filename)
+    try:
+        log_info(f"提供头像文件: {filename}")
+        return send_from_directory('assets/avatars', filename)
+    except Exception as e:
+        log_error(f"提供头像文件时出错: {e}")
+        return "File not found", 404
 
 
 @app.route('/assets/scenario_covers/<path:filename>')
