@@ -1,12 +1,14 @@
 // 主脚本文件
 import ScenarioController from './controllers/ScenarioController.js';
 import ToolManager from '../tools/toolManager.js';
+import configManager from './config/ConfigManager.js';
+import aiPlatformManager from './config/AIPlatformManager.js';
 
 // 全局工具管理器
 let toolManager;
 
 // DOM 加载完成后执行
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     // 初始化工具管理器
     toolManager = new ToolManager();
     
@@ -28,9 +30,770 @@ document.addEventListener('DOMContentLoaded', function() {
     // 初始化工具标签页
     initToolTabs();
     
+    // 初始化设置标签页
+    initSettingsTabs();
+    
+    // 加载并应用配置文件
+    await loadAndApplyConfigs();
+    
+    // 初始化AI平台管理
+    initAIPlatforms();
+    
     // 初始化用户认证功能
     initAuth();
+    
+    // 添加全局事件监听器，确保遮罩层在所有模态框关闭后被正确移除
+    document.addEventListener('hidden.bs.modal', function(event) {
+        // 检查关闭的模态框是否有背景遮罩
+        const modalElement = event.target;
+        const modalInstance = bootstrap.Modal.getInstance(modalElement);
+        
+        // 只有当关闭的是没有背景遮罩的模态框时，才不移除遮罩层
+        // 这样可以确保主配置模态框的遮罩层不会被错误移除
+        setTimeout(() => {
+            // 检查是否还有其他模态框是打开的
+            const openModals = document.querySelectorAll('.modal.show');
+            if (openModals.length === 0) {
+                // 如果没有其他模态框打开，移除所有遮罩层
+                const modalBackdrops = document.querySelectorAll('.modal-backdrop');
+                modalBackdrops.forEach(backdrop => {
+                    backdrop.remove();
+                });
+                console.log('所有模态框已关闭，已移除所有遮罩层');
+            } else {
+                console.log('还有其他模态框打开，保留遮罩层');
+            }
+        }, 100);
+    });
 });
+
+// 加载并应用配置文件
+async function loadAndApplyConfigs() {
+    try {
+        // 加载常规设置配置
+        await configManager.loadConfig('general');
+        
+        // 应用常规设置到UI
+        configManager.applyGeneralSettings();
+        
+        console.log('配置文件加载和应用完成');
+    } catch (error) {
+        console.error('加载配置文件时出错:', error);
+    }
+}
+
+// 初始化AI平台管理
+async function initAIPlatforms() {
+    try {
+        // 加载所有平台配置
+        const platforms = await aiPlatformManager.loadPlatforms();
+        
+        // 渲染平台配置卡片
+        renderPlatforms(platforms);
+        
+        // 绑定添加模型按钮事件
+        bindAddModelEvents();
+        
+        // 绑定API测试按钮事件
+        bindAPITestEvents();
+        
+        console.log('AI平台管理初始化完成');
+    } catch (error) {
+        console.error('初始化AI平台管理时出错:', error);
+    }
+}
+
+// 渲染平台配置卡片
+function renderPlatforms(platforms) {
+    const container = document.getElementById('ai-platforms-container');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    platforms.forEach(platform => {
+        const card = createPlatformCard(platform);
+        container.appendChild(card);
+    });
+}
+
+// 创建平台配置卡片
+function createPlatformCard(platform) {
+    const card = document.createElement('div');
+    card.className = 'ai-platform-card';
+    
+    card.innerHTML = `
+        <div class="platform-header platform-card-header" data-platform="${platform.platform}">
+            <div class="platform-info">
+                <img src="${platform.icon}" alt="${platform.name}" class="platform-icon">
+                <div class="platform-details">
+                    <h5>${platform.name}</h5>
+                    <p>${platform.description}</p>
+                </div>
+            </div>
+            <div class="platform-toggle">
+                <label for="toggle-${platform.platform}">${platform.enabled ? '已启用' : '已禁用'}</label>
+                <div class="form-check form-switch">
+                    <input class="form-check-input platform-toggle-input" type="checkbox" id="toggle-${platform.platform}" ${platform.enabled ? 'checked' : ''} data-platform="${platform.platform}">
+                </div>
+            </div>
+            <div class="platform-action">
+                <button class="btn btn-sm btn-primary config-btn" data-platform="${platform.platform}">配置</button>
+            </div>
+        </div>
+    `;
+    
+    // 绑定平台卡片点击事件，打开配置模态窗口
+    const cardHeader = card.querySelector('.platform-card-header');
+    if (cardHeader) {
+        cardHeader.addEventListener('click', function(e) {
+            // 防止点击开关时触发配置窗口
+            if (e.target.closest('.platform-toggle')) {
+                return;
+            }
+            
+            const platformName = this.getAttribute('data-platform');
+            openPlatformConfigModal(platformName);
+        });
+    }
+    
+    // 绑定配置按钮点击事件
+    const configBtn = card.querySelector('.config-btn');
+    if (configBtn) {
+        configBtn.addEventListener('click', function(e) {
+            e.stopPropagation(); // 防止触发卡片点击事件
+            const platformName = this.getAttribute('data-platform');
+            openPlatformConfigModal(platformName);
+        });
+    }
+    
+    // 绑定平台启用/禁用切换事件
+    const toggleInput = card.querySelector('.platform-toggle-input');
+    if (toggleInput) {
+        toggleInput.addEventListener('change', async function() {
+            const platformName = this.getAttribute('data-platform');
+            const enabled = this.checked;
+            
+            const success = await aiPlatformManager.setPlatformEnabled(platformName, enabled);
+            if (success) {
+                // 更新UI
+                const toggleLabel = this.parentElement.previousElementSibling;
+                toggleLabel.textContent = enabled ? '已启用' : '已禁用';
+            }
+        });
+    }
+    
+    // 绑定密码显示/隐藏切换事件
+    const passwordToggles = card.querySelectorAll('.password-toggle');
+    passwordToggles.forEach(toggle => {
+        toggle.addEventListener('click', function() {
+            const targetId = this.getAttribute('data-target');
+            const input = document.getElementById(targetId);
+            if (input) {
+                input.type = input.type === 'password' ? 'text' : 'password';
+                const icon = this.querySelector('i');
+                if (icon) {
+                    if (input.type === 'password') {
+                        icon.className = 'bi bi-eye';
+                    } else {
+                        icon.className = 'bi bi-eye-slash';
+                    }
+                }
+            }
+        });
+    });
+    
+    // 绑定超时滑块事件
+    const timeoutSlider = card.querySelector('.timeout-slider');
+    if (timeoutSlider) {
+        timeoutSlider.addEventListener('input', function() {
+            const value = this.value;
+            const platformName = this.getAttribute('data-platform');
+            const valueDisplay = document.getElementById(`timeout-value-${platformName}`);
+            if (valueDisplay) {
+                valueDisplay.textContent = `${value}秒`;
+            }
+        });
+    }
+    
+    // 绑定模型启用/禁用切换事件
+    const modelToggles = card.querySelectorAll('.model-toggle-input');
+    modelToggles.forEach(toggle => {
+        toggle.addEventListener('change', function() {
+            const platformName = this.getAttribute('data-platform');
+            const modelId = this.getAttribute('data-model');
+            const enabled = this.checked;
+            
+            // 这里可以添加模型启用/禁用的逻辑
+            console.log(`模型 ${modelId} 已${enabled ? '启用' : '禁用'}`);
+        });
+    });
+    
+    return card;
+}
+
+// 打开平台配置模态窗口
+async function openPlatformConfigModal(platformName) {
+    try {
+        console.log('开始打开平台配置模态窗口:', platformName);
+        // 加载平台配置
+        const platform = await aiPlatformManager.getPlatform(platformName);
+        console.log('平台配置加载成功:', platform);
+        if (!platform) {
+            alert('平台配置加载失败');
+            return;
+        }
+        
+        // 检查模态框元素是否存在
+        const modalElement = document.getElementById('platformConfigModal');
+        console.log('模态框元素:', modalElement);
+        if (!modalElement) {
+            console.error('模态框元素不存在');
+            return;
+        }
+        
+        // 更新模态窗口标题
+        document.getElementById('platformConfigModalLabel').textContent = `${platform.name} 配置`;
+        
+        // 生成配置内容
+        const configContent = `
+            <div class="api-config">
+                <h6>API配置</h6>
+                <div class="form-group">
+                    <label for="modal-api-key-${platform.platform}">API Key</label>
+                    <div class="password-input-group">
+                        <input type="password" class="form-control api-key-input" id="modal-api-key-${platform.platform}" value="${platform.config.api_key || ''}" data-platform="${platform.platform}">
+                        <span class="password-toggle" data-target="modal-api-key-${platform.platform}"><i class="bi bi-eye"></i></span>
+                    </div>
+                </div>
+                <div class="form-group mt-2">
+                    <label for="modal-base-url-${platform.platform}">Base URL</label>
+                    <input type="text" class="form-control base-url-input" id="modal-base-url-${platform.platform}" value="${platform.config.base_url}" data-platform="${platform.platform}">
+                </div>
+                <div class="form-group mt-2">
+                    <label for="modal-timeout-${platform.platform}">超时设置 (${platform.config.timeout}秒)</label>
+                    <input type="range" class="form-range timeout-slider" id="modal-timeout-${platform.platform}" min="10" max="60" step="5" value="${platform.config.timeout}" data-platform="${platform.platform}">
+                    <div class="timeout-value" id="modal-timeout-value-${platform.platform}">${platform.config.timeout}秒</div>
+                </div>
+            </div>
+            
+            <div class="models-section">
+                <h6>
+                    模型管理
+                    <button class="btn btn-sm btn-primary add-model-btn" data-platform="${platform.platform}">+ 添加模型</button>
+                </h6>
+                <div class="models-list" id="modal-models-list-${platform.platform}">
+                    ${platform.models.map(model => `
+                        <div class="model-item">
+                            <div class="model-info">
+                                <h7>${model.name}</h7>
+                                <p>${model.description}</p>
+                            </div>
+                            <div class="model-actions">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input model-toggle-input" type="checkbox" id="modal-model-toggle-${platform.platform}-${model.id}" ${model.enabled ? 'checked' : ''} data-platform="${platform.platform}" data-model="${model.id}">
+                                </div>
+                                <button class="btn btn-sm btn-primary test-model-btn" data-platform="${platform.platform}" data-model="${model.id}">测试连接</button>
+                                <button class="btn btn-sm btn-primary config-model-btn" data-platform="${platform.platform}" data-model="${model.id}">配置</button>
+                                <button class="btn btn-sm btn-danger remove-model-btn" data-platform="${platform.platform}" data-model="${model.id}">删除</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+        
+        // 更新模态窗口内容
+        document.getElementById('platformConfigContent').innerHTML = configContent;
+        
+        // 绑定密码显示/隐藏切换事件
+        const passwordToggles = document.querySelectorAll('.password-toggle');
+        passwordToggles.forEach(toggle => {
+            toggle.addEventListener('click', function() {
+                const targetId = this.getAttribute('data-target');
+                const input = document.getElementById(targetId);
+                if (input) {
+                    input.type = input.type === 'password' ? 'text' : 'password';
+                    const icon = this.querySelector('i');
+                    if (icon) {
+                        if (input.type === 'password') {
+                            icon.className = 'bi bi-eye';
+                        } else {
+                            icon.className = 'bi bi-eye-slash';
+                        }
+                    }
+                }
+            });
+        });
+        
+        // 绑定超时滑块事件
+        const timeoutSlider = document.getElementById(`modal-timeout-${platform.platform}`);
+        if (timeoutSlider) {
+            timeoutSlider.addEventListener('input', function() {
+                const value = this.value;
+                const platformName = this.getAttribute('data-platform');
+                const valueDisplay = document.getElementById(`modal-timeout-value-${platformName}`);
+                if (valueDisplay) {
+                    valueDisplay.textContent = `${value}秒`;
+                }
+            });
+        }
+        
+        // 绑定模型启用/禁用切换事件
+        const modelToggles = document.querySelectorAll('.model-toggle-input');
+        modelToggles.forEach(toggle => {
+            toggle.addEventListener('change', function() {
+                const platformName = this.getAttribute('data-platform');
+                const modelId = this.getAttribute('data-model');
+                const enabled = this.checked;
+                
+                // 这里可以添加模型启用/禁用的逻辑
+                console.log(`模型 ${modelId} 已${enabled ? '启用' : '禁用'}`);
+            });
+        });
+        
+        // 绑定删除模型按钮事件
+        const removeModelBtns = document.querySelectorAll('.remove-model-btn');
+        removeModelBtns.forEach(btn => {
+            btn.addEventListener('click', async function() {
+                const platformName = this.getAttribute('data-platform');
+                const modelId = this.getAttribute('data-model');
+                
+                if (confirm('确定要删除这个模型吗？')) {
+                    const success = await aiPlatformManager.removeModel(platformName, modelId);
+                    if (success) {
+                        // 重新打开模态窗口，刷新模型列表
+                        openPlatformConfigModal(platformName);
+                    }
+                }
+            });
+        });
+        
+        // 绑定添加模型按钮事件
+        const addModelBtns = document.querySelectorAll('.add-model-btn');
+        addModelBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const platform = this.getAttribute('data-platform');
+                
+                // 存储当前平台
+                window.currentPlatform = platform;
+                
+                // 重置表单
+                document.getElementById('modelName').value = '';
+                document.getElementById('modelId').value = '';
+                document.getElementById('modelDescription').value = '';
+                const addModelMessage = document.getElementById('addModelMessage');
+                if (addModelMessage) {
+                    addModelMessage.textContent = '';
+                    addModelMessage.className = 'add-model-message';
+                }
+                document.getElementById('addModelBtn').disabled = true;
+                
+                // 打开添加模型模态窗口
+                const addModelModal = new bootstrap.Modal(document.getElementById('addModelModal'), { backdrop: false });
+                addModelModal.show();
+            });
+        });
+        
+        // 绑定模型测试连接按钮事件
+        const testModelBtns = document.querySelectorAll('.test-model-btn');
+        testModelBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const platform = this.getAttribute('data-platform');
+                const modelId = this.getAttribute('data-model');
+                testModelAPI(platform, modelId);
+            });
+        });
+        
+        // 绑定模型配置按钮事件
+        const configModelBtns = document.querySelectorAll('.config-model-btn');
+        configModelBtns.forEach(btn => {
+            btn.addEventListener('click', function(event) {
+                // 阻止事件冒泡，防止点击配置按钮时触发模态窗口背景点击事件
+                event.stopPropagation();
+                
+                const platform = this.getAttribute('data-platform');
+                const modelId = this.getAttribute('data-model');
+                configModel(platform, modelId);
+            });
+        });
+        
+        // 绑定保存配置按钮事件
+        document.getElementById('savePlatformConfigBtn').onclick = async function() {
+            try {
+                // 收集配置数据
+                const apiKey = document.getElementById(`modal-api-key-${platform.platform}`).value;
+                let baseUrl = document.getElementById(`modal-base-url-${platform.platform}`).value;
+                const timeout = parseInt(document.getElementById(`modal-timeout-${platform.platform}`).value);
+                
+                // 确保baseURL以"/v1/chat/completions"结尾
+                if (!baseUrl.endsWith('/v1/chat/completions')) {
+                    baseUrl += '/v1/chat/completions';
+                }
+                
+                // 更新平台配置
+                platform.config.api_key = apiKey;
+                platform.config.base_url = baseUrl;
+                platform.config.timeout = timeout;
+                
+                // 保存配置
+                await aiPlatformManager.savePlatformConfig(platform.platform, platform);
+                
+                // 关闭模态窗口
+                const modal = bootstrap.Modal.getInstance(document.getElementById('platformConfigModal'));
+                modal.hide();
+                
+                // 显示成功提示
+                alert('配置保存成功');
+            } catch (error) {
+                console.error('保存配置失败:', error);
+                alert('配置保存失败');
+            }
+        };
+        
+        // 显示模态窗口
+        console.log('准备显示模态窗口');
+        const modal = new bootstrap.Modal(modalElement);
+        console.log('模态窗口实例创建成功:', modal);
+        modal.show();
+        console.log('模态窗口已显示');
+        
+        // 立即调整模态框和背景遮罩层的z-index
+        setTimeout(() => {
+            const modalBackdrops = document.querySelectorAll('.modal-backdrop');
+            modalBackdrops.forEach(backdrop => {
+                backdrop.style.zIndex = '1000';
+            });
+            modalElement.style.zIndex = '2000';
+            console.log('已调整模态框和背景遮罩层的z-index');
+        }, 0);
+        
+        // 添加模态框关闭事件监听器，确保遮罩层被正确移除
+        modalElement.addEventListener('hidden.bs.modal', function() {
+            setTimeout(() => {
+                const modalBackdrops = document.querySelectorAll('.modal-backdrop');
+                modalBackdrops.forEach(backdrop => {
+                    backdrop.remove();
+                });
+                console.log('模态框关闭，已移除所有遮罩层');
+            }, 100);
+        });
+    } catch (error) {
+        console.error('打开平台配置模态窗口失败:', error);
+        alert('打开配置窗口失败');
+    }
+}
+
+// 绑定添加模型按钮事件
+function bindAddModelEvents() {
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('add-model-btn')) {
+            const platform = e.target.getAttribute('data-platform');
+            
+            // 存储当前平台
+            window.currentPlatform = platform;
+            
+            // 重置表单
+            document.getElementById('modelName').value = '';
+            document.getElementById('modelId').value = '';
+            document.getElementById('modelDescription').value = '';
+            
+            // 启用/禁用确认按钮
+            document.getElementById('addModelBtn').disabled = true;
+            
+            // 显示模态窗口
+            const modal = new bootstrap.Modal(document.getElementById('addModelModal'));
+            modal.show();
+        }
+    });
+    
+    // 绑定表单验证事件
+    const modelNameInput = document.getElementById('modelName');
+    const modelIdInput = document.getElementById('modelId');
+    const addModelBtn = document.getElementById('addModelBtn');
+    
+    function validateForm() {
+        const nameValid = modelNameInput.value.trim() !== '';
+        const idValid = modelIdInput.value.trim() !== '';
+        addModelBtn.disabled = !nameValid || !idValid;
+    }
+    
+    if (modelNameInput) {
+        modelNameInput.addEventListener('input', validateForm);
+    }
+    
+    if (modelIdInput) {
+        modelIdInput.addEventListener('input', validateForm);
+    }
+    
+    // 绑定添加模型按钮点击事件
+    if (addModelBtn) {
+        addModelBtn.addEventListener('click', async function() {
+            const platform = window.currentPlatform;
+            if (!platform) return;
+            
+            const model = {
+                name: document.getElementById('modelName').value.trim(),
+                id: document.getElementById('modelId').value.trim(),
+                description: document.getElementById('modelDescription').value.trim()
+            };
+            
+            const success = await aiPlatformManager.addModel(platform, model);
+            if (success) {
+                // 关闭模态窗口
+                const modal = bootstrap.Modal.getInstance(document.getElementById('addModelModal'));
+                modal.hide();
+                
+                // 重新渲染平台卡片
+                const platforms = await aiPlatformManager.loadPlatforms();
+                renderPlatforms(platforms);
+                
+                // 显示成功提示
+                showNotification('模型添加成功', 'success');
+            } else {
+                showNotification('模型添加失败', 'error');
+            }
+        });
+    }
+}
+
+// 绑定API测试按钮事件
+function bindAPITestEvents() {
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('test-api-btn')) {
+            const platform = e.target.getAttribute('data-platform');
+            
+            // 显示测试模态窗口
+            const modal = new bootstrap.Modal(document.getElementById('apiTestModal'));
+            modal.show();
+            
+            // 显示加载状态
+            document.getElementById('testLoading').classList.remove('d-none');
+            document.getElementById('testStatus').classList.add('d-none');
+            document.getElementById('testResult').classList.add('d-none');
+            document.getElementById('testError').classList.add('d-none');
+            document.getElementById('testDetails').classList.add('d-none');
+            document.getElementById('reTestBtn').style.display = 'none';
+            
+            // 执行API测试
+            testAPI(platform);
+        }
+    });
+    
+    // 绑定重新测试按钮事件
+    const reTestBtn = document.getElementById('reTestBtn');
+    if (reTestBtn) {
+        reTestBtn.addEventListener('click', function() {
+            const platform = window.currentTestingPlatform;
+            if (platform) {
+                // 显示加载状态
+                document.getElementById('testLoading').classList.remove('d-none');
+                document.getElementById('testStatus').classList.add('d-none');
+                document.getElementById('testResult').classList.add('d-none');
+                document.getElementById('testError').classList.add('d-none');
+                document.getElementById('testDetails').classList.add('d-none');
+                document.getElementById('reTestBtn').style.display = 'none';
+                
+                // 清除测试详情内容
+                const testDetails = document.getElementById('testDetails');
+                if (testDetails) {
+                    testDetails.innerHTML = '';
+                }
+                
+                // 执行API测试
+                testAPI(platform);
+            }
+        });
+    }
+}
+
+// 执行API测试
+async function testAPI(platform) {
+    window.currentTestingPlatform = platform;
+    
+    try {
+        // 清除上一次的测试结果
+        document.getElementById('testLoading').classList.remove('d-none');
+        document.getElementById('testResult').classList.add('d-none');
+        document.getElementById('testError').classList.add('d-none');
+        document.getElementById('reTestBtn').style.display = 'none';
+        
+        // 清除测试详情内容
+        const testDetails = document.getElementById('testDetails');
+        if (testDetails) {
+            testDetails.innerHTML = '';
+        }
+        
+        // 获取平台配置
+        const platformConfig = aiPlatformManager.getPlatform(platform);
+        if (!platformConfig || !platformConfig.models.length) {
+            throw new Error('平台无可用模型');
+        }
+        
+        // 使用第一个启用的模型
+        const model = platformConfig.models.find(m => m.enabled) || platformConfig.models[0];
+        
+        // 执行测试
+        const result = await aiPlatformManager.testAPI(platform, model.id);
+        
+        // 隐藏加载状态
+        document.getElementById('testLoading').classList.add('d-none');
+        
+        if (result.success) {
+            // 显示成功结果
+            document.getElementById('testResult').classList.remove('d-none');
+            document.getElementById('testDetails').classList.remove('d-none');
+            
+            // 填充测试详情
+            const testDetails = document.getElementById('testDetails');
+            if (testDetails) {
+                // 确保测试详情元素有内容
+                testDetails.innerHTML = `
+                    <h6>测试详情</h6>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                        <p><strong>测试时间：</strong><span id="testTime">${result.time}</span></p>
+                        <p><strong>测试类型：</strong>文本对话测试</p>
+                        <p><strong>模型类型：</strong><span id="testModel">${result.model}</span></p>
+                        <p><strong>平均速度：</strong><span id="testSpeed">${result.speed}</span></p>
+                    </div>
+                    <p><strong>测试消耗：</strong><span id="testConsumption">${result.consumption}</span></p>
+                `;
+            }
+        } else {
+            // 显示错误结果
+            document.getElementById('testError').classList.remove('d-none');
+            const errorMessage = document.getElementById('errorMessage');
+            if (errorMessage) {
+                errorMessage.textContent = result.error;
+            }
+        }
+        
+        // 显示重新测试按钮
+        const reTestBtn = document.getElementById('reTestBtn');
+        if (reTestBtn) {
+            reTestBtn.style.display = 'inline-block';
+        }
+    } catch (error) {
+        // 隐藏加载状态
+        document.getElementById('testLoading').classList.add('d-none');
+        
+        // 显示错误结果
+        document.getElementById('testError').classList.remove('d-none');
+        document.getElementById('errorMessage').textContent = error.message;
+        
+        // 显示重新测试按钮
+        document.getElementById('reTestBtn').style.display = 'inline-block';
+    }
+}
+
+// 测试模型API连接
+async function testModelAPI(platform, modelId) {
+    try {
+        // 清除上一次的测试结果
+        document.getElementById('testLoading').classList.remove('d-none');
+        document.getElementById('testResult').classList.add('d-none');
+        document.getElementById('testError').classList.add('d-none');
+        document.getElementById('reTestBtn').style.display = 'none';
+        
+        // 清除测试详情内容
+        const testDetails = document.getElementById('testDetails');
+        if (testDetails) {
+            testDetails.innerHTML = '';
+        }
+        
+        // 显示测试模态窗口
+        const testModal = new bootstrap.Modal(document.getElementById('apiTestModal'), { backdrop: false });
+        testModal.show();
+        
+        // 获取平台配置
+        const platformConfig = aiPlatformManager.getPlatform(platform);
+        if (!platformConfig) {
+            throw new Error('平台配置不存在');
+        }
+        
+        // 获取模型信息
+        const model = platformConfig.models.find(m => m.id === modelId);
+        if (!model) {
+            throw new Error('模型不存在');
+        }
+        
+        // 执行测试
+        const result = await aiPlatformManager.testAPI(platform, modelId);
+        
+        // 隐藏加载状态
+        document.getElementById('testLoading').classList.add('d-none');
+        
+        if (result.success) {
+            // 显示成功结果
+            document.getElementById('testResult').classList.remove('d-none');
+            document.getElementById('testDetails').classList.remove('d-none');
+            
+            // 填充测试详情
+            const testDetails = document.getElementById('testDetails');
+            if (testDetails) {
+                // 确保测试详情元素有内容
+                testDetails.innerHTML = `
+                    <h6>测试详情</h6>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                        <p><strong>测试时间：</strong><span id="testTime">${result.time}</span></p>
+                        <p><strong>测试类型：</strong>文本对话测试</p>
+                        <p><strong>模型类型：</strong><span id="testModel">${result.model}</span></p>
+                        <p><strong>平均速度：</strong><span id="testSpeed">${result.speed}</span></p>
+                    </div>
+                    <p><strong>测试消耗：</strong><span id="testConsumption">${result.consumption}</span></p>
+                `;
+            }
+        } else {
+            // 显示错误结果
+            document.getElementById('testError').classList.remove('d-none');
+            const errorMessage = document.getElementById('errorMessage');
+            if (errorMessage) {
+                errorMessage.textContent = result.error;
+            }
+        }
+        
+        // 显示重新测试按钮
+        const reTestBtn = document.getElementById('reTestBtn');
+        if (reTestBtn) {
+            reTestBtn.style.display = 'inline-block';
+        }
+        
+    } catch (error) {
+        console.error('测试模型API连接失败:', error);
+        
+        // 隐藏加载状态
+        document.getElementById('testLoading').classList.add('d-none');
+        
+        // 显示错误结果
+        document.getElementById('testError').classList.remove('d-none');
+        document.getElementById('errorMessage').textContent = error.message;
+        
+        // 显示重新测试按钮
+        document.getElementById('reTestBtn').style.display = 'inline-block';
+    }
+}
+
+// 配置模型
+function configModel(platform, modelId) {
+    // 这里可以添加模型配置逻辑
+    console.log(`配置模型: ${platform} - ${modelId}`);
+    alert(`配置模型: ${platform} - ${modelId}`);
+}
+
+// 显示通知
+function showNotification(message, type = 'info') {
+    const container = document.querySelector('.notification-container');
+    if (!container) return;
+    
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.textContent = message;
+    
+    container.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 3000);
+}
 
 // 初始化选项卡切换
 function initTabs() {
@@ -455,13 +1218,55 @@ function initToolTabs() {
     console.log('工具标签页初始化成功');
 }
 
+// 初始化设置标签页
+function initSettingsTabs() {
+    const settingsTabs = document.querySelectorAll('.settings-tab');
+    const settingsContents = document.querySelectorAll('.settings-content');
+    
+    if (settingsTabs.length === 0 || settingsContents.length === 0) {
+        console.error('无法找到设置标签或设置内容');
+        return;
+    }
+    
+    settingsTabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+            const settingsName = this.getAttribute('data-settings');
+            
+            // 移除所有活动状态
+            settingsTabs.forEach(t => t.classList.remove('active'));
+            settingsContents.forEach(content => content.classList.remove('active'));
+            
+            // 添加当前活动状态
+            this.classList.add('active');
+            const targetContent = document.getElementById(`${settingsName}-settings-content`);
+            if (targetContent) {
+                targetContent.classList.add('active');
+            }
+        });
+    });
+    
+    // 绑定温度滑块值显示
+    const temperatureSlider = document.getElementById('temperature');
+    const temperatureValue = document.getElementById('temperatureValue');
+    if (temperatureSlider && temperatureValue) {
+        temperatureSlider.addEventListener('input', function() {
+            temperatureValue.textContent = this.value;
+        });
+    }
+    
+    console.log('设置标签页初始化成功');
+}
+
 // 初始化用户认证功能
 function initAuth() {
+    console.log('开始初始化用户认证功能');
+    
     // 检查认证状态
     checkAuthStatus();
     
     // 绑定登录/注册切换标签
     const authTabs = document.querySelectorAll('.auth-tab');
+    console.log('找到的认证标签数量:', authTabs.length);
     authTabs.forEach(tab => {
         tab.addEventListener('click', function() {
             const tabName = this.getAttribute('data-tab');
@@ -469,53 +1274,65 @@ function initAuth() {
         });
     });
     
-    // 绑定登录按钮事件
-    const loginButton = document.getElementById('loginButton');
-    if (loginButton) {
-        loginButton.addEventListener('click', login);
-    }
+    // 使用事件委托绑定登录按钮事件
+    console.log('使用事件委托绑定登录按钮事件');
+    document.addEventListener('click', function(e) {
+        if (e.target.id === 'loginButton') {
+            console.log('登录按钮被点击');
+            login();
+        }
+    });
     
-    // 绑定注册按钮事件
-    const registerButton = document.getElementById('registerButton');
-    if (registerButton) {
-        registerButton.addEventListener('click', register);
-    }
+    // 使用事件委托绑定注册按钮事件
+    document.addEventListener('click', function(e) {
+        if (e.target.id === 'registerButton') {
+            register();
+        }
+    });
     
     // 绑定登出按钮事件
     const logoutButton = document.getElementById('logoutButton');
+    console.log('登出按钮元素:', logoutButton);
     if (logoutButton) {
         logoutButton.addEventListener('click', logout);
     }
     
     // 绑定关闭弹窗按钮事件
     const closeAuthModal = document.getElementById('close-auth-modal');
+    console.log('关闭认证弹窗按钮元素:', closeAuthModal);
     if (closeAuthModal) {
         closeAuthModal.addEventListener('click', closeAuthModalFunc);
     }
     
     // 绑定用户信息点击事件
     const userInfo = document.getElementById('userInfo');
+    console.log('用户信息元素:', userInfo);
     if (userInfo) {
         userInfo.addEventListener('click', toggleUserSettings);
     }
     
     // 绑定关闭设置面板按钮事件
     const closeSettingsPanel = document.getElementById('close-settings-panel');
+    console.log('关闭设置面板按钮元素:', closeSettingsPanel);
     if (closeSettingsPanel) {
         closeSettingsPanel.addEventListener('click', closeSettingsPanelFunc);
     }
     
     // 绑定保存用户设置按钮事件
     const saveUserSettings = document.getElementById('saveUserSettings');
+    console.log('保存用户设置按钮元素:', saveUserSettings);
     if (saveUserSettings) {
         saveUserSettings.addEventListener('click', saveUserSettingsFunc);
     }
     
     // 绑定头像上传事件
     const avatarUpload = document.getElementById('avatarUpload');
+    console.log('头像上传元素:', avatarUpload);
     if (avatarUpload) {
         avatarUpload.addEventListener('change', handleAvatarUpload);
     }
+    
+    console.log('用户认证功能初始化完成');
 }
 
 // 处理头像上传
@@ -647,6 +1464,7 @@ function login() {
     const password = document.getElementById('loginPassword').value;
     const rememberMe = document.getElementById('rememberMe').checked;
     const stayLoggedIn = document.getElementById('stayLoggedIn').checked;
+    const autoLogin = document.getElementById('autoLogin').checked;
     const messageElement = document.getElementById('loginMessage');
     
     if (!username || !password) {
@@ -664,7 +1482,8 @@ function login() {
             username, 
             password,
             remember_me: rememberMe,
-            stay_logged_in: stayLoggedIn
+            stay_logged_in: stayLoggedIn,
+            auto_login: autoLogin
         })
     })
     .then(response => response.json())

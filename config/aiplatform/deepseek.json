@@ -1,0 +1,32 @@
+{
+  "platform": "deepseek",
+  "name": "DeepSeek",
+  "description": "深度求索AI模型服务平台",
+  "icon": "/assets/aiplatform/deepseek.png",
+  "enabled": false,
+  "config": {
+    "api_key": "",
+    "base_url": "https://api.deepseek.com/v1",
+    "timeout": 30,
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "models": [
+    {
+      "id": "deepseek-chat",
+      "name": "DeepSeek Chat",
+      "description": "深度求索的对话模型",
+      "enabled": true,
+      "params": {
+        "context_window": 8192,
+        "temperature": 0.7,
+        "top_p": 0.95,
+        "max_tokens": 4096
+      },
+      "doc_url": "https://platform.deepseek.com/docs/api/chat/completions"
+    }
+  ],
+  "auth_method": "api_key",
+  "version": "1.0.0"
+}

@@ -7,6 +7,7 @@ AI TRPG 系统服务器端
 import os
 import json
 import time
+from datetime import timedelta
 from flask import Flask, jsonify, request, send_from_directory, session, redirect, url_for
 from flask_cors import CORS
 from user_manager import user_manager
@@ -817,6 +818,7 @@ def login():
         # 获取登录信息
         username = login_data.get('username')
         password = login_data.get('password')
+        auto_login = login_data.get('auto_login', False)
         
         if not username or not password:
             log_warning("登录失败：信息不完整")
@@ -834,6 +836,12 @@ def login():
             session['user_id'] = user['id']
             session['username'] = user['username']
             session['role'] = user['role']
+            
+            # 如果用户选择了自动登录，设置较长的session过期时间
+            if auto_login:
+                session.permanent = True
+                # 设置session过期时间为7天
+                app.permanent_session_lifetime = timedelta(days=7)
             
             log_info(f"[用户操作] 登录成功: 用户名={username}, 用户ID={user['id']}, IP={ip_address}")
             return jsonify({
@@ -1093,6 +1101,176 @@ def serve_scenario_cover(filename):
     提供剧本封面文件服务
     """
     return send_from_directory('assets/scenario_covers', filename)
+
+
+@app.route('/config/<path:filename>')
+def serve_config(filename):
+    """
+    提供配置文件服务
+    """
+    try:
+        log_info(f"提供配置文件: {filename}")
+        return send_from_directory('config', filename)
+    except Exception as e:
+        log_error(f"提供配置文件时出错: {e}")
+        return "File not found", 404
+
+
+@app.route('/api/config/<config_name>', methods=['POST'])
+def save_config(config_name):
+    """
+    保存配置文件
+    """
+    try:
+        config_data = request.get_json()
+        if not config_data:
+            return jsonify({
+                'success': False,
+                'message': '无效的配置数据'
+            }), 400
+        
+        # 将配置数据转换为TOML格式
+        toml_content = convert_to_toml(config_data)
+        
+        # 保存到文件
+        config_path = os.path.join('config', f'{config_name}.toml')
+        with open(config_path, 'w', encoding='utf-8') as f:
+            f.write(toml_content)
+        
+        log_info(f"配置文件 {config_name}.toml 保存成功")
+        return jsonify({
+            'success': True,
+            'message': '配置保存成功'
+        })
+    except Exception as e:
+        log_error(f"保存配置文件失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'保存失败: {str(e)}'
+        }), 500
+
+
+@app.route('/api/config/aiplatform/<platform>', methods=['POST'])
+def save_ai_platform_config(platform):
+    """
+    保存AI平台配置文件
+    """
+    try:
+        config_data = request.get_json()
+        if not config_data:
+            return jsonify({
+                'success': False,
+                'message': '无效的配置数据'
+            }), 400
+        
+        # 保存到文件
+        config_path = os.path.join('config', 'aiplatform', f'{platform}.json')
+        with open(config_path, 'w', encoding='utf-8') as f:
+            json.dump(config_data, f, indent=2, ensure_ascii=False)
+        
+        log_info(f"AI平台配置文件 {platform}.json 保存成功")
+        return jsonify({
+            'success': True,
+            'message': '配置保存成功'
+        })
+    except Exception as e:
+        log_error(f"保存AI平台配置文件失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'保存失败: {str(e)}'
+        }), 500
+
+
+@app.route('/api/config/aiplatform/<platform>/test', methods=['POST'])
+def test_ai_platform_api(platform):
+    """
+    测试AI平台API连接
+    """
+    try:
+        test_data = request.get_json()
+        if not test_data:
+            return jsonify({
+                'success': False,
+                'message': '无效的测试数据'
+            }), 400
+        
+        # 记录测试请求
+        log_info(f"AI平台API测试请求 - 平台: {platform}, 请求: {json.dumps(test_data)}")
+        
+        # 从配置文件中读取平台配置
+        config_path = os.path.join('config', 'aiplatform', f'{platform}.json')
+        if not os.path.exists(config_path):
+            return jsonify({
+                'success': False,
+                'message': '平台配置文件不存在'
+            }), 404
+        
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        # 提取API Key和Base URL
+        api_key = config.get('config', {}).get('api_key')
+        base_url = config.get('config', {}).get('base_url')
+        
+        if not api_key or not base_url:
+            return jsonify({
+                'success': False,
+                'message': 'API Key或Base URL未设置'
+            }), 400
+        
+        # 构建测试请求
+        import requests
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {api_key}'
+        }
+        
+        # 发送测试请求
+        response = requests.post(base_url, headers=headers, json=test_data, timeout=30)
+        response_data = response.json()
+        
+        # 记录测试响应
+        log_info(f"AI平台API测试响应 - 平台: {platform}, 响应: {json.dumps(response_data)}")
+        
+        if response.status_code != 200:
+            return jsonify({
+                'success': False,
+                'error': response_data.get('error', {}).get('message', f'API请求失败: {response.status_code}')
+            }), response.status_code
+        
+        return jsonify({
+            'success': True,
+            'response': response_data
+        })
+    except Exception as e:
+        log_error(f"测试AI平台API连接失败: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+def convert_to_toml(config_data):
+    """
+    将配置对象转换为TOML格式字符串
+    """
+    lines = []
+    
+    for section, values in config_data.items():
+        if isinstance(values, dict):
+            lines.append(f"[{section}]")
+            for key, value in values.items():
+                if isinstance(value, str):
+                    lines.append(f'{key} = "{value}"')
+                elif isinstance(value, bool):
+                    lines.append(f'{key} = {str(value).lower()}')
+                elif isinstance(value, (int, float)):
+                    lines.append(f'{key} = {value}')
+                else:
+                    lines.append(f'{key} = "{str(value)}"')
+            lines.append("")
+    
+    return "\n".join(lines)
 
 
 @app.route('/api/users', methods=['GET'])

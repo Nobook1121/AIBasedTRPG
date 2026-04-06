@@ -171,6 +171,12 @@
                                         <label class="form-check-label" for="stayLoggedIn">短期免登录</label>
                                     </div>
                                 </div>
+                                <div class="form-group mt-2">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="autoLogin">
+                                        <label class="form-check-label" for="autoLogin">自动登录</label>
+                                    </div>
+                                </div>
                                 <button class="btn btn-primary mt-3 w-100" id="loginButton">登录</button>
                                 <div class="login-message mt-2" id="loginMessage"></div>
                             </div>
@@ -245,39 +251,102 @@
                 <div id="settings" class="tab-content">
                     <div class="p-4">
                         <h2>设置</h2>
-                        <div class="mb-4">
-                            <h3>常规设置</h3>
-                            <div class="form-group">
-                                <label>主题</label>
-                                <select class="form-select">
-                                    <option>浅色</option>
-                                    <option>深色</option>
-                                </select>
+                        <!-- 设置子标签页 -->
+                        <div class="settings-tabs mb-4">
+                            <button class="settings-tab active" data-settings="general">常规设置</button>
+                            <button class="settings-tab" data-settings="model">模型设置</button>
+                            <button class="settings-tab" data-settings="about">关于应用</button>
+                        </div>
+                        
+                        <!-- 常规设置内容 -->
+                        <div id="general-settings-content" class="settings-content active">
+                            <div class="mb-4">
+                                <h4>界面设置</h4>
+                                <div class="form-group">
+                                    <label>主题</label>
+                                    <select class="form-select" id="themeSelect">
+                                        <option value="light">浅色</option>
+                                        <option value="dark">深色</option>
+                                    </select>
+                                </div>
+                                <div class="form-group mt-2">
+                                    <label>语言</label>
+                                    <select class="form-select" id="languageSelect">
+                                        <option value="zh-CN">简体中文</option>
+                                        <option value="en-US">English</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="mb-4">
+                                <h4>通知设置</h4>
+                                <div class="form-group">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="enableSound">
+                                        <label class="form-check-label" for="enableSound">启用提示音</label>
+                                    </div>
+                                </div>
+                                <div class="form-group mt-2">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="enableNotification">
+                                        <label class="form-check-label" for="enableNotification">启用桌面通知</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-4">
+                                <h4>自动保存设置</h4>
+                                <div class="form-group">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="enableAutosave">
+                                        <label class="form-check-label" for="enableAutosave">启用自动保存</label>
+                                    </div>
+                                </div>
+                                <div class="form-group mt-2">
+                                    <label>自动保存间隔（秒）</label>
+                                    <input type="number" class="form-control" id="autosaveInterval" value="300" min="30" max="3600">
+                                </div>
+                            </div>
+                            <div class="mb-4">
+                                <h4>聊天设置</h4>
+                                <div class="form-group">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="showTimestamp" checked>
+                                        <label class="form-check-label" for="showTimestamp">显示消息时间戳</label>
+                                    </div>
+                                </div>
+                                <div class="form-group mt-2">
+                                    <label>消息字体大小（像素）</label>
+                                    <input type="number" class="form-control" id="messageFontSize" value="14" min="10" max="24">
+                                </div>
                             </div>
                         </div>
-                        <div class="mb-4">
-                            <h3>网络设置</h3>
-                            <div class="form-group">
-                                <label>端口号</label>
-                                <input type="number" class="form-control" value="8080">
+                        
+                        <!-- 模型设置内容 -->
+                        <div id="model-settings-content" class="settings-content">
+                            <div class="mb-4">
+                                <h4>AI平台管理</h4>
+                                <p class="text-muted">管理和配置AI平台连接</p>
                             </div>
-                            <div class="form-group">
-                                <label>局域网访问</label>
-                                <input type="checkbox" class="form-check-input">
+                            
+                            <!-- AI平台配置卡片 -->
+                            <div id="ai-platforms-container" class="ai-platforms-container">
+                                <!-- 平台卡片将在这里动态生成 -->
                             </div>
                         </div>
-                        <div class="mb-4">
-                            <h3>模型设置</h3>
-                            <div class="form-group">
-                                <label>API Key</label>
-                                <input type="password" class="form-control">
+                        
+                        <!-- 关于应用内容 -->
+                        <div id="about-settings-content" class="settings-content">
+                            <div class="mb-4">
+                                <h4>应用信息</h4>
+                                <div class="about-info">
+                                    <p><strong>应用名称：</strong> AI TRPG 系统</p>
+                                    <p><strong>版本：</strong> 0.0.6</p>
+                                    <p><strong>开发者：</strong> Nobook1121</p>
+                                    <p><strong>描述：</strong> 一个基于人工智能的TRPG跑团系统</p>
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <label>模型选择</label>
-                                <select class="form-select">
-                                    <option>GPT-3.5</option>
-                                    <option>GPT-4</option>
-                                </select>
+                            <div class="mb-4">
+                                <h4>许可证</h4>
+                                <p class="text-muted">本软件遵循 MIT 许可证开源发布。</p>
                             </div>
                         </div>
                     </div>
@@ -437,6 +506,124 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
                     <button type="button" class="btn btn-primary" id="saveCharacter">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加模型模态窗口 -->
+    <div class="modal fade" id="addModelModal" tabindex="-1" aria-labelledby="addModelModalLabel" aria-hidden="true">
+        <div class="modal-dialog" style="max-width: 500px;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addModelModalLabel">添加模型</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="modelName" class="form-label">模型名称 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="modelName" placeholder="请输入模型名称" maxlength="50">
+                        <div class="invalid-feedback" id="modelNameError"></div>
+                    </div>
+                    <div class="form-group mt-3">
+                        <label for="modelId" class="form-label">模型ID <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="modelId" placeholder="请输入模型ID" maxlength="100">
+                        <div class="invalid-feedback" id="modelIdError"></div>
+                    </div>
+                    <div class="form-group mt-3">
+                        <label for="modelDescription" class="form-label">模型描述</label>
+                        <textarea class="form-control" id="modelDescription" rows="3" placeholder="请输入模型描述" maxlength="200"></textarea>
+                        <div class="invalid-feedback" id="modelDescriptionError"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="addModelBtn" disabled>确认</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- API测试模态窗口 -->
+    <div class="modal fade" id="apiTestModal" tabindex="-1" aria-labelledby="apiTestModalLabel" aria-hidden="true">
+        <div class="modal-dialog" style="max-width: 600px;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="apiTestModalLabel">API连接测试</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="test-status mb-4">
+                        <div id="testStatus" class="d-none">
+                            <div class="test-status-indicator test-status-pending mb-2"></div>
+                            <p class="test-status-text">测试中...</p>
+                        </div>
+                        <div id="testResult" class="d-none">
+                            <div class="test-status-indicator test-status-success mb-2"></div>
+                            <p class="test-status-text test-status-success-text">测试成功</p>
+                        </div>
+                        <div id="testError" class="d-none">
+                            <div class="test-status-indicator test-status-error mb-2"></div>
+                            <p class="test-status-text test-status-error-text">测试失败</p>
+                            <p id="errorMessage" class="text-sm text-muted mt-2"></p>
+                        </div>
+                    </div>
+                    <div id="testDetails" class="d-none">
+                        <h6>测试详情</h6>
+                        <div class="test-details-grid">
+                            <div class="test-detail-item">
+                                <span class="test-detail-label">测试时间：</span>
+                                <span id="testTime" class="test-detail-value"></span>
+                            </div>
+                            <div class="test-detail-item">
+                                <span class="test-detail-label">测试类型：</span>
+                                <span class="test-detail-value">文本对话测试</span>
+                            </div>
+                            <div class="test-detail-item">
+                                <span class="test-detail-label">模型类型：</span>
+                                <span id="testModel" class="test-detail-value"></span>
+                            </div>
+                            <div class="test-detail-item">
+                                <span class="test-detail-label">平均速度：</span>
+                                <span id="testSpeed" class="test-detail-value"></span>
+                            </div>
+                            <div class="test-detail-item">
+                                <span class="test-detail-label">测试消耗：</span>
+                                <span id="testConsumption" class="test-detail-value"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="testLoading" class="d-none">
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">加载中...</span>
+                            </div>
+                            <p class="mt-2">正在测试API连接...</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                    <button type="button" class="btn btn-primary" id="reTestBtn" style="display: none;">重新测试</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 平台配置模态窗口 -->
+    <div class="modal fade" id="platformConfigModal" tabindex="-1" aria-labelledby="platformConfigModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="platformConfigModalLabel">平台配置</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="platformConfigContent"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                    <button type="button" class="btn btn-primary" id="savePlatformConfigBtn">保存配置</button>
                 </div>
             </div>
         </div>

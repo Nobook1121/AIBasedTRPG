@@ -1,0 +1,32 @@
+{
+  "platform": "aliyun",
+  "name": "阿里云百炼",
+  "description": "阿里云AI大模型服务平台",
+  "icon": "/assets/aiplatform/aliyun.png",
+  "enabled": true,
+  "config": {
+    "api_key": "",
+    "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+    "timeout": 20,
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "models": [
+    {
+      "id": "qwen3.5-plus",
+      "name": "Qwen3.5-Plus",
+      "description": "阿里云最新的通用大模型，支持多轮对话、内容创作、代码生成等功能",
+      "enabled": true,
+      "params": {
+        "context_window": 128000,
+        "temperature": 0.7,
+        "top_p": 0.95,
+        "max_tokens": 4096
+      },
+      "doc_url": "https://help.aliyun.com/zh/model-studio/developer-reference/qwen3-5-model-api-reference"
+    }
+  ],
+  "auth_method": "api_key",
+  "version": "1.0.0"
+}

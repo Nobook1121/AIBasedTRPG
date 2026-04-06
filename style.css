@@ -407,7 +407,394 @@ body, html {
     font-size: 1.2em;
 }
 
+/* 设置子标签样式 - 与小工具标签样式保持一致 */
+.settings-tabs {
+    display: flex;
+    border-bottom: 1px solid #dee2e6;
+    margin-bottom: 20px;
+}
 
+.settings-tab {
+    padding: 10px 20px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 16px;
+    border-bottom: 2px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.settings-tab:hover {
+    color: #007bff;
+}
+
+.settings-tab.active {
+    color: #007bff;
+    border-bottom: 2px solid #007bff;
+    font-weight: bold;
+}
+
+.settings-content {
+    display: none;
+}
+
+.settings-content.active {
+    display: block;
+}
+
+/* 关于应用样式 */
+.about-info p {
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.about-info strong {
+    color: #333;
+}
+
+/* 滑块样式 */
+.form-range {
+    width: 100%;
+}
+
+/* AI平台管理样式 */
+.ai-platforms-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-height: 70vh;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+.ai-platforms-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.ai-platforms-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.ai-platforms-container::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.ai-platforms-container::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+.ai-platform-card {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+    background-color: #ffffff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+}
+
+.ai-platform-card:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.platform-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+    padding: 10px 0;
+}
+
+.platform-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 10px 0;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.platform-card-header:hover {
+    background-color: rgba(0, 0, 0, 0.02);
+    border-radius: 8px;
+}
+
+.platform-expand-icon {
+    margin-left: 10px;
+    color: #666;
+    font-size: 12px;
+    transition: transform 0.3s ease;
+}
+
+.platform-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.platform-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    object-fit: cover;
+}
+
+.platform-details h5 {
+    margin: 0 0 5px 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.platform-details p {
+    margin: 0;
+    font-size: 14px;
+    color: #666;
+}
+
+.platform-toggle {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-shrink: 0;
+    width: 150px;
+}
+
+.platform-toggle label {
+    margin: 0;
+    font-size: 16px;
+    color: #666;
+    font-weight: 500;
+    flex-shrink: 0;
+}
+
+.platform-toggle .form-check-input {
+    width: 50px;
+    height: 24px;
+}
+
+.platform-action {
+    margin-left: 20px;
+    display: flex;
+    align-items: center;
+}
+
+.platform-action .btn {
+    padding: 6px 12px;
+    font-size: 14px;
+}
+
+.platform-config {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #e9ecef;
+}
+
+.api-config {
+    margin-bottom: 20px;
+}
+
+.api-config h6 {
+    margin-bottom: 15px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.password-input-group {
+    position: relative;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: #666;
+}
+
+.timeout-slider {
+    margin: 15px 0;
+}
+
+.timeout-value {
+    font-size: 14px;
+    color: #666;
+    text-align: center;
+    margin-top: 5px;
+}
+
+.models-section {
+    margin-top: 20px;
+}
+
+.models-section h6 {
+    margin-bottom: 15px;
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.add-model-btn {
+    font-size: 12px;
+    padding: 4px 8px;
+}
+
+.models-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.model-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 15px;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    background-color: #f8f9fa;
+    transition: all 0.2s ease;
+}
+
+.model-item:hover {
+    background-color: #e9ecef;
+}
+
+.model-info {
+    flex: 1;
+}
+
+.model-info h7 {
+    margin: 0 0 3px 0;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.model-info p {
+    margin: 0;
+    font-size: 12px;
+    color: #666;
+}
+
+.model-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* 模态窗口样式 */
+.modal-backdrop {
+    background-color: rgba(0, 0, 0, 0.7) !important;
+    backdrop-filter: blur(10px) !important;
+    z-index: 1049 !important;
+}
+
+/* 模态窗口层级 */
+.modal {
+    z-index: 1050 !important;
+}
+
+/* 确保特定模态窗口的层级 */
+#platformConfigModal {
+    z-index: 1050 !important;
+}
+
+#addModelModal,
+#apiTestModal {
+    z-index: 1060 !important;
+}
+
+/* 确保模态窗口背景也有正确的层级 */
+#addModelModal + .modal-backdrop,
+#apiTestModal + .modal-backdrop {
+    z-index: 1059 !important;
+}
+
+/* API测试模态窗口样式 */
+.test-status-indicator {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+}
+
+.test-status-pending {
+    background-color: #e3f2fd;
+    color: #2196f3;
+}
+
+.test-status-success {
+    background-color: #e8f5e8;
+    color: #4caf50;
+}
+
+.test-status-error {
+    background-color: #ffebee;
+    color: #f44336;
+}
+
+.test-status-text {
+    text-align: center;
+    margin: 0;
+    font-weight: 500;
+}
+
+.test-status-success-text {
+    color: #4caf50;
+}
+
+.test-status-error-text {
+    color: #f44336;
+}
+
+.test-details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.test-detail-item {
+    font-size: 14px;
+}
+
+.test-detail-label {
+    font-weight: 500;
+    color: #666;
+}
+
+.test-detail-value {
+    color: #333;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .platform-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .platform-info {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .platform-toggle {
+        align-self: flex-start;
+    }
+    
+    .test-details-grid {
+        grid-template-columns: 1fr;
+    }
+}
 
 /* 模态框样式 */
 .modal-body {
