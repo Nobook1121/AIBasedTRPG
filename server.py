@@ -1089,7 +1089,12 @@ def serve_avatar(filename):
     """
     try:
         log_info(f"提供头像文件: {filename}")
-        return send_from_directory('assets/avatars', filename)
+        response = send_from_directory('assets/avatars', filename)
+        # 添加缓存控制头，避免浏览器缓存
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
     except Exception as e:
         log_error(f"提供头像文件时出错: {e}")
         return "File not found", 404
@@ -1100,7 +1105,30 @@ def serve_scenario_cover(filename):
     """
     提供剧本封面文件服务
     """
-    return send_from_directory('assets/scenario_covers', filename)
+    response = send_from_directory('assets/scenario_covers', filename)
+    # 添加缓存控制头，避免浏览器缓存
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
+
+@app.route('/assets/aiplatform/<path:filename>')
+def serve_aiplatform_icon(filename):
+    """
+    提供AI平台图标文件服务
+    """
+    try:
+        log_info(f"提供AI平台图标文件: {filename}")
+        response = send_from_directory('assets/aiplatform', filename)
+        # 添加缓存控制头，避免浏览器缓存
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
+    except Exception as e:
+        log_error(f"提供AI平台图标文件时出错: {e}")
+        return "File not found", 404
 
 
 @app.route('/config/<path:filename>')
@@ -1212,11 +1240,16 @@ def test_ai_platform_api(platform):
         api_key = config.get('config', {}).get('api_key')
         base_url = config.get('config', {}).get('base_url')
         
-        if not api_key or not base_url:
+        # LMStudio平台可以跳过API Key检查，因为LMStudio会忽略API Key
+        if not base_url:
             return jsonify({
                 'success': False,
-                'message': 'API Key或Base URL未设置'
+                'message': 'Base URL未设置'
             }), 400
+        
+        # 对于LMStudio平台，如果没有设置API Key，使用默认值
+        if not api_key and platform == 'lmstudio':
+            api_key = 'lm-studio'
         
         # 构建测试请求
         import requests

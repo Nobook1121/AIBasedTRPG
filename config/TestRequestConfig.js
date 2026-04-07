@@ -17,6 +17,18 @@ const testRequestConfigs = {
             enable_thinking: false
         }
     },
+    // LMStudio模型的测试请求配置
+    'local-model': {
+        messages: [
+            {
+                role: 'user',
+                content: 'a'
+            }
+        ],
+        temperature: 0,
+        max_tokens: 1,
+        stop: ['\n']
+    },
     // 其他模型的默认测试请求配置
     'default': {
         messages: [

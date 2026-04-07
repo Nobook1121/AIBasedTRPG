@@ -182,52 +182,6 @@ function createPlatformCard(platform) {
         });
     }
     
-    // 绑定密码显示/隐藏切换事件
-    const passwordToggles = card.querySelectorAll('.password-toggle');
-    passwordToggles.forEach(toggle => {
-        toggle.addEventListener('click', function() {
-            const targetId = this.getAttribute('data-target');
-            const input = document.getElementById(targetId);
-            if (input) {
-                input.type = input.type === 'password' ? 'text' : 'password';
-                const icon = this.querySelector('i');
-                if (icon) {
-                    if (input.type === 'password') {
-                        icon.className = 'bi bi-eye';
-                    } else {
-                        icon.className = 'bi bi-eye-slash';
-                    }
-                }
-            }
-        });
-    });
-    
-    // 绑定超时滑块事件
-    const timeoutSlider = card.querySelector('.timeout-slider');
-    if (timeoutSlider) {
-        timeoutSlider.addEventListener('input', function() {
-            const value = this.value;
-            const platformName = this.getAttribute('data-platform');
-            const valueDisplay = document.getElementById(`timeout-value-${platformName}`);
-            if (valueDisplay) {
-                valueDisplay.textContent = `${value}秒`;
-            }
-        });
-    }
-    
-    // 绑定模型启用/禁用切换事件
-    const modelToggles = card.querySelectorAll('.model-toggle-input');
-    modelToggles.forEach(toggle => {
-        toggle.addEventListener('change', function() {
-            const platformName = this.getAttribute('data-platform');
-            const modelId = this.getAttribute('data-model');
-            const enabled = this.checked;
-            
-            // 这里可以添加模型启用/禁用的逻辑
-            console.log(`模型 ${modelId} 已${enabled ? '启用' : '禁用'}`);
-        });
-    });
-    
     return card;
 }
 
@@ -255,7 +209,7 @@ async function openPlatformConfigModal(platformName) {
         document.getElementById('platformConfigModalLabel').textContent = `${platform.name} 配置`;
         
         // 生成配置内容
-        const configContent = `
+        let configContent = `
             <div class="api-config">
                 <h6>API配置</h6>
                 <div class="form-group">
@@ -275,32 +229,52 @@ async function openPlatformConfigModal(platformName) {
                     <div class="timeout-value" id="modal-timeout-value-${platform.platform}">${platform.config.timeout}秒</div>
                 </div>
             </div>
-            
-            <div class="models-section">
-                <h6>
-                    模型管理
-                    <button class="btn btn-sm btn-primary add-model-btn" data-platform="${platform.platform}">+ 添加模型</button>
-                </h6>
-                <div class="models-list" id="modal-models-list-${platform.platform}">
-                    ${platform.models.map(model => `
-                        <div class="model-item">
-                            <div class="model-info">
-                                <h7>${model.name}</h7>
-                                <p>${model.description}</p>
-                            </div>
-                            <div class="model-actions">
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input model-toggle-input" type="checkbox" id="modal-model-toggle-${platform.platform}-${model.id}" ${model.enabled ? 'checked' : ''} data-platform="${platform.platform}" data-model="${model.id}">
-                                </div>
-                                <button class="btn btn-sm btn-primary test-model-btn" data-platform="${platform.platform}" data-model="${model.id}">测试连接</button>
-                                <button class="btn btn-sm btn-primary config-model-btn" data-platform="${platform.platform}" data-model="${model.id}">配置</button>
-                                <button class="btn btn-sm btn-danger remove-model-btn" data-platform="${platform.platform}" data-model="${model.id}">删除</button>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
         `;
+        
+        // 为非LMStudio平台添加模型管理部分
+        if (platform.platform !== 'lmstudio') {
+            configContent += `
+                <div class="models-section">
+                    <h6>
+                        模型管理
+                        <button class="btn btn-sm btn-primary add-model-btn" data-platform="${platform.platform}">+ 添加模型</button>
+                    </h6>
+                    <div class="models-list" id="modal-models-list-${platform.platform}">
+                        ${platform.models.map(model => `
+                            <div class="model-item">
+                                <div class="model-info">
+                                    <h7>${model.name}</h7>
+                                    <p>${model.description}</p>
+                                </div>
+                                <div class="model-actions">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input model-toggle-input" type="checkbox" id="modal-model-toggle-${platform.platform}-${model.id}" ${model.enabled ? 'checked' : ''} data-platform="${platform.platform}" data-model="${model.id}">
+                                    </div>
+                                    <button class="btn btn-sm btn-primary test-model-btn" data-platform="${platform.platform}" data-model="${model.id}">测试连接</button>
+                                    <button class="btn btn-sm btn-primary config-model-btn" data-platform="${platform.platform}" data-model="${model.id}">配置</button>
+                                    <button class="btn btn-sm btn-danger remove-model-btn" data-platform="${platform.platform}" data-model="${model.id}">删除</button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        } else {
+            // 为LMStudio平台添加特殊说明和测试连接按钮
+            configContent += `
+                <div class="models-section">
+                    <h6>
+                        模型说明
+                        <button class="btn btn-sm btn-primary test-platform-btn" data-platform="${platform.platform}">测试连接</button>
+                    </h6>
+                    <div class="alert alert-info">
+                        <p>LMStudio平台使用本地运行的模型，无需选择模型。</p>
+                        <p>请确保LMStudio服务器正在运行，默认端口为1234。</p>
+                        <p>API Key可以设置为任意值，LMStudio会忽略它。</p>
+                    </div>
+                </div>
+            `;
+        }
         
         // 更新模态窗口内容
         document.getElementById('platformConfigContent').innerHTML = configContent;
@@ -338,84 +312,109 @@ async function openPlatformConfigModal(platformName) {
             });
         }
         
-        // 绑定模型启用/禁用切换事件
-        const modelToggles = document.querySelectorAll('.model-toggle-input');
-        modelToggles.forEach(toggle => {
-            toggle.addEventListener('change', function() {
-                const platformName = this.getAttribute('data-platform');
-                const modelId = this.getAttribute('data-model');
-                const enabled = this.checked;
-                
-                // 这里可以添加模型启用/禁用的逻辑
-                console.log(`模型 ${modelId} 已${enabled ? '启用' : '禁用'}`);
+        // 绑定模型相关事件（仅对非LMStudio平台）
+        if (platform.platform !== 'lmstudio') {
+            // 绑定模型启用/禁用切换事件
+            const modelToggles = document.querySelectorAll('.model-toggle-input');
+            modelToggles.forEach(toggle => {
+                toggle.addEventListener('change', function() {
+                    const platformName = this.getAttribute('data-platform');
+                    const modelId = this.getAttribute('data-model');
+                    const enabled = this.checked;
+                    
+                    // 这里可以添加模型启用/禁用的逻辑
+                    console.log(`模型 ${modelId} 已${enabled ? '启用' : '禁用'}`);
+                });
             });
-        });
-        
-        // 绑定删除模型按钮事件
-        const removeModelBtns = document.querySelectorAll('.remove-model-btn');
-        removeModelBtns.forEach(btn => {
-            btn.addEventListener('click', async function() {
-                const platformName = this.getAttribute('data-platform');
-                const modelId = this.getAttribute('data-model');
-                
-                if (confirm('确定要删除这个模型吗？')) {
-                    const success = await aiPlatformManager.removeModel(platformName, modelId);
-                    if (success) {
-                        // 重新打开模态窗口，刷新模型列表
-                        openPlatformConfigModal(platformName);
+            
+            // 绑定删除模型按钮事件
+            const removeModelBtns = document.querySelectorAll('.remove-model-btn');
+            removeModelBtns.forEach(btn => {
+                btn.addEventListener('click', async function() {
+                    const platformName = this.getAttribute('data-platform');
+                    const modelId = this.getAttribute('data-model');
+                    
+                    if (confirm('确定要删除这个模型吗？')) {
+                        const success = await aiPlatformManager.removeModel(platformName, modelId);
+                        if (success) {
+                            // 重新打开模态窗口，刷新模型列表
+                            openPlatformConfigModal(platformName);
+                        }
                     }
-                }
+                });
             });
-        });
-        
-        // 绑定添加模型按钮事件
-        const addModelBtns = document.querySelectorAll('.add-model-btn');
-        addModelBtns.forEach(btn => {
-            btn.addEventListener('click', function() {
-                const platform = this.getAttribute('data-platform');
-                
-                // 存储当前平台
-                window.currentPlatform = platform;
-                
-                // 重置表单
-                document.getElementById('modelName').value = '';
-                document.getElementById('modelId').value = '';
-                document.getElementById('modelDescription').value = '';
-                const addModelMessage = document.getElementById('addModelMessage');
-                if (addModelMessage) {
-                    addModelMessage.textContent = '';
-                    addModelMessage.className = 'add-model-message';
-                }
-                document.getElementById('addModelBtn').disabled = true;
-                
-                // 打开添加模型模态窗口
-                const addModelModal = new bootstrap.Modal(document.getElementById('addModelModal'), { backdrop: false });
-                addModelModal.show();
+            
+            // 绑定添加模型按钮事件
+            const addModelBtns = document.querySelectorAll('.add-model-btn');
+            addModelBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const platform = this.getAttribute('data-platform');
+                    
+                    // 存储当前平台
+                    window.currentPlatform = platform;
+                    
+                    // 重置表单
+                    document.getElementById('modelName').value = '';
+                    document.getElementById('modelId').value = '';
+                    document.getElementById('modelDescription').value = '';
+                    const addModelMessage = document.getElementById('addModelMessage');
+                    if (addModelMessage) {
+                        addModelMessage.textContent = '';
+                        addModelMessage.className = 'add-model-message';
+                    }
+                    document.getElementById('addModelBtn').disabled = true;
+                    
+                    // 打开添加模型模态窗口
+                    const addModelModal = new bootstrap.Modal(document.getElementById('addModelModal'), { backdrop: false });
+                    addModelModal.show();
+                });
             });
-        });
-        
-        // 绑定模型测试连接按钮事件
-        const testModelBtns = document.querySelectorAll('.test-model-btn');
-        testModelBtns.forEach(btn => {
-            btn.addEventListener('click', function() {
-                const platform = this.getAttribute('data-platform');
-                const modelId = this.getAttribute('data-model');
-                testModelAPI(platform, modelId);
+            
+            // 绑定模型测试连接按钮事件
+            const testModelBtns = document.querySelectorAll('.test-model-btn');
+            testModelBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const platform = this.getAttribute('data-platform');
+                    const modelId = this.getAttribute('data-model');
+                    testModelAPI(platform, modelId);
+                });
             });
-        });
-        
-        // 绑定模型配置按钮事件
-        const configModelBtns = document.querySelectorAll('.config-model-btn');
-        configModelBtns.forEach(btn => {
-            btn.addEventListener('click', function(event) {
-                // 阻止事件冒泡，防止点击配置按钮时触发模态窗口背景点击事件
-                event.stopPropagation();
-                
-                const platform = this.getAttribute('data-platform');
-                const modelId = this.getAttribute('data-model');
-                configModel(platform, modelId);
+            
+            // 绑定模型配置按钮事件
+            const configModelBtns = document.querySelectorAll('.config-model-btn');
+            configModelBtns.forEach(btn => {
+                btn.addEventListener('click', function(event) {
+                    // 阻止事件冒泡，防止点击配置按钮时触发模态窗口背景点击事件
+                    event.stopPropagation();
+                    
+                    const platform = this.getAttribute('data-platform');
+                    const modelId = this.getAttribute('data-model');
+                    configModel(platform, modelId);
+                });
             });
-        });
+        } else {
+            // 绑定LMStudio平台的测试连接按钮事件
+            const testPlatformBtns = document.querySelectorAll('.test-platform-btn');
+            testPlatformBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const platform = this.getAttribute('data-platform');
+                    
+                    // 显示测试模态窗口
+                    const testModal = new bootstrap.Modal(document.getElementById('apiTestModal'), { backdrop: false });
+                    testModal.show();
+                    
+                    // 显示加载状态
+                    document.getElementById('testLoading').classList.remove('d-none');
+                    document.getElementById('testResult').classList.add('d-none');
+                    document.getElementById('testError').classList.add('d-none');
+                    document.getElementById('testDetails').classList.add('d-none');
+                    document.getElementById('reTestBtn').style.display = 'none';
+                    
+                    // 执行API测试
+                    testAPI(platform);
+                });
+            });
+        }
         
         // 绑定保存配置按钮事件
         document.getElementById('savePlatformConfigBtn').onclick = async function() {
@@ -625,15 +624,25 @@ async function testAPI(platform) {
         
         // 获取平台配置
         const platformConfig = aiPlatformManager.getPlatform(platform);
-        if (!platformConfig || !platformConfig.models.length) {
-            throw new Error('平台无可用模型');
+        if (!platformConfig) {
+            throw new Error('平台配置不存在');
         }
         
-        // 使用第一个启用的模型
-        const model = platformConfig.models.find(m => m.enabled) || platformConfig.models[0];
+        // 对于LMStudio平台，使用默认模型ID
+        let modelId;
+        if (platform === 'lmstudio') {
+            modelId = 'local-model';
+        } else {
+            // 对于其他平台，使用第一个启用的模型
+            if (!platformConfig.models.length) {
+                throw new Error('平台无可用模型');
+            }
+            const model = platformConfig.models.find(m => m.enabled) || platformConfig.models[0];
+            modelId = model.id;
+        }
         
         // 执行测试
-        const result = await aiPlatformManager.testAPI(platform, model.id);
+        const result = await aiPlatformManager.testAPI(platform, modelId);
         
         // 隐藏加载状态
         document.getElementById('testLoading').classList.add('d-none');

@@ -16,7 +16,7 @@ class AIPlatformManager {
      */
     async loadPlatforms() {
         try {
-            const platforms = ['aliyun', 'siliconflow', 'deepseek', 'openrouter'];
+            const platforms = ['aliyun', 'siliconflow', 'deepseek', 'openrouter', 'lmstudio'];
             const platformPromises = platforms.map(async (platform) => {
                 try {
                     const response = await fetch(`${this.platformsPath}/${platform}.json`);
@@ -209,7 +209,8 @@ class AIPlatformManager {
                 throw new Error('平台未启用');
             }
 
-            if (!config.config.api_key) {
+            // LMStudio平台可以跳过API Key检查，因为LMStudio会忽略API Key
+            if (!config.config.api_key && platform !== 'lmstudio') {
                 throw new Error('API Key未设置');
             }
 
