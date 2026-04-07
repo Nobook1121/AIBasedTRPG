@@ -1,8 +1,8 @@
 // 主脚本文件
 import ScenarioController from './controllers/ScenarioController.js';
 import ToolManager from '../tools/toolManager.js';
-import configManager from './config/ConfigManager.js';
-import aiPlatformManager from './config/AIPlatformManager.js';
+import configManager from '../config/ConfigManager.js';
+import aiPlatformManager from '../config/AIPlatformManager.js';
 
 // 全局工具管理器
 let toolManager;

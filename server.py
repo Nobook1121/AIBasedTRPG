@@ -1225,8 +1225,15 @@ def test_ai_platform_api(platform):
             'Authorization': f'Bearer {api_key}'
         }
         
+        # 处理Qwen3.5-Plus模型的特殊参数
+        test_payload = test_data.copy()
+        if 'extra_body' in test_payload:
+            # 对于Qwen3.5-Plus模型，将extra_body中的参数合并到测试请求中
+            extra_body = test_payload.pop('extra_body')
+            test_payload.update(extra_body)
+        
         # 发送测试请求
-        response = requests.post(base_url, headers=headers, json=test_data, timeout=30)
+        response = requests.post(base_url, headers=headers, json=test_payload, timeout=30)
         response_data = response.json()
         
         # 记录测试响应

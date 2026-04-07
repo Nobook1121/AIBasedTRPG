@@ -1,6 +1,8 @@
 // AI平台管理模块
 // 负责加载、管理和配置AI平台
 
+import { getTestRequestConfig } from './TestRequestConfig.js';
+
 class AIPlatformManager {
     constructor() {
         this.platforms = {};
@@ -219,19 +221,13 @@ class AIPlatformManager {
             // 记录测试开始时间
             const startTime = Date.now();
 
+            // 从配置文件中获取测试请求配置
+            const testConfig = getTestRequestConfig(modelId);
+            
             // 构建测试请求
             const testRequest = {
                 model: modelId,
-                messages: [
-                    {
-                        role: 'user',
-                        content: 'a'
-                    }
-                ],
-                temperature: 0,
-                max_tokens: 1,
-                stop: ['\n'],
-                reasoning: false
+                ...testConfig
             };
 
             // 在控制台输出请求的消息
