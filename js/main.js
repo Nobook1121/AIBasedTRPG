@@ -782,10 +782,122 @@ async function testModelAPI(platform, modelId) {
 }
 
 // 配置模型
-function configModel(platform, modelId) {
-    // 这里可以添加模型配置逻辑
-    console.log(`配置模型: ${platform} - ${modelId}`);
-    alert(`配置模型: ${platform} - ${modelId}`);
+async function configModel(platform, modelId) {
+    try {
+        // 获取平台配置
+        const platformConfig = aiPlatformManager.getPlatform(platform);
+        if (!platformConfig) {
+            throw new Error('平台配置不存在');
+        }
+        
+        // 获取模型信息
+        const model = platformConfig.models.find(m => m.id === modelId);
+        if (!model) {
+            throw new Error('模型不存在');
+        }
+        
+        // 获取模型JS配置
+        let modelJSConfig = '';
+        try {
+            const response = await fetch(`config/aimodel/${platform}/${modelId}.js`);
+            if (response.ok) {
+                modelJSConfig = await response.text();
+            } else {
+                // 如果文件不存在，使用默认配置
+                const defaultResponse = await fetch('config/aiplatform/default.js');
+                if (defaultResponse.ok) {
+                    modelJSConfig = await defaultResponse.text();
+                    // 替换模型ID
+                    modelJSConfig = modelJSConfig.replace(/model: '1'/g, `model: '${modelId}'`);
+                }
+            }
+        } catch (error) {
+            console.error('加载模型JS配置失败:', error);
+            // 使用默认配置
+            const defaultResponse = await fetch('config/aiplatform/default.js');
+            if (defaultResponse.ok) {
+                modelJSConfig = await defaultResponse.text();
+                // 替换模型ID
+                modelJSConfig = modelJSConfig.replace(/model: '1'/g, `model: '${modelId}'`);
+            }
+        }
+        
+        // 创建模型配置模态窗口
+        const modalElement = document.createElement('div');
+        modalElement.className = 'modal fade';
+        modalElement.id = 'modelConfigModal';
+        modalElement.tabIndex = -1;
+        modalElement.setAttribute('aria-labelledby', 'modelConfigModalLabel');
+        modalElement.setAttribute('aria-hidden', 'true');
+        
+        modalElement.innerHTML = `
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="modelConfigModalLabel">${model.name} 配置</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="modelJSConfig">JS配置</label>
+                            <textarea class="form-control" id="modelJSConfig" rows="20">${modelJSConfig}</textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                        <button type="button" class="btn btn-primary" id="saveModelConfigBtn">保存</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // 添加到文档
+        document.body.appendChild(modalElement);
+        
+        // 显示模态窗口
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+        
+        // 绑定保存按钮事件
+        document.getElementById('saveModelConfigBtn').addEventListener('click', async function() {
+            try {
+                const jsConfig = document.getElementById('modelJSConfig').value;
+                
+                // 保存JS配置
+                const saveResponse = await fetch('/api/config/aimodel/save', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        platform: platform,
+                        modelId: modelId,
+                        content: jsConfig
+                    })
+                });
+                
+                if (saveResponse.ok) {
+                    alert('JS配置保存成功');
+                    modal.hide();
+                } else {
+                    throw new Error('保存JS配置失败');
+                }
+            } catch (error) {
+                console.error('保存JS配置失败:', error);
+                alert('保存JS配置失败: ' + error.message);
+            }
+        });
+        
+        // 绑定模态窗口关闭事件
+        modalElement.addEventListener('hidden.bs.modal', function() {
+            setTimeout(() => {
+                modalElement.remove();
+            }, 100);
+        });
+    } catch (error) {
+        console.error('配置模型失败:', error);
+        alert('配置模型失败: ' + error.message);
+    }
 }
 
 // 显示通知
@@ -884,8 +996,14 @@ function initChat() {
                 addMessage('player', '我', message);
                 chatInput.value = '';
                 
-                // 发送消息到后端API
-                fetch('/api/messages', {
+                // 发送消息到后端API，使用AI平台进行回复
+                console.log('发送消息到后端API:', message);
+                
+                // 显示AI正在思考的提示
+                const thinkingMessageId = Date.now();
+                addMessage('kp', 'KP', 'AI正在思考...', thinkingMessageId, true);
+                
+                fetch('/api/chat', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -895,27 +1013,40 @@ function initChat() {
                         user_id: 'user_' + Date.now()
                     })
                 })
-                .then(response => response.json())
-                .then(data => {
-                    console.log('消息发送成功:', data);
-                    // 模拟 AI 回复
-                    setTimeout(() => {
-                        addMessage('kp', 'KP', '这是 AI 的回复...');
-                    }, 1000);
+                .then(response => {
+                    console.log('API响应状态:', response.status);
+                    console.log('API响应头:', response.headers);
+                    if (!response.ok) {
+                        throw new Error('API请求失败: ' + response.status);
+                    }
+                    
+                    // 处理普通JSON响应
+                    return response.json().then(data => {
+                        console.log('消息发送成功:', data);
+                        
+                        // 移除思考提示，添加实际回复
+                        removeMessage(thinkingMessageId);
+                        if (data.content) {
+                            addMessage('kp', 'KP', data.content);
+                        } else if (data.error) {
+                            addMessage('kp', 'KP', 'AI 回复失败: ' + data.error);
+                        } else {
+                            addMessage('kp', 'KP', 'AI 回复失败: 未知错误');
+                        }
+                    });
                 })
                 .catch(error => {
                     console.error('消息发送失败:', error);
-                    // 即使发送失败，也显示模拟回复
-                    setTimeout(() => {
-                        addMessage('kp', 'KP', '这是 AI 的回复...');
-                    }, 1000);
+                    // 移除思考提示，添加错误消息
+                    removeMessage(thinkingMessageId);
+                    addMessage('kp', 'KP', 'AI 回复失败: ' + error.message);
                 });
             }
         }
     }
     
     // 添加消息到聊天历史
-    function addMessage(type, sender, content) {
+    function addMessage(type, sender, content, messageId = Date.now(), isThinking = false) {
         const messageDiv = document.createElement('div');
         
         // 根据消息类型设置不同的样式类
@@ -955,7 +1086,12 @@ function initChat() {
                 avatarSrc = 'https://via.placeholder.com/40';
         }
         
+        if (isThinking) {
+            messageClass += ' thinking';
+        }
+        
         messageDiv.className = `message ${messageClass}`;
+        messageDiv.setAttribute('data-id', messageId);
         
         const now = new Date();
         const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
@@ -980,6 +1116,16 @@ function initChat() {
         setTimeout(() => {
             chatHistory.scrollTop = chatHistory.scrollHeight;
         }, 100);
+        
+        return messageId;
+    }
+    
+    // 移除消息
+    function removeMessage(messageId) {
+        const messageDiv = document.querySelector(`.message[data-id="${messageId}"]`);
+        if (messageDiv) {
+            messageDiv.remove();
+        }
     }
     
     // 绑定事件

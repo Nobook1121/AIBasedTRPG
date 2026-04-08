@@ -1290,6 +1290,101 @@ def test_ai_platform_api(platform):
         }), 500
 
 
+@app.route('/api/config/aimodel/save', methods=['POST'])
+def save_model_js_config():
+    """
+    保存模型JS配置文件
+    """
+    try:
+        config_data = request.get_json()
+        if not config_data:
+            return jsonify({
+                'success': False,
+                'message': '无效的配置数据'
+            }), 400
+        
+        platform = config_data.get('platform')
+        modelId = config_data.get('modelId')
+        content = config_data.get('content')
+        
+        if not platform or not modelId or not content:
+            return jsonify({
+                'success': False,
+                'message': '平台、模型ID和配置内容不能为空'
+            }), 400
+        
+        # 确保目录存在
+        model_dir = os.path.join('config', 'aimodel', platform)
+        if not os.path.exists(model_dir):
+            os.makedirs(model_dir)
+        
+        # 保存配置文件
+        config_path = os.path.join(model_dir, f'{modelId}.js')
+        with open(config_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+        
+        log_info(f"模型JS配置文件保存成功: {config_path}")
+        return jsonify({
+            'success': True,
+            'message': '配置保存成功'
+        })
+    except Exception as e:
+        log_error(f"保存模型JS配置文件失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'保存失败: {str(e)}'
+        }), 500
+
+
+@app.route('/api/config/aimodel/delete', methods=['POST'])
+def delete_model_js_config():
+    """
+    删除模型JS配置文件
+    """
+    try:
+        config_data = request.get_json()
+        if not config_data:
+            return jsonify({
+                'success': False,
+                'message': '无效的配置数据'
+            }), 400
+        
+        platform = config_data.get('platform')
+        modelId = config_data.get('modelId')
+        
+        if not platform or not modelId:
+            return jsonify({
+                'success': False,
+                'message': '平台和模型ID不能为空'
+            }), 400
+        
+        # 构建文件路径
+        config_path = os.path.join('config', 'aimodel', platform, f'{modelId}.js')
+        
+        # 检查文件是否存在
+        if os.path.exists(config_path):
+            # 删除文件
+            os.remove(config_path)
+            log_info(f"模型JS配置文件删除成功: {config_path}")
+            return jsonify({
+                'success': True,
+                'message': '配置删除成功'
+            })
+        else:
+            # 文件不存在，返回成功
+            log_info(f"模型JS配置文件不存在，无需删除: {config_path}")
+            return jsonify({
+                'success': True,
+                'message': '配置删除成功'
+            })
+    except Exception as e:
+        log_error(f"删除模型JS配置文件失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'删除失败: {str(e)}'
+        }), 500
+
+
 def convert_to_toml(config_data):
     """
     将配置对象转换为TOML格式字符串
@@ -1451,6 +1546,310 @@ def update_user_status(user_id):
             'success': False,
             'error': str(e),
             'message': '更新用户状态失败'
+        }), 500
+
+
+@app.route('/api/chat', methods=['POST'])
+def chat():
+    """
+    聊天API，使用AI平台处理消息
+    """
+    try:
+        message_data = request.json
+        
+        if not message_data:
+            log_warning("聊天请求失败：无数据")
+            return jsonify({
+                'success': False,
+                'error': '无数据',
+                'message': '请提供消息数据'
+            }), 400
+        
+        # 获取用户ID和消息内容
+        user_id = message_data.get('user_id', 'unknown')
+        content = message_data.get('content', '')
+        
+        log_info(f"接收到聊天请求 - 用户ID: {user_id}, 内容: {content}")
+        
+        # 加载对话历史
+        import os
+        import json
+        
+        history_file = os.path.join('history', f'{user_id}.json')
+        history = []
+        
+        if os.path.exists(history_file):
+            try:
+                with open(history_file, 'r', encoding='utf-8') as f:
+                    history = json.load(f)
+                log_info(f"加载对话历史 - 用户: {user_id}, 历史长度: {len(history)}")
+            except Exception as e:
+                log_error(f"加载对话历史失败: {e}")
+                history = []
+        
+        # 动态选择启用的AI平台
+        platform_config = None
+        selected_platform = None
+        
+        # 遍历所有平台配置文件
+        
+        # 获取当前工作目录
+        current_dir = os.getcwd()
+        log_info(f"当前工作目录: {current_dir}")
+        
+        # 构建AI平台配置目录的绝对路径
+        aiplatform_dir = os.path.join(current_dir, 'config', 'aiplatform')
+        log_info(f"AI平台配置目录: {aiplatform_dir}")
+        log_info(f"AI平台配置目录是否存在: {os.path.exists(aiplatform_dir)}")
+        
+        if os.path.exists(aiplatform_dir):
+            try:
+                files = os.listdir(aiplatform_dir)
+                log_info(f"AI平台配置目录中的文件: {files}")
+                
+                for filename in files:
+                    if filename.endswith('.json'):
+                        platform = filename[:-5]  # 移除.json后缀
+                        config_path = os.path.join(aiplatform_dir, filename)
+                        log_info(f"检查平台配置文件: {config_path}")
+                        
+                        try:
+                            with open(config_path, 'r', encoding='utf-8') as f:
+                                config = json.load(f)
+                            log_info(f"平台 {platform} 配置: {json.dumps(config, ensure_ascii=False)}")
+                            log_info(f"平台 {platform} 启用状态: {config.get('enabled', False)}")
+                            if config.get('enabled', False):
+                                platform_config = config
+                                selected_platform = platform
+                                log_info(f"选择平台: {selected_platform}")
+                                break
+                        except Exception as e:
+                            log_error(f"读取平台配置文件失败: {e}")
+                            import traceback
+                            log_error(f"错误堆栈: {traceback.format_exc()}")
+            except Exception as e:
+                log_error(f"列出AI平台配置目录中的文件失败: {e}")
+                import traceback
+                log_error(f"错误堆栈: {traceback.format_exc()}")
+        else:
+            log_error(f"AI平台配置目录不存在: {aiplatform_dir}")
+        
+        if not platform_config:
+            log_warning("无启用的AI平台")
+            return jsonify({
+                'success': False,
+                'error': '无启用的平台',
+                'message': '无启用的AI平台'
+            }), 400
+        
+        log_info(f"使用启用的AI平台: {selected_platform}")
+        
+        # 获取API Key和Base URL
+        api_key = platform_config.get('config', {}).get('api_key')
+        base_url = platform_config.get('config', {}).get('base_url')
+        
+        # 检查必要的配置
+        if not base_url:
+            log_warning(f"平台配置不完整: {selected_platform}")
+            return jsonify({
+                'success': False,
+                'error': '平台配置不完整',
+                'message': 'AI平台配置不完整'
+            }), 400
+        
+        # 对于LMStudio平台，如果没有设置API Key，使用默认值
+        if not api_key and selected_platform == 'lmstudio':
+            api_key = 'lm-studio'
+            log_info(f"LMStudio平台使用默认API Key")
+        elif not api_key:
+            log_warning(f"平台配置不完整: {selected_platform}")
+            return jsonify({
+                'success': False,
+                'error': '平台配置不完整',
+                'message': 'AI平台配置不完整'
+            }), 400
+        
+        # 获取第一个启用的模型
+        models = platform_config.get('models', [])
+        model_id = 'local-model'  # 默认模型ID
+        
+        # 选择一个启用的模型
+        if models:
+            model = next((m for m in models if m.get('enabled', True)), models[0])
+            model_id = model.get('id')
+            log_info(f"选择模型: {model_id}")
+        else:
+            log_info(f"使用默认模型ID: {model_id}")
+        
+        # 构建聊天消息
+        messages = [
+            {
+                'role': 'system',
+                'content': '你是KP（守密人），负责主持TRPG游戏，引导玩家进行游戏。'
+            }
+        ]
+        
+        # 添加对话历史
+        for item in history:
+            messages.append({
+                'role': item['role'],
+                'content': item['content']
+            })
+        
+        # 添加当前用户消息
+        messages.append({
+            'role': 'user',
+            'content': content
+        })
+        
+        log_info(f"构建消息 - 消息数量: {len(messages)}")
+        
+        # 构建请求数据
+        request_data = {
+            'messages': messages,
+            'model': model_id,
+            'max_tokens': 4096,
+            'temperature': 0.7,
+            'top_p': 0.9
+        }
+        
+        # 发送请求到AI平台
+        import requests
+        import json
+        
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {api_key}'
+        }
+        
+        log_info(f"发送请求到AI平台 - URL: {base_url}, 模型: {model_id}")
+        log_info(f"请求数据: {json.dumps(request_data, ensure_ascii=False)}")
+        log_info(f"请求头: {json.dumps(dict(headers), ensure_ascii=False)}")
+        
+        try:
+            # 发送请求，使用更长的超时时间
+            log_info(f"发送请求到AI平台...")
+            # 增加超时时间到300秒（5分钟），以确保AI有足够的时间处理请求
+            response = requests.post(base_url, headers=headers, json=request_data, timeout=300)  # 增加到300秒
+            
+            log_info(f"AI平台响应状态: {response.status_code}")
+            
+            # 打印响应内容，以便调试
+            try:
+                log_info(f"AI平台响应内容: {response.text}")
+            except Exception as e:
+                log_error(f"记录响应内容失败: {e}")
+            
+            if not response.ok:
+                try:
+                    log_error(f"AI平台请求失败: {response.status_code}, {response.text}")
+                except Exception as e:
+                    log_error(f"记录请求失败信息失败: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': f'API请求失败: {response.status_code}',
+                    'message': 'AI平台请求失败'
+                }), response.status_code
+            
+            try:
+                # 解析响应
+                response_data = response.json()
+                try:
+                    log_info(f"AI平台响应数据: {json.dumps(response_data, ensure_ascii=False)}")
+                except Exception as e:
+                    log_error(f"记录响应数据失败: {e}")
+                
+                # 提取AI回复
+                if 'choices' in response_data and len(response_data['choices']) > 0:
+                    choice = response_data['choices'][0]
+                    if 'message' in choice and 'content' in choice['message']:
+                        ai_response = choice['message']['content']
+                    elif 'delta' in choice and 'content' in choice['delta']:
+                        ai_response = choice['delta']['content']
+                    else:
+                        ai_response = ''
+                else:
+                    ai_response = ''
+                
+                if not ai_response:
+                    log_warning("AI平台未返回回复")
+                    return jsonify({
+                        'success': False,
+                        'error': '无回复',
+                        'message': 'AI平台未返回回复'
+                    }), 400
+                
+                # 返回AI回复
+                try:
+                    log_info(f"AI回复: {ai_response}")
+                except Exception as e:
+                    log_error(f"记录AI回复失败: {e}")
+                
+                # 保存对话历史
+                try:
+                    # 添加当前对话到历史
+                    history.append({
+                        'role': 'user',
+                        'content': content
+                    })
+                    history.append({
+                        'role': 'assistant',
+                        'content': ai_response
+                    })
+                    
+                    # 限制历史长度，避免消息过长
+                    if len(history) > 20:  # 保留最近10轮对话
+                        history = history[-20:]
+                    
+                    # 保存历史到文件
+                    os.makedirs('history', exist_ok=True)  # 确保history目录存在
+                    with open(history_file, 'w', encoding='utf-8') as f:
+                        json.dump(history, f, ensure_ascii=False, indent=2)
+                    log_info(f"保存对话历史 - 用户: {user_id}, 历史长度: {len(history)}")
+                except Exception as e:
+                    log_error(f"保存对话历史失败: {e}")
+                
+                return jsonify({
+                    'success': True,
+                    'content': ai_response
+                })
+            except json.JSONDecodeError as e:
+                log_error(f"解析AI平台响应失败: {e}")
+                log_error(f"响应内容: {response.text}")
+                return jsonify({
+                    'success': False,
+                    'error': '解析响应失败',
+                    'message': '解析AI平台响应失败'
+                }), 500
+        except requests.exceptions.Timeout as e:
+            log_error(f"AI平台请求超时: {e}")
+            return jsonify({
+                'success': False,
+                'error': '请求超时',
+                'message': 'AI平台请求超时'
+            }), 504
+        except requests.exceptions.ConnectionError as e:
+            log_error(f"AI平台连接错误: {e}")
+            return jsonify({
+                'success': False,
+                'error': '连接错误',
+                'message': '无法连接到AI平台'
+            }), 503
+        except Exception as e:
+            log_error(f"发送请求到AI平台失败: {e}")
+            import traceback
+            log_error(f"错误堆栈: {traceback.format_exc()}")
+            return jsonify({
+                'success': False,
+                'error': f'请求失败: {str(e)}',
+                'message': 'AI平台请求失败'
+            }), 500
+    except Exception as e:
+        log_error(f"聊天请求失败: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '聊天请求失败'
         }), 500
 
 

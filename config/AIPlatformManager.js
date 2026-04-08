@@ -2,6 +2,7 @@
 // 负责加载、管理和配置AI平台
 
 import { getTestRequestConfig } from './TestRequestConfig.js';
+import defaultProcessModel from './aiplatform/default.js';
 
 class AIPlatformManager {
     constructor() {
@@ -155,12 +156,60 @@ class AIPlatformManager {
                 }
             });
 
+            // 生成模型JS配置文件
+            await this.generateModelJSConfig(platform, model.id);
+
             await this.savePlatformConfig(platform, config);
             this.platforms[platform] = config;
             return true;
         } catch (error) {
             console.error('添加模型失败:', error);
             return false;
+        }
+    }
+
+    /**
+     * 生成模型JS配置文件
+     * @param {string} platform - 平台名称
+     * @param {string} modelId - 模型ID
+     * @returns {Promise<void>}
+     */
+    async generateModelJSConfig(platform, modelId) {
+        try {
+            // 读取默认JS配置模板
+            const response = await fetch('config/aiplatform/default.js');
+            if (!response.ok) {
+                throw new Error('无法加载默认JS配置模板');
+            }
+            let template = await response.text();
+
+            // 替换模型ID
+            template = template.replace(/model: '1'/g, `model: '${modelId}'`);
+
+            // 保存到对应平台的目录下
+            const filePath = `config/aimodel/${platform}/${modelId}.js`;
+            
+            // 发送请求保存文件
+            const saveResponse = await fetch('/api/config/aimodel/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    platform: platform,
+                    modelId: modelId,
+                    content: template
+                })
+            });
+
+            if (!saveResponse.ok) {
+                throw new Error('保存模型JS配置失败');
+            }
+
+            console.log(`模型JS配置文件已生成: ${filePath}`);
+        } catch (error) {
+            console.error('生成模型JS配置失败:', error);
+            throw error;
         }
     }
 
@@ -183,12 +232,64 @@ class AIPlatformManager {
             }
 
             config.models.splice(modelIndex, 1);
+            
+            // 删除模型JS配置文件
+            await this.deleteModelJSConfig(platform, modelId);
+            
             await this.savePlatformConfig(platform, config);
             this.platforms[platform] = config;
             return true;
         } catch (error) {
             console.error('移除模型失败:', error);
             return false;
+        }
+    }
+
+    /**
+     * 删除模型JS配置文件
+     * @param {string} platform - 平台名称
+     * @param {string} modelId - 模型ID
+     * @returns {Promise<void>}
+     */
+    async deleteModelJSConfig(platform, modelId) {
+        try {
+            // 发送请求删除文件
+            const deleteResponse = await fetch('/api/config/aimodel/delete', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    platform: platform,
+                    modelId: modelId
+                })
+            });
+
+            if (!deleteResponse.ok) {
+                throw new Error('删除模型JS配置失败');
+            }
+
+            console.log(`模型JS配置文件已删除: config/aimodel/${platform}/${modelId}.js`);
+        } catch (error) {
+            console.error('删除模型JS配置失败:', error);
+            // 即使删除文件失败，也继续执行模型删除操作
+        }
+    }
+
+    /**
+     * 获取默认JS配置
+     * @returns {string} 默认JS配置代码
+     */
+    async getDefaultJSConfig() {
+        try {
+            const response = await fetch('config/aiplatform/default.js');
+            if (!response.ok) {
+                throw new Error('无法加载默认JS配置');
+            }
+            return await response.text();
+        } catch (error) {
+            console.error('获取默认JS配置失败:', error);
+            return '';
         }
     }
 
