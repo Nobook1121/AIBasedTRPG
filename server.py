@@ -1681,11 +1681,30 @@ def chat():
         else:
             log_info(f"使用默认模型ID: {model_id}")
         
+        # 加载KP角色提示词
+        import os
+        kp_prompt_path = os.path.join('config', 'roles', 'kp.md')
+        
+        try:
+            with open(kp_prompt_path, 'r', encoding='utf-8') as f:
+                kp_prompt_content = f.read()
+                # 提取markdown内容（跳过标题行）
+                lines = kp_prompt_content.split('\n')
+                content_lines = []
+                for line in lines:
+                    if not line.startswith('#') and line.strip():
+                        content_lines.append(line)
+                kp_system_prompt = '\n'.join(content_lines) if content_lines else '你是KP（守密人），负责主持TRPG游戏，引导玩家进行游戏。'
+                log_info(f"已加载KP角色提示词文件")
+        except Exception as e:
+            log_error(f"加载KP角色提示词文件失败: {e}")
+            raise Exception(f"无法加载KP角色提示词文件: {kp_prompt_path}")
+        
         # 构建聊天消息
         messages = [
             {
                 'role': 'system',
-                'content': '你是KP（守密人），负责主持TRPG游戏，引导玩家进行游戏。'
+                'content': kp_system_prompt
             }
         ]
         
@@ -1771,6 +1790,15 @@ def chat():
                 else:
                     ai_response = ''
                 
+                # 提取Token消耗数据
+                token_count = None
+                if 'usage' in response_data:
+                    usage = response_data['usage']
+                    if 'total_tokens' in usage:
+                        token_count = usage['total_tokens']
+                    elif 'completion_tokens' in usage and 'prompt_tokens' in usage:
+                        token_count = usage['completion_tokens'] + usage['prompt_tokens']
+                
                 if not ai_response:
                     log_warning("AI平台未返回回复")
                     return jsonify({
@@ -1782,6 +1810,8 @@ def chat():
                 # 返回AI回复
                 try:
                     log_info(f"AI回复: {ai_response}")
+                    if token_count:
+                        log_info(f"Token消耗: {token_count}")
                 except Exception as e:
                     log_error(f"记录AI回复失败: {e}")
                 
@@ -1811,7 +1841,8 @@ def chat():
                 
                 return jsonify({
                     'success': True,
-                    'content': ai_response
+                    'content': ai_response,
+                    'token_count': token_count
                 })
             except json.JSONDecodeError as e:
                 log_error(f"解析AI平台响应失败: {e}")

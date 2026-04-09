@@ -76,6 +76,9 @@ async function loadAndApplyConfigs() {
         // 应用常规设置到UI
         configManager.applyGeneralSettings();
         
+        // 初始化主题系统
+        configManager.initThemeSystem();
+        
         console.log('配置文件加载和应用完成');
     } catch (error) {
         console.error('加载配置文件时出错:', error);
@@ -1001,7 +1004,14 @@ function initChat() {
                 
                 // 显示AI正在思考的提示
                 const thinkingMessageId = Date.now();
+                const startTime = Date.now(); // 记录开始时间
                 addMessage('kp', 'KP', 'AI正在思考...', thinkingMessageId, true);
+                
+                // 开始实时计时
+                let timerInterval = setInterval(() => {
+                    const elapsedTime = Math.round((Date.now() - startTime) / 1000);
+                    updateMessage(thinkingMessageId, 'AI正在思考...', elapsedTime);
+                }, 1000);
                 
                 fetch('/api/chat', {
                     method: 'POST',
@@ -1024,29 +1034,49 @@ function initChat() {
                     return response.json().then(data => {
                         console.log('消息发送成功:', data);
                         
-                        // 移除思考提示，添加实际回复
-                        removeMessage(thinkingMessageId);
+                        // 清除计时器
+                        clearInterval(timerInterval);
+                        
+                        // 计算处理时间
+                        const endTime = Date.now();
+                        const processingTime = Math.round((endTime - startTime) / 1000);
+                        
+                        // 提取Token消耗数据
+                        const tokenCount = data.token_count || null;
+                        
+                        // 构建带有处理时间的消息内容
+                        let messageContent = '';
                         if (data.content) {
-                            addMessage('kp', 'KP', data.content);
+                            messageContent = data.content;
                         } else if (data.error) {
-                            addMessage('kp', 'KP', 'AI 回复失败: ' + data.error);
+                            messageContent = 'AI 回复失败: ' + data.error;
                         } else {
-                            addMessage('kp', 'KP', 'AI 回复失败: 未知错误');
+                            messageContent = 'AI 回复失败: 未知错误';
                         }
+                        
+                        // 更新思考提示为实际回复，而不是移除后添加
+                        updateMessage(thinkingMessageId, messageContent, processingTime, tokenCount);
                     });
                 })
                 .catch(error => {
                     console.error('消息发送失败:', error);
-                    // 移除思考提示，添加错误消息
-                    removeMessage(thinkingMessageId);
-                    addMessage('kp', 'KP', 'AI 回复失败: ' + error.message);
+                    
+                    // 清除计时器
+                    clearInterval(timerInterval);
+                    
+                    // 计算处理时间
+                    const endTime = Date.now();
+                    const processingTime = Math.round((endTime - startTime) / 1000);
+                    
+                    // 更新思考提示为错误消息
+                    updateMessage(thinkingMessageId, 'AI 回复失败: ' + error.message, processingTime, null);
                 });
             }
         }
     }
     
     // 添加消息到聊天历史
-    function addMessage(type, sender, content, messageId = Date.now(), isThinking = false) {
+    function addMessage(type, sender, content, messageId = Date.now(), isThinking = false, processingTime = null, tokenCount = null) {
         const messageDiv = document.createElement('div');
         
         // 根据消息类型设置不同的样式类
@@ -1097,7 +1127,7 @@ function initChat() {
         const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
         
         // 构建消息HTML，包含头像、发送者、时间和内容
-        messageDiv.innerHTML = `
+        let messageHTML = `
             <div class="message-avatar">
                 <img src="${avatarSrc}" alt="${sender}">
             </div>
@@ -1107,8 +1137,24 @@ function initChat() {
                     <span class="message-time">${time}</span>
                 </div>
                 <div class="message-content">${content}</div>
+        `;
+        
+        // 添加处理时间和Token消耗显示
+        if (processingTime !== null) {
+            let displayText = `已耗时: ${processingTime}秒`;
+            if (tokenCount !== null) {
+                displayText += ` 消耗Token：${tokenCount}`;
+            }
+            messageHTML += `
+                <div class="processing-time">${displayText}</div>
+            `;
+        }
+        
+        messageHTML += `
             </div>
         `;
+        
+        messageDiv.innerHTML = messageHTML;
         
         chatHistory.appendChild(messageDiv);
         
@@ -1125,6 +1171,89 @@ function initChat() {
         const messageDiv = document.querySelector(`.message[data-id="${messageId}"]`);
         if (messageDiv) {
             messageDiv.remove();
+        }
+    }
+    
+    // 更新消息内容
+    function updateMessage(messageId, newContent, processingTime = null, tokenCount = null) {
+        // 确保messageId是字符串类型
+        const messageIdStr = String(messageId);
+        console.log('尝试更新消息:', messageIdStr);
+        
+        // 首先查找所有带有thinking类的KP消息
+        const thinkingMessages = document.querySelectorAll('.message.thinking.kp-message');
+        console.log('找到的thinking KP消息数量:', thinkingMessages.length);
+        
+        // 优先更新带有thinking类的KP消息
+        if (thinkingMessages.length > 0) {
+            const thinkingMessage = thinkingMessages[0];
+            console.log('更新thinking KP消息');
+            
+            const contentDiv = thinkingMessage.querySelector('.message-content');
+            if (contentDiv) {
+                contentDiv.textContent = newContent;
+            }
+            
+            // 添加处理时间和Token消耗显示
+            if (processingTime !== null) {
+                let processingTimeDiv = thinkingMessage.querySelector('.processing-time');
+                if (!processingTimeDiv) {
+                    processingTimeDiv = document.createElement('div');
+                    processingTimeDiv.className = 'processing-time';
+                    // 找到消息内容容器，将处理时间添加到消息内容下方
+                    const contentContainer = thinkingMessage.querySelector('.message-content-container');
+                    if (contentContainer) {
+                        contentContainer.appendChild(processingTimeDiv);
+                    }
+                }
+                let displayText = `已耗时: ${processingTime}秒`;
+                if (tokenCount !== null) {
+                    displayText += ` 消耗Token：${tokenCount}`;
+                }
+                processingTimeDiv.textContent = displayText;
+            }
+            
+            // 移除thinking样式
+            thinkingMessage.classList.remove('thinking');
+            console.log('Thinking KP消息更新完成');
+        } else {
+            // 如果没有thinking KP消息，查找指定ID的消息
+            const messageDiv = document.querySelector(`.message[data-id="${messageIdStr}"]`);
+            if (messageDiv) {
+                console.log('找到指定ID的消息，开始更新');
+                
+                const contentDiv = messageDiv.querySelector('.message-content');
+                if (contentDiv) {
+                    contentDiv.textContent = newContent;
+                }
+                
+                // 添加处理时间和Token消耗显示
+                if (processingTime !== null) {
+                    let processingTimeDiv = messageDiv.querySelector('.processing-time');
+                    if (!processingTimeDiv) {
+                        processingTimeDiv = document.createElement('div');
+                        processingTimeDiv.className = 'processing-time';
+                        // 找到消息内容容器，将处理时间添加到消息内容下方
+                        const contentContainer = messageDiv.querySelector('.message-content-container');
+                        if (contentContainer) {
+                            contentContainer.appendChild(processingTimeDiv);
+                        }
+                    }
+                    let displayText = `已耗时: ${processingTime}秒`;
+                    if (tokenCount !== null) {
+                        displayText += ` 消耗Token：${tokenCount}`;
+                    }
+                    processingTimeDiv.textContent = displayText;
+                }
+                
+                // 移除thinking样式
+                messageDiv.classList.remove('thinking');
+                console.log('指定ID消息更新完成');
+            } else {
+                console.error('未找到ID为', messageIdStr, '的消息，也没有找到thinking KP消息');
+                // 如果找不到消息，添加一个新的KP消息
+                addMessage('kp', 'KP', newContent, null, false, processingTime, tokenCount);
+            }
         }
     }
     
@@ -1406,6 +1535,28 @@ function initSettingsTabs() {
     if (temperatureSlider && temperatureValue) {
         temperatureSlider.addEventListener('input', function() {
             temperatureValue.textContent = this.value;
+        });
+    }
+    
+    // 绑定主题下拉选择框事件
+    const themeSelect = document.getElementById('themeSelect');
+    if (themeSelect) {
+        themeSelect.addEventListener('change', async function() {
+            const themeValue = this.value;
+            
+            // 更新配置
+            const generalConfig = configManager.getConfig('general') || {};
+            
+            if (!generalConfig.appearance) {
+                generalConfig.appearance = {};
+            }
+            generalConfig.appearance.theme = themeValue;
+            
+            // 保存配置
+            await configManager.saveConfig('general', generalConfig);
+            
+            // 应用主题
+            configManager.applyTheme();
         });
     }
     

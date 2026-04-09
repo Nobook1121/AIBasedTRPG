@@ -1,37 +1,27 @@
-# 常规设置配置文件
-# 该文件用于存储"常规设置"子标签下的所有可配置项目
-
 [appearance]
-# 界面主题设置
-theme = "light"  # 可选值: light (浅色), dark (深色)
+theme = "light"
 
 [language]
-# 语言设置
-language = "zh-CN"  # 可选值: zh-CN (简体中文), en-US (英文)
+language = "zh-CN"
 
 [notification]
-# 通知设置
-enable_sound = true  # 是否启用提示音
-enable_desktop_notification = false  # 是否启用桌面通知
+enable_sound = true
+enable_desktop_notification = false
 
 [autosave]
-# 自动保存设置
-enabled = true  # 是否启用自动保存
-interval = 300  # 自动保存间隔（秒）
+enabled = true
+interval = 300
 
 [chat]
-# 聊天设置
-show_timestamp = true  # 是否显示消息时间戳
-message_font_size = 14  # 消息字体大小（像素）
-max_history_messages = 1000  # 最大历史消息数量
+show_timestamp = true
+message_font_size = 14
+max_history_messages = 1000
 
 [window]
-# 窗口设置
-remember_window_size = true  # 是否记住窗口大小
-window_width = 1200  # 默认窗口宽度
-window_height = 800  # 默认窗口高度
+remember_window_size = true
+window_width = 1200
+window_height = 800
 
 [update]
-# 更新设置
-check_update_on_startup = true  # 启动时检查更新
-auto_update = false  # 是否自动更新
+check_update_on_startup = true
+auto_update = false

@@ -134,6 +134,14 @@ body, html {
     justify-content: flex-start;
 }
 
+/* 处理时间显示样式 */
+.processing-time {
+    font-size: 12px;
+    color: #666;
+    margin-top: 5px;
+    font-style: italic;
+}
+
 /* 统一消息元素的间距 */
 .message-content-container {
     display: flex;
@@ -455,6 +463,162 @@ body, html {
 /* 滑块样式 */
 .form-range {
     width: 100%;
+}
+
+                                                                     /* 主题滑块样式 */
+.theme-slider-container {
+    margin-top: 10px;
+}
+
+.theme-options {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 5px;
+    font-size: 14px;
+    color: #666;
+}
+
+.theme-slider {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: #ddd;
+    outline: none;
+    -webkit-appearance: none;
+}
+
+.theme-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #007bff;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.theme-slider::-webkit-slider-thumb:hover {
+    background: #0056b3;
+    transform: scale(1.1);
+}
+
+.theme-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #007bff;
+    cursor: pointer;
+    border: none;
+    transition: all 0.3s ease;
+}
+
+.theme-slider::-moz-range-thumb:hover {
+    background: #0056b3;
+    transform: scale(1.1);
+}
+
+/* 暗色主题样式 */
+body.dark-theme {
+    background-color: #1a1a1a;
+    color: #e0e0e0;
+}
+
+body.dark-theme .sidebar {
+    background-color: #2d2d2d;
+    color: #e0e0e0;
+}
+
+body.dark-theme .chat-history {
+    background-color: #1a1a1a;
+    border-bottom: 1px solid #444;
+}
+
+body.dark-theme .message.kp-message .message-content-container {
+    background-color: #2d2d2d;
+    color: #e0e0e0;
+    border: 1px solid #444;
+}
+
+body.dark-theme .message.player-message .message-content-container {
+    background-color: #007bff;
+    color: white;
+}
+
+body.dark-theme .chat-input-container {
+    background-color: #2d2d2d;
+    border-top: 1px solid #444;
+}
+
+body.dark-theme .chat-input {
+    background-color: #3a3a3a;
+    color: #e0e0e0;
+    border: 1px solid #444;
+}
+
+body.dark-theme .send-button {
+    background-color: #007bff;
+    color: white;
+}
+
+body.dark-theme .send-button:hover {
+    background-color: #0056b3;
+}
+
+body.dark-theme .settings-content {
+    background-color: #2d2d2d;
+    color: #e0e0e0;
+}
+
+body.dark-theme .ai-platform-card {
+    background-color: #2d2d2d;
+    border: 1px solid #444;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+body.dark-theme .form-control {
+    background-color: #3a3a3a;
+    color: #e0e0e0;
+    border: 1px solid #444;
+}
+
+body.dark-theme .form-control:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+body.dark-theme .btn-primary {
+    background-color: #007bff;
+    border-color: #007bff;
+}
+
+body.dark-theme .btn-primary:hover {
+    background-color: #0056b3;
+    border-color: #0056b3;
+}
+
+body.dark-theme .btn-secondary {
+    background-color: #444;
+    border-color: #444;
+    color: #e0e0e0;
+}
+
+body.dark-theme .btn-secondary:hover {
+    background-color: #555;
+    border-color: #555;
+}
+
+body.dark-theme .modal-content {
+    background-color: #2d2d2d;
+    color: #e0e0e0;
+}
+
+body.dark-theme .modal-header {
+    border-bottom: 1px solid #444;
+}
+
+body.dark-theme .modal-footer {
+    border-top: 1px solid #444;
 }
 
 /* AI平台管理样式 */

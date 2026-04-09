@@ -149,6 +149,15 @@ class ConfigManager {
         if (!config) return null;
         return config[section] || null;
     }
+    
+    /**
+     * 获取完整的配置对象
+     * @param {string} configName - 配置文件名称
+     * @returns {Object} 配置对象
+     */
+    getConfig(configName) {
+        return this.configs[configName] || {};
+    }
 
     /**
      * 应用常规设置到UI
@@ -166,6 +175,9 @@ class ConfigManager {
         if (themeSelect) {
             themeSelect.value = theme;
         }
+        
+        // 应用主题到页面
+        this.applyTheme();
 
         // 应用语言设置
         const language = this.get('general', 'language', 'language', 'zh-CN');
@@ -214,6 +226,54 @@ class ConfigManager {
         }
 
         console.log('常规设置已应用到UI');
+    }
+
+    /**
+     * 应用主题到页面
+     */
+    applyTheme() {
+        const theme = this.get('general', 'appearance', 'theme', 'light');
+        
+        // 移除所有主题类
+        document.body.classList.remove('dark-theme', 'light-theme');
+        
+        if (theme === 'dark') {
+            // 应用暗色主题
+            document.body.classList.add('dark-theme');
+        } else if (theme === 'light') {
+            // 应用浅色主题
+            document.body.classList.add('light-theme');
+        } else if (theme === 'system') {
+            // 跟随系统主题
+            const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (prefersDarkScheme) {
+                document.body.classList.add('dark-theme');
+            } else {
+                document.body.classList.add('light-theme');
+            }
+        }
+        
+        console.log(`主题已应用: ${theme}`);
+    }
+    
+    /**
+     * 初始化主题系统
+     */
+    initThemeSystem() {
+        // 应用初始主题
+        this.applyTheme();
+        
+        // 监听系统主题变化
+        if (window.matchMedia) {
+            const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+            mediaQuery.addEventListener('change', () => {
+                // 只有在跟随系统主题时才响应变化
+                const theme = this.get('general', 'appearance', 'theme', 'light');
+                if (theme === 'system') {
+                    this.applyTheme();
+                }
+            });
+        }
     }
 
     /**
