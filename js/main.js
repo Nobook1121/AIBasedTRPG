@@ -1,8 +1,5 @@
 // 主脚本文件
-import ScenarioController from './controllers/ScenarioController.js';
-import ToolManager from '../tools/toolManager.js';
-import configManager from '../config/ConfigManager.js';
-import aiPlatformManager from '../config/AIPlatformManager.js';
+// 移除import语句，因为现在不再是模块
 
 // 全局工具管理器
 let toolManager;
@@ -41,6 +38,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     // 初始化用户认证功能
     initAuth();
+    
+    // 初始化网络配置
+    initNetworkConfig();
     
     // 添加全局事件监听器，确保遮罩层在所有模态框关闭后被正确移除
     document.addEventListener('hidden.bs.modal', function(event) {
@@ -930,9 +930,26 @@ function initTabs() {
             return;
         }
         
+        // 处理导航链接点击
         navLinks.forEach(link => {
             link.addEventListener('click', function(e) {
                 e.preventDefault();
+                
+                // 检查点击的链接是否在下拉容器内
+                const isInDropdown = this.closest('.dropdown-container');
+                
+                // 只有当点击的不是下拉容器内的链接时，才关闭所有下拉菜单
+                if (!isInDropdown) {
+                    // 关闭所有下拉菜单
+                    const dropdownBtns = document.querySelectorAll('.dropdown-btn');
+                    dropdownBtns.forEach(btn => {
+                        btn.classList.remove('active');
+                        const dropdownContent = btn.nextElementSibling;
+                        if (dropdownContent) {
+                            dropdownContent.style.display = 'none';
+                        }
+                    });
+                }
                 
                 // 移除所有活动状态
                 navLinks.forEach(l => l.classList.remove('active'));
@@ -955,6 +972,74 @@ function initTabs() {
                 
                 targetTab.classList.add('active');
                 console.log(`切换到标签页: ${tabId}`);
+                
+                // 处理设置子标签页的切换
+                if (tabId === 'settings') {
+                    const settingsLink = this.getAttribute('href');
+                    if (settingsLink) {
+                        const settingsTab = settingsLink.replace('#', '');
+                        const tabName = settingsTab.replace('settings-', '');
+                        const settingsTabs = document.querySelectorAll('.settings-tab');
+                        const settingsContents = document.querySelectorAll('.settings-content');
+                        
+                        settingsTabs.forEach(tab => tab.classList.remove('active'));
+                        settingsContents.forEach(content => content.classList.remove('active'));
+                        
+                        const targetSettingsTab = document.querySelector(`.settings-tab[data-settings="${tabName}"]`);
+                        const targetSettingsContent = document.getElementById(`${tabName}-settings-content`);
+                        
+                        if (targetSettingsTab) targetSettingsTab.classList.add('active');
+                        if (targetSettingsContent) targetSettingsContent.classList.add('active');
+                    }
+                }
+                
+                // 处理工具子标签页的切换
+                if (tabId === 'tools') {
+                    const toolsLink = this.getAttribute('href');
+                    if (toolsLink) {
+                        const toolsTab = toolsLink.replace('#', '');
+                        const toolTabs = document.querySelectorAll('.tool-tab');
+                        const toolContents = document.querySelectorAll('.tool-content');
+                        
+                        toolTabs.forEach(tab => tab.classList.remove('active'));
+                        toolContents.forEach(content => content.classList.remove('active'));
+                        
+                        if (toolsTab === 'tools-dice') {
+                            document.querySelector('.tool-tab[data-tool="dice"]').classList.add('active');
+                            document.getElementById('dice-tool-content').classList.add('active');
+                        }
+                    }
+                }
+            });
+        });
+        
+        // 处理下拉按钮点击
+        const dropdownBtns = document.querySelectorAll('.dropdown-btn');
+        dropdownBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                // 切换活动状态
+                this.classList.toggle('active');
+                
+                // 获取下一个兄弟元素（下拉容器）
+                const dropdownContent = this.nextElementSibling;
+                
+                // 切换下拉容器的显示/隐藏
+                if (dropdownContent.style.display === 'block') {
+                    dropdownContent.style.display = 'none';
+                } else {
+                    dropdownContent.style.display = 'block';
+                }
+                
+                // 关闭其他下拉菜单
+                dropdownBtns.forEach(otherBtn => {
+                    if (otherBtn !== this) {
+                        otherBtn.classList.remove('active');
+                        const otherContent = otherBtn.nextElementSibling;
+                        if (otherContent) {
+                            otherContent.style.display = 'none';
+                        }
+                    }
+                });
             });
         });
         
@@ -1075,6 +1160,23 @@ function initChat() {
         }
     }
     
+    // 渲染Markdown内容
+    function renderMarkdown(content) {
+        try {
+            // 配置marked选项
+            marked.setOptions({
+                breaks: true,
+                gfm: true,
+                headerIds: false,
+                mangle: false
+            });
+            return marked(content);
+        } catch (error) {
+            console.error('Markdown渲染失败:', error);
+            return `<div class="markdown-error">Markdown解析失败: ${error.message}</div>`;
+        }
+    }
+    
     // 添加消息到聊天历史
     function addMessage(type, sender, content, messageId = Date.now(), isThinking = false, processingTime = null, tokenCount = null) {
         const messageDiv = document.createElement('div');
@@ -1126,6 +1228,9 @@ function initChat() {
         const now = new Date();
         const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
         
+        // 渲染Markdown内容
+        const renderedContent = isThinking ? content : renderMarkdown(content);
+        
         // 构建消息HTML，包含头像、发送者、时间和内容
         let messageHTML = `
             <div class="message-avatar">
@@ -1136,7 +1241,7 @@ function initChat() {
                     <span class="message-sender">${sender}</span>
                     <span class="message-time">${time}</span>
                 </div>
-                <div class="message-content">${content}</div>
+                <div class="message-content markdown-body">${renderedContent}</div>
         `;
         
         // 添加处理时间和Token消耗显示
@@ -1191,7 +1296,11 @@ function initChat() {
             
             const contentDiv = thinkingMessage.querySelector('.message-content');
             if (contentDiv) {
-                contentDiv.textContent = newContent;
+                // 渲染Markdown内容
+                const renderedContent = renderMarkdown(newContent);
+                contentDiv.innerHTML = renderedContent;
+                // 添加markdown-body类
+                contentDiv.classList.add('markdown-body');
             }
             
             // 添加处理时间和Token消耗显示
@@ -1224,7 +1333,11 @@ function initChat() {
                 
                 const contentDiv = messageDiv.querySelector('.message-content');
                 if (contentDiv) {
-                    contentDiv.textContent = newContent;
+                    // 渲染Markdown内容
+                    const renderedContent = renderMarkdown(newContent);
+                    contentDiv.innerHTML = renderedContent;
+                    // 添加markdown-body类
+                    contentDiv.classList.add('markdown-body');
                 }
                 
                 // 添加处理时间和Token消耗显示
@@ -1932,4 +2045,156 @@ function saveUserSettingsFunc() {
     setTimeout(() => {
         messageElement.textContent = '';
     }, 3000);
+}
+
+// 初始化网络配置
+function initNetworkConfig() {
+    // 加载网络配置
+    loadNetworkConfig();
+    
+    // 绑定保存网络配置按钮事件
+    const saveNetworkConfigBtn = document.getElementById('saveNetworkConfig');
+    if (saveNetworkConfigBtn) {
+        saveNetworkConfigBtn.addEventListener('click', saveNetworkConfig);
+    }
+    
+    // 绑定测试网络连接按钮事件
+    const testNetworkConnectionBtn = document.getElementById('testNetworkConnection');
+    if (testNetworkConnectionBtn) {
+        testNetworkConnectionBtn.addEventListener('click', testNetworkConnection);
+    }
+    
+
+    
+    // 定期更新网络状态
+    setInterval(updateNetworkStatus, 5000);
+    
+    console.log('网络配置初始化成功');
+}
+
+// 加载网络配置
+async function loadNetworkConfig() {
+    try {
+        const response = await fetch('/api/network/config');
+        const data = await response.json();
+        
+        if (data.success) {
+            const config = data.data;
+            
+            // 更新UI
+            const networkPort = document.getElementById('networkPort');
+            if (networkPort) {
+                networkPort.value = config.port || 8086;
+            }
+            
+            const enableDiscovery = document.getElementById('enableDiscovery');
+            if (enableDiscovery) {
+                enableDiscovery.checked = config.discovery_enabled !== false;
+            }
+            
+            // 加载网络穿透配置
+            loadPenetrationConfig();
+        }
+    } catch (error) {
+        console.error('加载网络配置失败:', error);
+    }
+}
+
+// 保存网络配置
+async function saveNetworkConfig() {
+    try {
+        const port = document.getElementById('networkPort').value;
+        const discoveryEnabled = document.getElementById('enableDiscovery').checked;
+        
+        const response = await fetch('/api/network/config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                port: parseInt(port),
+                discovery_enabled: discoveryEnabled
+            })
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            showNotification('网络配置保存成功', 'success');
+            // 重新加载网络状态
+            updateNetworkStatus();
+        } else {
+            showNotification('网络配置保存失败: ' + data.message, 'error');
+        }
+    } catch (error) {
+        console.error('保存网络配置失败:', error);
+        showNotification('保存网络配置失败: ' + error.message, 'error');
+    }
+}
+
+// 测试网络连接
+async function testNetworkConnection() {
+    try {
+        const response = await fetch('/api/network/test', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({})
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+            const testData = data.data;
+            let message = `网络连接测试完成\n本地IP: ${testData.local_ip}\n端口: ${testData.port}\n连接状态: ${testData.connection_success ? '成功' : '失败'}`;
+            if (!testData.connection_success) {
+                message += `\n错误信息: ${testData.error_message}`;
+            }
+            message += `\n服务发现: ${testData.discovery_success ? '成功' : '失败'}`;
+            if (!testData.discovery_success) {
+                message += `\n发现错误: ${testData.discovery_error}`;
+            }
+            showNotification(message, testData.connection_success ? 'success' : 'error');
+            // 重新加载网络状态
+            updateNetworkStatus();
+        } else {
+            showNotification('网络连接测试失败: ' + data.message, 'error');
+        }
+    } catch (error) {
+        console.error('测试网络连接失败:', error);
+        showNotification('测试网络连接失败: ' + error.message, 'error');
+    }
+}
+
+// 更新网络状态
+async function updateNetworkStatus() {
+    try {
+        const response = await fetch('/api/network/status');
+        const data = await response.json();
+        
+        if (data.success) {
+            const status = data.data;
+            
+            // 更新服务器状态
+            const serverStatus = document.getElementById('serverStatus');
+            if (serverStatus) {
+                serverStatus.textContent = status.server_status || '未知';
+                serverStatus.className = 'status-value ' + (status.server_status === '运行中' ? 'status-success' : 'status-error');
+            }
+            
+            // 更新局域网IP
+            const lanIp = document.getElementById('lanIp');
+            if (lanIp) {
+                lanIp.textContent = status.lan_ip || '未知';
+            }
+            
+            // 更新外部可访问性
+            const externalAccess = document.getElementById('externalAccess');
+            if (externalAccess) {
+                externalAccess.textContent = status.external_access || '未知';
+                externalAccess.className = 'status-value ' + (status.external_access === '可访问' ? 'status-success' : 'status-error');
+            }
+        }
+    } catch (error) {
+        console.error('更新网络状态失败:', error);
+    }
 }

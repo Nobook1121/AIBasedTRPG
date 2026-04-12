@@ -1,4 +1,5 @@
 // 骰子工具模块
+// 改为普通脚本，使用全局变量
 class DiceTool {
     constructor() {
         this.diceTypes = {
@@ -102,4 +103,5 @@ class DiceTool {
     }
 }
 
-export default DiceTool;
+// 导出为全局变量
+window.DiceTool = DiceTool;

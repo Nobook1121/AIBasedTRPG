@@ -1,6 +1,5 @@
 // 工具管理器模块
-import DiceTool from './diceTool.js';
-
+// 改为普通脚本，使用全局变量
 class ToolManager {
     constructor() {
         this.tools = {
@@ -59,4 +58,5 @@ class ToolManager {
     }
 }
 
-export default ToolManager;
+// 导出为全局变量
+window.ToolManager = ToolManager;

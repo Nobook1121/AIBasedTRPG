@@ -1,0 +1,8 @@
+{
+  "port": 8086,
+  "discovery_enabled": true,
+  "access_control": {
+    "enabled": false,
+    "allowed_ips": []
+  }
+}

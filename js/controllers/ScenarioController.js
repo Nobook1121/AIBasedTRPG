@@ -1,7 +1,5 @@
 // 剧本控制器类 - MVC架构的Controller层
-import ScenarioModel from '../models/ScenarioModel.js';
-import ScenarioView from '../views/ScenarioView.js';
-
+// 改为普通脚本，使用全局变量
 class ScenarioController {
     constructor() {
         // 初始化Model
@@ -336,5 +334,5 @@ class ScenarioController {
 
 }
 
-// 导出模块
-export default ScenarioController;
+// 导出为全局变量
+window.ScenarioController = ScenarioController;

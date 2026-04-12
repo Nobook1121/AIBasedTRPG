@@ -5,7 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI TRPG 系统</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://www.w3schools.cn/cdnjs/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="tools/diceTool.js"></script>
+    <script src="tools/toolManager.js"></script>
+    <script src="config/TestRequestConfig.js"></script>
+    <script src="config/ConfigManager.js"></script>
+    <script src="config/AIPlatformManager.js"></script>
+    <script src="js/models/ScenarioModel.js"></script>
+    <script src="js/views/ScenarioView.js"></script>
+    <script src="js/controllers/ScenarioController.js"></script>
 </head>
 <body>
     <div class="notification-container"></div>
@@ -29,10 +39,24 @@
                             <a class="nav-link" href="#save" data-tab="save">存档管理</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="#tools" data-tab="tools">小工具</a>
+                            <button class="dropdown-btn">小工具
+                                <i class="fa fa-caret-down"></i>
+                            </button>
+                            <div class="dropdown-container">
+                                <a class="nav-link" href="#tools-dice" data-tab="tools">骰子工具</a>
+                                <a class="nav-link" href="#tools-other" data-tab="tools">其他工具</a>
+                            </div>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="#settings" data-tab="settings">设置</a>
+                            <button class="dropdown-btn">设置
+                                <i class="fa fa-caret-down"></i>
+                            </button>
+                            <div class="dropdown-container">
+                                <a class="nav-link" href="#settings-general" data-tab="settings">常规设置</a>
+                                <a class="nav-link" href="#settings-model" data-tab="settings">模型设置</a>
+                                <a class="nav-link" href="#settings-network" data-tab="settings">网络配置</a>
+                                <a class="nav-link" href="#settings-about" data-tab="settings">关于应用</a>
+                            </div>
                         </li>
                     </ul>
                     <!-- 用户信息区域 -->
@@ -255,6 +279,7 @@
                         <div class="settings-tabs mb-4">
                             <button class="settings-tab active" data-settings="general">常规设置</button>
                             <button class="settings-tab" data-settings="model">模型设置</button>
+                            <button class="settings-tab" data-settings="network">网络配置</button>
                             <button class="settings-tab" data-settings="about">关于应用</button>
                         </div>
                         
@@ -332,6 +357,45 @@
                             <div id="ai-platforms-container" class="ai-platforms-container">
                                 <!-- 平台卡片将在这里动态生成 -->
                             </div>
+                        </div>
+                        
+                        <!-- 网络配置内容 -->
+                        <div id="network-settings-content" class="settings-content">
+                            <div class="mb-4">
+                                <h4>网络配置</h4>
+                                <div class="network-config">
+                                    <div class="form-group">
+                                        <label>端口号</label>
+                                        <input type="number" class="form-control" id="networkPort" min="1" max="65535" value="8086">
+                                    </div>
+                                    <div class="form-group mt-2">
+                                        <div class="form-check">
+                                            <input type="checkbox" class="form-check-input" id="enableDiscovery">
+                                            <label class="form-check-label" for="enableDiscovery">启用局域网服务发现</label>
+                                        </div>
+                                    </div>
+                                    <div class="form-group mt-3">
+                                        <button class="btn btn-primary" id="saveNetworkConfig">保存网络配置</button>
+                                        <button class="btn btn-secondary ml-2" id="testNetworkConnection">测试网络连接</button>
+                                    </div>
+                                    <div class="network-status mt-3 p-3 border rounded">
+                                        <h5>网络状态</h5>
+                                        <div class="status-item">
+                                            <span>服务器状态：</span>
+                                            <span id="serverStatus" class="status-value">未知</span>
+                                        </div>
+                                        <div class="status-item">
+                                            <span>局域网IP：</span>
+                                            <span id="lanIp" class="status-value">未知</span>
+                                        </div>
+                                        <div class="status-item">
+                                            <span>外部可访问性：</span>
+                                            <span id="externalAccess" class="status-value">未知</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                         </div>
                         
                         <!-- 关于应用内容 -->
@@ -631,6 +695,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script type="module" src="js/main.js"></script>
+    <script src="js/main.js"></script>
 </body>
 </html>

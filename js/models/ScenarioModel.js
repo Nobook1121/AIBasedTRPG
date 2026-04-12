@@ -1,4 +1,5 @@
 // 剧本模型类 - MVC架构的Model层
+// 改为普通脚本，使用全局变量
 class ScenarioModel {
     constructor() {
         this.scenarios = [];
@@ -365,5 +366,5 @@ class ScenarioModel {
     }
 }
 
-// 导出模块
-export default ScenarioModel;
+// 导出为全局变量
+window.ScenarioModel = ScenarioModel;

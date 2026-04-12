@@ -315,4 +315,5 @@ class ConfigManager {
 // 创建全局配置管理器实例
 const configManager = new ConfigManager();
 
-export default configManager;
+// 导出为全局变量
+window.configManager = configManager;

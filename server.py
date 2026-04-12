@@ -7,6 +7,8 @@ AI TRPG 系统服务器端
 import os
 import json
 import time
+import socket
+import threading
 from datetime import timedelta
 from flask import Flask, jsonify, request, send_from_directory, session, redirect, url_for
 from flask_cors import CORS
@@ -113,6 +115,21 @@ SCENARIOS_DIR = 'scenarios'
 SCENARIO_COVERS_DIR = 'assets/scenario_covers'
 AVATARS_DIR = 'assets/avatars'
 
+# 网络配置
+NETWORK_CONFIG_FILE = 'config/network.json'
+DEFAULT_PORT = 8086
+
+# 网络穿透配置
+PENETRATION_CONFIG_FILE = 'config/penetration.json'
+
+# 端口冲突重试配置
+PORT_RETRY_COUNT = 5
+PORT_RETRY_INTERVAL = 2
+
+# 局域网服务发现
+DISCOVERY_PORT = 50000
+DISCOVERY_INTERVAL = 5  # 秒
+
 # 确保scenarios目录存在
 if not os.path.exists(SCENARIOS_DIR):
     os.makedirs(SCENARIOS_DIR)
@@ -132,10 +149,328 @@ if not os.path.exists(AVATARS_DIR):
     os.makedirs(AVATARS_DIR)
     log_info(f"创建scenario_covers目录: {SCENARIO_COVERS_DIR}")
 
+# 确保网络配置文件存在
+if not os.path.exists('config'):
+    os.makedirs('config')
+
+if not os.path.exists(NETWORK_CONFIG_FILE):
+    default_network_config = {
+        "port": DEFAULT_PORT,
+        "discovery_enabled": True,
+        "access_control": {
+            "enabled": False,
+            "allowed_ips": []
+        }
+    }
+    with open(NETWORK_CONFIG_FILE, 'w', encoding='utf-8') as f:
+        json.dump(default_network_config, f, ensure_ascii=False, indent=2)
+    log_info(f"创建默认网络配置文件: {NETWORK_CONFIG_FILE}")
+
+# 确保网络穿透配置文件存在
+if not os.path.exists(PENETRATION_CONFIG_FILE):
+    default_penetration_config = {
+        "enabled": False,
+        "type": "ngrok",
+        "settings": {
+            "auth_token": "",
+            "region": "us",
+            "subdomain": ""
+        },
+        "port_mappings": []
+    }
+    with open(PENETRATION_CONFIG_FILE, 'w', encoding='utf-8') as f:
+        json.dump(default_penetration_config, f, ensure_ascii=False, indent=2)
+    log_info(f"创建默认网络穿透配置文件: {PENETRATION_CONFIG_FILE}")
+
 # 缓存机制
 scenarios_cache = {}
 cache_timestamp = 0
 CACHE_DURATION = 60  # 缓存有效期（秒）
+
+# 网络配置缓存
+network_config = None
+network_config_timestamp = 0
+
+# 网络穿透配置缓存
+penetration_config = None
+penetration_config_timestamp = 0
+
+# 检查端口是否可用
+def is_port_available(port):
+    """
+    检查端口是否可用
+    """
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.bind(('0.0.0.0', port))
+        sock.close()
+        return True
+    except:
+        return False
+
+# 寻找可用端口
+def find_available_port(start_port, max_attempts=PORT_RETRY_COUNT):
+    """
+    寻找可用端口
+    """
+    current_port = start_port
+    attempts = 0
+    
+    while attempts < max_attempts:
+        if is_port_available(current_port):
+            return current_port
+        attempts += 1
+        current_port += 1
+        time.sleep(PORT_RETRY_INTERVAL)
+    
+    return None
+
+# 加载网络配置
+def load_network_config():
+    """
+    加载网络配置
+    """
+    global network_config, network_config_timestamp
+    try:
+        with open(NETWORK_CONFIG_FILE, 'r', encoding='utf-8') as f:
+            network_config = json.load(f)
+        network_config_timestamp = time.time()
+        log_info(f"加载网络配置成功: {network_config}")
+        return network_config
+    except Exception as e:
+        log_error(f"加载网络配置失败: {e}")
+        # 返回默认配置
+        return {
+            "port": DEFAULT_PORT,
+            "discovery_enabled": True,
+            "access_control": {
+                "enabled": False,
+                "allowed_ips": []
+            }
+        }
+
+# 获取网络配置
+def get_network_config():
+    """
+    获取网络配置，使用缓存
+    """
+    global network_config, network_config_timestamp
+    current_time = time.time()
+    if network_config is None or current_time - network_config_timestamp > 10:
+        return load_network_config()
+    return network_config
+
+# 保存网络配置
+def save_network_config(config_data):
+    """
+    保存网络配置
+    """
+    global network_config, network_config_timestamp
+    try:
+        # 合并配置
+        current_config = get_network_config()
+        current_config.update(config_data)
+        
+        # 保存到文件
+        with open(NETWORK_CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(current_config, f, ensure_ascii=False, indent=2)
+        
+        # 更新缓存
+        network_config = current_config
+        network_config_timestamp = time.time()
+        
+        log_info(f"保存网络配置成功: {current_config}")
+        return True
+    except Exception as e:
+        log_error(f"保存网络配置失败: {e}")
+        return False
+
+# 加载网络穿透配置
+def load_penetration_config():
+    """
+    加载网络穿透配置
+    """
+    global penetration_config, penetration_config_timestamp
+    try:
+        with open(PENETRATION_CONFIG_FILE, 'r', encoding='utf-8') as f:
+            penetration_config = json.load(f)
+        penetration_config_timestamp = time.time()
+        log_info(f"加载网络穿透配置成功: {penetration_config}")
+        return penetration_config
+    except Exception as e:
+        log_error(f"加载网络穿透配置失败: {e}")
+        # 返回默认配置
+        return {
+            "enabled": False,
+            "type": "ngrok",
+            "settings": {
+                "auth_token": "",
+                "region": "us",
+                "subdomain": ""
+            },
+            "port_mappings": []
+        }
+
+# 获取网络穿透配置
+def get_penetration_config():
+    """
+    获取网络穿透配置，使用缓存
+    """
+    global penetration_config, penetration_config_timestamp
+    current_time = time.time()
+    if penetration_config is None or current_time - penetration_config_timestamp > 10:
+        return load_penetration_config()
+    return penetration_config
+
+# 保存网络穿透配置
+def save_penetration_config(config_data):
+    """
+    保存网络穿透配置
+    """
+    global penetration_config, penetration_config_timestamp
+    try:
+        # 合并配置
+        current_config = get_penetration_config()
+        current_config.update(config_data)
+        
+        # 保存到文件
+        with open(PENETRATION_CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(current_config, f, ensure_ascii=False, indent=2)
+        
+        # 更新缓存
+        penetration_config = current_config
+        penetration_config_timestamp = time.time()
+        
+        log_info(f"保存网络穿透配置成功: {current_config}")
+        return True
+    except Exception as e:
+        log_error(f"保存网络穿透配置失败: {e}")
+        return False
+
+# 局域网服务发现线程
+def discovery_thread():
+    """
+    局域网服务发现线程
+    实现基于TCP的服务发现机制
+    """
+    while True:
+        try:
+            # 检查是否启用了服务发现
+            config = get_network_config()
+            if not config.get('discovery_enabled', True):
+                time.sleep(DISCOVERY_INTERVAL)
+                continue
+            
+            # 构建服务信息
+            service_info = {
+                "name": "AI TRPG Server",
+                "port": config.get('port', DEFAULT_PORT),
+                "timestamp": int(time.time()),
+                "local_ip": get_local_ip()
+            }
+            
+            # 广播服务信息
+            broadcast_service_info(service_info)
+            
+            log_info(f"服务发现广播 - 端口: {config.get('port', DEFAULT_PORT)}, IP: {service_info['local_ip']}")
+            time.sleep(DISCOVERY_INTERVAL)
+        except socket.error as e:
+            log_error(f"服务发现线程网络错误: {e}")
+            time.sleep(DISCOVERY_INTERVAL)
+        except json.JSONDecodeError as e:
+            log_error(f"服务发现线程JSON编码错误: {e}")
+            time.sleep(DISCOVERY_INTERVAL)
+        except Exception as e:
+            log_error(f"服务发现线程错误: {e}")
+            time.sleep(DISCOVERY_INTERVAL)
+
+# 获取本地IP地址
+def get_local_ip():
+    """
+    获取本地IP地址
+    """
+    try:
+        # 创建一个临时套接字来获取本地IP
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # 连接到一个公共DNS服务器
+        sock.connect(('8.8.8.8', 80))
+        local_ip = sock.getsockname()[0]
+        sock.close()
+        return local_ip
+    except Exception as e:
+        log_error(f"获取本地IP地址失败: {e}")
+        return '127.0.0.1'
+
+# 广播服务信息
+def broadcast_service_info(service_info):
+    """
+    广播服务信息到局域网
+    """
+    try:
+        # 创建UDP套接字进行广播
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        sock.settimeout(2)
+        
+        # 构建消息
+        message = json.dumps(service_info).encode('utf-8')
+        
+        # 广播到局域网
+        sock.sendto(message, ('<broadcast>', DISCOVERY_PORT))
+        sock.close()
+        
+        # 同时启动TCP服务器用于响应查询
+        start_tcp_discovery_server(service_info)
+    except Exception as e:
+        log_error(f"广播服务信息失败: {e}")
+
+# 启动TCP服务发现服务器
+def start_tcp_discovery_server(service_info):
+    """
+    启动TCP服务器用于响应服务发现查询
+    """
+    def tcp_server():
+        try:
+            # 创建TCP套接字
+            server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            
+            # 绑定到本地IP和发现端口+1
+            local_ip = get_local_ip()
+            server_port = DISCOVERY_PORT + 1
+            
+            try:
+                server_socket.bind((local_ip, server_port))
+                server_socket.listen(5)
+                server_socket.settimeout(3)  # 设置超时，避免阻塞
+                
+                # 等待连接
+                try:
+                    client_socket, client_address = server_socket.accept()
+                    # 发送服务信息
+                    message = json.dumps(service_info).encode('utf-8')
+                    client_socket.send(message)
+                    client_socket.close()
+                    log_info(f"TCP服务发现响应 - 客户端: {client_address}")
+                except socket.timeout:
+                    # 超时是正常的，只是为了避免阻塞
+                    pass
+            except socket.error as e:
+                # 端口可能被占用，忽略错误
+                pass
+            finally:
+                server_socket.close()
+        except Exception as e:
+            log_error(f"TCP服务发现服务器错误: {e}")
+    
+    # 在新线程中启动TCP服务器
+    tcp_thread = threading.Thread(target=tcp_server, daemon=True)
+    tcp_thread.start()
+
+# 启动服务发现线程
+discovery_thread_instance = threading.Thread(target=discovery_thread, daemon=True)
+discovery_thread_instance.start()
+log_info("启动局域网服务发现线程")
 
 
 def get_scenarios():
@@ -1426,7 +1761,6 @@ def get_users():
                 'username': user['username'],
                 'email': user['email'],
                 'role': user['role'],
-                'ip_addresses': user['ip_addresses'],
                 'created_at': user['created_at'],
                 'last_login': user['last_login'],
                 'status': user['status']
@@ -1990,6 +2324,460 @@ def send_message(script_id):
         }), 500
 
 
+# 网络配置相关路由
+@app.route('/api/network/config', methods=['GET'])
+def get_network_config_api():
+    """
+    获取网络配置
+    """
+    try:
+        config = get_network_config()
+        log_info("获取网络配置成功")
+        return jsonify({
+            'success': True,
+            'data': config,
+            'message': '获取网络配置成功'
+        })
+    except Exception as e:
+        log_error(f"获取网络配置失败: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '获取网络配置失败'
+        }), 500
+
+
+@app.route('/api/network/config', methods=['POST'])
+@require_permission('ADMIN')
+def update_network_config_api():
+    """
+    更新网络配置
+    """
+    try:
+        config_data = request.json
+        if not config_data:
+            log_warning("更新网络配置失败：无数据")
+            return jsonify({
+                'success': False,
+                'error': '无数据',
+                'message': '请提供网络配置数据'
+            }), 400
+        
+        # 验证端口号
+        port = config_data.get('port')
+        if port:
+            try:
+                port = int(port)
+                if port < 1 or port > 65535:
+                    log_warning(f"更新网络配置失败：无效端口号{port}")
+                    return jsonify({
+                        'success': False,
+                        'error': '无效端口号',
+                        'message': '端口号必须是1-65535之间的整数'
+                    }), 400
+            except (ValueError, TypeError):
+                log_warning(f"更新网络配置失败：端口号必须是整数")
+                return jsonify({
+                    'success': False,
+                    'error': '无效端口号',
+                    'message': '端口号必须是整数'
+                }), 400
+        
+        # 验证访问控制配置
+        access_control = config_data.get('access_control', {})
+        if access_control and isinstance(access_control, dict):
+            allowed_ips = access_control.get('allowed_ips', [])
+            if not isinstance(allowed_ips, list):
+                log_warning("更新网络配置失败：allowed_ips必须是列表")
+                return jsonify({
+                    'success': False,
+                    'error': '无效配置',
+                    'message': 'allowed_ips必须是列表'
+                }), 400
+        
+        # 保存配置
+        if save_network_config(config_data):
+            log_info(f"网络配置更新成功: {config_data}")
+            return jsonify({
+                'success': True,
+                'data': config_data,
+                'message': '网络配置更新成功'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': '保存失败',
+                'message': '网络配置保存失败'
+            }), 500
+    except ValueError as e:
+        log_error(f"更新网络配置失败 - 数值错误: {e}")
+        return jsonify({
+            'success': False,
+            'error': '参数错误',
+            'message': f'参数错误: {str(e)}'
+        }), 400
+    except TypeError as e:
+        log_error(f"更新网络配置失败 - 类型错误: {e}")
+        return jsonify({
+            'success': False,
+            'error': '参数错误',
+            'message': f'参数类型错误: {str(e)}'
+        }), 400
+    except Exception as e:
+        log_error(f"更新网络配置失败: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '更新网络配置失败'
+        }), 500
+
+
+@app.route('/api/network/status', methods=['GET'])
+def get_network_status():
+    """
+    获取网络状态
+    """
+    try:
+        # 获取本地IP地址
+        try:
+            local_ip = socket.gethostbyname(socket.gethostname())
+        except socket.gaierror as e:
+            log_warning(f"获取本地IP地址失败: {e}")
+            local_ip = '127.0.0.1'
+        
+        # 获取网络配置
+        config = get_network_config()
+        port = config.get('port', DEFAULT_PORT)
+        
+        # 检查端口是否可用
+        port_available = True
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.bind((local_ip, port))
+            sock.close()
+        except socket.error as e:
+            log_warning(f"端口检查失败: {e}")
+            port_available = False
+        except Exception as e:
+            log_warning(f"端口检查异常: {e}")
+            port_available = False
+        
+        # 构建网络状态信息
+        status = {
+            'local_ip': local_ip,
+            'port': port,
+            'port_available': port_available,
+            'discovery_enabled': config.get('discovery_enabled', True),
+            'access_control': config.get('access_control', {
+                'enabled': False,
+                'allowed_ips': []
+            }),
+            'timestamp': int(time.time())
+        }
+        
+        log_info(f"获取网络状态成功: {status}")
+        return jsonify({
+            'success': True,
+            'data': status,
+            'message': '获取网络状态成功'
+        })
+    except socket.error as e:
+        log_error(f"获取网络状态失败 - 网络错误: {e}")
+        return jsonify({
+            'success': False,
+            'error': '网络错误',
+            'message': f'网络错误: {str(e)}'
+        }), 500
+    except Exception as e:
+        log_error(f"获取网络状态失败: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '获取网络状态失败'
+        }), 500
+
+
+@app.route('/api/network/test', methods=['POST'])
+def test_network_connection():
+    """
+    测试网络连接
+    """
+    try:
+        # 获取网络配置
+        config = get_network_config()
+        local_ip = get_local_ip()
+        target_port = config.get('port', DEFAULT_PORT)
+        
+        # 测试本地连接
+        success = False
+        error_message = ''
+        
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(5)
+            sock.bind((local_ip, 0))  # 绑定到随机端口
+            sock.close()
+            success = True
+        except socket.timeout:
+            error_message = '连接超时'
+        except socket.gaierror:
+            error_message = 'DNS解析失败'
+        except socket.error as e:
+            error_message = f'网络错误: {str(e)}'
+        except Exception as e:
+            error_message = str(e)
+        
+        # 测试服务发现
+        discovery_success = False
+        discovery_error = ''
+        
+        try:
+            # 测试UDP广播
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            sock.settimeout(2)
+            test_message = json.dumps({"test": "discovery"}).encode('utf-8')
+            sock.sendto(test_message, ('<broadcast>', DISCOVERY_PORT))
+            sock.close()
+            discovery_success = True
+        except Exception as e:
+            discovery_error = str(e)
+        
+        log_info(f"测试网络连接 - 本地IP: {local_ip}, 端口: {target_port}, 结果: {success}")
+        return jsonify({
+            'success': True,
+            'data': {
+                'local_ip': local_ip,
+                'port': target_port,
+                'connection_success': success,
+                'error_message': error_message,
+                'discovery_success': discovery_success,
+                'discovery_error': discovery_error
+            },
+            'message': '网络连接测试完成'
+        })
+    except ValueError as e:
+        log_error(f"测试网络连接失败 - 数值错误: {e}")
+        return jsonify({
+            'success': False,
+            'error': '参数错误',
+            'message': f'参数错误: {str(e)}'
+        }), 400
+    except TypeError as e:
+        log_error(f"测试网络连接失败 - 类型错误: {e}")
+        return jsonify({
+            'success': False,
+            'error': '参数错误',
+            'message': f'参数类型错误: {str(e)}'
+        }), 400
+    except Exception as e:
+        log_error(f"测试网络连接失败: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '测试网络连接失败'
+        }), 500
+
+
+@app.route('/api/network/penetration/config', methods=['GET'])
+@require_permission('ADMIN')
+def get_penetration_config_api():
+    """
+    获取网络穿透配置
+    """
+    try:
+        config = get_penetration_config()
+        log_info("获取网络穿透配置成功")
+        return jsonify({
+            'success': True,
+            'data': config,
+            'message': '获取网络穿透配置成功'
+        })
+    except Exception as e:
+        log_error(f"获取网络穿透配置失败: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '获取网络穿透配置失败'
+        }), 500
+
+
+@app.route('/api/network/penetration/config', methods=['POST'])
+@require_permission('ADMIN')
+def update_penetration_config_api():
+    """
+    更新网络穿透配置
+    """
+    try:
+        config_data = request.json
+        if not config_data:
+            log_warning("更新网络穿透配置失败：无数据")
+            return jsonify({
+                'success': False,
+                'error': '无数据',
+                'message': '请提供网络穿透配置数据'
+            }), 400
+        
+        # 保存配置
+        if save_penetration_config(config_data):
+            log_info(f"网络穿透配置更新成功: {config_data}")
+            return jsonify({
+                'success': True,
+                'data': config_data,
+                'message': '网络穿透配置更新成功'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': '保存失败',
+                'message': '网络穿透配置保存失败'
+            }), 500
+    except Exception as e:
+        log_error(f"更新网络穿透配置失败: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '更新网络穿透配置失败'
+        }), 500
+
+
+@app.route('/api/network/penetration/status', methods=['GET'])
+def get_penetration_status():
+    """
+    获取网络穿透状态
+    """
+    try:
+        # 获取网络穿透配置
+        config = get_penetration_config()
+        
+        # 构建网络穿透状态信息
+        status = {
+            'enabled': config.get('enabled', False),
+            'type': config.get('type', 'ngrok'),
+            'settings': config.get('settings', {}),
+            'port_mappings': config.get('port_mappings', []),
+            'timestamp': int(time.time())
+        }
+        
+        log_info(f"获取网络穿透状态成功: {status}")
+        return jsonify({
+            'success': True,
+            'data': status,
+            'message': '获取网络穿透状态成功'
+        })
+    except Exception as e:
+        log_error(f"获取网络穿透状态失败: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '获取网络穿透状态失败'
+        }), 500
+
+
+# IP地址用户配置相关路由
+@app.route('/api/user/ip/config', methods=['GET'])
+def get_ip_config():
+    """
+    获取当前IP地址的用户配置
+    """
+    try:
+        # 获取用户IP地址
+        ip_address = request.remote_addr
+        log_info(f"获取IP配置 - IP: {ip_address}")
+        
+        # 获取IP配置
+        config = user_manager.get_ip_config(ip_address)
+        if config:
+            return jsonify({
+                'success': True,
+                'data': config,
+                'message': '获取IP配置成功'
+            })
+        else:
+            # 创建默认配置
+            user_manager.create_ip_config(ip_address)
+            config = user_manager.get_ip_config(ip_address)
+            return jsonify({
+                'success': True,
+                'data': config,
+                'message': '创建并获取IP配置成功'
+            })
+    except Exception as e:
+        log_error(f"获取IP配置失败: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '获取IP配置失败'
+        }), 500
+
+
+@app.route('/api/user/ip/config', methods=['POST'])
+def update_ip_config():
+    """
+    更新当前IP地址的用户配置
+    """
+    try:
+        # 获取用户IP地址
+        ip_address = request.remote_addr
+        config_data = request.json
+        
+        if not config_data:
+            log_warning("更新IP配置失败：无数据")
+            return jsonify({
+                'success': False,
+                'error': '无数据',
+                'message': '请提供配置数据'
+            }), 400
+        
+        log_info(f"更新IP配置 - IP: {ip_address}, 数据: {config_data}")
+        
+        # 更新IP配置
+        if user_manager.update_ip_config(ip_address, config_data):
+            # 获取更新后的配置
+            updated_config = user_manager.get_ip_config(ip_address)
+            return jsonify({
+                'success': True,
+                'data': updated_config,
+                'message': 'IP配置更新成功'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': '更新失败',
+                'message': 'IP配置更新失败'
+            }), 500
+    except Exception as e:
+        log_error(f"更新IP配置失败: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '更新IP配置失败'
+        }), 500
+
+
+@app.route('/api/admin/ip/configs', methods=['GET'])
+@require_permission('ADMIN')
+def get_all_ip_configs():
+    """
+    获取所有IP配置（管理员）
+    """
+    try:
+        configs = user_manager.get_all_ip_configs()
+        log_info(f"获取所有IP配置成功，共 {len(configs)} 个")
+        return jsonify({
+            'success': True,
+            'data': configs,
+            'message': '获取所有IP配置成功'
+        })
+    except Exception as e:
+        log_error(f"获取所有IP配置失败: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '获取所有IP配置失败'
+        }), 500
+
+
 # 静态文件服务
 @app.route('/')
 def serve_index():
@@ -2001,11 +2789,47 @@ def serve_static(path):
     return send_from_directory('.', path)
 
 
+import sys
+
 if __name__ == '__main__':
-    port = 8086
-    print(f"启动服务器，监听端口：{port}")
-    print("服务器启动中...")
+    # 从网络配置文件中获取端口号
+    config = get_network_config()
+    port = config.get('port', DEFAULT_PORT)
+    
+    # 从命令行参数中获取端口号，如果指定则覆盖配置文件中的端口
+    if len(sys.argv) > 1:
+        try:
+            port = int(sys.argv[1])
+            log_info(f"使用命令行指定的端口: {port}")
+        except ValueError:
+            log_warning("无效的端口号，使用配置文件中的端口")
+    
+    # 检查端口是否可用，如果不可用则寻找可用端口
+    if not is_port_available(port):
+        log_warning(f"端口 {port} 被占用，尝试寻找可用端口")
+        available_port = find_available_port(port)
+        if available_port:
+            log_info(f"找到可用端口: {available_port}")
+            port = available_port
+        else:
+            log_error(f"无法找到可用端口，使用默认端口 {DEFAULT_PORT}")
+            port = DEFAULT_PORT
+    
+    log_info(f"启动服务器，监听端口：{port}")
+    log_info("服务器启动中...")
     try:
-        app.run(debug=True, host='127.0.0.1', port=port)
+        # 监听所有网络接口，以便局域网内的其他设备可以访问
+        app.run(debug=True, host='0.0.0.0', port=port)
+    except socket.error as e:
+        log_error(f"服务器启动失败 - 端口错误: {e}")
+        # 再次尝试寻找可用端口
+        available_port = find_available_port(port)
+        if available_port:
+            log_info(f"找到可用端口: {available_port}")
+            port = available_port
+            log_info(f"重新启动服务器，监听端口：{port}")
+            app.run(debug=True, host='0.0.0.0', port=port)
+        else:
+            log_error("无法找到可用端口，服务器启动失败")
     except Exception as e:
-        print(f"服务器启动失败: {e}")
+        log_error(f"服务器启动失败: {e}")

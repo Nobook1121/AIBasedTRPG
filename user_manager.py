@@ -13,9 +13,16 @@ import bcrypt
 # 用户数据文件路径
 USERS_FILE = 'users/users.json'
 
+# IP配置文件目录
+USER_IP_CONFIG_DIR = 'users/ip_configs'
+
 # 确保users目录存在
 if not os.path.exists('users'):
     os.makedirs('users')
+
+# 确保IP配置目录存在
+if not os.path.exists(USER_IP_CONFIG_DIR):
+    os.makedirs(USER_IP_CONFIG_DIR)
 
 # 确保用户数据文件存在
 if not os.path.exists(USERS_FILE):
@@ -59,7 +66,7 @@ class UserManager:
         """验证密码"""
         return bcrypt.checkpw(password.encode('utf-8'), hashed_password.encode('utf-8'))
     
-    def register(self, username, password, email, ip_address):
+    def register(self, username, password, email, ip_address=None):
         """注册新用户"""
         # 检查用户名是否已存在
         for user in self.users:
@@ -75,7 +82,6 @@ class UserManager:
             "username": username,
             "password": self._hash_password(password),
             "email": email,
-            "ip_addresses": [ip_address],
             "role": "USER",  # 默认角色为USER
             "created_at": time.strftime('%Y-%m-%dT%H:%M:%S') + '.000Z',
             "last_login": time.strftime('%Y-%m-%dT%H:%M:%S') + '.000Z',
@@ -93,7 +99,7 @@ class UserManager:
         else:
             return False, "注册失败"
     
-    def login(self, username, password, ip_address):
+    def login(self, username, password, ip_address=None):
         """用户登录"""
         # 查找用户
         for user in self.users:
@@ -102,10 +108,6 @@ class UserManager:
                 if self._verify_password(password, user['password']):
                     # 更新最后登录时间
                     user['last_login'] = time.strftime('%Y-%m-%dT%H:%M:%S') + '.000Z'
-                    
-                    # 添加IP地址到用户记录
-                    if ip_address not in user['ip_addresses']:
-                        user['ip_addresses'].append(ip_address)
                     
                     # 保存用户数据
                     self._save_users()
@@ -169,6 +171,96 @@ class UserManager:
         required_level = role_levels.get(required_role, 0)
         
         return user_level >= required_level
+    
+
+    
+    def create_ip_config(self, ip_address):
+        """为IP地址创建配置文件"""
+        config_file = os.path.join(USER_IP_CONFIG_DIR, f'{ip_address.replace(".", "_")}.json')
+        config = {
+            "ip_address": ip_address,
+            "created_at": time.strftime('%Y-%m-%dT%H:%M:%S') + '.000Z',
+            "last_accessed": time.strftime('%Y-%m-%dT%H:%M:%S') + '.000Z',
+            "settings": {},
+            "preferences": {}
+        }
+        
+        try:
+            with open(config_file, 'w', encoding='utf-8') as f:
+                json.dump(config, f, ensure_ascii=False, indent=2)
+            return True
+        except Exception as e:
+            print(f"创建IP配置文件失败: {e}")
+            return False
+    
+    def get_ip_config(self, ip_address):
+        """获取IP地址的配置文件"""
+        config_file = os.path.join(USER_IP_CONFIG_DIR, f'{ip_address.replace(".", "_")}.json')
+        try:
+            if os.path.exists(config_file):
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    # 更新最后访问时间
+                    config['last_accessed'] = time.strftime('%Y-%m-%dT%H:%M:%S') + '.000Z'
+                    # 保存更新
+                    with open(config_file, 'w', encoding='utf-8') as f:
+                        json.dump(config, f, ensure_ascii=False, indent=2)
+                    return config
+            return None
+        except Exception as e:
+            print(f"获取IP配置文件失败: {e}")
+            return None
+    
+    def update_ip_config(self, ip_address, config_data):
+        """更新IP地址的配置文件"""
+        config_file = os.path.join(USER_IP_CONFIG_DIR, f'{ip_address.replace(".", "_")}.json')
+        try:
+            if os.path.exists(config_file):
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                
+                # 更新配置
+                config.update(config_data)
+                config['last_accessed'] = time.strftime('%Y-%m-%dT%H:%M:%S') + '.000Z'
+                
+                with open(config_file, 'w', encoding='utf-8') as f:
+                    json.dump(config, f, ensure_ascii=False, indent=2)
+                return True
+            return False
+        except Exception as e:
+            print(f"更新IP配置文件失败: {e}")
+            return False
+    
+    def delete_ip_config(self, ip_address):
+        """删除IP地址的配置文件"""
+        config_file = os.path.join(USER_IP_CONFIG_DIR, f'{ip_address.replace(".", "_")}.json')
+        try:
+            if os.path.exists(config_file):
+                os.remove(config_file)
+                return True
+            return False
+        except Exception as e:
+            print(f"删除IP配置文件失败: {e}")
+            return False
+    
+    def get_all_ip_configs(self):
+        """获取所有IP配置文件"""
+        configs = []
+        try:
+            for filename in os.listdir(USER_IP_CONFIG_DIR):
+                if filename.endswith('.json'):
+                    file_path = os.path.join(USER_IP_CONFIG_DIR, filename)
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            config = json.load(f)
+                            configs.append(config)
+                    except Exception as e:
+                        print(f"读取IP配置文件失败: {e}")
+                        continue
+            return configs
+        except Exception as e:
+            print(f"获取所有IP配置文件失败: {e}")
+            return []
 
 # 初始化用户管理器
 user_manager = UserManager()

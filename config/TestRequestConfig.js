@@ -44,7 +44,7 @@ const testRequestConfigs = {
 };
 
 // 获取模型的测试请求配置
-export function getTestRequestConfig(modelId) {
+function getTestRequestConfig(modelId) {
     // 检查是否有特定模型的配置
     for (const key in testRequestConfigs) {
         if (modelId.toLowerCase().includes(key.toLowerCase())) {
@@ -55,4 +55,6 @@ export function getTestRequestConfig(modelId) {
     return testRequestConfigs.default;
 }
 
-export default testRequestConfigs;
+// 导出为全局变量
+window.testRequestConfigs = testRequestConfigs;
+window.getTestRequestConfig = getTestRequestConfig;

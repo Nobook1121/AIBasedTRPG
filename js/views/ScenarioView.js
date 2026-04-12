@@ -1,4 +1,5 @@
 // 剧本视图类 - MVC架构的View层
+// 改为普通脚本，使用全局变量
 class ScenarioView {
     constructor() {
         this.scenarioList = document.getElementById('scenarioList');
@@ -486,5 +487,5 @@ class ScenarioView {
     }
 }
 
-// 导出模块
-export default ScenarioView;
+// 导出为全局变量
+window.ScenarioView = ScenarioView;

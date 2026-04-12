@@ -1,9 +1,7 @@
 // AI平台管理模块
 // 负责加载、管理和配置AI平台
 
-import { getTestRequestConfig } from './TestRequestConfig.js';
-import defaultProcessModel from './aiplatform/default.js';
-
+// 改为普通脚本，使用全局变量
 class AIPlatformManager {
     constructor() {
         this.platforms = {};
@@ -399,4 +397,5 @@ class AIPlatformManager {
 // 创建全局AI平台管理器实例
 const aiPlatformManager = new AIPlatformManager();
 
-export default aiPlatformManager;
+// 导出为全局变量
+window.aiPlatformManager = aiPlatformManager;
