@@ -2,6 +2,7 @@ import json
 import logging
 import socket
 import time
+from copy import deepcopy
 
 from trpg_server.json_store import read_json, write_json_atomic
 from trpg_server.settings import (
@@ -73,7 +74,7 @@ def get_local_ip():
 def get_network_config(path=NETWORK_CONFIG_FILE):
     data = read_json(path, default=None)
     if not data:
-        return DEFAULT_NETWORK_CONFIG.copy()
+        return deepcopy(DEFAULT_NETWORK_CONFIG)
     return data
 
 
@@ -87,7 +88,7 @@ def save_network_config(config_data, path=NETWORK_CONFIG_FILE):
 def get_penetration_config(path=PENETRATION_CONFIG_FILE):
     data = read_json(path, default=None)
     if not data:
-        return json.loads(json.dumps(DEFAULT_PENETRATION_CONFIG))
+        return deepcopy(DEFAULT_PENETRATION_CONFIG)
     return data
 
 

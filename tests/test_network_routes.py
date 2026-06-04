@@ -1,6 +1,7 @@
 import json
 
 from trpg_server.app_factory import create_app
+from trpg_server.network_discovery import get_network_config, get_penetration_config
 
 
 class FakeUserManager:
@@ -85,3 +86,25 @@ def test_penetration_config_update_and_status(tmp_path):
     status = status_response.get_json()["data"]
     assert status["enabled"] is True
     assert status["type"] == "frp"
+
+
+def test_default_network_config_returns_independent_nested_copy(tmp_path):
+    missing_config = tmp_path / "missing-network.json"
+
+    first = get_network_config(missing_config)
+    first["access_control"]["allowed_ips"].append("127.0.0.1")
+
+    second = get_network_config(missing_config)
+
+    assert second["access_control"]["allowed_ips"] == []
+
+
+def test_default_penetration_config_returns_independent_nested_copy(tmp_path):
+    missing_config = tmp_path / "missing-penetration.json"
+
+    first = get_penetration_config(missing_config)
+    first["settings"]["auth_token"] = "changed"
+
+    second = get_penetration_config(missing_config)
+
+    assert second["settings"]["auth_token"] == ""
