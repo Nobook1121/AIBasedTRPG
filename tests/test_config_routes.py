@@ -1,6 +1,8 @@
 import json
+import tomllib
 
 from trpg_server.app_factory import create_app
+from trpg_server.routes.config import convert_to_toml
 
 
 def _config_app(tmp_path):
@@ -29,6 +31,16 @@ def test_config_route_saves_toml_file(tmp_path):
         "limit = 3\n"
         'name = "TRPG"\n'
     )
+
+
+def test_convert_to_toml_escapes_string_values():
+    toml_text = convert_to_toml(
+        {"general": {"name": 'TRPG "Keeper"\nsecond line'}}
+    )
+
+    parsed = tomllib.loads(toml_text)
+
+    assert parsed["general"]["name"] == 'TRPG "Keeper"\nsecond line'
 
 
 def test_config_route_saves_ai_platform_json(tmp_path):

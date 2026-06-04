@@ -24,6 +24,16 @@ def _get_ai_model_dir():
     return current_app.config.get("AI_MODEL_DIR", _get_config_dir() / "aimodel")
 
 
+def _format_toml_value(value):
+    if isinstance(value, str):
+        return json.dumps(value, ensure_ascii=False)
+    if isinstance(value, bool):
+        return str(value).lower()
+    if isinstance(value, (int, float)):
+        return str(value)
+    return json.dumps(str(value), ensure_ascii=False)
+
+
 def convert_to_toml(config_data):
     lines = []
     for section, values in config_data.items():
@@ -32,14 +42,7 @@ def convert_to_toml(config_data):
 
         lines.append(f"[{section}]")
         for key, value in values.items():
-            if isinstance(value, str):
-                lines.append(f'{key} = "{value}"')
-            elif isinstance(value, bool):
-                lines.append(f"{key} = {str(value).lower()}")
-            elif isinstance(value, (int, float)):
-                lines.append(f"{key} = {value}")
-            else:
-                lines.append(f'{key} = "{str(value)}"')
+            lines.append(f"{key} = {_format_toml_value(value)}")
         lines.append("")
 
     return "\n".join(lines)
