@@ -22,7 +22,13 @@
 node --check js\tabs.js
 ```
 
-当前测试在 Python 3.13 下会输出 Flask/Werkzeug 2.0.1 相关 `DeprecationWarning`。这些警告不是本轮验证失败条件，但属于后续兼容性治理项。
+兼容性变更应先用更严格的警告策略复现问题，例如：
+
+```powershell
+python -W error::DeprecationWarning -m pytest tests\test_app_factory.py -q
+```
+
+依赖升级后再运行完整 `.\scripts\verify.ps1`，确认没有引入路由、session 或 Socket.IO 回归。
 
 ## 日志规范
 
