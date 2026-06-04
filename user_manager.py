@@ -2,6 +2,7 @@
 """User management for registration, login, permissions, and IP preferences."""
 
 import logging
+import re
 import time
 from pathlib import Path
 
@@ -24,7 +25,8 @@ def _now_iso():
 
 
 def _ip_config_path(ip_address):
-    return Path(USER_IP_CONFIG_DIR) / f'{ip_address.replace(".", "_")}.json'
+    safe_name = re.sub(r"[^A-Za-z0-9_.-]", "_", str(ip_address)).replace(".", "_")
+    return Path(USER_IP_CONFIG_DIR) / f"{safe_name or 'unknown'}.json"
 
 
 class UserManager:
