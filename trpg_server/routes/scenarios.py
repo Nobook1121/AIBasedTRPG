@@ -64,8 +64,7 @@ def load_scenarios():
     scenarios = []
     for path in _iter_scenario_files():
         try:
-            with path.open("r", encoding="utf-8") as file:
-                scenario = json.load(file)
+            scenario = read_json(path, default={})
         except json.JSONDecodeError:
             logger.exception("Failed to parse scenario file: %s", path.name)
             continue
