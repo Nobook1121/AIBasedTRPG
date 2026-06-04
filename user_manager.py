@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """User management for registration, login, permissions, and IP preferences."""
 
+import logging
 import time
 from pathlib import Path
 
@@ -10,6 +11,7 @@ from trpg_server.json_store import read_json, write_json_atomic
 
 USERS_FILE = "users/users.json"
 USER_IP_CONFIG_DIR = "users/ip_configs"
+logger = logging.getLogger(__name__)
 
 Path("users").mkdir(parents=True, exist_ok=True)
 Path(USER_IP_CONFIG_DIR).mkdir(parents=True, exist_ok=True)
@@ -35,16 +37,16 @@ class UserManager:
         try:
             data = read_json(USERS_FILE, default={"users": []})
             return data.get("users", [])
-        except Exception as exc:
-            print(f"Failed to load user data: {exc}")
+        except Exception:
+            logger.exception("Failed to load user data")
             return []
 
     def _save_users(self):
         try:
             write_json_atomic(USERS_FILE, {"users": self.users})
             return True
-        except Exception as exc:
-            print(f"Failed to save user data: {exc}")
+        except Exception:
+            logger.exception("Failed to save user data")
             return False
 
     def _hash_password(self, password):
@@ -146,8 +148,8 @@ class UserManager:
         try:
             write_json_atomic(_ip_config_path(ip_address), config)
             return True
-        except Exception as exc:
-            print(f"Failed to create IP config: {exc}")
+        except Exception:
+            logger.exception("Failed to create IP config")
             return False
 
     def get_ip_config(self, ip_address):
@@ -160,8 +162,8 @@ class UserManager:
             config["last_accessed"] = _now_iso()
             write_json_atomic(config_file, config)
             return config
-        except Exception as exc:
-            print(f"Failed to get IP config: {exc}")
+        except Exception:
+            logger.exception("Failed to get IP config")
             return None
 
     def update_ip_config(self, ip_address, config_data):
@@ -175,8 +177,8 @@ class UserManager:
             config["last_accessed"] = _now_iso()
             write_json_atomic(config_file, config)
             return True
-        except Exception as exc:
-            print(f"Failed to update IP config: {exc}")
+        except Exception:
+            logger.exception("Failed to update IP config")
             return False
 
     def delete_ip_config(self, ip_address):
@@ -186,8 +188,8 @@ class UserManager:
                 config_file.unlink()
                 return True
             return False
-        except Exception as exc:
-            print(f"Failed to delete IP config: {exc}")
+        except Exception:
+            logger.exception("Failed to delete IP config")
             return False
 
     def get_all_ip_configs(self):
@@ -197,8 +199,8 @@ class UserManager:
                 if config_file.is_file():
                     configs.append(read_json(config_file, default={}))
             return configs
-        except Exception as exc:
-            print(f"Failed to list IP configs: {exc}")
+        except Exception:
+            logger.exception("Failed to list IP configs")
             return []
 
 
