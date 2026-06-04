@@ -2,7 +2,7 @@ import logging
 import socket
 import time
 
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, current_app, request
 
 from trpg_server.network_discovery import (
     DEFAULT_PORT,
@@ -14,6 +14,7 @@ from trpg_server.network_discovery import (
     test_udp_discovery,
 )
 from trpg_server.security import require_permission
+from trpg_server.responses import error_response, success_response
 from trpg_server.settings import NETWORK_CONFIG_FILE, PENETRATION_CONFIG_FILE
 
 bp = Blueprint("network", __name__)
@@ -32,25 +33,10 @@ def _penetration_config_file():
 def get_network_config_api():
     try:
         config = get_network_config(_network_config_file())
-        return jsonify(
-            {
-                "success": True,
-                "data": config,
-                "message": "Network config loaded successfully",
-            }
-        )
+        return success_response(config, "Network config loaded successfully")
     except Exception as exc:
         logger.exception("Failed to get network config")
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": str(exc),
-                    "message": "Failed to get network config",
-                }
-            ),
-            500,
-        )
+        return error_response("Failed to get network config", 500, str(exc))
 
 
 @bp.route("/api/network/config", methods=["POST"])
@@ -59,16 +45,7 @@ def update_network_config_api():
     try:
         config_data = request.get_json(silent=True)
         if not config_data:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "No data",
-                        "message": "Please provide network config data",
-                    }
-                ),
-                400,
-            )
+            return error_response("Please provide network config data", 400, "No data")
 
         validation_error = _validate_network_config(config_data)
         if validation_error:
@@ -76,25 +53,10 @@ def update_network_config_api():
 
         saved_config = save_network_config(config_data, _network_config_file())
         logger.info("Network config updated port=%s", saved_config.get("port"))
-        return jsonify(
-            {
-                "success": True,
-                "data": config_data,
-                "message": "Network config updated successfully",
-            }
-        )
+        return success_response(config_data, "Network config updated successfully")
     except Exception as exc:
         logger.exception("Failed to update network config")
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": str(exc),
-                    "message": "Failed to update network config",
-                }
-            ),
-            500,
-        )
+        return error_response("Failed to update network config", 500, str(exc))
 
 
 @bp.route("/api/network/status", methods=["GET"])
@@ -119,25 +81,10 @@ def get_network_status():
             ),
             "timestamp": int(time.time()),
         }
-        return jsonify(
-            {
-                "success": True,
-                "data": status,
-                "message": "Network status loaded successfully",
-            }
-        )
+        return success_response(status, "Network status loaded successfully")
     except Exception as exc:
         logger.exception("Failed to get network status")
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": str(exc),
-                    "message": "Failed to get network status",
-                }
-            ),
-            500,
-        )
+        return error_response("Failed to get network status", 500, str(exc))
 
 
 @bp.route("/api/network/test", methods=["POST"])
@@ -149,32 +96,20 @@ def test_network_connection():
         connection_success, error_message = _test_local_bind(local_ip)
         discovery_success, discovery_error = test_udp_discovery()
 
-        return jsonify(
+        return success_response(
             {
-                "success": True,
-                "data": {
-                    "local_ip": local_ip,
-                    "port": target_port,
-                    "connection_success": connection_success,
-                    "error_message": error_message,
-                    "discovery_success": discovery_success,
-                    "discovery_error": discovery_error,
-                },
-                "message": "Network connection test completed",
-            }
+                "local_ip": local_ip,
+                "port": target_port,
+                "connection_success": connection_success,
+                "error_message": error_message,
+                "discovery_success": discovery_success,
+                "discovery_error": discovery_error,
+            },
+            "Network connection test completed",
         )
     except Exception as exc:
         logger.exception("Failed to test network connection")
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": str(exc),
-                    "message": "Failed to test network connection",
-                }
-            ),
-            500,
-        )
+        return error_response("Failed to test network connection", 500, str(exc))
 
 
 @bp.route("/api/network/penetration/config", methods=["GET"])
@@ -182,25 +117,10 @@ def test_network_connection():
 def get_penetration_config_api():
     try:
         config = get_penetration_config(_penetration_config_file())
-        return jsonify(
-            {
-                "success": True,
-                "data": config,
-                "message": "Penetration config loaded successfully",
-            }
-        )
+        return success_response(config, "Penetration config loaded successfully")
     except Exception as exc:
         logger.exception("Failed to get penetration config")
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": str(exc),
-                    "message": "Failed to get penetration config",
-                }
-            ),
-            500,
-        )
+        return error_response("Failed to get penetration config", 500, str(exc))
 
 
 @bp.route("/api/network/penetration/config", methods=["POST"])
@@ -209,38 +129,14 @@ def update_penetration_config_api():
     try:
         config_data = request.get_json(silent=True)
         if not config_data:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "No data",
-                        "message": "Please provide penetration config data",
-                    }
-                ),
-                400,
-            )
+            return error_response("Please provide penetration config data", 400, "No data")
 
         save_penetration_config(config_data, _penetration_config_file())
         logger.info("Penetration config updated type=%s", config_data.get("type"))
-        return jsonify(
-            {
-                "success": True,
-                "data": config_data,
-                "message": "Penetration config updated successfully",
-            }
-        )
+        return success_response(config_data, "Penetration config updated successfully")
     except Exception as exc:
         logger.exception("Failed to update penetration config")
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": str(exc),
-                    "message": "Failed to update penetration config",
-                }
-            ),
-            500,
-        )
+        return error_response("Failed to update penetration config", 500, str(exc))
 
 
 @bp.route("/api/network/penetration/status", methods=["GET"])
@@ -254,25 +150,10 @@ def get_penetration_status():
             "port_mappings": config.get("port_mappings", []),
             "timestamp": int(time.time()),
         }
-        return jsonify(
-            {
-                "success": True,
-                "data": status,
-                "message": "Penetration status loaded successfully",
-            }
-        )
+        return success_response(status, "Penetration status loaded successfully")
     except Exception as exc:
         logger.exception("Failed to get penetration status")
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": str(exc),
-                    "message": "Failed to get penetration status",
-                }
-            ),
-            500,
-        )
+        return error_response("Failed to get penetration status", 500, str(exc))
 
 
 def _validate_network_config(config_data):
@@ -281,42 +162,15 @@ def _validate_network_config(config_data):
         try:
             port = int(port)
             if port < 1 or port > 65535:
-                return (
-                    jsonify(
-                        {
-                            "success": False,
-                            "error": "Invalid port",
-                            "message": "Port must be between 1 and 65535",
-                        }
-                    ),
-                    400,
-                )
+                return error_response("Port must be between 1 and 65535", 400, "Invalid port")
         except (TypeError, ValueError):
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "Invalid port",
-                        "message": "Port must be an integer",
-                    }
-                ),
-                400,
-            )
+            return error_response("Port must be an integer", 400, "Invalid port")
 
     access_control = config_data.get("access_control", {})
     if access_control and isinstance(access_control, dict):
         allowed_ips = access_control.get("allowed_ips", [])
         if not isinstance(allowed_ips, list):
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "Invalid config",
-                        "message": "allowed_ips must be a list",
-                    }
-                ),
-                400,
-            )
+            return error_response("allowed_ips must be a list", 400, "Invalid config")
 
     return None
 
