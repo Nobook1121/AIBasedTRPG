@@ -2,3 +2,6 @@ Flask==2.0.1
 Flask-Cors==3.0.10
 bcrypt==4.0.1
 Werkzeug==2.0.1
+flask-socketio==5.3.6
+python-socketio==5.11.2
+pytest==8.4.0
