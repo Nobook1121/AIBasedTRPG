@@ -21,3 +21,28 @@ def test_create_app_serves_avatar_with_no_cache_headers():
     assert response.headers["Cache-Control"] == "no-cache, no-store, must-revalidate"
     assert response.headers["Pragma"] == "no-cache"
     assert response.headers["Expires"] == "0"
+
+
+def test_create_app_lists_scenarios():
+    app = create_app()
+    client = app.test_client()
+
+    response = client.get("/api/scenarios")
+
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["success"] is True
+    assert isinstance(data["data"], list)
+
+
+def test_create_app_lists_scenario_files():
+    app = create_app()
+    client = app.test_client()
+
+    response = client.get("/api/scenarios/list")
+
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["success"] is True
+    assert "files" in data["data"]
+    assert "total" in data["data"]
