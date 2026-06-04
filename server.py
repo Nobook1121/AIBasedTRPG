@@ -50,7 +50,7 @@ def run_server(argv=None):
     try:
         socketio.run(
             app,
-            debug=True,
+            debug=False,
             host="0.0.0.0",
             port=port,
             allow_unsafe_werkzeug=True,
@@ -64,7 +64,7 @@ def run_server(argv=None):
         logger.info("Retrying server on port %s", available_port)
         socketio.run(
             app,
-            debug=True,
+            debug=False,
             host="0.0.0.0",
             port=available_port,
             allow_unsafe_werkzeug=True,
