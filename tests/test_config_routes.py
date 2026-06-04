@@ -43,6 +43,16 @@ def test_convert_to_toml_escapes_string_values():
     assert parsed["general"]["name"] == 'TRPG "Keeper"\nsecond line'
 
 
+def test_convert_to_toml_quotes_unsafe_section_and_key_names():
+    toml_text = convert_to_toml(
+        {'general"]\n[injected': {'name"\nother': "TRPG"}}
+    )
+
+    parsed = tomllib.loads(toml_text)
+
+    assert parsed['general"]\n[injected']['name"\nother'] == "TRPG"
+
+
 def test_config_route_saves_ai_platform_json(tmp_path):
     app, config_dir = _config_app(tmp_path)
     client = app.test_client()

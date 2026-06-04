@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 
 import requests
 from flask import Blueprint, current_app, jsonify, request
@@ -10,6 +11,7 @@ from trpg_server.settings import CONFIG_DIR
 
 bp = Blueprint("config", __name__)
 logger = logging.getLogger(__name__)
+_BARE_TOML_KEY_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
 def _get_config_dir():
@@ -34,15 +36,22 @@ def _format_toml_value(value):
     return json.dumps(str(value), ensure_ascii=False)
 
 
+def _format_toml_key(key):
+    key_text = str(key)
+    if _BARE_TOML_KEY_RE.fullmatch(key_text):
+        return key_text
+    return json.dumps(key_text, ensure_ascii=False)
+
+
 def convert_to_toml(config_data):
     lines = []
     for section, values in config_data.items():
         if not isinstance(values, dict):
             continue
 
-        lines.append(f"[{section}]")
+        lines.append(f"[{_format_toml_key(section)}]")
         for key, value in values.items():
-            lines.append(f"{key} = {_format_toml_value(value)}")
+            lines.append(f"{_format_toml_key(key)} = {_format_toml_value(value)}")
         lines.append("")
 
     return "\n".join(lines)
