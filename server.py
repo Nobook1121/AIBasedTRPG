@@ -13,7 +13,10 @@ from datetime import timedelta
 from flask import Flask, jsonify, request, send_from_directory, session, redirect, url_for
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
+from trpg_server.logging_config import configure_logging
 from user_manager import user_manager
+
+configure_logging()
 
 # 权限检查装饰器
 def require_permission(required_role):
