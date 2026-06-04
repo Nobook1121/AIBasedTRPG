@@ -67,7 +67,8 @@ body, html {
     top: 0;
     left: 0;
     z-index: 1000;
-    overflow-y: auto;
+    overflow-y: hidden;
+    transition: width 0.3s ease;
 }
 
 #sidebar .nav-link {
@@ -138,6 +139,7 @@ body, html {
     margin-left: 16.666667%;
     height: 100vh;
     overflow: hidden;
+    transition: margin-left 0.3s ease, width 0.3s ease;
 }
 
 .tab-content {
@@ -193,30 +195,48 @@ body, html {
 /* Markdown样式 */
 .markdown-body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    line-height: 1.6;
+    line-height: 1.4;
 }
 
 .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4, .markdown-body h5, .markdown-body h6 {
-    margin-top: 1.5em;
-    margin-bottom: 0.5em;
+    margin-top: 0.6em;
+    margin-bottom: 0.3em;
     font-weight: 600;
     line-height: 1.25;
 }
 
+.markdown-body h1:first-child, 
+.markdown-body h2:first-child, 
+.markdown-body h3:first-child, 
+.markdown-body h4:first-child, 
+.markdown-body h5:first-child, 
+.markdown-body h6:first-child {
+    margin-top: 0;
+}
+
+.markdown-body h1:last-child, 
+.markdown-body h2:last-child, 
+.markdown-body h3:last-child, 
+.markdown-body h4:last-child, 
+.markdown-body h5:last-child, 
+.markdown-body h6:last-child {
+    margin-bottom: 0;
+}
+
 .markdown-body h1 {
-    font-size: 1.8em;
+    font-size: 1.6em;
     border-bottom: 1px solid #eaecef;
-    padding-bottom: 0.3em;
+    padding-bottom: 0.2em;
 }
 
 .markdown-body h2 {
-    font-size: 1.5em;
+    font-size: 1.4em;
     border-bottom: 1px solid #eaecef;
-    padding-bottom: 0.3em;
+    padding-bottom: 0.2em;
 }
 
 .markdown-body h3 {
-    font-size: 1.25em;
+    font-size: 1.2em;
 }
 
 .markdown-body h4 {
@@ -233,31 +253,55 @@ body, html {
 }
 
 .markdown-body p {
+    margin-top: 0.4em;
+    margin-bottom: 0.4em;
+}
+
+.markdown-body p:first-child {
     margin-top: 0;
-    margin-bottom: 1em;
+}
+
+.markdown-body p:last-child {
+    margin-bottom: 0;
 }
 
 .markdown-body ul, .markdown-body ol {
-    padding-left: 2em;
+    padding-left: 1.5em;
+    margin-top: 0.4em;
+    margin-bottom: 0.4em;
+}
+
+.markdown-body ul:first-child, .markdown-body ol:first-child {
     margin-top: 0;
-    margin-bottom: 1em;
+}
+
+.markdown-body ul:last-child, .markdown-body ol:last-child {
+    margin-bottom: 0;
 }
 
 .markdown-body li {
-    margin-top: 0.25em;
+    margin-top: 0.15em;
 }
 
 .markdown-body blockquote {
-    padding: 0 1em;
+    padding: 0.4em 0.8em;
     color: #6a737d;
     border-left: 0.25em solid #dfe2e5;
-    margin: 0 0 1em 0;
+    margin: 0.4em 0;
+}
+
+.markdown-body blockquote:first-child {
+    margin-top: 0;
+}
+
+.markdown-body blockquote:last-child {
+    margin-bottom: 0;
 }
 
 .markdown-body code {
     font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
     font-size: 0.9em;
-    padding: 0.2em 0.4em;
+    padding: 0.15em 0.3em;
     background-color: rgba(27, 31, 35, 0.05);
     border-radius: 3px;
 }
@@ -265,10 +309,10 @@ body, html {
 .markdown-body pre {
     background-color: #f6f8fa;
     border-radius: 3px;
-    padding: 1em;
+    padding: 0.6em;
     overflow: auto;
     margin-top: 0;
-    margin-bottom: 1em;
+    margin-bottom: 0.6em;
 }
 
 .markdown-body pre code {
@@ -294,11 +338,11 @@ body, html {
 .markdown-body table {
     border-collapse: collapse;
     width: 100%;
-    margin-bottom: 1em;
+    margin-bottom: 0.6em;
 }
 
 .markdown-body th, .markdown-body td {
-    padding: 6px 13px;
+    padding: 4px 10px;
     border: 1px solid #dfe2e5;
 }
 
@@ -320,6 +364,29 @@ body, html {
     border-radius: 3px;
     padding: 10px;
     margin: 10px 0;
+}
+
+/* 存档卡片高亮样式 */
+.save-card.border-primary {
+    transition: all 0.3s ease;
+}
+
+.save-card.border-primary .card-header {
+    background-color: #007bff !important;
+}
+
+/* 预览消息样式 */
+.preview-messages {
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.preview-message {
+    transition: background-color 0.2s ease;
+}
+
+.preview-message:hover {
+    background-color: #e9ecef !important;
 }
 
 /* 暗色主题下的Markdown样式 */
@@ -413,10 +480,20 @@ body.dark-theme .markdown-error {
 /* 调整消息内容的间距 */
 .message-content {
     word-wrap: break-word;
-    padding: 12px 16px;
+    padding: 10px 14px;
     border-radius: 18px;
     position: relative;
     margin-top: 2px;
+    display: block;
+}
+
+/* Markdown样式调整 - 移除第一个元素的上边距和最后一个元素的下边距 */
+.message-content .markdown-body > :first-child {
+    margin-top: 0 !important;
+}
+
+.message-content .markdown-body > :last-child {
+    margin-bottom: 0 !important;
 }
 
 .message-avatar {
@@ -1530,4 +1607,272 @@ body.dark-theme .modal-footer {
 @keyframes slideUp {
     from { transform: translateY(20px); opacity: 0; }
     to { transform: translateY(0); opacity: 1; }
+}
+
+/* 欢迎文字样式 */
+.welcome-text {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 300px;
+    color: #999;
+    font-size: 14px;
+    text-align: center;
+    user-select: none;
+}
+
+/* 存档状态栏样式 */
+.save-status-bar {
+    background-color: #f8f9fa;
+    color: #495057;
+    padding: 6px 16px;
+    font-size: 12px;
+    border-bottom: 1px solid #dee2e6;
+    border-left: 3px solid #007bff;
+    display: flex;
+    align-items: center;
+    animation: slideDown 0.3s ease;
+}
+
+.save-status-content {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.save-status-content .fa-save {
+    font-size: 12px;
+    color: #007bff;
+}
+
+.save-status-label {
+    color: #6c757d;
+}
+
+.save-status-name {
+    font-weight: 600;
+    color: #212529;
+}
+
+.save-status-divider {
+    color: #ced4da;
+}
+
+.save-status-scenario {
+    color: #6c757d;
+}
+
+body.dark-theme .save-status-bar {
+    background-color: #2d2d2d;
+    color: #ccc;
+    border-bottom-color: #444;
+    border-left-color: #007bff;
+}
+
+body.dark-theme .save-status-name {
+    color: #e0e0e0;
+}
+
+body.dark-theme .save-status-label,
+body.dark-theme .save-status-scenario {
+    color: #999;
+}
+
+/* AI思考中动画样式 */
+.thinking-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+}
+
+.thinking-animation {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.thinking-dot {
+    width: 8px;
+    height: 8px;
+    background-color: #007bff;
+    border-radius: 50%;
+    display: inline-block;
+    animation: thinkingBounce 1.4s ease-in-out infinite both;
+}
+
+.thinking-dot:nth-child(1) {
+    animation-delay: -0.32s;
+}
+
+.thinking-dot:nth-child(2) {
+    animation-delay: -0.16s;
+}
+
+.thinking-dot:nth-child(3) {
+    animation-delay: 0s;
+}
+
+@keyframes thinkingBounce {
+    0%, 80%, 100% {
+        transform: scale(0.6);
+        opacity: 0.4;
+    }
+    40% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.thinking-text {
+    color: #666;
+    font-size: 14px;
+    font-style: italic;
+}
+
+body.dark-theme .thinking-text {
+    color: #aaa;
+}
+
+/* 玩家消息右对齐增强 */
+.message.player-message {
+    flex-direction: row-reverse;
+    justify-content: flex-start;
+    margin-left: auto;
+    margin-right: 0;
+}
+
+.message.player-message .message-avatar {
+    margin-left: 12px;
+    margin-right: 0;
+}
+
+.message.player-message .message-content-container {
+    align-items: flex-end;
+    text-align: right;
+}
+
+.message.player-message .message-header {
+    flex-direction: row-reverse;
+}
+
+.message.player-message .message-sender {
+    margin-right: 0;
+    margin-left: 10px;
+}
+
+.message.player-message .message-content {
+    border-bottom-right-radius: 4px;
+    border-bottom-left-radius: 18px;
+}
+
+.message.player-message .processing-time {
+    display: none;
+}
+
+/* 侧边栏顶部收起按钮 */
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    min-height: 32px;
+}
+
+.sidebar-title {
+    width: 100%;
+    margin: 0;
+    padding: 0 32px;
+    text-align: center;
+}
+
+.sidebar-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    position: absolute;
+    top: 50%;
+    right: 0;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    color: #adb5bd;
+    background: transparent;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    transform: translateY(-50%);
+    transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.sidebar-toggle:hover,
+.sidebar-toggle:focus-visible {
+    color: white;
+    background-color: rgba(255, 255, 255, 0.12);
+    outline: none;
+}
+
+/* 侧边栏收起状态 */
+#sidebar.sidebar-collapsed {
+    width: 60px !important;
+    overflow: hidden;
+}
+
+#sidebar.sidebar-collapsed .d-flex.flex-column {
+    padding: 0.5rem !important;
+}
+
+#sidebar.sidebar-collapsed .sidebar-title,
+#sidebar.sidebar-collapsed .nav-link,
+#sidebar.sidebar-collapsed .dropdown-btn,
+#sidebar.sidebar-collapsed .dropdown-container,
+#sidebar.sidebar-collapsed .user-details {
+    display: none;
+}
+
+#sidebar.sidebar-collapsed .sidebar-header {
+    justify-content: center;
+}
+
+#sidebar.sidebar-collapsed .sidebar-toggle {
+    position: static;
+    transform: none;
+}
+
+#sidebar.sidebar-collapsed .user-info {
+    justify-content: center;
+    padding: 8px;
+}
+
+#sidebar.sidebar-collapsed .user-avatar {
+    margin-right: 0;
+}
+
+/* 主内容区自适应侧边栏 */
+.col-10.sidebar-collapsed-content {
+    margin-left: 60px !important;
+    width: calc(100% - 60px) !important;
+    transition: margin-left 0.3s ease, width 0.3s ease;
+}
+
+/* AI提示前缀样式 */
+.ai-hint {
+    background-color: #e8f4fd;
+    color: #007bff;
+    font-weight: 600;
+    font-size: 13px;
+    border-right: 1px solid #b8daff;
+    user-select: none;
+    min-width: 42px;
+    justify-content: center;
+}
+
+body.dark-theme .ai-hint {
+    background-color: #1a3a5c;
+    color: #58a6ff;
+    border-right-color: #2a5a8c;
 }

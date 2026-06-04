@@ -12,6 +12,7 @@ import threading
 from datetime import timedelta
 from flask import Flask, jsonify, request, send_from_directory, session, redirect, url_for
 from flask_cors import CORS
+from flask_socketio import SocketIO, emit
 from user_manager import user_manager
 
 # 权限检查装饰器
@@ -97,6 +98,7 @@ def log_error(message):
 
 app = Flask(__name__)
 CORS(app)  # 允许跨域请求
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 # 设置静态文件服务
 app.static_folder = 'assets'
@@ -114,6 +116,7 @@ log.setLevel(logging.ERROR)
 SCENARIOS_DIR = 'scenarios'
 SCENARIO_COVERS_DIR = 'assets/scenario_covers'
 AVATARS_DIR = 'assets/avatars'
+SAVES_DIR = 'saves'
 
 # 网络配置
 NETWORK_CONFIG_FILE = 'config/network.json'
@@ -148,6 +151,11 @@ if not os.path.exists(SCENARIO_COVERS_DIR):
 if not os.path.exists(AVATARS_DIR):
     os.makedirs(AVATARS_DIR)
     log_info(f"创建scenario_covers目录: {SCENARIO_COVERS_DIR}")
+
+# 确保saves目录存在
+if not os.path.exists(SAVES_DIR):
+    os.makedirs(SAVES_DIR)
+    log_info(f"创建saves目录: {SAVES_DIR}")
 
 # 确保网络配置文件存在
 if not os.path.exists('config'):
@@ -235,7 +243,7 @@ def load_network_config():
         with open(NETWORK_CONFIG_FILE, 'r', encoding='utf-8') as f:
             network_config = json.load(f)
         network_config_timestamp = time.time()
-        log_info(f"加载网络配置成功: {network_config}")
+        # 移除加载网络配置日志，避免日志过于频繁
         return network_config
     except Exception as e:
         log_error(f"加载网络配置失败: {e}")
@@ -372,7 +380,7 @@ def discovery_thread():
             # 广播服务信息
             broadcast_service_info(service_info)
             
-            log_info(f"服务发现广播 - 端口: {config.get('port', DEFAULT_PORT)}, IP: {service_info['local_ip']}")
+            # 移除服务发现广播日志，避免日志过于频繁
             time.sleep(DISCOVERY_INTERVAL)
         except socket.error as e:
             log_error(f"服务发现线程网络错误: {e}")
@@ -451,7 +459,8 @@ def start_tcp_discovery_server(service_info):
                     message = json.dumps(service_info).encode('utf-8')
                     client_socket.send(message)
                     client_socket.close()
-                    log_info(f"TCP服务发现响应 - 客户端: {client_address}")
+                    # 只在有新连接时记录IP等重要信息
+                    log_info(f"新连接 - 客户端: {client_address}")
                 except socket.timeout:
                     # 超时是正常的，只是为了避免阻塞
                     pass
@@ -1241,8 +1250,12 @@ def get_auth_status():
     获取认证状态
     """
     try:
+        # 获取用户IP地址
+        ip_address = request.remote_addr
         if 'user_id' in session:
             user = user_manager.get_user_by_id(session['user_id'])
+            # 记录登录状态，包括自动登录的情况
+            log_info(f"[用户操作] 登录状态: 用户名={session['username']}, 用户ID={session['user_id']}, IP={ip_address}")
             return jsonify({
                 'success': True,
                 'data': {
@@ -1423,7 +1436,7 @@ def serve_avatar(filename):
     提供头像文件服务
     """
     try:
-        log_info(f"提供头像文件: {filename}")
+        # 移除日志记录，避免日志过于频繁
         response = send_from_directory('assets/avatars', filename)
         # 添加缓存控制头，避免浏览器缓存
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
@@ -1454,7 +1467,7 @@ def serve_aiplatform_icon(filename):
     提供AI平台图标文件服务
     """
     try:
-        log_info(f"提供AI平台图标文件: {filename}")
+        # 移除日志记录，避免日志过于频繁
         response = send_from_directory('assets/aiplatform', filename)
         # 添加缓存控制头，避免浏览器缓存
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
@@ -1472,7 +1485,7 @@ def serve_config(filename):
     提供配置文件服务
     """
     try:
-        log_info(f"提供配置文件: {filename}")
+        # 移除日志记录，避免日志过于频繁
         return send_from_directory('config', filename)
     except Exception as e:
         log_error(f"提供配置文件时出错: {e}")
@@ -2475,7 +2488,7 @@ def get_network_status():
             'timestamp': int(time.time())
         }
         
-        log_info(f"获取网络状态成功: {status}")
+        # 移除网络状态获取日志，避免日志过于频繁
         return jsonify({
             'success': True,
             'data': status,
@@ -2778,6 +2791,529 @@ def get_all_ip_configs():
         }), 500
 
 
+# ==================== 存档功能API ====================
+
+@app.route('/api/saves', methods=['GET'])
+def get_saves_list():
+    """
+    获取所有存档卡片列表
+    """
+    try:
+        saves = []
+        if os.path.exists(SAVES_DIR):
+            for filename in os.listdir(SAVES_DIR):
+                save_dir = os.path.join(SAVES_DIR, filename)
+                if os.path.isdir(save_dir):
+                    info_file = os.path.join(save_dir, 'info.json')
+                    if os.path.exists(info_file):
+                        try:
+                            with open(info_file, 'r', encoding='utf-8') as f:
+                                info = json.load(f)
+                                saves.append(info)
+                        except Exception as e:
+                            log_error(f"读取存档信息失败: {e}")
+        log_info(f"获取存档列表成功，共 {len(saves)} 个")
+        return jsonify({
+            'success': True,
+            'data': saves,
+            'message': '获取存档列表成功'
+        })
+    except Exception as e:
+        log_error(f"获取存档列表失败: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '获取存档列表失败'
+        }), 500
+
+
+@app.route('/api/saves', methods=['POST'])
+def create_save():
+    """
+    创建存档卡片
+    """
+    try:
+        data = request.json
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': '无数据',
+                'message': '请提供存档数据'
+            }), 400
+        
+        save_name = data.get('name', '').strip()
+        scenario_id = data.get('scenario_id')
+        scenario_title = data.get('scenario_title', '').strip()
+        
+        if not save_name:
+            return jsonify({
+                'success': False,
+                'error': '存档名称不能为空',
+                'message': '请输入存档名称'
+            }), 400
+        
+        if scenario_id is None:
+            return jsonify({
+                'success': False,
+                'error': '请选择绑定的剧本',
+                'message': '请选择绑定的剧本'
+            }), 400
+        
+        # 生成存档ID和目录
+        save_id = str(int(time.time() * 1000))
+        save_dir = os.path.join(SAVES_DIR, save_name)
+        
+        # 检查存档名称是否已存在
+        if os.path.exists(save_dir):
+            return jsonify({
+                'success': False,
+                'error': '存档名称已存在',
+                'message': '请使用其他存档名称'
+            }), 400
+        
+        # 创建存档目录
+        os.makedirs(save_dir)
+        
+        # 创建存档信息
+        save_info = {
+            'id': save_id,
+            'name': save_name,
+            'scenario_id': scenario_id,
+            'scenario_title': scenario_title,
+            'created_at': time.strftime('%Y-%m-%d %H:%M:%S'),
+            'participants': []
+        }
+        
+        # 保存存档信息
+        info_file = os.path.join(save_dir, 'info.json')
+        with open(info_file, 'w', encoding='utf-8') as f:
+            json.dump(save_info, f, ensure_ascii=False, indent=2)
+        
+        # 创建自动存档文件
+        autosave_file = os.path.join(save_dir, 'autosave.json')
+        with open(autosave_file, 'w', encoding='utf-8') as f:
+            json.dump([], f, ensure_ascii=False, indent=2)
+        
+        log_info(f"创建存档成功: {save_name}, 绑定剧本: {scenario_title}")
+        return jsonify({
+            'success': True,
+            'data': save_info,
+            'message': '创建存档成功'
+        }), 201
+    except Exception as e:
+        log_error(f"创建存档失败: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '创建存档失败'
+        }), 500
+
+
+@app.route('/api/saves/<save_id>', methods=['DELETE'])
+def delete_save(save_id):
+    """
+    删除存档卡片
+    """
+    try:
+        # 查找存档目录
+        save_dir = None
+        for filename in os.listdir(SAVES_DIR):
+            dir_path = os.path.join(SAVES_DIR, filename)
+            if os.path.isdir(dir_path):
+                info_file = os.path.join(dir_path, 'info.json')
+                if os.path.exists(info_file):
+                    try:
+                        with open(info_file, 'r', encoding='utf-8') as f:
+                            info = json.load(f)
+                            if info.get('id') == save_id:
+                                save_dir = dir_path
+                                break
+                    except Exception as e:
+                        log_error(f"读取存档信息失败: {e}")
+        
+        if not save_dir:
+            return jsonify({
+                'success': False,
+                'error': '存档不存在',
+                'message': '存档不存在'
+            }), 404
+        
+        # 删除存档目录
+        import shutil
+        shutil.rmtree(save_dir)
+        
+        log_info(f"删除存档成功: {save_id}")
+        return jsonify({
+            'success': True,
+            'message': '删除存档成功'
+        })
+    except Exception as e:
+        log_error(f"删除存档失败: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '删除存档失败'
+        }), 500
+
+
+@app.route('/api/saves/<save_id>/nodes', methods=['GET'])
+def get_save_nodes(save_id):
+    """
+    获取存档节点列表
+    """
+    try:
+        # 查找存档目录
+        save_dir = None
+        save_info = None
+        for filename in os.listdir(SAVES_DIR):
+            dir_path = os.path.join(SAVES_DIR, filename)
+            if os.path.isdir(dir_path):
+                info_file = os.path.join(dir_path, 'info.json')
+                if os.path.exists(info_file):
+                    try:
+                        with open(info_file, 'r', encoding='utf-8') as f:
+                            info = json.load(f)
+                            if info.get('id') == save_id:
+                                save_dir = dir_path
+                                save_info = info
+                                break
+                    except Exception as e:
+                        log_error(f"读取存档信息失败: {e}")
+        
+        if not save_dir:
+            return jsonify({
+                'success': False,
+                'error': '存档不存在',
+                'message': '存档不存在'
+            }), 404
+        
+        # 获取所有存档节点
+        nodes = []
+        for filename in os.listdir(save_dir):
+            if filename.endswith('.json') and filename != 'info.json' and filename != 'autosave.json':
+                node_file = os.path.join(save_dir, filename)
+                try:
+                    with open(node_file, 'r', encoding='utf-8') as f:
+                        node_data = json.load(f)
+                        nodes.append({
+                            'filename': filename,
+                            'created_at': node_data.get('created_at', ''),
+                            'message_count': len(node_data.get('messages', []))
+                        })
+                except Exception as e:
+                    log_error(f"读取存档节点失败: {e}")
+        
+        # 按创建时间排序
+        nodes.sort(key=lambda x: x['created_at'], reverse=True)
+        
+        log_info(f"获取存档节点成功，存档: {save_id}, 节点数: {len(nodes)}")
+        return jsonify({
+            'success': True,
+            'data': {
+                'info': save_info,
+                'nodes': nodes
+            },
+            'message': '获取存档节点成功'
+        })
+    except Exception as e:
+        log_error(f"获取存档节点失败: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '获取存档节点失败'
+        }), 500
+
+
+@app.route('/api/saves/<save_id>/nodes', methods=['POST'])
+def create_save_node(save_id):
+    """
+    创建存档节点
+    """
+    try:
+        data = request.json
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': '无数据',
+                'message': '请提供存档数据'
+            }), 400
+        
+        messages = data.get('messages', [])
+        
+        # 查找存档目录
+        save_dir = None
+        for filename in os.listdir(SAVES_DIR):
+            dir_path = os.path.join(SAVES_DIR, filename)
+            if os.path.isdir(dir_path):
+                info_file = os.path.join(dir_path, 'info.json')
+                if os.path.exists(info_file):
+                    try:
+                        with open(info_file, 'r', encoding='utf-8') as f:
+                            info = json.load(f)
+                            if info.get('id') == save_id:
+                                save_dir = dir_path
+                                break
+                    except Exception as e:
+                        log_error(f"读取存档信息失败: {e}")
+        
+        if not save_dir:
+            return jsonify({
+                'success': False,
+                'error': '存档不存在',
+                'message': '存档不存在'
+            }), 404
+        
+        # 生成存档节点文件名（使用时间戳）
+        timestamp = int(time.time())
+        node_filename = f"{timestamp}.json"
+        node_file = os.path.join(save_dir, node_filename)
+        
+        # 构建存档节点数据
+        node_data = {
+            'created_at': time.strftime('%Y-%m-%d %H:%M:%S'),
+            'timestamp': timestamp,
+            'messages': messages
+        }
+        
+        # 保存存档节点
+        with open(node_file, 'w', encoding='utf-8') as f:
+            json.dump(node_data, f, ensure_ascii=False, indent=2)
+        
+        log_info(f"创建存档节点成功: {save_id}, 消息数: {len(messages)}")
+        return jsonify({
+            'success': True,
+            'data': node_data,
+            'message': '创建存档节点成功'
+        }), 201
+    except Exception as e:
+        log_error(f"创建存档节点失败: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '创建存档节点失败'
+        }), 500
+
+
+@app.route('/api/saves/<save_id>/nodes/<node_filename>', methods=['GET'])
+def load_save_node(save_id, node_filename):
+    """
+    加载存档节点
+    """
+    try:
+        # 查找存档目录
+        save_dir = None
+        for filename in os.listdir(SAVES_DIR):
+            dir_path = os.path.join(SAVES_DIR, filename)
+            if os.path.isdir(dir_path):
+                info_file = os.path.join(dir_path, 'info.json')
+                if os.path.exists(info_file):
+                    try:
+                        with open(info_file, 'r', encoding='utf-8') as f:
+                            info = json.load(f)
+                            if info.get('id') == save_id:
+                                save_dir = dir_path
+                                break
+                    except Exception as e:
+                        log_error(f"读取存档信息失败: {e}")
+        
+        if not save_dir:
+            return jsonify({
+                'success': False,
+                'error': '存档不存在',
+                'message': '存档不存在'
+            }), 404
+        
+        # 读取存档节点
+        node_file = os.path.join(save_dir, node_filename)
+        if not os.path.exists(node_file):
+            return jsonify({
+                'success': False,
+                'error': '存档节点不存在',
+                'message': '存档节点不存在'
+            }), 404
+        
+        with open(node_file, 'r', encoding='utf-8') as f:
+            node_data = json.load(f)
+        
+        log_info(f"加载存档节点成功: {save_id}, {node_filename}")
+        return jsonify({
+            'success': True,
+            'data': node_data,
+            'message': '加载存档节点成功'
+        })
+    except Exception as e:
+        log_error(f"加载存档节点失败: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '加载存档节点失败'
+        }), 500
+
+
+@app.route('/api/saves/<save_id>/nodes/<node_filename>', methods=['DELETE'])
+def delete_save_node(save_id, node_filename):
+    """
+    删除存档节点
+    """
+    try:
+        # 查找存档目录
+        save_dir = None
+        for filename in os.listdir(SAVES_DIR):
+            dir_path = os.path.join(SAVES_DIR, filename)
+            if os.path.isdir(dir_path):
+                info_file = os.path.join(dir_path, 'info.json')
+                if os.path.exists(info_file):
+                    try:
+                        with open(info_file, 'r', encoding='utf-8') as f:
+                            info = json.load(f)
+                            if info.get('id') == save_id:
+                                save_dir = dir_path
+                                break
+                    except Exception as e:
+                        log_error(f"读取存档信息失败: {e}")
+        
+        if not save_dir:
+            return jsonify({
+                'success': False,
+                'error': '存档不存在',
+                'message': '存档不存在'
+            }), 404
+        
+        # 删除存档节点
+        node_file = os.path.join(save_dir, node_filename)
+        if os.path.exists(node_file):
+            os.remove(node_file)
+        
+        log_info(f"删除存档节点成功: {save_id}, {node_filename}")
+        return jsonify({
+            'success': True,
+            'message': '删除存档节点成功'
+        })
+    except Exception as e:
+        log_error(f"删除存档节点失败: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '删除存档节点失败'
+        }), 500
+
+
+@app.route('/api/saves/<save_id>/autosave', methods=['POST'])
+def save_autosave(save_id):
+    """
+    保存自动存档
+    """
+    try:
+        data = request.json
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': '无数据',
+                'message': '请提供存档数据'
+            }), 400
+        
+        messages = data.get('messages', [])
+        
+        # 查找存档目录
+        save_dir = None
+        for filename in os.listdir(SAVES_DIR):
+            dir_path = os.path.join(SAVES_DIR, filename)
+            if os.path.isdir(dir_path):
+                info_file = os.path.join(dir_path, 'info.json')
+                if os.path.exists(info_file):
+                    try:
+                        with open(info_file, 'r', encoding='utf-8') as f:
+                            info = json.load(f)
+                            if info.get('id') == save_id:
+                                save_dir = dir_path
+                                break
+                    except Exception as e:
+                        log_error(f"读取存档信息失败: {e}")
+        
+        if not save_dir:
+            return jsonify({
+                'success': False,
+                'error': '存档不存在',
+                'message': '存档不存在'
+            }), 404
+        
+        # 保存自动存档
+        autosave_file = os.path.join(save_dir, 'autosave.json')
+        autosave_data = {
+            'updated_at': time.strftime('%Y-%m-%d %H:%M:%S'),
+            'messages': messages
+        }
+        with open(autosave_file, 'w', encoding='utf-8') as f:
+            json.dump(autosave_data, f, ensure_ascii=False, indent=2)
+        
+        # 不记录自动存档日志，避免过于频繁
+        return jsonify({
+            'success': True,
+            'message': '保存自动存档成功'
+        })
+    except Exception as e:
+        log_error(f"保存自动存档失败: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '保存自动存档失败'
+        }), 500
+
+
+@app.route('/api/saves/<save_id>/autosave', methods=['GET'])
+def load_autosave(save_id):
+    """
+    加载自动存档
+    """
+    try:
+        # 查找存档目录
+        save_dir = None
+        for filename in os.listdir(SAVES_DIR):
+            dir_path = os.path.join(SAVES_DIR, filename)
+            if os.path.isdir(dir_path):
+                info_file = os.path.join(dir_path, 'info.json')
+                if os.path.exists(info_file):
+                    try:
+                        with open(info_file, 'r', encoding='utf-8') as f:
+                            info = json.load(f)
+                            if info.get('id') == save_id:
+                                save_dir = dir_path
+                                break
+                    except Exception as e:
+                        log_error(f"读取存档信息失败: {e}")
+        
+        if not save_dir:
+            return jsonify({
+                'success': False,
+                'error': '存档不存在',
+                'message': '存档不存在'
+            }), 404
+        
+        # 读取自动存档
+        autosave_file = os.path.join(save_dir, 'autosave.json')
+        if os.path.exists(autosave_file):
+            with open(autosave_file, 'r', encoding='utf-8') as f:
+                autosave_data = json.load(f)
+            return jsonify({
+                'success': True,
+                'data': autosave_data,
+                'message': '加载自动存档成功'
+            })
+        else:
+            return jsonify({
+                'success': True,
+                'data': {'messages': []},
+                'message': '无自动存档'
+            })
+    except Exception as e:
+        log_error(f"加载自动存档失败: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '加载自动存档失败'
+        }), 500
+
+
 # 静态文件服务
 @app.route('/')
 def serve_index():
@@ -2787,6 +3323,34 @@ def serve_index():
 @app.route('/<path:path>')
 def serve_static(path):
     return send_from_directory('.', path)
+
+
+# ==================== WebSocket 消息同步 ====================
+
+@socketio.on('connect')
+def handle_connect():
+    """客户端连接"""
+    log_info(f"WebSocket客户端已连接")
+
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    """客户端断开连接"""
+    log_info("WebSocket客户端已断开")
+
+
+@socketio.on('send_message')
+def handle_send_message(data):
+    """接收客户端发送的消息并广播给所有连接的客户端"""
+    log_info(f"WebSocket收到消息: {data}")
+    # 广播消息给所有其他客户端
+    emit('new_message', data, broadcast=True, include_self=False)
+
+
+@socketio.on('typing')
+def handle_typing(data):
+    """接收客户端输入状态"""
+    emit('user_typing', data, broadcast=True, include_self=False)
 
 
 import sys
@@ -2815,11 +3379,14 @@ if __name__ == '__main__':
             log_error(f"无法找到可用端口，使用默认端口 {DEFAULT_PORT}")
             port = DEFAULT_PORT
     
+    # 获取本地IP地址
+    local_ip = get_local_ip()
     log_info(f"启动服务器，监听端口：{port}")
+    log_info(f"局域网访问地址：http://{local_ip}:{port}")
     log_info("服务器启动中...")
     try:
         # 监听所有网络接口，以便局域网内的其他设备可以访问
-        app.run(debug=True, host='0.0.0.0', port=port)
+        socketio.run(app, debug=True, host='0.0.0.0', port=port, allow_unsafe_werkzeug=True)
     except socket.error as e:
         log_error(f"服务器启动失败 - 端口错误: {e}")
         # 再次尝试寻找可用端口
@@ -2827,8 +3394,11 @@ if __name__ == '__main__':
         if available_port:
             log_info(f"找到可用端口: {available_port}")
             port = available_port
+            # 获取本地IP地址
+            local_ip = get_local_ip()
             log_info(f"重新启动服务器，监听端口：{port}")
-            app.run(debug=True, host='0.0.0.0', port=port)
+            log_info(f"局域网访问地址：http://{local_ip}:{port}")
+            socketio.run(app, debug=True, host='0.0.0.0', port=port, allow_unsafe_werkzeug=True)
         else:
             log_error("无法找到可用端口，服务器启动失败")
     except Exception as e:

@@ -67,51 +67,13 @@ class ScenarioController {
             // 创建剧本，获取真实ID
             const scenario = await this.model.createScenario(scenarioData);
             
-            // 检查是否有封面图片需要处理
+            // 使用统一的封面重命名方法处理封面
             const coverUrl = document.getElementById('scenarioCoverUrl').value;
-            if (coverUrl && coverUrl !== '/scenario_covers/default_cover.png') {
-                // 提取旧的封面文件名
-                const oldCoverFilename = coverUrl.split('/').pop();
-                // 生成新的封面文件名，使用剧本标题
-                const safeTitle = scenario.title.replace('/', '_').replace('\\', '_');
-                const newCoverFilename = `${safeTitle}.png`;
-                
-                // 调用服务器API重命名封面文件
-                try {
-                    const response = await fetch('/api/scenarios/cover/rename', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            old_filename: oldCoverFilename,
-                            new_filename: newCoverFilename
-                        })
-                    });
-                    
-                    const data = await response.json();
-                    if (data.success) {
-                        console.log(`封面文件重命名成功: ${oldCoverFilename} -> ${newCoverFilename}`);
-                        
-                        // 更新剧本的封面路径
-                        scenario.cover = `/scenario_covers/${newCoverFilename}`;
-                        // 更新本地存储中的剧本数据
-                        this.model.scenarios[this.model.scenarios.findIndex(s => s.id === scenario.id)] = scenario;
-                        this.model.saveScenarios();
-                    } else {
-                        console.error('重命名封面文件失败:', data.message);
-                        // 使用默认封面
-                        scenario.cover = '/scenario_covers/default_cover.png';
-                    }
-                } catch (error) {
-                    console.error('重命名封面文件失败:', error);
-                    // 使用默认封面
-                    scenario.cover = '/scenario_covers/default_cover.png';
-                }
-            } else {
-                // 没有上传封面，使用默认封面
-                scenario.cover = '/scenario_covers/default_cover.png';
-            }
+            await this.renameScenarioCover(scenario, coverUrl, 'title');
+            
+            // 更新本地存储中的剧本数据
+            this.model.scenarios[this.model.scenarios.findIndex(s => s.id === scenario.id)] = scenario;
+            this.model.saveScenarios();
             
             // 渲染剧本列表
             this.renderScenarioList();
@@ -165,51 +127,10 @@ class ScenarioController {
                     // 获取表单数据
                     let scenarioData = this.view.getFormData();
                     
-                    // 如果没有设置封面URL，使用默认封面
-                    if (!scenarioData.cover) {
-                        scenarioData.cover = '/scenario_covers/default_cover.png';
-                    }
-                    
-                    // 确保只使用scenario_covers文件夹的路径，禁止外部URL和其他文件夹
-                    if (scenarioData.cover && !scenarioData.cover.startsWith('/scenario_covers/')) {
-                        scenarioData.cover = '/scenario_covers/default_cover.png';
-                    }
-                    
-                    // 检查是否上传了新的封面
-                    if (scenarioData.cover && scenarioData.cover !== '/scenario_covers/default_cover.png') {
-                        // 提取当前封面文件名
-                        const currentCoverFilename = scenarioData.cover.split('/').pop();
-                        // 生成新的封面文件名，使用剧本ID
-                        const newCoverFilename = `${id}.png`;
-                        
-                        // 如果文件名不是剧本ID，需要重命名
-                        if (currentCoverFilename !== newCoverFilename) {
-                            // 调用服务器API重命名封面文件
-                            try {
-                                const response = await fetch('/api/scenarios/cover/rename', {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json'
-                                    },
-                                    body: JSON.stringify({
-                                        old_filename: currentCoverFilename,
-                                        new_filename: newCoverFilename
-                                    })
-                                });
-                                
-                                const data = await response.json();
-                                if (data.success) {
-                                    console.log(`封面文件重命名成功: ${currentCoverFilename} -> ${newCoverFilename}`);
-                                    // 更新封面路径
-                                    scenarioData.cover = `/scenario_covers/${newCoverFilename}`;
-                                } else {
-                                    console.error('重命名封面文件失败:', data.message);
-                                }
-                            } catch (error) {
-                                console.error('重命名封面文件失败:', error);
-                            }
-                        }
-                    }
+                    // 使用统一的封面重命名方法处理封面
+                    const tempScenario = { id: id };
+                    await this.renameScenarioCover(tempScenario, scenarioData.cover, 'id');
+                    scenarioData.cover = tempScenario.cover;
                     
                     // 直接更新本地剧本数据，不调用updateScenario避免认证问题
                     const updatedScenario = {
@@ -329,6 +250,76 @@ class ScenarioController {
             reader.onerror = (e) => reject(new Error('文件读取失败'));
             reader.readAsText(file);
         });
+    }
+
+    /**
+     * 重命名剧本封面文件（统一处理新建和编辑时的封面重命名逻辑）
+     * @param {Object} scenario - 剧本对象
+     * @param {string} coverUrl - 当前封面URL
+     * @param {string} namingStrategy - 命名策略：'title'使用标题命名，'id'使用ID命名
+     * @returns {Promise<Object>} 更新后的剧本对象
+     */
+    async renameScenarioCover(scenario, coverUrl, namingStrategy = 'title') {
+        const DEFAULT_COVER = '/scenario_covers/default_cover.png';
+
+        // 如果没有封面或已是默认封面，直接返回
+        if (!coverUrl || coverUrl === DEFAULT_COVER) {
+            scenario.cover = DEFAULT_COVER;
+            return scenario;
+        }
+
+        // 确保只使用scenario_covers文件夹的路径
+        if (!coverUrl.startsWith('/scenario_covers/')) {
+            scenario.cover = DEFAULT_COVER;
+            return scenario;
+        }
+
+        try {
+            // 提取旧封面文件名
+            const oldCoverFilename = coverUrl.split('/').pop();
+
+            // 根据策略生成新文件名
+            let newCoverFilename;
+            if (namingStrategy === 'title') {
+                const safeTitle = (scenario.title || '').replace(/[\/\\]/g, '_');
+                newCoverFilename = `${safeTitle}.png`;
+            } else {
+                newCoverFilename = `${scenario.id}.png`;
+            }
+
+            // 如果文件名没有变化，直接返回
+            if (oldCoverFilename === newCoverFilename) {
+                scenario.cover = `/scenario_covers/${newCoverFilename}`;
+                return scenario;
+            }
+
+            // 调用API重命名文件
+            const response = await fetch('/api/scenarios/cover/rename', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    old_filename: oldCoverFilename,
+                    new_filename: newCoverFilename
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                console.log(`封面文件重命名成功: ${oldCoverFilename} -> ${newCoverFilename}`);
+                scenario.cover = `/scenario_covers/${newCoverFilename}`;
+            } else {
+                console.warn('重命名封面文件失败:', data.message);
+                scenario.cover = DEFAULT_COVER;
+            }
+        } catch (error) {
+            console.error('重命名封面文件时出错:', error);
+            scenario.cover = DEFAULT_COVER;
+        }
+
+        return scenario;
     }
 
 
