@@ -3,6 +3,8 @@
 let toolManager;
 
 document.addEventListener('DOMContentLoaded', async function() {
+    const dom = window.TrpgDom;
+
     toolManager = new ToolManager();
 
     initTabs();
@@ -23,12 +25,9 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     await autoLoadLastSave();
 
-    document.addEventListener('hidden.bs.modal', function(event) {
+    dom.on(document, 'hidden.bs.modal', function() {
         setTimeout(() => {
-            const openModals = document.querySelectorAll('.modal.show');
-            if (openModals.length === 0) {
-                const modalBackdrops = document.querySelectorAll('.modal-backdrop');
-                modalBackdrops.forEach(backdrop => backdrop.remove());
+            if (dom.removeModalBackdropsWhenIdle()) {
                 console.log('所有模态框已关闭，已移除所有遮罩层');
             } else {
                 console.log('还有其他模态框打开，保留遮罩层');
@@ -157,31 +156,28 @@ function initDiceTool() {
 }
 
 function initSidebarToggle() {
-    const toggleBtn = document.getElementById('sidebarToggle');
-    const sidebar = document.getElementById('sidebar');
-    const mainContent = document.getElementById('mainContent');
+    const dom = window.TrpgDom;
+    const toggleBtn = dom.byId('sidebarToggle');
+    const sidebar = dom.byId('sidebar');
+    const mainContent = dom.byId('mainContent');
 
     if (!toggleBtn || !sidebar || !mainContent) return;
 
-    toggleBtn.addEventListener('click', function() {
-        const isCollapsed = sidebar.classList.contains('sidebar-collapsed');
+    function setSidebarExpanded(isExpanded) {
+        sidebar.classList.toggle('sidebar-expanded', isExpanded);
+        sidebar.classList.toggle('sidebar-collapsed', !isExpanded);
+        mainContent.classList.toggle('sidebar-collapsed-content', !isExpanded);
+        dom.setButtonDisclosure(toggleBtn, {
+            expanded: isExpanded,
+            expandedLabel: '收起侧边栏',
+            collapsedLabel: '展开侧边栏',
+            expandedIconClass: 'fa fa-angle-double-left',
+            collapsedIconClass: 'fa fa-angle-double-right'
+        });
+    }
 
-        if (isCollapsed) {
-            sidebar.classList.remove('sidebar-collapsed');
-            sidebar.classList.add('sidebar-expanded');
-            mainContent.classList.remove('sidebar-collapsed-content');
-            toggleBtn.querySelector('i').className = 'fa fa-angle-double-left';
-            toggleBtn.title = '收起侧边栏';
-            toggleBtn.setAttribute('aria-label', '收起侧边栏');
-            toggleBtn.setAttribute('aria-expanded', 'true');
-        } else {
-            sidebar.classList.remove('sidebar-expanded');
-            sidebar.classList.add('sidebar-collapsed');
-            mainContent.classList.add('sidebar-collapsed-content');
-            toggleBtn.querySelector('i').className = 'fa fa-angle-double-right';
-            toggleBtn.title = '展开侧边栏';
-            toggleBtn.setAttribute('aria-label', '展开侧边栏');
-            toggleBtn.setAttribute('aria-expanded', 'false');
-        }
+    dom.on(toggleBtn, 'click', function() {
+        const isCollapsed = sidebar.classList.contains('sidebar-collapsed');
+        setSidebarExpanded(isCollapsed);
     });
 }

@@ -19,8 +19,7 @@ function initNetworkConfig() {
 
 async function loadNetworkConfig() {
     try {
-        const response = await fetch('/api/network/config');
-        const data = await response.json();
+        const data = await TrpgApi.get('/api/network/config');
 
         if (data.success) {
             const config = data.data;
@@ -44,8 +43,7 @@ async function loadNetworkConfig() {
 
 async function loadPenetrationConfig() {
     try {
-        const response = await fetch('/api/network/penetration');
-        const data = await response.json();
+        const data = await TrpgApi.get('/api/network/penetration');
 
         if (data.success) {
             const config = data.data;
@@ -65,16 +63,11 @@ async function saveNetworkConfig() {
         const port = document.getElementById('networkPort').value;
         const discoveryEnabled = document.getElementById('enableDiscovery').checked;
 
-        const response = await fetch('/api/network/config', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                port: parseInt(port),
-                discovery_enabled: discoveryEnabled
-            })
+        const data = await TrpgApi.post('/api/network/config', {
+            port: parseInt(port),
+            discovery_enabled: discoveryEnabled
         });
 
-        const data = await response.json();
         if (data.success) {
             showNotification('网络配置保存成功', 'success');
             updateNetworkStatus();
@@ -89,12 +82,7 @@ async function saveNetworkConfig() {
 
 async function testNetworkConnection() {
     try {
-        const response = await fetch('/api/network/test', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({})
-        });
-        const data = await response.json();
+        const data = await TrpgApi.post('/api/network/test', {});
 
         if (data.success) {
             const testData = data.data;
@@ -119,8 +107,7 @@ async function testNetworkConnection() {
 
 async function updateNetworkStatus() {
     try {
-        const response = await fetch('/api/network/status');
-        const data = await response.json();
+        const data = await TrpgApi.get('/api/network/status');
 
         if (data.success) {
             const status = data.data;
