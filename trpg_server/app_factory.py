@@ -11,7 +11,7 @@ socketio = SocketIO(cors_allowed_origins="*", async_mode="threading")
 
 def create_app():
     configure_logging()
-    app = Flask(__name__, static_folder="../assets", static_url_path="/assets")
+    app = Flask(__name__, static_folder=None)
     app.secret_key = SECRET_KEY
     CORS(app)
     socketio.init_app(app)
@@ -22,6 +22,8 @@ def create_app():
 
 
 def register_blueprints(app):
+    from trpg_server.routes.assets import bp as assets_bp
     from trpg_server.routes.pages import bp as pages_bp
 
+    app.register_blueprint(assets_bp)
     app.register_blueprint(pages_bp)
