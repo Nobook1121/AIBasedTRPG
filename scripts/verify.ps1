@@ -44,6 +44,8 @@ try {
     "config\TestRequestConfig.js",
     "config\ConfigManager.js",
     "config\AIPlatformManager.js",
+    "js\api-client.js",
+    "js\dom-utils.js",
     "js\models\ScenarioModel.js",
     "js\views\ScenarioView.js",
     "js\controllers\ScenarioController.js",
@@ -61,7 +63,7 @@ try {
     Invoke-Checked node --check $file
   }
 
-  pytest -q
+  python -W error::DeprecationWarning -m pytest -q
   $pytestExitCode = $LASTEXITCODE
 
   if ($pytestExitCode -eq 0) {
