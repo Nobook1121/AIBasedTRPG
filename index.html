@@ -56,9 +56,9 @@
                         </li>
                     </ul>
                     <!-- 用户信息区域 -->
-                    <div class="user-info mt-auto" id="userInfo">
+                    <div class="user-info mt-auto" id="userInfo" role="button" tabindex="0" aria-label="打开用户设置">
                         <div class="user-avatar" id="userAvatar">
-                            <img src="https://via.placeholder.com/40" alt="用户头像">
+                            <img src="https://via.placeholder.com/40" alt="用户头像" width="40" height="40">
                         </div>
                         <div class="user-details">
                             <div class="user-name" id="userName">未登录</div>
@@ -231,7 +231,7 @@
                                     <option value="d100">D100</option>
                                 </select>
                                 <button class="btn btn-primary" id="rollDice">投掷</button>
-                                <div class="dice-result mt-2" id="diceResult"></div>
+                                <div class="dice-result mt-2" id="diceResult" aria-live="polite"></div>
                             </div>
                         </div>
                     </div>
@@ -254,12 +254,12 @@
                             <!-- 登录表单 -->
                             <div id="login-form" class="auth-form active">
                                 <div class="form-group">
-                                    <label>用户名</label>
-                                    <input type="text" class="form-control" id="loginUsername" placeholder="请输入用户名">
+                                    <label for="loginUsername">用户名</label>
+                                    <input type="text" class="form-control" id="loginUsername" name="username" placeholder="请输入用户名" autocomplete="username">
                                 </div>
                                 <div class="form-group mt-2">
-                                    <label>密码</label>
-                                    <input type="password" class="form-control" id="loginPassword" placeholder="请输入密码">
+                                    <label for="loginPassword">密码</label>
+                                    <input type="password" class="form-control" id="loginPassword" name="password" placeholder="请输入密码" autocomplete="current-password">
                                 </div>
                                 <div class="form-group mt-2">
                                     <div class="form-check">
@@ -280,25 +280,25 @@
                                     </div>
                                 </div>
                                 <button class="btn btn-primary mt-3 w-100" id="loginButton">登录</button>
-                                <div class="login-message mt-2" id="loginMessage"></div>
+                                <div class="login-message mt-2" id="loginMessage" aria-live="polite"></div>
                             </div>
                             
                             <!-- 注册表单 -->
                             <div id="register-form" class="auth-form">
                                 <div class="form-group">
-                                    <label>用户名</label>
-                                    <input type="text" class="form-control" id="registerUsername" placeholder="请输入用户名">
+                                    <label for="registerUsername">用户名</label>
+                                    <input type="text" class="form-control" id="registerUsername" name="username" placeholder="请输入用户名" autocomplete="username">
                                 </div>
                                 <div class="form-group mt-2">
-                                    <label>密码</label>
-                                    <input type="password" class="form-control" id="registerPassword" placeholder="请输入密码">
+                                    <label for="registerPassword">密码</label>
+                                    <input type="password" class="form-control" id="registerPassword" name="new-password" placeholder="请输入密码" autocomplete="new-password">
                                 </div>
                                 <div class="form-group mt-2">
-                                    <label>邮箱</label>
-                                    <input type="email" class="form-control" id="registerEmail" placeholder="请输入邮箱">
+                                    <label for="registerEmail">邮箱</label>
+                                    <input type="email" class="form-control" id="registerEmail" name="email" placeholder="请输入邮箱" autocomplete="email">
                                 </div>
                                 <button class="btn btn-primary mt-3 w-100" id="registerButton">注册</button>
-                                <div class="register-message mt-2" id="registerMessage"></div>
+                                <div class="register-message mt-2" id="registerMessage" aria-live="polite"></div>
                             </div>
                         </div>
                     </div>
@@ -316,35 +316,35 @@
                                 <label>头像</label>
                                 <div class="avatar-upload-container">
                                     <div class="avatar-preview">
-                                        <img id="avatarPreview" src="https://via.placeholder.com/100" alt="用户头像">
+                                        <img id="avatarPreview" src="https://via.placeholder.com/100" alt="用户头像" width="100" height="100">
                                     </div>
                                     <input type="file" id="avatarUpload" class="avatar-upload-input" accept="image/*">
                                     <label for="avatarUpload" class="avatar-upload-label">更换头像</label>
                                 </div>
                             </div>
                             <div class="form-group mt-2">
-                                <label>用户名</label>
-                                <input type="text" class="form-control" id="editUsername" placeholder="请输入用户名">
+                                <label for="editUsername">用户名</label>
+                                <input type="text" class="form-control" id="editUsername" name="username" placeholder="请输入用户名" autocomplete="username">
                             </div>
                             <div class="form-group mt-2">
-                                <label>昵称</label>
-                                <input type="text" class="form-control" id="editNickname" placeholder="请输入昵称">
+                                <label for="editNickname">昵称</label>
+                                <input type="text" class="form-control" id="editNickname" name="nickname" placeholder="请输入昵称" autocomplete="nickname">
                             </div>
                             <div class="form-group mt-2">
-                                <label>邮箱</label>
-                                <input type="email" class="form-control" id="editEmail" placeholder="请输入邮箱">
+                                <label for="editEmail">邮箱</label>
+                                <input type="email" class="form-control" id="editEmail" name="email" placeholder="请输入邮箱" autocomplete="email">
                             </div>
                             <div class="form-group mt-2">
-                                <label>新密码</label>
-                                <input type="password" class="form-control" id="editPassword" placeholder="请输入新密码">
+                                <label for="editPassword">新密码</label>
+                                <input type="password" class="form-control" id="editPassword" name="new-password" placeholder="请输入新密码" autocomplete="new-password">
                             </div>
                             <div class="form-group mt-2">
-                                <label>确认新密码</label>
-                                <input type="password" class="form-control" id="confirmPassword" placeholder="请确认新密码">
+                                <label for="confirmPassword">确认新密码</label>
+                                <input type="password" class="form-control" id="confirmPassword" name="confirm-password" placeholder="请确认新密码" autocomplete="new-password">
                             </div>
                             <button class="btn btn-primary mt-3 w-100" id="saveUserSettings">保存设置</button>
                             <button class="btn btn-danger mt-2 w-100" id="logoutButton">登出</button>
-                            <div class="settings-message mt-2" id="settingsMessage"></div>
+                            <div class="settings-message mt-2" id="settingsMessage" aria-live="polite"></div>
                         </div>
                     </div>
                 </div>
@@ -527,7 +527,7 @@
                         <label>封面图片</label>
                         <div class="cover-upload-container">
                             <div class="cover-preview">
-                                <img id="coverPreview" src="https://via.placeholder.com/200x300?text=封面图片" alt="剧本封面">
+                                <img id="coverPreview" src="https://via.placeholder.com/200x300?text=封面图片" alt="剧本封面" width="200" height="300">
                             </div>
                             <input type="file" id="coverUpload" class="cover-upload-input" accept="image/*">
                             <label for="coverUpload" class="cover-upload-label">上传封面</label>

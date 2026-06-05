@@ -142,7 +142,6 @@ body, html {
     width: 100%;
     text-align: left;
     cursor: pointer;
-    outline: none;
     border-radius: var(--radius-sm);
     transition: color 0.2s ease, background-color 0.2s ease;
 }
@@ -162,7 +161,6 @@ body, html {
     display: none;
     background-color: #212529;
     padding-left: 8px;
-    transition: all 0.3s ease;
 }
 
 #sidebar .fa-caret-down {
@@ -408,7 +406,7 @@ body, html {
 
 /* 存档卡片高亮样式 */
 .save-card.border-primary {
-    transition: all 0.3s ease;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .save-card.border-primary .card-header {
@@ -866,7 +864,6 @@ body.dark-theme #network-settings-content::-webkit-scrollbar-thumb:hover {
     height: 6px;
     border-radius: 3px;
     background: #ddd;
-    outline: none;
     -webkit-appearance: none;
 }
 
@@ -878,7 +875,7 @@ body.dark-theme #network-settings-content::-webkit-scrollbar-thumb:hover {
     border-radius: 50%;
     background: #007bff;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
 .theme-slider::-webkit-slider-thumb:hover {
@@ -893,7 +890,7 @@ body.dark-theme #network-settings-content::-webkit-scrollbar-thumb:hover {
     background: #007bff;
     cursor: pointer;
     border: none;
-    transition: all 0.3s ease;
+    transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
 .theme-slider::-moz-range-thumb:hover {
@@ -1493,7 +1490,7 @@ body.dark-theme .modal-footer {
     display: flex;
     align-items: center;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: background-color 0.2s ease;
 }
 
 .user-info:hover {
@@ -1872,7 +1869,6 @@ body.dark-theme .thinking-text {
 .sidebar-toggle:focus-visible {
     color: white;
     background-color: rgba(255, 255, 255, 0.12);
-    outline: none;
 }
 
 /* 侧边栏收起状态 */
@@ -1934,4 +1930,15 @@ body.dark-theme .ai-hint {
     background-color: #1a3a5c;
     color: #58a6ff;
     border-right-color: #2a5a8c;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+    }
 }

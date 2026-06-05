@@ -50,6 +50,12 @@ function initAuth() {
     console.log('用户信息元素:', userInfo);
     if (userInfo) {
         userInfo.addEventListener('click', toggleUserSettings);
+        userInfo.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                toggleUserSettings();
+            }
+        });
     }
 
     const closeSettingsPanel = document.getElementById('close-settings-panel');
