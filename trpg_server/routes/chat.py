@@ -3,9 +3,10 @@ import logging
 import time
 
 import requests
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, current_app, request
 
 from trpg_server.json_store import read_json, write_json_atomic
+from trpg_server.responses import error_response, success_response
 from trpg_server.settings import BASE_DIR, CONFIG_DIR
 
 bp = Blueprint("chat", __name__)
@@ -25,7 +26,7 @@ def _message_response(user_id, content, message, script_id=None):
     if script_id is not None:
         payload["script_id"] = script_id
 
-    return jsonify({"success": True, "data": payload, "message": message})
+    return success_response(payload, message)
 
 
 def _get_ai_platform_dir():
@@ -123,58 +124,34 @@ def chat():
     try:
         message_data = request.get_json(silent=True)
         if not message_data:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "No data",
-                        "message": "Please provide message data",
-                    }
-                ),
-                400,
-            )
+            return error_response("Please provide message data", 400, "No data")
 
         user_id = message_data.get("user_id", "unknown")
         content = message_data.get("content", "")
         selected_platform, platform_config = _load_enabled_platform()
         if not platform_config:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "No enabled platform",
-                        "message": "No enabled AI platform",
-                    }
-                ),
+            return error_response(
+                "No enabled AI platform",
                 400,
+                "No enabled platform",
             )
 
         api_key = platform_config.get("config", {}).get("api_key")
         base_url = platform_config.get("config", {}).get("base_url")
         if not base_url:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "Incomplete platform config",
-                        "message": "AI platform config is incomplete",
-                    }
-                ),
+            return error_response(
+                "AI platform config is incomplete",
                 400,
+                "Incomplete platform config",
             )
 
         if not api_key and selected_platform == "lmstudio":
             api_key = "lm-studio"
         elif not api_key:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "Incomplete platform config",
-                        "message": "AI platform config is incomplete",
-                    }
-                ),
+            return error_response(
+                "AI platform config is incomplete",
                 400,
+                "Incomplete platform config",
             )
 
         history_file, history = _load_history(user_id)
@@ -199,29 +176,19 @@ def chat():
         )
         response = requests.post(base_url, headers=headers, json=request_data, timeout=300)
         if not response.ok:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": f"API request failed: {response.status_code}",
-                        "message": "AI platform request failed",
-                    }
-                ),
+            return error_response(
+                "AI platform request failed",
                 response.status_code,
+                f"API request failed: {response.status_code}",
             )
 
         response_data = response.json()
         ai_response, token_count = _extract_ai_response(response_data)
         if not ai_response:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "No response",
-                        "message": "AI platform did not return a response",
-                    }
-                ),
+            return error_response(
+                "AI platform did not return a response",
                 400,
+                "No response",
             )
 
         history.extend(
@@ -232,41 +199,21 @@ def chat():
         )
         write_json_atomic(history_file, history[-20:])
 
-        return jsonify(
-            {
-                "success": True,
-                "content": ai_response,
-                "token_count": token_count,
-            }
+        return success_response(
+            message=None,
+            content=ai_response,
+            token_count=token_count,
         )
     except requests.exceptions.Timeout:
-        return jsonify({"success": False, "error": "Request timeout", "message": "AI platform request timeout"}), 504
+        return error_response("AI platform request timeout", 504, "Request timeout")
     except requests.exceptions.ConnectionError:
-        return jsonify({"success": False, "error": "Connection error", "message": "Cannot connect to AI platform"}), 503
+        return error_response("Cannot connect to AI platform", 503, "Connection error")
     except json.JSONDecodeError as exc:
         logger.exception("Failed to parse AI platform response")
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": str(exc),
-                    "message": "Failed to parse AI platform response",
-                }
-            ),
-            500,
-        )
+        return error_response("Failed to parse AI platform response", 500, str(exc))
     except Exception as exc:
         logger.exception("Chat request failed")
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": str(exc),
-                    "message": "Chat request failed",
-                }
-            ),
-            500,
-        )
+        return error_response("Chat request failed", 500, str(exc))
 
 
 @bp.route("/api/messages", methods=["POST"])
@@ -274,45 +221,22 @@ def send_home_message():
     try:
         message_data = request.get_json(silent=True)
         if not message_data:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "No data",
-                        "message": "Please provide message data",
-                    }
-                ),
-                400,
-            )
+            return error_response("Please provide message data", 400, "No data")
 
         user_id = message_data.get("user_id", "unknown")
         message_content = message_data.get("content", "")
         if not message_content:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "No message content",
-                        "message": "Please provide message content",
-                    }
-                ),
+            return error_response(
+                "Please provide message content",
                 400,
+                "No message content",
             )
 
         logger.info("Home message user_id=%s", user_id)
         return _message_response(user_id, message_content, "Message sent successfully")
     except Exception as exc:
         logger.exception("Failed to send home message")
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": str(exc),
-                    "message": "Failed to send message",
-                }
-            ),
-            500,
-        )
+        return error_response("Failed to send message", 500, str(exc))
 
 
 @bp.route("/api/scenarios/<int:script_id>/messages", methods=["POST"])
@@ -320,29 +244,15 @@ def send_message(script_id):
     try:
         message_data = request.get_json(silent=True)
         if not message_data:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "No data",
-                        "message": "Please provide message data",
-                    }
-                ),
-                400,
-            )
+            return error_response("Please provide message data", 400, "No data")
 
         user_id = message_data.get("user_id", "unknown")
         message_content = message_data.get("content", "")
         if not message_content:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "No message content",
-                        "message": "Please provide message content",
-                    }
-                ),
+            return error_response(
+                "Please provide message content",
                 400,
+                "No message content",
             )
 
         logger.info("Scenario message script_id=%s user_id=%s", script_id, user_id)
@@ -354,13 +264,4 @@ def send_message(script_id):
         )
     except Exception as exc:
         logger.exception("Failed to send scenario message: %s", script_id)
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": str(exc),
-                    "message": "Failed to send scenario message",
-                }
-            ),
-            500,
-        )
+        return error_response("Failed to send scenario message", 500, str(exc))
