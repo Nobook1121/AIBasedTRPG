@@ -109,8 +109,7 @@ function switchAuthTab(tabName) {
 }
 
 function checkAuthStatus() {
-    fetch('/api/auth/status')
-        .then(response => response.json())
+    TrpgApi.get('/api/auth/status')
         .then(data => {
             if (data.success) {
                 showLoggedInState(data.data);
@@ -154,8 +153,7 @@ function toggleUserSettings() {
 function openSettingsPanel() {
     document.getElementById('user-settings-panel').style.display = 'block';
 
-    fetch('/api/auth/status')
-        .then(response => response.json())
+    TrpgApi.get('/api/auth/status')
         .then(data => {
             if (data.success) {
                 document.getElementById('editUsername').value = data.data.username;
@@ -188,18 +186,13 @@ function login() {
         return;
     }
 
-    fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            username,
-            password,
-            remember_me: rememberMe,
-            stay_logged_in: stayLoggedIn,
-            auto_login: autoLogin
-        })
+    TrpgApi.post('/api/auth/login', {
+        username,
+        password,
+        remember_me: rememberMe,
+        stay_logged_in: stayLoggedIn,
+        auto_login: autoLogin
     })
-    .then(response => response.json())
     .then(data => {
         if (data.success) {
             messageElement.textContent = '登录成功';
@@ -229,12 +222,7 @@ function register() {
         return;
     }
 
-    fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, email })
-    })
-    .then(response => response.json())
+    TrpgApi.post('/api/auth/register', { username, password, email })
     .then(data => {
         if (data.success) {
             messageElement.textContent = '注册成功，请登录';
@@ -253,8 +241,7 @@ function register() {
 }
 
 function logout() {
-    fetch('/api/auth/logout', { method: 'POST' })
-    .then(response => response.json())
+    TrpgApi.post('/api/auth/logout')
     .then(data => {
         if (data.success) {
             document.getElementById('userName').textContent = '未登录';
@@ -300,11 +287,7 @@ function saveUserSettingsFunc() {
         formData.append('avatar', avatarInput.files[0]);
     }
 
-    fetch('/api/auth/update', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
+    TrpgApi.post('/api/auth/update', formData)
     .then(data => {
         if (data.success) {
             messageElement.textContent = '设置保存成功';
