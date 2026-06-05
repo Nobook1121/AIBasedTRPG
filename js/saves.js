@@ -40,8 +40,7 @@ async function openCreateSaveModal() {
     if (scenarioSelect) {
         scenarioSelect.innerHTML = '<option value="">请选择剧本</option>';
         try {
-            const response = await fetch('/api/scenarios');
-            const data = await response.json();
+            const data = await TrpgApi.get('/api/scenarios');
             if (data.success && data.data) {
                 data.data.forEach(scenario => {
                     const option = document.createElement('option');
@@ -81,17 +80,12 @@ async function createSave() {
     }
 
     try {
-        const response = await fetch('/api/saves', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                name: saveName,
-                scenario_id: parseInt(scenarioId),
-                scenario_title: scenarioTitle
-            })
+        const data = await TrpgApi.post('/api/saves', {
+            name: saveName,
+            scenario_id: parseInt(scenarioId),
+            scenario_title: scenarioTitle
         });
 
-        const data = await response.json();
         if (data.success) {
             showNotification('创建存档成功', 'success');
             const modal = bootstrap.Modal.getInstance(document.getElementById('createSaveModal'));
@@ -108,8 +102,7 @@ async function createSave() {
 
 async function loadSavesList() {
     try {
-        const response = await fetch('/api/saves');
-        const data = await response.json();
+        const data = await TrpgApi.get('/api/saves');
         if (data.success && data.data) {
             renderSavesList(data.data);
         }
@@ -166,8 +159,7 @@ async function viewSaveDetail(saveId, saveName) {
     currentSave = { id: saveId, name: saveName };
 
     try {
-        const response = await fetch(`/api/saves/${saveId}/nodes`);
-        const data = await response.json();
+        const data = await TrpgApi.get(`/api/saves/${saveId}/nodes`);
         if (data.success) {
             showSaveDetailView();
             document.getElementById('saveDetailTitle').textContent = saveName;
@@ -220,8 +212,7 @@ async function deleteCurrentSave() {
     if (!confirm('确定要删除这个存档吗？此操作不可恢复！')) return;
 
     try {
-        const response = await fetch(`/api/saves/${currentSave.id}`, { method: 'DELETE' });
-        const data = await response.json();
+        const data = await TrpgApi.del(`/api/saves/${currentSave.id}`);
         if (data.success) {
             showNotification('删除存档成功', 'success');
             showSaveListView();
@@ -286,8 +277,7 @@ async function previewSaveNode(nodeFilename) {
     if (!currentSave) return;
 
     try {
-        const response = await fetch(`/api/saves/${currentSave.id}/nodes/${nodeFilename}`);
-        const data = await response.json();
+        const data = await TrpgApi.get(`/api/saves/${currentSave.id}/nodes/${nodeFilename}`);
         if (data.success) {
             previewNodeFilename = nodeFilename;
             renderPreviewContent(data.data.messages);
@@ -334,13 +324,9 @@ async function createSaveNode() {
     }
 
     try {
-        const response = await fetch(`/api/saves/${currentSave.id}/nodes`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ messages: messages })
+        const data = await TrpgApi.post(`/api/saves/${currentSave.id}/nodes`, {
+            messages: messages
         });
-
-        const data = await response.json();
         if (data.success) {
             showNotification('创建存档节点成功', 'success');
             viewSaveDetail(currentSave.id, currentSave.name);
@@ -357,8 +343,7 @@ async function loadSaveNode(nodeFilename) {
     if (!currentSave) return;
 
     try {
-        const response = await fetch(`/api/saves/${currentSave.id}/nodes/${nodeFilename}`);
-        const data = await response.json();
+        const data = await TrpgApi.get(`/api/saves/${currentSave.id}/nodes/${nodeFilename}`);
         if (data.success) {
             renderChatMessages(data.data.messages);
             updateSaveStatusBar(currentSave.name, '');
@@ -378,8 +363,7 @@ async function deleteSaveNode(nodeFilename) {
     if (!confirm('确定要删除这个存档节点吗？此操作不可恢复！')) return;
 
     try {
-        const response = await fetch(`/api/saves/${currentSave.id}/nodes/${nodeFilename}`, { method: 'DELETE' });
-        const data = await response.json();
+        const data = await TrpgApi.del(`/api/saves/${currentSave.id}/nodes/${nodeFilename}`);
         if (data.success) {
             showNotification('删除存档节点成功', 'success');
             viewSaveDetail(currentSave.id, currentSave.name);
@@ -416,10 +400,8 @@ async function saveAutosave() {
     const messages = getCurrentChatMessages();
 
     try {
-        await fetch(`/api/saves/${currentSave.id}/autosave`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ messages: messages })
+        await TrpgApi.post(`/api/saves/${currentSave.id}/autosave`, {
+            messages: messages
         });
     } catch (error) {
         console.error('保存自动存档失败:', error);
@@ -430,8 +412,7 @@ async function loadAutosave() {
     if (!currentSave) return;
 
     try {
-        const response = await fetch(`/api/saves/${currentSave.id}/autosave`);
-        const data = await response.json();
+        const data = await TrpgApi.get(`/api/saves/${currentSave.id}/autosave`);
         if (data.success && data.data && data.data.messages && data.data.messages.length > 0) {
             renderChatMessages(data.data.messages);
             showNotification('已自动加载存档', 'success');
@@ -461,16 +442,14 @@ async function autoLoadLastSave() {
     if (!lastSaveId || !lastSaveName) return;
 
     try {
-        const response = await fetch(`/api/saves/${lastSaveId}/nodes`);
-        const data = await response.json();
+        const data = await TrpgApi.get(`/api/saves/${lastSaveId}/nodes`);
         if (data.success) {
             currentSave = { id: lastSaveId, name: lastSaveName };
             updateSaveStatusBar(lastSaveName, lastSaveScenario);
             startAutosaveTimer();
             updateCurrentSaveStatus();
 
-            const autosaveResponse = await fetch(`/api/saves/${lastSaveId}/autosave`);
-            const autosaveData = await autosaveResponse.json();
+            const autosaveData = await TrpgApi.get(`/api/saves/${lastSaveId}/autosave`);
             if (autosaveData.success && autosaveData.data && autosaveData.data.messages && autosaveData.data.messages.length > 0) {
                 renderChatMessages(autosaveData.data.messages);
             }
