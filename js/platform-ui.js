@@ -585,14 +585,13 @@ async function configModel(platform, modelId) {
             try {
                 const jsConfig = document.getElementById('modelJSConfig').value;
 
-                const saveResponse = await fetch('/api/config/aimodel/save', {
+                const { response: saveResponse } = await TrpgApi.requestWithResponse('/api/config/aimodel/save', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
+                    body: {
                         platform: platform,
                         modelId: modelId,
                         content: jsConfig
-                    })
+                    }
                 });
 
                 if (saveResponse.ok) {

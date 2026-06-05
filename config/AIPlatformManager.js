@@ -104,19 +104,16 @@ class AIPlatformManager {
      */
     async savePlatformConfig(platform, config) {
         try {
-            const response = await fetch(`/api/config/aiplatform/${platform}`, {
+            const { response, data } = await TrpgApi.requestWithResponse(`/api/config/aiplatform/${platform}`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(config)
+                body: config
             });
 
             if (!response.ok) {
                 throw new Error('保存配置失败');
             }
 
-            const result = await response.json();
+            const result = data;
             if (!result.success) {
                 throw new Error(result.message || '保存配置失败');
             }
@@ -188,16 +185,13 @@ class AIPlatformManager {
             const filePath = `config/aimodel/${platform}/${modelId}.js`;
             
             // 发送请求保存文件
-            const saveResponse = await fetch('/api/config/aimodel/save', {
+            const { response: saveResponse } = await TrpgApi.requestWithResponse('/api/config/aimodel/save', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
+                body: {
                     platform: platform,
                     modelId: modelId,
                     content: template
-                })
+                }
             });
 
             if (!saveResponse.ok) {
@@ -252,15 +246,12 @@ class AIPlatformManager {
     async deleteModelJSConfig(platform, modelId) {
         try {
             // 发送请求删除文件
-            const deleteResponse = await fetch('/api/config/aimodel/delete', {
+            const { response: deleteResponse } = await TrpgApi.requestWithResponse('/api/config/aimodel/delete', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
+                body: {
                     platform: platform,
                     modelId: modelId
-                })
+                }
             });
 
             if (!deleteResponse.ok) {
@@ -334,12 +325,9 @@ class AIPlatformManager {
             console.log('API测试请求:', testRequest);
 
             // 发送测试请求到服务器端，由服务器端转发并记录日志
-            const response = await fetch(`/api/config/aiplatform/${platform}/test`, {
+            const { response, data } = await TrpgApi.requestWithResponse(`/api/config/aiplatform/${platform}/test`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(testRequest),
+                body: testRequest,
                 timeout: config.config.timeout * 1000
             });
 
@@ -348,11 +336,11 @@ class AIPlatformManager {
             const duration = (endTime - startTime) / 1000;
 
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
+                const errorData = data || {};
                 throw new Error(errorData.error || `API请求失败: ${response.status}`);
             }
 
-            const serverResponse = await response.json();
+            const serverResponse = data;
 
             // 在控制台输出模型回复的消息
             console.log('API测试响应:', serverResponse);

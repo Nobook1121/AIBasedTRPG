@@ -284,19 +284,16 @@ class ConfigManager {
      */
     async saveConfig(configName, settings) {
         try {
-            const response = await fetch(`/api/config/${configName}`, {
+            const { response, data } = await TrpgApi.requestWithResponse(`/api/config/${configName}`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(settings)
+                body: settings
             });
             
             if (!response.ok) {
                 throw new Error('保存配置失败');
             }
             
-            const result = await response.json();
+            const result = data;
             if (result.success) {
                 // 更新本地缓存
                 this.configs[configName] = settings;
