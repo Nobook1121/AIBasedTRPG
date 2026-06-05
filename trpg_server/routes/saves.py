@@ -2,9 +2,10 @@ import logging
 import shutil
 import time
 
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, current_app, request
 
 from trpg_server.json_store import read_json, write_json_atomic
+from trpg_server.responses import error_response, success_response
 from trpg_server.security import safe_join
 from trpg_server.settings import SAVES_DIR
 
@@ -59,25 +60,10 @@ def get_saves_list():
                 logger.exception("Failed to read save info: %s", info_file)
 
         logger.info("Saves listed count=%s", len(saves))
-        return jsonify(
-            {
-                "success": True,
-                "data": saves,
-                "message": "Saves loaded successfully",
-            }
-        )
+        return success_response(saves, "Saves loaded successfully")
     except Exception as exc:
         logger.exception("Failed to list saves")
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": str(exc),
-                    "message": "Failed to load saves",
-                }
-            ),
-            500,
-        )
+        return error_response("Failed to load saves", 500, str(exc))
 
 
 @bp.route("/api/saves", methods=["POST"])
@@ -85,56 +71,20 @@ def create_save():
     try:
         data = request.get_json(silent=True)
         if not data:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "No data",
-                        "message": "Please provide save data",
-                    }
-                ),
-                400,
-            )
+            return error_response("Please provide save data", 400, "No data")
 
         save_name = data.get("name", "").strip()
         scenario_id = data.get("scenario_id")
         scenario_title = data.get("scenario_title", "").strip()
         if not save_name:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "Save name is required",
-                        "message": "Please enter save name",
-                    }
-                ),
-                400,
-            )
+            return error_response("Please enter save name", 400, "Save name is required")
         if scenario_id is None:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "Scenario is required",
-                        "message": "Please choose a scenario",
-                    }
-                ),
-                400,
-            )
+            return error_response("Please choose a scenario", 400, "Scenario is required")
 
         save_id = str(int(time.time() * 1000))
         save_dir = safe_join(_get_saves_dir(), save_name)
         if save_dir.exists():
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "Save name already exists",
-                        "message": "Please use another save name",
-                    }
-                ),
-                400,
-            )
+            return error_response("Please use another save name", 400, "Save name already exists")
 
         save_info = {
             "id": save_id,
@@ -148,30 +98,12 @@ def create_save():
         write_json_atomic(save_dir / "autosave.json", [])
 
         logger.info("Save created save_id=%s name=%s", save_id, save_name)
-        return (
-            jsonify(
-                {
-                    "success": True,
-                    "data": save_info,
-                    "message": "Save created successfully",
-                }
-            ),
-            201,
-        )
+        return success_response(save_info, "Save created successfully", 201)
     except ValueError as exc:
-        return jsonify({"success": False, "error": str(exc), "message": str(exc)}), 400
+        return error_response(str(exc), 400, str(exc))
     except Exception as exc:
         logger.exception("Failed to create save")
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": str(exc),
-                    "message": "Failed to create save",
-                }
-            ),
-            500,
-        )
+        return error_response("Failed to create save", 500, str(exc))
 
 
 @bp.route("/api/saves/<save_id>", methods=["DELETE"])
@@ -183,19 +115,10 @@ def delete_save(save_id):
 
         shutil.rmtree(save_dir)
         logger.info("Save deleted save_id=%s", save_id)
-        return jsonify({"success": True, "message": "Save deleted successfully"})
+        return success_response(message="Save deleted successfully")
     except Exception as exc:
         logger.exception("Failed to delete save: %s", save_id)
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": str(exc),
-                    "message": "Failed to delete save",
-                }
-            ),
-            500,
-        )
+        return error_response("Failed to delete save", 500, str(exc))
 
 
 @bp.route("/api/saves/<save_id>/nodes", methods=["GET"])
@@ -224,25 +147,13 @@ def get_save_nodes(save_id):
             )
 
         nodes.sort(key=lambda item: item["created_at"], reverse=True)
-        return jsonify(
-            {
-                "success": True,
-                "data": {"info": save_info, "nodes": nodes},
-                "message": "Save nodes loaded successfully",
-            }
+        return success_response(
+            {"info": save_info, "nodes": nodes},
+            "Save nodes loaded successfully",
         )
     except Exception as exc:
         logger.exception("Failed to list save nodes: %s", save_id)
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": str(exc),
-                    "message": "Failed to load save nodes",
-                }
-            ),
-            500,
-        )
+        return error_response("Failed to load save nodes", 500, str(exc))
 
 
 @bp.route("/api/saves/<save_id>/nodes", methods=["POST"])
@@ -250,16 +161,7 @@ def create_save_node(save_id):
     try:
         data = request.get_json(silent=True)
         if not data:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "No data",
-                        "message": "Please provide save data",
-                    }
-                ),
-                400,
-            )
+            return error_response("Please provide save data", 400, "No data")
 
         save_dir, _ = _find_save_dir(save_id)
         if not save_dir:
@@ -278,28 +180,10 @@ def create_save_node(save_id):
             save_id,
             len(node_data["messages"]),
         )
-        return (
-            jsonify(
-                {
-                    "success": True,
-                    "data": node_data,
-                    "message": "Save node created successfully",
-                }
-            ),
-            201,
-        )
+        return success_response(node_data, "Save node created successfully", 201)
     except Exception as exc:
         logger.exception("Failed to create save node: %s", save_id)
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": str(exc),
-                    "message": "Failed to create save node",
-                }
-            ),
-            500,
-        )
+        return error_response("Failed to create save node", 500, str(exc))
 
 
 @bp.route("/api/saves/<save_id>/nodes/<node_filename>", methods=["GET"])
@@ -311,38 +195,14 @@ def load_save_node(save_id, node_filename):
 
         node_file = safe_join(save_dir, node_filename)
         if not node_file.exists():
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "Save node not found",
-                        "message": "Save node not found",
-                    }
-                ),
-                404,
-            )
+            return error_response("Save node not found", 404, "Save node not found")
 
-        return jsonify(
-            {
-                "success": True,
-                "data": read_json(node_file, default={}),
-                "message": "Save node loaded successfully",
-            }
-        )
+        return success_response(read_json(node_file, default={}), "Save node loaded successfully")
     except ValueError as exc:
-        return jsonify({"success": False, "error": str(exc), "message": str(exc)}), 400
+        return error_response(str(exc), 400, str(exc))
     except Exception as exc:
         logger.exception("Failed to load save node: %s %s", save_id, node_filename)
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": str(exc),
-                    "message": "Failed to load save node",
-                }
-            ),
-            500,
-        )
+        return error_response("Failed to load save node", 500, str(exc))
 
 
 @bp.route("/api/saves/<save_id>/nodes/<node_filename>", methods=["DELETE"])
@@ -357,21 +217,12 @@ def delete_save_node(save_id, node_filename):
             node_file.unlink()
 
         logger.info("Save node deleted save_id=%s file=%s", save_id, node_filename)
-        return jsonify({"success": True, "message": "Save node deleted successfully"})
+        return success_response(message="Save node deleted successfully")
     except ValueError as exc:
-        return jsonify({"success": False, "error": str(exc), "message": str(exc)}), 400
+        return error_response(str(exc), 400, str(exc))
     except Exception as exc:
         logger.exception("Failed to delete save node: %s %s", save_id, node_filename)
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": str(exc),
-                    "message": "Failed to delete save node",
-                }
-            ),
-            500,
-        )
+        return error_response("Failed to delete save node", 500, str(exc))
 
 
 @bp.route("/api/saves/<save_id>/autosave", methods=["POST"])
@@ -379,16 +230,7 @@ def save_autosave(save_id):
     try:
         data = request.get_json(silent=True)
         if not data:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "No data",
-                        "message": "Please provide save data",
-                    }
-                ),
-                400,
-            )
+            return error_response("Please provide save data", 400, "No data")
 
         save_dir, _ = _find_save_dir(save_id)
         if not save_dir:
@@ -398,19 +240,10 @@ def save_autosave(save_id):
             save_dir / "autosave.json",
             {"updated_at": _timestamp(), "messages": data.get("messages", [])},
         )
-        return jsonify({"success": True, "message": "Autosave saved successfully"})
+        return success_response(message="Autosave saved successfully")
     except Exception as exc:
         logger.exception("Failed to save autosave: %s", save_id)
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": str(exc),
-                    "message": "Failed to save autosave",
-                }
-            ),
-            500,
-        )
+        return error_response("Failed to save autosave", 500, str(exc))
 
 
 @bp.route("/api/saves/<save_id>/autosave", methods=["GET"])
@@ -428,29 +261,11 @@ def load_autosave(save_id):
             autosave_data = {"messages": []}
             message = "No autosave"
 
-        return jsonify({"success": True, "data": autosave_data, "message": message})
+        return success_response(autosave_data, message)
     except Exception as exc:
         logger.exception("Failed to load autosave: %s", save_id)
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": str(exc),
-                    "message": "Failed to load autosave",
-                }
-            ),
-            500,
-        )
+        return error_response("Failed to load autosave", 500, str(exc))
 
 
 def _save_not_found():
-    return (
-        jsonify(
-            {
-                "success": False,
-                "error": "Save not found",
-                "message": "Save not found",
-            }
-        ),
-        404,
-    )
+    return error_response("Save not found", 404, "Save not found")
