@@ -100,23 +100,20 @@ function initChat() {
         const startTime = Date.now();
         addThinkingMessage(thinkingMessageId);
 
-        fetch('/api/chat', {
+        TrpgApi.requestWithResponse('/api/chat', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
+            body: {
                 content: pendingMessages.map(m => m.content).join('\n'),
                 messages: pendingMessages,
                 user_id: 'user_' + Date.now()
-            })
+            }
         })
-        .then(response => {
+        .then(({ response, data }) => {
             console.log('API响应状态:', response.status);
             if (!response.ok) {
                 throw new Error('API请求失败: ' + response.status);
             }
-            return response.json();
+            return data;
         })
         .then(data => {
             console.log('消息发送成功:', data);

@@ -27,6 +27,12 @@
         return parseJson(response);
     }
 
+    async function requestWithResponse(url, options = {}) {
+        const response = await fetch(url, buildOptions(options));
+        const data = await parseJson(response);
+        return { response, data };
+    }
+
     function get(url, options = {}) {
         return request(url, { ...options, method: options.method || 'GET' });
     }
@@ -44,6 +50,6 @@
     }
 
     global.TRPG = global.TRPG || {};
-    global.TRPG.api = { request, get, post, put, del };
+    global.TRPG.api = { request, requestWithResponse, get, post, put, del };
     global.TrpgApi = global.TRPG.api;
 })(window);
