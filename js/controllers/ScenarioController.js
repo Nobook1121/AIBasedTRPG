@@ -178,14 +178,10 @@ class ScenarioController {
                     
                     // 调用API删除封面
                     try {
-                        await fetch('/api/scenarios/cover', {
-                            method: 'DELETE',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({
+                        await TrpgApi.del('/api/scenarios/cover', {
+                            body: {
                                 cover_path: coverPath
-                            })
+                            }
                         });
                     } catch (coverError) {
                         console.error('删除封面时出错:', coverError);
@@ -294,18 +290,10 @@ class ScenarioController {
             }
 
             // 调用API重命名文件
-            const response = await fetch('/api/scenarios/cover/rename', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    old_filename: oldCoverFilename,
-                    new_filename: newCoverFilename
-                })
+            const data = await TrpgApi.post('/api/scenarios/cover/rename', {
+                old_filename: oldCoverFilename,
+                new_filename: newCoverFilename
             });
-
-            const data = await response.json();
 
             if (data.success) {
                 console.log(`封面文件重命名成功: ${oldCoverFilename} -> ${newCoverFilename}`);

@@ -17,9 +17,8 @@ class ScenarioModel {
     // 检查认证状态
     async checkAuthStatus() {
         try {
-            const response = await fetch('/api/auth/status');
+            const { response, data } = await TrpgApi.requestWithResponse('/api/auth/status');
             if (response.ok) {
-                const data = await response.json();
                 if (data.success) {
                     this.userId = data.data.user_id;
                     this.isAuthenticated = true;
@@ -47,9 +46,8 @@ class ScenarioModel {
 
             // 尝试从API加载
             try {
-                const response = await fetch(`${this.apiBaseUrl}/scenarios`);
+                const { response, data } = await TrpgApi.requestWithResponse(`${this.apiBaseUrl}/scenarios`);
                 if (response.ok) {
-                    const data = await response.json();
                     if (data.success) {
                         console.log('从API加载剧本成功');
                         this.scenarios = data.data;
@@ -184,18 +182,13 @@ class ScenarioModel {
             }
 
             // 通过API创建剧本
-            const response = await fetch(`${this.apiBaseUrl}/scenarios`, {
+            const { response, data } = await TrpgApi.requestWithResponse(`${this.apiBaseUrl}/scenarios`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
+                body: {
                     ...scenarioData,
                     user_id: this.userId || 'anonymous'
-                })
+                }
             });
-            
-            const data = await response.json();
             
             if (!response.ok || !data.success) {
                 throw new Error(data.message || `API请求失败: ${response.status}`);
@@ -224,18 +217,13 @@ class ScenarioModel {
             }
 
             // 通过API更新剧本
-            const response = await fetch(`${this.apiBaseUrl}/scenarios/${id}`, {
+            const { response, data } = await TrpgApi.requestWithResponse(`${this.apiBaseUrl}/scenarios/${id}`, {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
+                body: {
                     ...scenarioData,
                     user_id: this.userId
-                })
+                }
             });
-            
-            const data = await response.json();
             
             if (!response.ok || !data.success) {
                 throw new Error(data.message || `API请求失败: ${response.status}`);
@@ -268,17 +256,12 @@ class ScenarioModel {
             }
 
             // 通过API删除剧本
-            const response = await fetch(`${this.apiBaseUrl}/scenarios/${id}`, {
+            const { response, data } = await TrpgApi.requestWithResponse(`${this.apiBaseUrl}/scenarios/${id}`, {
                 method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
+                body: {
                     user_id: this.userId
-                })
+                }
             });
-            
-            const data = await response.json();
             
             if (!response.ok || !data.success) {
                 throw new Error(data.message || `API请求失败: ${response.status}`);

@@ -37,17 +37,15 @@ function handleCoverUpload(e) {
     const scenarioTitle = document.getElementById('scenarioTitle').value.trim() || 'unknown_scenario';
     formData.append('scenario_title', scenarioTitle);
 
-    fetch('/api/scenarios/cover', {
+    TrpgApi.requestWithResponse('/api/scenarios/cover', {
         method: 'POST',
         body: formData
     })
-    .then(response => {
+    .then(({ response, data }) => {
         if (!response.ok) {
-            return response.json().then(err => {
-                throw new Error(err.message || '上传失败');
-            });
+            throw new Error(data.message || '上传失败');
         }
-        return response.json();
+        return data;
     })
     .then(data => {
         if (data.success) {
