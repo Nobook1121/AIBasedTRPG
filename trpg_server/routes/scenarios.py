@@ -3,9 +3,10 @@ import logging
 import time
 from pathlib import Path
 
-from flask import Blueprint, jsonify, request, session
+from flask import Blueprint, request, session
 
 from trpg_server.json_store import read_json, write_json_atomic
+from trpg_server.responses import error_response, success_response
 from trpg_server.security import is_allowed_upload, safe_join
 from trpg_server.settings import SCENARIO_COVERS_DIR, SCENARIOS_DIR
 
@@ -88,25 +89,13 @@ def load_scenarios():
 def get_all_scenarios():
     try:
         scenarios = load_scenarios()
-        return jsonify(
-            {
-                "success": True,
-                "data": scenarios,
-                "message": f"Successfully loaded {len(scenarios)} scenarios",
-            }
+        return success_response(
+            scenarios,
+            f"Successfully loaded {len(scenarios)} scenarios",
         )
     except Exception as exc:
         logger.exception("Failed to load scenarios")
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": str(exc),
-                    "message": "Failed to load scenarios",
-                }
-            ),
-            500,
-        )
+        return error_response("Failed to load scenarios", 500, str(exc))
 
 
 @bp.route("/api/scenarios/<int:scenario_id>", methods=["GET"])
@@ -117,36 +106,12 @@ def get_scenario(scenario_id):
             None,
         )
         if scenario is None:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "Scenario not found",
-                        "message": "Scenario not found",
-                    }
-                ),
-                404,
-            )
+            return error_response("Scenario not found", 404, "Scenario not found")
 
-        return jsonify(
-            {
-                "success": True,
-                "data": scenario,
-                "message": "Scenario loaded successfully",
-            }
-        )
+        return success_response(scenario, "Scenario loaded successfully")
     except Exception as exc:
         logger.exception("Failed to load scenario: %s", scenario_id)
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": str(exc),
-                    "message": "Failed to load scenario",
-                }
-            ),
-            500,
-        )
+        return error_response("Failed to load scenario", 500, str(exc))
 
 
 @bp.route("/api/scenarios", methods=["POST"])
@@ -154,16 +119,7 @@ def create_scenario():
     try:
         scenario_data = request.get_json(silent=True)
         if not scenario_data:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "No data",
-                        "message": "Please provide scenario data",
-                    }
-                ),
-                400,
-            )
+            return error_response("Please provide scenario data", 400, "No data")
 
         title = scenario_data.get("title", "unnamed")
         for path in _iter_scenario_files():
@@ -174,15 +130,10 @@ def create_scenario():
                 continue
 
             if existing_data.get("title") == title:
-                return (
-                    jsonify(
-                        {
-                            "success": False,
-                            "error": "Scenario title already exists",
-                            "message": f'Scenario title "{title}" already exists',
-                        }
-                    ),
+                return error_response(
+                    f'Scenario title "{title}" already exists',
                     400,
+                    "Scenario title already exists",
                 )
 
         scenario_id = int(time.time() * 1000)
@@ -202,28 +153,14 @@ def create_scenario():
             scenario_id,
             title,
         )
-        return (
-            jsonify(
-                {
-                    "success": True,
-                    "data": scenario_data,
-                    "message": "Scenario created successfully",
-                }
-            ),
+        return success_response(
+            scenario_data,
+            "Scenario created successfully",
             201,
         )
     except Exception as exc:
         logger.exception("Failed to create scenario")
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": str(exc),
-                    "message": "Failed to create scenario",
-                }
-            ),
-            500,
-        )
+        return error_response("Failed to create scenario", 500, str(exc))
 
 
 @bp.route("/api/scenarios/<int:scenario_id>", methods=["PUT"])
@@ -231,28 +168,14 @@ def update_scenario(scenario_id):
     try:
         scenario_data = request.get_json(silent=True)
         if not scenario_data:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "No data",
-                        "message": "Please provide scenario data",
-                    }
-                ),
-                400,
-            )
+            return error_response("Please provide scenario data", 400, "No data")
 
         target_file, existing_scenario = _find_scenario_file(scenario_id)
         if target_file is None:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "Scenario not found",
-                        "message": f"Scenario with ID {scenario_id} does not exist",
-                    }
-                ),
+            return error_response(
+                f"Scenario with ID {scenario_id} does not exist",
                 404,
+                "Scenario not found",
             )
 
         scenario_data["id"] = scenario_id
@@ -272,25 +195,10 @@ def update_scenario(scenario_id):
             scenario_id,
             scenario_data.get("title", "unknown"),
         )
-        return jsonify(
-            {
-                "success": True,
-                "data": scenario_data,
-                "message": "Scenario updated successfully",
-            }
-        )
+        return success_response(scenario_data, "Scenario updated successfully")
     except Exception as exc:
         logger.exception("Failed to update scenario: %s", scenario_id)
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": str(exc),
-                    "message": "Failed to update scenario",
-                }
-            ),
-            500,
-        )
+        return error_response("Failed to update scenario", 500, str(exc))
 
 
 @bp.route("/api/scenarios/<int:scenario_id>", methods=["DELETE"])
@@ -303,15 +211,10 @@ def delete_scenario(scenario_id):
 
         target_file, scenario_data = _find_scenario_file(scenario_id)
         if target_file is None:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "Scenario not found",
-                        "message": f"Scenario with ID {scenario_id} does not exist",
-                    }
-                ),
+            return error_response(
+                f"Scenario with ID {scenario_id} does not exist",
                 404,
+                "Scenario not found",
             )
 
         target_file.unlink()
@@ -326,24 +229,10 @@ def delete_scenario(scenario_id):
             scenario_id,
             scenario_data.get("title", "unknown"),
         )
-        return jsonify(
-            {
-                "success": True,
-                "message": "Scenario deleted successfully",
-            }
-        )
+        return success_response(message="Scenario deleted successfully")
     except Exception as exc:
         logger.exception("Failed to delete scenario: %s", scenario_id)
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": str(exc),
-                    "message": "Failed to delete scenario",
-                }
-            ),
-            500,
-        )
+        return error_response("Failed to delete scenario", 500, str(exc))
 
 
 @bp.route("/api/scenarios/cover", methods=["POST"])
@@ -351,40 +240,25 @@ def upload_scenario_cover():
     try:
         user_id = session.get("user_id") or request.form.get("user_id", "unknown")
         if "cover" not in request.files:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "No file",
-                        "message": "Please choose a scenario cover image",
-                    }
-                ),
+            return error_response(
+                "Please choose a scenario cover image",
                 400,
+                "No file",
             )
 
         cover = request.files["cover"]
         if not is_allowed_upload(cover.filename or "", _allowed_cover_extensions):
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "Invalid file type",
-                        "message": "Please upload an image file",
-                    }
-                ),
+            return error_response(
+                "Please upload an image file",
                 400,
+                "Invalid file type",
             )
 
         if (cover.content_length or 0) > 5 * 1024 * 1024:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "File too large",
-                        "message": "Cover file size must not exceed 5MB",
-                    }
-                ),
+            return error_response(
+                "Cover file size must not exceed 5MB",
                 400,
+                "File too large",
             )
 
         scenario_title = request.form.get("scenario_title", str(int(time.time() * 1000)))
@@ -399,25 +273,13 @@ def upload_scenario_cover():
         cover_url = f"/assets/scenario_covers/{filename}"
 
         logger.info("Scenario cover uploaded user_id=%s file=%s", user_id, filename)
-        return jsonify(
-            {
-                "success": True,
-                "data": {"cover_url": cover_url},
-                "message": "Cover uploaded successfully",
-            }
+        return success_response(
+            {"cover_url": cover_url},
+            "Cover uploaded successfully",
         )
     except Exception as exc:
         logger.exception("Failed to upload scenario cover")
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": str(exc),
-                    "message": "Failed to upload cover",
-                }
-            ),
-            500,
-        )
+        return error_response("Failed to upload cover", 500, str(exc))
 
 
 @bp.route("/api/scenarios/cover", methods=["DELETE"])
@@ -426,63 +288,26 @@ def delete_scenario_cover():
         user_id = session.get("user_id", "unknown")
         data = request.get_json(silent=True)
         if not data or "cover_path" not in data:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "No data",
-                        "message": "Please provide cover path",
-                    }
-                ),
-                400,
-            )
+            return error_response("Please provide cover path", 400, "No data")
 
         filename = Path(data["cover_path"]).name
         if filename == "default_cover.png":
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "Default cover cannot be deleted",
-                        "message": "Default cover cannot be deleted",
-                    }
-                ),
+            return error_response(
+                "Default cover cannot be deleted",
                 400,
+                "Default cover cannot be deleted",
             )
 
         file_path = safe_join(SCENARIO_COVERS_DIR, filename)
         if not file_path.exists():
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "File not found",
-                        "message": "Cover file does not exist",
-                    }
-                ),
-                404,
-            )
+            return error_response("Cover file does not exist", 404, "File not found")
 
         file_path.unlink()
         logger.info("Scenario cover deleted user_id=%s file=%s", user_id, filename)
-        return jsonify(
-            {
-                "success": True,
-                "message": "Cover deleted successfully",
-            }
-        )
+        return success_response(message="Cover deleted successfully")
     except Exception as exc:
         logger.exception("Failed to delete scenario cover")
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": str(exc),
-                    "message": "Failed to delete cover",
-                }
-            ),
-            500,
-        )
+        return error_response("Failed to delete cover", 500, str(exc))
 
 
 @bp.route("/api/scenarios/cover/rename", methods=["POST"])
@@ -491,44 +316,25 @@ def rename_scenario_cover():
         user_id = session.get("user_id", "unknown")
         data = request.get_json(silent=True)
         if not data or "old_filename" not in data or "new_filename" not in data:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "No data",
-                        "message": "Please provide old and new filenames",
-                    }
-                ),
+            return error_response(
+                "Please provide old and new filenames",
                 400,
+                "No data",
             )
 
         old_filename = Path(data["old_filename"]).name
         new_filename = Path(data["new_filename"]).name
         if old_filename == "default_cover.png":
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "Default cover cannot be renamed",
-                        "message": "Default cover cannot be renamed",
-                    }
-                ),
+            return error_response(
+                "Default cover cannot be renamed",
                 400,
+                "Default cover cannot be renamed",
             )
 
         old_file_path = safe_join(SCENARIO_COVERS_DIR, old_filename)
         new_file_path = safe_join(SCENARIO_COVERS_DIR, new_filename)
         if not old_file_path.exists():
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "File not found",
-                        "message": "Cover file does not exist",
-                    }
-                ),
-                404,
-            )
+            return error_response("Cover file does not exist", 404, "File not found")
 
         if new_file_path.exists():
             new_file_path.unlink()
@@ -540,24 +346,10 @@ def rename_scenario_cover():
             old_filename,
             new_filename,
         )
-        return jsonify(
-            {
-                "success": True,
-                "message": "Cover renamed successfully",
-            }
-        )
+        return success_response(message="Cover renamed successfully")
     except Exception as exc:
         logger.exception("Failed to rename scenario cover")
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": str(exc),
-                    "message": "Failed to rename cover",
-                }
-            ),
-            500,
-        )
+        return error_response("Failed to rename cover", 500, str(exc))
 
 
 @bp.route("/api/scenarios/list", methods=["GET"])
@@ -581,22 +373,10 @@ def get_scenario_list():
                 }
             )
 
-        return jsonify(
-            {
-                "success": True,
-                "data": {"files": files, "total": len(files)},
-                "message": "Scenario list loaded successfully",
-            }
+        return success_response(
+            {"files": files, "total": len(files)},
+            "Scenario list loaded successfully",
         )
     except Exception as exc:
         logger.exception("Failed to list scenario files")
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": str(exc),
-                    "message": "Failed to list scenario files",
-                }
-            ),
-            500,
-        )
+        return error_response("Failed to list scenario files", 500, str(exc))
