@@ -20,7 +20,7 @@ class ScenarioController {
         try {
             // 加载剧本数据
             await this.model.init();
-            
+
             // 渲染剧本列表
             this.renderScenarioList();
         } catch (error) {
@@ -39,7 +39,7 @@ class ScenarioController {
             onDeleteScenario: (id) => this.onDeleteScenario(id),
             onImportScenario: (files) => this.onImportScenario(files)
         };
-        
+
         this.view.setEventHandlers(handlers);
     }
 
@@ -63,27 +63,27 @@ class ScenarioController {
         try {
             // 获取表单数据
             let scenarioData = this.view.getFormData();
-            
+
             // 创建剧本，获取真实ID
             const scenario = await this.model.createScenario(scenarioData);
-            
+
             // 使用统一的封面重命名方法处理封面
             const coverUrl = document.getElementById('scenarioCoverUrl').value;
             await this.renameScenarioCover(scenario, coverUrl, 'title');
-            
+
             // 更新本地存储中的剧本数据
             this.model.scenarios[this.model.scenarios.findIndex(s => s.id === scenario.id)] = scenario;
             this.model.saveScenarios();
-            
+
             // 渲染剧本列表
             this.renderScenarioList();
-            
+
             // 关闭模态框
             this.view.closeModal();
-            
+
             // 显示成功消息
             this.view.showMessage('剧本保存成功！');
-            
+
             // 刷新页面以显示更新后的封面
             setTimeout(() => {
                 location.reload();
@@ -112,26 +112,26 @@ class ScenarioController {
             if (window.setCurrentEditingScenarioId) {
                 window.setCurrentEditingScenarioId(id);
             }
-            
+
             this.view.openEditModal(scenario);
-            
+
             // 移除原始的保存按钮事件监听器
             const saveButton = document.getElementById('saveScenario');
             if (this.view.saveScenarioHandler) {
                 saveButton.removeEventListener('click', this.view.saveScenarioHandler);
             }
-            
+
             // 重新绑定保存按钮事件，处理编辑逻辑
             saveButton.onclick = async () => {
                 try {
                     // 获取表单数据
                     let scenarioData = this.view.getFormData();
-                    
+
                     // 使用统一的封面重命名方法处理封面
                     const tempScenario = { id: id };
                     await this.renameScenarioCover(tempScenario, scenarioData.cover, 'id');
                     scenarioData.cover = tempScenario.cover;
-                    
+
                     // 直接更新本地剧本数据，不调用updateScenario避免认证问题
                     const updatedScenario = {
                         ...scenario,
@@ -141,16 +141,16 @@ class ScenarioController {
                     // 更新本地存储中的剧本数据
                     this.model.scenarios[this.model.scenarios.findIndex(s => s.id === id)] = updatedScenario;
                     this.model.saveScenarios();
-                    
+
                     // 重新添加原始的保存按钮事件监听器
                     saveButton.addEventListener('click', this.view.saveScenarioHandler);
-                    
+
                     // 渲染剧本列表
                     this.renderScenarioList();
-                    
+
                     // 关闭模态框
                     this.view.closeModal();
-                    
+
                     // 显示成功消息
                     this.view.showMessage('剧本更新成功！');
                 } catch (error) {
@@ -175,7 +175,7 @@ class ScenarioController {
                     // 构建封面路径，确保只使用scenario_covers文件夹
                     const safeTitle = scenario.title.replace(/[^a-zA-Z0-9]/g, '_');
                     const coverPath = `/scenario_covers/${safeTitle}.png`;
-                    
+
                     // 调用API删除封面
                     try {
                         await TrpgApi.del('/api/scenarios/cover', {
@@ -188,7 +188,7 @@ class ScenarioController {
                         // 封面删除失败不影响剧本删除
                     }
                 }
-                
+
                 // 删除剧本
                 await this.model.deleteScenario(id);
                 this.renderScenarioList();
@@ -214,7 +214,7 @@ class ScenarioController {
             try {
                 const content = await this.readFile(file);
                 const scenarioData = JSON.parse(content);
-                
+
                 // 导入剧本
                 await this.model.importScenario(scenarioData);
                 successCount++;
