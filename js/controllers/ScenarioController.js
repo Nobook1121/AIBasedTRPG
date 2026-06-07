@@ -4,13 +4,13 @@ class ScenarioController {
     constructor() {
         // 初始化Model
         this.model = new ScenarioModel();
-        
+
         // 初始化View
         this.view = new ScenarioView();
-        
+
         // 绑定事件处理函数
         this.bindEventHandlers();
-        
+
         // 初始化
         this.init();
     }

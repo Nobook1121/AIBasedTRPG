@@ -1,7 +1,9 @@
 from functools import wraps
 from pathlib import Path
 
-from flask import current_app, jsonify, session
+from flask import current_app, session
+
+from trpg_server.responses import error_response
 
 
 def safe_join(base, *parts):
@@ -36,29 +38,11 @@ def require_permission(required_role):
         @wraps(func)
         def wrapper(*args, **kwargs):
             if "user_id" not in session:
-                return (
-                    jsonify(
-                        {
-                            "success": False,
-                            "error": "Not logged in",
-                            "message": "Please login first",
-                        }
-                    ),
-                    401,
-                )
+                return error_response("Please login first", 401, "Not logged in")
 
             manager = get_user_manager()
             if not manager.check_permission(session["user_id"], required_role):
-                return (
-                    jsonify(
-                        {
-                            "success": False,
-                            "error": "Permission denied",
-                            "message": "Permission denied",
-                        }
-                    ),
-                    403,
-                )
+                return error_response("Permission denied", 403, "Permission denied")
 
             return func(*args, **kwargs)
 

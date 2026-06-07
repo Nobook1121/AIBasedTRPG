@@ -243,20 +243,20 @@ body, html {
     line-height: 1.25;
 }
 
-.markdown-body h1:first-child, 
-.markdown-body h2:first-child, 
-.markdown-body h3:first-child, 
-.markdown-body h4:first-child, 
-.markdown-body h5:first-child, 
+.markdown-body h1:first-child,
+.markdown-body h2:first-child,
+.markdown-body h3:first-child,
+.markdown-body h4:first-child,
+.markdown-body h5:first-child,
 .markdown-body h6:first-child {
     margin-top: 0;
 }
 
-.markdown-body h1:last-child, 
-.markdown-body h2:last-child, 
-.markdown-body h3:last-child, 
-.markdown-body h4:last-child, 
-.markdown-body h5:last-child, 
+.markdown-body h1:last-child,
+.markdown-body h2:last-child,
+.markdown-body h3:last-child,
+.markdown-body h4:last-child,
+.markdown-body h5:last-child,
 .markdown-body h6:last-child {
     margin-bottom: 0;
 }
