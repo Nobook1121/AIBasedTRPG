@@ -38,6 +38,11 @@ Push-Location $RepositoryRoot
 try {
   Invoke-Checked python -m py_compile server.py user_manager.py
 
+  if (Test-Path "package.json") {
+    Invoke-Checked npm run typecheck
+    Invoke-Checked npm run build:frontend
+  }
+
   $jsFiles = @(
     "tools\diceTool.js",
     "tools\toolManager.js",
@@ -51,10 +56,11 @@ try {
     "js\controllers\ScenarioController.js",
     "js\tabs.js",
     "js\platform-ui.js",
+    "js\cookie-consent.js",
     "js\chat.js",
     "js\auth.js",
     "js\network.js",
-    "js\saves.js",
+    "js\rooms.js",
     "js\scenario.js",
     "js\main.js"
   )

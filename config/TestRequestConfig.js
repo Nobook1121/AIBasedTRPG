@@ -1,6 +1,6 @@
+// @ts-nocheck
 // 测试请求配置文件
 // 为不同模型定义不同的测试请求配置
-
 const testRequestConfigs = {
     // Qwen3.5-Plus模型的测试请求配置
     'qwen3.5-plus': {
@@ -42,7 +42,6 @@ const testRequestConfigs = {
         stop: ['\n']
     }
 };
-
 // 获取模型的测试请求配置
 function getTestRequestConfig(modelId) {
     // 检查是否有特定模型的配置
@@ -54,7 +53,6 @@ function getTestRequestConfig(modelId) {
     // 如果没有特定模型的配置，使用默认配置
     return testRequestConfigs.default;
 }
-
 // 导出为全局变量
 window.testRequestConfigs = testRequestConfigs;
 window.getTestRequestConfig = getTestRequestConfig;

@@ -1,0 +1,20 @@
+{
+  "id": "53431a0676044fbca4b63bdc90b7008e",
+  "name": "1",
+  "room_code": "D9824358",
+  "scenario_id": 1776085966397,
+  "scenario_title": "长生俑",
+  "creator_id": 1,
+  "creator_name": "ADMIN",
+  "members": [
+    {
+      "user_id": 1,
+      "username": "ADMIN",
+      "role": "OWNER",
+      "avatar": "/assets/avatars/default.jpg",
+      "joined_at": "2026-06-08 13:42:51"
+    }
+  ],
+  "created_at": "2026-06-08 13:42:51",
+  "updated_at": "2026-06-08 13:47:43"
+}

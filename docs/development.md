@@ -33,8 +33,10 @@ python -W error::DeprecationWarning -m pytest tests\test_app_factory.py -q
 ## 日志规范
 
 - 使用 `logging.getLogger(__name__)` 或业务命名 logger。
-- 请求日志由 `trpg_server.logging_config.register_request_logging` 统一记录 method、path、status、elapsed time、user id 和 client IP。
-- 日志文件写入 `logs/ai_trpg.log`，使用 `RotatingFileHandler` 控制文件大小。
+- 日志前缀统一为 `[Time][INFO/WARN/ERROR/FATAL][Thread]`。
+- `INFO` 仅记录关键操作：用户登录、用户发送消息、请求 AI；普通 `GET`、列表读取、状态轮询和配置查看不记录 `INFO`。
+- 业务维护类成功操作如配置保存、剧本维护、房间维护默认使用 `DEBUG`，避免生产日志噪声。
+- 日志文件写入 `logs/ai_trpg_YYYYMMDD_HHMMSS.log`，使用 `RotatingFileHandler` 控制文件大小。
 - 不要记录密码、API key、auth token、provider secret、上传文件内容或完整认证载荷。
 - 需要输出字典前，优先使用 `trpg_server.logging_config.redact_sensitive`。
 

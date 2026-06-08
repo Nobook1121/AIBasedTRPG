@@ -1,3 +1,4 @@
+// @ts-nocheck
 // 剧本视图类 - MVC架构的View层
 // 改为普通脚本，使用全局变量
 class ScenarioView {
@@ -7,19 +8,16 @@ class ScenarioView {
         // 绑定剧本操作按钮事件（只绑定一次）
         this.bindScenarioActions();
     }
-
     // 初始化事件监听器
     initEventListeners() {
         // 创建剧本按钮
         document.getElementById('createScenario').addEventListener('click', () => {
             this.onCreateScenarioClick();
         });
-
         // 导入剧本按钮
         document.getElementById('importScenario').addEventListener('click', () => {
             document.getElementById('importScenarioFile').click();
         });
-
         // 文件选择事件
         document.getElementById('importScenarioFile').addEventListener('change', async (e) => {
             if (this.onImportScenario) {
@@ -28,7 +26,6 @@ class ScenarioView {
             // 清空文件输入，允许重复选择同一文件
             e.target.value = '';
         });
-
         // 保存剧本按钮 - 使用函数引用以便后续可以移除
         this.saveScenarioHandler = async () => {
             if (this.onSaveScenario) {
@@ -36,35 +33,27 @@ class ScenarioView {
             }
         };
         document.getElementById('saveScenario').addEventListener('click', this.saveScenarioHandler);
-
         // 添加场景按钮
         document.getElementById('addScene').addEventListener('click', () => {
             this.addScene();
         });
-
         // 添加结局按钮
         document.getElementById('addEnding').addEventListener('click', () => {
             this.addEnding();
         });
     }
-
     // 渲染剧本列表
     renderScenarioList(scenarios) {
         this.scenarioList.innerHTML = '';
-
         scenarios.forEach(scenario => {
             const card = document.createElement('div');
             card.className = 'scenario-card';
             // 构建封面图片路径 - 只使用scenario_covers文件夹
             const defaultCoverPath = '/assets/scenario_covers/default_cover.png';
-            
-            // 优先使用以剧本标题命名的封面图片
-            const safeTitle = scenario.title.replace('/', '_').replace('\\', '_');
-            const titleBasedCoverPath = `/assets/scenario_covers/${safeTitle}.png`;
-            
-            // 直接使用标题命名的封面路径
-            let coverPath = titleBasedCoverPath;
-            
+            let coverPath = scenario.cover || defaultCoverPath;
+            if (!coverPath.startsWith('/assets/scenario_covers/')) {
+                coverPath = defaultCoverPath;
+            }
             card.innerHTML = `
                 <img src="${coverPath}" alt="${scenario.title}" onerror="this.src='/assets/scenario_covers/default_cover.png'">
                 <div class="scenario-card-body">
@@ -81,59 +70,51 @@ class ScenarioView {
             this.scenarioList.appendChild(card);
         });
     }
-
     // 绑定剧本操作按钮事件
     bindScenarioActions() {
         // 使用事件委托来绑定事件，确保动态添加的元素也能响应
         this.scenarioList.addEventListener('click', async (e) => {
             const btn = e.target.closest('button');
-            if (!btn) return;
-
+            if (!btn)
+                return;
             const id = parseInt(btn.getAttribute('data-id'));
-            if (isNaN(id)) return;
-
+            if (isNaN(id))
+                return;
             if (btn.classList.contains('preview-scenario')) {
                 if (this.onPreviewScenario) {
                     this.onPreviewScenario(id);
                 }
-            } else if (btn.classList.contains('edit-scenario')) {
+            }
+            else if (btn.classList.contains('edit-scenario')) {
                 if (this.onEditScenario) {
                     this.onEditScenario(id);
                 }
-            } else if (btn.classList.contains('delete-scenario')) {
+            }
+            else if (btn.classList.contains('delete-scenario')) {
                 if (this.onDeleteScenario) {
                     await this.onDeleteScenario(id);
                 }
             }
         });
     }
-
     // 打开创建剧本模态框
     openCreateModal() {
         const modal = new bootstrap.Modal(document.getElementById('scenarioModal'));
-        
         // 重置表单
         this.resetScenarioForm();
-        
         // 绑定删除事件
         this.bindRemoveEvents();
-        
         modal.show();
     }
-
     // 打开编辑剧本模态框
     openEditModal(scenario) {
         const modal = new bootstrap.Modal(document.getElementById('scenarioModal'));
-        
         // 填充表单
         this.fillScenarioForm(scenario);
-        
         // 绑定删除事件
         this.bindRemoveEvents();
-        
         modal.show();
     }
-
     // 重置剧本表单
     resetScenarioForm() {
         document.getElementById('scenarioTitle').value = '';
@@ -143,8 +124,7 @@ class ScenarioView {
         document.getElementById('scenarioBackground').value = '';
         document.getElementById('scenarioPreparation').value = '';
         document.getElementById('scenarioCoverUrl').value = '';
-        document.getElementById('coverPreview').src = '/scenario_covers/default_cover.png';
-        
+        document.getElementById('coverPreview').src = '/assets/scenario_covers/default_cover.png';
         // 重置场景和结局
         const scenesContainer = document.getElementById('scenarioScenes');
         const endingsContainer = document.getElementById('scenarioEndings');
@@ -181,7 +161,6 @@ class ScenarioView {
             </div>
         `;
     }
-
     // 填充剧本表单
     fillScenarioForm(scenario) {
         document.getElementById('scenarioTitle').value = scenario.title;
@@ -191,13 +170,12 @@ class ScenarioView {
         document.getElementById('scenarioBackground').value = scenario.background || '';
         document.getElementById('scenarioPreparation').value = scenario.preparation || '';
         document.getElementById('scenarioCoverUrl').value = scenario.cover || '';
-        // 确保只使用scenario_covers文件夹的路径，禁止外部URL和其他文件夹
+        // 确保只使用scenario_covers文件夹的公开资源路径，禁止外部URL和其他文件夹
         let coverSrc = scenario.cover;
-        if (!coverSrc || !coverSrc.startsWith('/scenario_covers/')) {
-            coverSrc = '/scenario_covers/default_cover.png';
+        if (!coverSrc || !coverSrc.startsWith('/assets/scenario_covers/')) {
+            coverSrc = '/assets/scenario_covers/default_cover.png';
         }
         document.getElementById('coverPreview').src = coverSrc;
-        
         // 填充场景
         const scenesContainer = document.getElementById('scenarioScenes');
         scenesContainer.innerHTML = '';
@@ -220,7 +198,6 @@ class ScenarioView {
             `;
             scenesContainer.appendChild(sceneItem);
         });
-        
         // 填充结局
         const endingsContainer = document.getElementById('scenarioEndings');
         endingsContainer.innerHTML = '';
@@ -244,7 +221,6 @@ class ScenarioView {
             endingsContainer.appendChild(endingItem);
         });
     }
-
     // 绑定删除事件
     bindRemoveEvents() {
         // 删除场景
@@ -255,7 +231,6 @@ class ScenarioView {
                 this.updateSceneNumbers();
             });
         });
-        
         // 删除结局
         document.querySelectorAll('.remove-ending').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -265,7 +240,6 @@ class ScenarioView {
             });
         });
     }
-
     // 更新场景编号
     updateSceneNumbers() {
         const scenes = document.querySelectorAll('.scene-item');
@@ -273,7 +247,6 @@ class ScenarioView {
             scene.querySelector('h6').textContent = `场景 ${index + 1}`;
         });
     }
-
     // 更新结局编号
     updateEndingNumbers() {
         const endings = document.querySelectorAll('.ending-item');
@@ -281,12 +254,10 @@ class ScenarioView {
             ending.querySelector('h6').textContent = `结局 ${index + 1}`;
         });
     }
-
     // 添加场景
     addScene() {
         const scenesContainer = document.getElementById('scenarioScenes');
         const sceneCount = scenesContainer.querySelectorAll('.scene-item').length + 1;
-        
         const sceneItem = document.createElement('div');
         sceneItem.className = 'scene-item mb-3 p-3 border rounded';
         sceneItem.innerHTML = `
@@ -303,16 +274,13 @@ class ScenarioView {
                 <textarea class="form-control" rows="2" placeholder="AI总结内容将显示在这里"></textarea>
             </div>
         `;
-        
         scenesContainer.appendChild(sceneItem);
         this.bindRemoveEvents();
     }
-
     // 添加结局
     addEnding() {
         const endingsContainer = document.getElementById('scenarioEndings');
         const endingCount = endingsContainer.querySelectorAll('.ending-item').length + 1;
-        
         const endingItem = document.createElement('div');
         endingItem.className = 'ending-item mb-3 p-3 border rounded';
         endingItem.innerHTML = `
@@ -329,22 +297,18 @@ class ScenarioView {
                 <textarea class="form-control" rows="2" placeholder="AI总结内容将显示在这里"></textarea>
             </div>
         `;
-        
         endingsContainer.appendChild(endingItem);
         this.bindRemoveEvents();
     }
-
     // 获取表单数据
     getFormData() {
         // 表单验证
         const title = document.getElementById('scenarioTitle').value.trim();
         const author = document.getElementById('scenarioAuthor').value.trim();
         const playerCount = document.getElementById('scenarioPlayerCount').value;
-        
         if (!title || !author || !playerCount) {
             throw new Error('请填写所有必填项！');
         }
-        
         // 收集场景数据
         const scenes = [];
         document.querySelectorAll('.scene-item').forEach((scene, index) => {
@@ -356,7 +320,6 @@ class ScenarioView {
                 marker: marker
             });
         });
-        
         // 收集结局数据
         const endings = [];
         document.querySelectorAll('.ending-item').forEach((ending, index) => {
@@ -368,7 +331,6 @@ class ScenarioView {
                 marker: marker
             });
         });
-        
         // 构建剧本数据
         return {
             title: title,
@@ -382,7 +344,6 @@ class ScenarioView {
             cover: document.getElementById('scenarioCoverUrl').value
         };
     }
-
     // 预览剧本
     previewScenario(scenario) {
         if (scenario) {
@@ -395,7 +356,6 @@ class ScenarioView {
                 <p><strong>游戏准备:</strong> ${scenario.preparation || '无'}</p>
                 <h4>场景</h4>
             `;
-            
             scenario.scenes.forEach(scene => {
                 previewContent += `
                     <div class="mb-3">
@@ -405,9 +365,7 @@ class ScenarioView {
                     </div>
                 `;
             });
-            
             previewContent += `<h4>结局</h4>`;
-            
             scenario.endings.forEach(ending => {
                 previewContent += `
                     <div class="mb-3">
@@ -417,7 +375,6 @@ class ScenarioView {
                     </div>
                 `;
             });
-            
             // 创建预览模态框
             const modal = document.createElement('div');
             modal.className = 'modal fade';
@@ -439,18 +396,15 @@ class ScenarioView {
                     </div>
                 </div>
             `;
-            
             document.body.appendChild(modal);
             const previewModal = new bootstrap.Modal(modal);
             previewModal.show();
-            
             // 清理模态框
             modal.addEventListener('hidden.bs.modal', () => {
                 modal.remove();
             });
         }
     }
-
     // 关闭模态框
     closeModal() {
         const modal = bootstrap.Modal.getInstance(document.getElementById('scenarioModal'));
@@ -458,24 +412,20 @@ class ScenarioView {
             modal.hide();
         }
     }
-
     // 显示消息
     showMessage(message, isError = false) {
         // 创建通知元素
         const notification = document.createElement('div');
         notification.className = `notification ${isError ? 'notification-error' : 'notification-success'}`;
         notification.textContent = message;
-        
         // 获取通知容器
         const container = document.querySelector('.notification-container');
         container.appendChild(notification);
-        
         // 3秒后自动移除通知
         setTimeout(() => {
             notification.remove();
         }, 3000);
     }
-
     // 绑定事件处理函数
     setEventHandlers(handlers) {
         this.onCreateScenarioClick = handlers.onCreateScenarioClick;
@@ -486,6 +436,5 @@ class ScenarioView {
         this.onImportScenario = handlers.onImportScenario;
     }
 }
-
 // 导出为全局变量
 window.ScenarioView = ScenarioView;

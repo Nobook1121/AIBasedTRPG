@@ -1,3 +1,4 @@
+// @ts-nocheck
 // 剧本模型类 - MVC架构的Model层
 // 改为普通脚本，使用全局变量
 class ScenarioModel {
@@ -8,12 +9,10 @@ class ScenarioModel {
         this.userId = null;
         this.isAuthenticated = false;
     }
-    
     // 获取当前用户ID
     getCurrentUserId() {
         return this.userId;
     }
-
     // 检查认证状态
     async checkAuthStatus() {
         try {
@@ -25,25 +24,23 @@ class ScenarioModel {
                     return true;
                 }
             }
-        } catch (error) {
+        }
+        catch (error) {
             console.error('检查认证状态失败:', error);
         }
         this.isAuthenticated = false;
         return false;
     }
-
     // 初始化
     async init() {
         await this.checkAuthStatus();
         return this.loadScenarios();
     }
-
     // 加载所有剧本
     async loadScenarios() {
         try {
             console.log('开始加载剧本...');
             this.scenarios = [];
-
             // 尝试从API加载
             try {
                 const { response, data } = await TrpgApi.requestWithResponse(`${this.apiBaseUrl}/scenarios`);
@@ -54,16 +51,18 @@ class ScenarioModel {
                         // 保存到本地存储作为备份
                         localStorage.setItem('trpg_scenarios', JSON.stringify(this.scenarios));
                         return this.scenarios;
-                    } else {
+                    }
+                    else {
                         console.log('API返回错误:', data.message);
                     }
-                } else {
+                }
+                else {
                     console.log('API请求失败:', response.status);
                 }
-            } catch (error) {
+            }
+            catch (error) {
                 console.log('从API加载剧本失败，尝试从本地存储加载:', error);
             }
-
             // 尝试从本地存储加载
             const storedScenarios = localStorage.getItem('trpg_scenarios');
             if (storedScenarios) {
@@ -71,19 +70,16 @@ class ScenarioModel {
                 this.scenarios = JSON.parse(storedScenarios);
                 return this.scenarios;
             }
-
             // 使用默认剧本
             this.loadDefaultScenarios();
             return this.scenarios;
-        } catch (error) {
+        }
+        catch (error) {
             console.error('加载剧本时出错:', error);
             this.loadDefaultScenarios();
             return this.scenarios;
         }
     }
-
-
-
     // 加载默认剧本
     loadDefaultScenarios() {
         console.log('加载默认剧本');
@@ -125,7 +121,7 @@ class ScenarioModel {
                         marker: ''
                     }
                 ],
-                cover: "/scenario_covers/古宅奇案_cover.png",
+                cover: "/assets/scenario_covers/古宅奇案_cover.png",
                 createdAt: new Date().toISOString()
             },
             {
@@ -165,14 +161,13 @@ class ScenarioModel {
                         marker: ''
                     }
                 ],
-                cover: "/scenario_covers/星际探索_cover.png",
+                cover: "/assets/scenario_covers/星际探索_cover.png",
                 createdAt: new Date().toISOString()
             }
         ];
         // 保存到本地存储
         localStorage.setItem('trpg_scenarios', JSON.stringify(this.scenarios));
     }
-
     // 创建剧本
     async createScenario(scenarioData) {
         try {
@@ -180,7 +175,6 @@ class ScenarioModel {
             if (!this.isAuthenticated) {
                 await this.checkAuthStatus();
             }
-
             // 通过API创建剧本
             const { response, data } = await TrpgApi.requestWithResponse(`${this.apiBaseUrl}/scenarios`, {
                 method: 'POST',
@@ -189,22 +183,20 @@ class ScenarioModel {
                     user_id: this.userId || 'anonymous'
                 }
             });
-            
             if (!response.ok || !data.success) {
                 throw new Error(data.message || `API请求失败: ${response.status}`);
             }
-            
             const scenario = data.data;
             this.scenarios.push(scenario);
             this.saveScenarios();
             console.log('剧本创建成功');
             return scenario;
-        } catch (error) {
+        }
+        catch (error) {
             console.error('创建剧本时出错:', error);
             throw error;
         }
     }
-
     // 更新剧本
     async updateScenario(id, scenarioData) {
         try {
@@ -215,7 +207,6 @@ class ScenarioModel {
                     throw new Error('请先登录');
                 }
             }
-
             // 通过API更新剧本
             const { response, data } = await TrpgApi.requestWithResponse(`${this.apiBaseUrl}/scenarios/${id}`, {
                 method: 'PUT',
@@ -224,11 +215,9 @@ class ScenarioModel {
                     user_id: this.userId
                 }
             });
-            
             if (!response.ok || !data.success) {
                 throw new Error(data.message || `API请求失败: ${response.status}`);
             }
-            
             const updatedScenario = data.data;
             const index = this.scenarios.findIndex(s => s.id === id);
             if (index !== -1) {
@@ -238,12 +227,12 @@ class ScenarioModel {
                 return updatedScenario;
             }
             throw new Error('剧本不存在');
-        } catch (error) {
+        }
+        catch (error) {
             console.error('更新剧本时出错:', error);
             throw error;
         }
     }
-
     // 删除剧本
     async deleteScenario(id) {
         try {
@@ -254,7 +243,6 @@ class ScenarioModel {
                     throw new Error('请先登录');
                 }
             }
-
             // 通过API删除剧本
             const { response, data } = await TrpgApi.requestWithResponse(`${this.apiBaseUrl}/scenarios/${id}`, {
                 method: 'DELETE',
@@ -262,11 +250,9 @@ class ScenarioModel {
                     user_id: this.userId
                 }
             });
-            
             if (!response.ok || !data.success) {
                 throw new Error(data.message || `API请求失败: ${response.status}`);
             }
-            
             const index = this.scenarios.findIndex(s => s.id === id);
             if (index !== -1) {
                 this.scenarios.splice(index, 1);
@@ -275,27 +261,24 @@ class ScenarioModel {
                 return true;
             }
             throw new Error('剧本不存在');
-        } catch (error) {
+        }
+        catch (error) {
             console.error('删除剧本时出错:', error);
             throw error;
         }
     }
-
     // 获取单个剧本
     getScenario(id) {
         return this.scenarios.find(s => s.id === id);
     }
-
     // 获取所有剧本
     getScenarios() {
         return this.scenarios;
     }
-
     // 保存所有剧本到本地存储
     saveScenarios() {
         localStorage.setItem('trpg_scenarios', JSON.stringify(this.scenarios));
     }
-
     // 导入剧本
     async importScenario(scenarioData) {
         try {
@@ -303,51 +286,42 @@ class ScenarioModel {
             if (!this.validateScenarioData(scenarioData)) {
                 throw new Error('剧本数据格式不正确');
             }
-
             // 移除原有ID，让系统生成新ID
             delete scenarioData.id;
-            
             // 创建剧本
             return await this.createScenario(scenarioData);
-        } catch (error) {
+        }
+        catch (error) {
             console.error('导入剧本时出错:', error);
             throw error;
         }
     }
-
     // 验证剧本数据格式
     validateScenarioData(data) {
         // 检查必需字段
         if (!data || typeof data !== 'object') {
             return false;
         }
-        
         // 检查基本字段
         if (!data.title || typeof data.title !== 'string') {
             return false;
         }
-        
         if (!data.author || typeof data.author !== 'string') {
             return false;
         }
-        
         // playerCount 可以是数字或字符串数字
         if (data.playerCount === undefined || data.playerCount === null) {
             return false;
         }
-
         // scenes 和 endings 应该是数组（如果存在）
         if (data.scenes && !Array.isArray(data.scenes)) {
             return false;
         }
-        
         if (data.endings && !Array.isArray(data.endings)) {
             return false;
         }
-
         return true;
     }
 }
-
 // 导出为全局变量
 window.ScenarioModel = ScenarioModel;

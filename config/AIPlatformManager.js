@@ -1,6 +1,6 @@
+// @ts-nocheck
 // AI平台管理模块
 // 负责加载、管理和配置AI平台
-
 // 改为普通脚本，使用全局变量
 class AIPlatformManager {
     constructor() {
@@ -8,7 +8,6 @@ class AIPlatformManager {
         this.platformsPath = 'config/aiplatform';
         this.currentPlatform = null;
     }
-
     /**
      * 加载所有AI平台配置
      * @returns {Promise<Array>} 平台列表
@@ -25,20 +24,20 @@ class AIPlatformManager {
                     const config = await response.json();
                     this.platforms[platform] = config;
                     return config;
-                } catch (error) {
+                }
+                catch (error) {
                     console.error(`加载平台 ${platform} 失败:`, error);
                     return null;
                 }
             });
-
             const results = await Promise.all(platformPromises);
             return results.filter(Boolean);
-        } catch (error) {
+        }
+        catch (error) {
             console.error('加载平台配置失败:', error);
             return [];
         }
     }
-
     /**
      * 获取平台配置
      * @param {string} platform - 平台名称
@@ -47,7 +46,6 @@ class AIPlatformManager {
     getPlatform(platform) {
         return this.platforms[platform] || null;
     }
-
     /**
      * 获取所有平台
      * @returns {Array} 平台列表
@@ -55,7 +53,6 @@ class AIPlatformManager {
     getAllPlatforms() {
         return Object.values(this.platforms);
     }
-
     /**
      * 启用/禁用平台
      * @param {string} platform - 平台名称
@@ -68,17 +65,16 @@ class AIPlatformManager {
             if (!config) {
                 throw new Error('平台不存在');
             }
-
             config.enabled = enabled;
             await this.savePlatformConfig(platform, config);
             this.platforms[platform] = config;
             return true;
-        } catch (error) {
+        }
+        catch (error) {
             console.error('设置平台状态失败:', error);
             return false;
         }
     }
-
     /**
      * 更新平台配置
      * @param {string} platform - 平台名称
@@ -90,12 +86,12 @@ class AIPlatformManager {
             await this.savePlatformConfig(platform, config);
             this.platforms[platform] = config;
             return true;
-        } catch (error) {
+        }
+        catch (error) {
             console.error('更新平台配置失败:', error);
             return false;
         }
     }
-
     /**
      * 保存平台配置
      * @param {string} platform - 平台名称
@@ -108,23 +104,20 @@ class AIPlatformManager {
                 method: 'POST',
                 body: config
             });
-
             if (!response.ok) {
                 throw new Error('保存配置失败');
             }
-
             const result = data;
             if (!result.success) {
                 throw new Error(result.message || '保存配置失败');
             }
-            
             return true;
-        } catch (error) {
+        }
+        catch (error) {
             console.error('保存平台配置失败:', error);
             throw error;
         }
     }
-
     /**
      * 添加模型
      * @param {string} platform - 平台名称
@@ -137,7 +130,6 @@ class AIPlatformManager {
             if (!config) {
                 throw new Error('平台不存在');
             }
-
             config.models.push({
                 id: model.id,
                 name: model.name,
@@ -150,19 +142,17 @@ class AIPlatformManager {
                     max_tokens: 4096
                 }
             });
-
             // 生成模型JS配置文件
             await this.generateModelJSConfig(platform, model.id);
-
             await this.savePlatformConfig(platform, config);
             this.platforms[platform] = config;
             return true;
-        } catch (error) {
+        }
+        catch (error) {
             console.error('添加模型失败:', error);
             return false;
         }
     }
-
     /**
      * 生成模型JS配置文件
      * @param {string} platform - 平台名称
@@ -177,13 +167,10 @@ class AIPlatformManager {
                 throw new Error('无法加载默认JS配置模板');
             }
             let template = await response.text();
-
             // 替换模型ID
             template = template.replace(/model: '1'/g, `model: '${modelId}'`);
-
             // 保存到对应平台的目录下
             const filePath = `config/aimodel/${platform}/${modelId}.js`;
-            
             // 发送请求保存文件
             const { response: saveResponse } = await TrpgApi.requestWithResponse('/api/config/aimodel/save', {
                 method: 'POST',
@@ -193,18 +180,16 @@ class AIPlatformManager {
                     content: template
                 }
             });
-
             if (!saveResponse.ok) {
                 throw new Error('保存模型JS配置失败');
             }
-
             console.log(`模型JS配置文件已生成: ${filePath}`);
-        } catch (error) {
+        }
+        catch (error) {
             console.error('生成模型JS配置失败:', error);
             throw error;
         }
     }
-
     /**
      * 移除模型
      * @param {string} platform - 平台名称
@@ -217,26 +202,22 @@ class AIPlatformManager {
             if (!config) {
                 throw new Error('平台不存在');
             }
-
             const modelIndex = config.models.findIndex(m => m.id === modelId);
             if (modelIndex === -1) {
                 throw new Error('模型不存在');
             }
-
             config.models.splice(modelIndex, 1);
-            
             // 删除模型JS配置文件
             await this.deleteModelJSConfig(platform, modelId);
-            
             await this.savePlatformConfig(platform, config);
             this.platforms[platform] = config;
             return true;
-        } catch (error) {
+        }
+        catch (error) {
             console.error('移除模型失败:', error);
             return false;
         }
     }
-
     /**
      * 删除模型JS配置文件
      * @param {string} platform - 平台名称
@@ -253,18 +234,16 @@ class AIPlatformManager {
                     modelId: modelId
                 }
             });
-
             if (!deleteResponse.ok) {
                 throw new Error('删除模型JS配置失败');
             }
-
             console.log(`模型JS配置文件已删除: config/aimodel/${platform}/${modelId}.js`);
-        } catch (error) {
+        }
+        catch (error) {
             console.error('删除模型JS配置失败:', error);
             // 即使删除文件失败，也继续执行模型删除操作
         }
     }
-
     /**
      * 获取默认JS配置
      * @returns {string} 默认JS配置代码
@@ -276,12 +255,12 @@ class AIPlatformManager {
                 throw new Error('无法加载默认JS配置');
             }
             return await response.text();
-        } catch (error) {
+        }
+        catch (error) {
             console.error('获取默认JS配置失败:', error);
             return '';
         }
     }
-
     /**
      * 测试API连接
      * @param {string} platform - 平台名称
@@ -294,73 +273,58 @@ class AIPlatformManager {
             if (!config) {
                 throw new Error('平台不存在');
             }
-
             if (!config.enabled) {
                 throw new Error('平台未启用');
             }
-
             // LMStudio平台可以跳过API Key检查，因为LMStudio会忽略API Key
             if (!config.config.api_key && platform !== 'lmstudio') {
                 throw new Error('API Key未设置');
             }
-
             const model = config.models.find(m => m.id === modelId);
             if (!model) {
                 throw new Error('模型不存在');
             }
-
             // 记录测试开始时间
             const startTime = Date.now();
-
             // 从配置文件中获取测试请求配置
             const testConfig = getTestRequestConfig(modelId);
-            
             // 构建测试请求
             const testRequest = {
                 model: modelId,
                 ...testConfig
             };
-
             // 在控制台输出请求的消息
             console.log('API测试请求:', testRequest);
-
             // 发送测试请求到服务器端，由服务器端转发并记录日志
             const { response, data } = await TrpgApi.requestWithResponse(`/api/config/aiplatform/${platform}/test`, {
                 method: 'POST',
                 body: testRequest,
                 timeout: config.config.timeout * 1000
             });
-
             // 记录测试结束时间
             const endTime = Date.now();
             const duration = (endTime - startTime) / 1000;
-
             if (!response.ok) {
                 const errorData = data || {};
                 throw new Error(errorData.error || `API请求失败: ${response.status}`);
             }
-
             const serverResponse = data;
-
             // 在控制台输出模型回复的消息
             console.log('API测试响应:', serverResponse);
-
             // 处理服务器端返回的响应格式
             if (!serverResponse.success) {
                 throw new Error(serverResponse.error || 'API测试失败');
             }
-
             const result = serverResponse.response;
-
             // 处理阿里云百炼API的响应格式
             let totalTokens = 0;
             if (result.usage) {
                 totalTokens = result.usage.total_tokens || 0;
-            } else if (result.output && result.output.usage) {
+            }
+            else if (result.output && result.output.usage) {
                 totalTokens = result.output.usage.total_tokens || 0;
             }
             const tokenSpeed = totalTokens / duration;
-
             return {
                 success: true,
                 time: new Date().toLocaleString(),
@@ -370,7 +334,8 @@ class AIPlatformManager {
                 duration: `${duration.toFixed(2)}s`,
                 response: result
             };
-        } catch (error) {
+        }
+        catch (error) {
             console.error('API测试失败:', error);
             return {
                 success: false,
@@ -378,12 +343,8 @@ class AIPlatformManager {
             };
         }
     }
-
 }
-
-
 // 创建全局AI平台管理器实例
 const aiPlatformManager = new AIPlatformManager();
-
 // 导出为全局变量
 window.aiPlatformManager = aiPlatformManager;

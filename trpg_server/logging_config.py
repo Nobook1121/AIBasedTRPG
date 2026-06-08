@@ -1,10 +1,24 @@
 import logging
-import time
+from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any
 
 SENSITIVE_KEYS = {"api_key", "auth_token", "token", "password", "secret", "secret_key"}
+LEVEL_LABELS = {
+    logging.WARNING: "WARN",
+    logging.CRITICAL: "FATAL",
+}
+
+
+class CompactFormatter(logging.Formatter):
+    def format(self, record):
+        original_levelname = record.levelname
+        record.levelname = LEVEL_LABELS.get(record.levelno, record.levelname)
+        try:
+            return super().format(record)
+        finally:
+            record.levelname = original_levelname
 
 
 def redact_sensitive(value: Any) -> Any:
@@ -20,9 +34,10 @@ def redact_sensitive(value: Any) -> Any:
 
 def configure_logging(log_dir: str | Path = "logs") -> None:
     Path(log_dir).mkdir(parents=True, exist_ok=True)
-    log_path = Path(log_dir) / "ai_trpg.log"
+    started_at = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_path = Path(log_dir) / f"ai_trpg_{started_at}.log"
 
-    formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+    formatter = CompactFormatter("[%(asctime)s][%(levelname)s][%(name)s] %(message)s")
 
     file_handler = RotatingFileHandler(
         log_path,
@@ -41,31 +56,4 @@ def configure_logging(log_dir: str | Path = "logs") -> None:
     root_logger.addHandler(file_handler)
     root_logger.addHandler(console_handler)
 
-
-def register_request_logging(app) -> None:
-    logger = logging.getLogger("trpg_server.requests")
-
-    @app.before_request
-    def _start_request_timer():
-        from flask import g
-
-        g.request_started_at = time.perf_counter()
-
-    @app.after_request
-    def _log_response(response):
-        from flask import g, request, session
-
-        elapsed_ms = int(
-            (time.perf_counter() - g.get("request_started_at", time.perf_counter()))
-            * 1000
-        )
-        logger.info(
-            "%s %s status=%s elapsed_ms=%s user_id=%s client_ip=%s",
-            request.method,
-            request.path,
-            response.status_code,
-            elapsed_ms,
-            session.get("user_id"),
-            request.remote_addr,
-        )
-        return response
+    logging.getLogger("werkzeug").setLevel(logging.WARNING)

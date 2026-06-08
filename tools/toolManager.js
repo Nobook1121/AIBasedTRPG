@@ -1,3 +1,4 @@
+// @ts-nocheck
 // 工具管理器模块
 // 改为普通脚本，使用全局变量
 class ToolManager {
@@ -9,7 +10,6 @@ class ToolManager {
             '/dice': this.handleDiceCommand.bind(this)
         };
     }
-
     /**
      * 处理骰子命令
      * @param {string} command - 完整的命令，如 '/dice 1d6'
@@ -18,7 +18,6 @@ class ToolManager {
     handleDiceCommand(command) {
         return this.tools.dice.handleDiceCommand(command);
     }
-
     /**
      * 处理命令
      * @param {string} command - 完整的命令
@@ -29,18 +28,14 @@ class ToolManager {
         if (!command.startsWith('/')) {
             return null;
         }
-
         // 提取命令名称
         const commandName = command.split(' ')[0].toLowerCase();
-
         // 检查是否是已注册的命令
         if (this.commands[commandName]) {
             return this.commands[commandName](command);
         }
-
         return '未知命令，请查看可用命令列表';
     }
-
     /**
      * 获取所有工具
      * @returns {Object} 工具对象
@@ -48,7 +43,6 @@ class ToolManager {
     getTools() {
         return this.tools;
     }
-
     /**
      * 获取所有命令
      * @returns {Array} 命令列表
@@ -57,6 +51,5 @@ class ToolManager {
         return Object.keys(this.commands);
     }
 }
-
 // 导出为全局变量
 window.ToolManager = ToolManager;

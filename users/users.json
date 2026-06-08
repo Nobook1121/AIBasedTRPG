@@ -2,15 +2,30 @@
   "users": [
     {
       "id": 1,
+      "username": "Alice",
+      "role": "USER",
+      "status": "active"
+    },
+    {
+      "id": 2,
+      "username": "alice",
+      "password": "$2b$12$geN8RYCEJ.RhwtlNhUIVDeh8pwdmkUA5r9C.3kBn0YkhLKxFlLgCG",
+      "email": "alice2@example.com",
+      "role": "USER",
+      "created_at": "2026-06-08T14:10:56.000Z",
+      "last_login": "2026-06-08T14:10:56.000Z",
+      "character_cards": [],
+      "status": "active",
+      "avatar": "/assets/avatars/default.jpg"
+    },
+    {
+      "id": 3,
       "username": "ADMIN",
-      "password": "$2b$12$jpLH41KFbVFEiBxXSXNyEuxj.UjYCccDIlhy2SwTQaM7406hNw0CG",
-      "email": "admin@example.com",
-      "ip_addresses": [
-        "127.0.0.1"
-      ],
-      "role": "OWNER",
-      "created_at": "2026-03-31T00:00:00.000Z",
-      "last_login": "2026-06-04T16:10:51.000Z",
+      "password": "$2b$12$UnLz/Yyc.mCOK58lFvXAM.EzpnRJ/x1TYoeuMH7NKZLOsCaLFpz1G",
+      "email": "1982690405@qq.com",
+      "role": "USER",
+      "created_at": "2026-06-08T14:26:16.000Z",
+      "last_login": "2026-06-08T14:26:20.000Z",
       "character_cards": [],
       "status": "active",
       "avatar": "/assets/avatars/default.jpg",

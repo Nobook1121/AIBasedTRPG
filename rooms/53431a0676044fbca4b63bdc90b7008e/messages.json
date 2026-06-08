@@ -1,0 +1,46 @@
+[
+  {
+    "id": "efe40659463d470e847e27187c6fbb1b",
+    "type": "player",
+    "sender_id": 1,
+    "sender_name": "ADMIN",
+    "avatar": "/assets/avatars/default.jpg",
+    "content": "你好",
+    "time": "13:43",
+    "created_at": "2026-06-08 13:43:02",
+    "metadata": {}
+  },
+  {
+    "id": "a7ceccb9f7ca4dab9d5eef2fca6eaeca",
+    "type": "player",
+    "sender_id": 2,
+    "sender_name": "ADMIN2",
+    "avatar": "/assets/avatars/default.jpg",
+    "content": "你好",
+    "time": "13:43",
+    "created_at": "2026-06-08 13:43:49",
+    "metadata": {}
+  },
+  {
+    "id": "62b882df15de4db3896a57237b7b7b74",
+    "type": "player",
+    "sender_id": 1,
+    "sender_name": "ADMIN",
+    "avatar": "/assets/avatars/default.jpg",
+    "content": "你好",
+    "time": "13:44",
+    "created_at": "2026-06-08 13:44:09",
+    "metadata": {}
+  },
+  {
+    "id": "1e9b8df6dedc42af9a54ffb6b2e52b82",
+    "type": "player",
+    "sender_id": 1,
+    "sender_name": "ADMIN",
+    "avatar": "/assets/avatars/default.jpg",
+    "content": "你好",
+    "time": "13:47",
+    "created_at": "2026-06-08 13:47:43",
+    "metadata": {}
+  }
+]

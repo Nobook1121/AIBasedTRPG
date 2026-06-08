@@ -26,7 +26,7 @@ def _public_user(user):
 def get_users():
     try:
         users = [_public_user(user) for user in get_user_manager().get_all_users()]
-        logger.info("Users listed count=%s", len(users))
+        logger.debug("Users listed count=%s", len(users))
         return success_response(users, "Users loaded successfully")
     except Exception as exc:
         logger.exception("Failed to list users")
@@ -53,7 +53,7 @@ def update_user_role(user_id):
         if not success:
             return error_response(message, 404, message)
 
-        logger.info("User role updated user_id=%s role=%s", user_id, role)
+        logger.debug("User role updated user_id=%s role=%s", user_id, role)
         return success_response(message=message)
     except Exception as exc:
         logger.exception("Failed to update user role: %s", user_id)
@@ -80,7 +80,7 @@ def update_user_status(user_id):
         if not success:
             return error_response(message, 404, message)
 
-        logger.info("User status updated user_id=%s status=%s", user_id, status)
+        logger.debug("User status updated user_id=%s status=%s", user_id, status)
         return success_response(message=message)
     except Exception as exc:
         logger.exception("Failed to update user status: %s", user_id)
@@ -127,7 +127,7 @@ def update_ip_config():
 def get_all_ip_configs():
     try:
         configs = get_user_manager().get_all_ip_configs()
-        logger.info("Admin IP configs listed count=%s", len(configs))
+        logger.debug("Admin IP configs listed count=%s", len(configs))
         return success_response(configs, "IP configs loaded successfully")
     except Exception as exc:
         logger.exception("Failed to list IP configs")

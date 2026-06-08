@@ -1,231 +1,224 @@
-// 聊天功能模块
-
+// @ts-nocheck
+// Chat module. Room-aware messages are persisted by the backend.
 let isAIThinking = false;
 let messageTimestamps = [];
 let pendingMessages = [];
 let aiName = 'KP';
 let socket = null;
-
+function getCurrentUsername() {
+    const username = document.getElementById('userName')?.textContent?.trim();
+    if (username && username !== '未登录') {
+        return username;
+    }
+    return window.currentUser?.username || '用户';
+}
+function getCurrentUserId() {
+    return window.currentUser?.user_id || null;
+}
+function getCurrentRoom() {
+    return window.currentRoom || null;
+}
 function initChat() {
     const chatInput = document.getElementById('chatInput');
     const sendButton = document.getElementById('sendButton');
-    const chatHistory = document.getElementById('chatHistory');
-
     updateAIHint();
-
     initWebSocket();
-
-    function sendMessage() {
+    async function sendMessage() {
         const rawMessage = chatInput.value.trim();
-        if (!rawMessage) return;
-
-        if (isAIThinking) {
-            const enableLock = document.getElementById('enableAIResponseLock')?.checked;
-            if (enableLock) {
-                showNotification('请等待AI回复完成后再发送消息', 'error');
-                return;
-            }
+        if (!rawMessage)
+            return;
+        if (isAIThinking && document.getElementById('enableAIResponseLock')?.checked) {
+            showNotification('请等待 AI 回复完成后再发送消息', 'error');
+            return;
         }
-
         const rateLimit = parseInt(document.getElementById('messageRateLimit')?.value) || 0;
         if (rateLimit > 0) {
             const now = Date.now();
             messageTimestamps = messageTimestamps.filter(ts => now - ts < 60000);
-
             if (messageTimestamps.length >= rateLimit) {
-                showNotification(`消息发送过于频繁，请稍后再试（限制${rateLimit}条/分钟）`, 'error');
+                showNotification(`消息发送过于频繁，请稍后再试（限制 ${rateLimit} 条/分钟）`, 'error');
                 return;
             }
             messageTimestamps.push(now);
         }
-
         const isAIMessage = rawMessage.startsWith(`@${aiName}`);
         const message = isAIMessage ? rawMessage.substring(aiName.length + 1).trim() : rawMessage;
-
         if (!message) {
             showNotification('请输入消息内容', 'error');
             return;
         }
-
         const commandResult = toolManager.handleCommand(message);
-
-        if (commandResult) {
-            addMessage('player', '我', message);
-            chatInput.value = '';
-
-            broadcastMessage('player', '我', message);
-
-            if (message.toLowerCase().startsWith('/dice')) {
-                setTimeout(() => {
-                    addMessage('dice', '骰娘', commandResult);
-                    broadcastMessage('dice', '骰娘', commandResult);
-                }, 500);
-            } else {
-                setTimeout(() => {
-                    addMessage('system', '系统', commandResult);
-                    broadcastMessage('system', '系统', commandResult);
-                }, 500);
-            }
-            return;
-        }
-
-        if (!isAIMessage) {
-            addMessage('player', '我', message);
-            chatInput.value = '';
-            broadcastMessage('player', '我', message);
-            return;
-        }
-
-        pendingMessages.push({ sender: 'player', content: message, time: new Date().toLocaleTimeString() });
-
-        addMessage('player', '我', message);
-        broadcastMessage('player', '我', message);
         chatInput.value = '';
-
-        if (isAIThinking) {
-            showNotification('消息已添加到队列，请等待AI回复完成后发送', 'info');
+        if (commandResult) {
+            await sendVisibleMessage('player', message);
+            const commandType = message.toLowerCase().startsWith('/dice') ? 'dice' : 'system';
+            setTimeout(() => {
+                sendVisibleMessage(commandType, commandResult);
+            }, 300);
             return;
         }
-
+        await sendVisibleMessage('player', message);
+        if (!isAIMessage) {
+            return;
+        }
+        pendingMessages.push({
+            sender: getCurrentUsername(),
+            content: message,
+            time: new Date().toLocaleTimeString(),
+        });
+        if (isAIThinking) {
+            showNotification('消息已加入队列，请等待 AI 回复完成后发送', 'info');
+            return;
+        }
         sendToAI();
     }
-
-    function sendToAI() {
-        if (pendingMessages.length === 0) return;
-
+    async function sendToAI() {
+        if (pendingMessages.length === 0)
+            return;
         isAIThinking = true;
         updateInputState();
-
         const thinkingMessageId = Date.now();
         const startTime = Date.now();
         addThinkingMessage(thinkingMessageId);
-
-        TrpgApi.requestWithResponse('/api/chat', {
-            method: 'POST',
-            body: {
-                content: pendingMessages.map(m => m.content).join('\n'),
-                messages: pendingMessages,
-                user_id: 'user_' + Date.now()
-            }
-        })
-        .then(({ response, data }) => {
-            console.log('API响应状态:', response.status);
+        try {
+            const { response, data } = await TrpgApi.requestWithResponse('/api/chat', {
+                method: 'POST',
+                body: {
+                    content: pendingMessages.map(m => m.content).join('\n'),
+                    messages: pendingMessages,
+                    user_id: getCurrentUserId(),
+                    room_id: getCurrentRoom()?.id || null,
+                },
+            });
             if (!response.ok) {
-                throw new Error('API请求失败: ' + response.status);
+                throw new Error(data?.message || `API 请求失败: ${response.status}`);
             }
-            return data;
-        })
-        .then(data => {
-            console.log('消息发送成功:', data);
-            const endTime = Date.now();
-            const processingTime = Math.round((endTime - startTime) / 1000);
+            const processingTime = Math.round((Date.now() - startTime) / 1000);
             const tokenCount = data.token_count || null;
-
-            let messageContent = '';
-            if (data.content) {
-                messageContent = data.content;
-            } else if (data.error) {
-                messageContent = 'AI 回复失败: ' + data.error;
-            } else {
-                messageContent = 'AI 回复失败: 未知错误';
-            }
-
+            const messageContent = data.content || data.error || 'AI 回复失败: 未知错误';
             pendingMessages = [];
             replaceThinkingMessage(thinkingMessageId, messageContent, processingTime, tokenCount);
-
-            broadcastMessage('kp', 'KP', messageContent);
-
-            isAIThinking = false;
-            updateInputState();
-        })
-        .catch(error => {
-            console.error('消息发送失败:', error);
-            const endTime = Date.now();
-            const processingTime = Math.round((endTime - startTime) / 1000);
-
+            const room = getCurrentRoom();
+            if (room) {
+                const persisted = await persistRoomMessage('kp', messageContent, {
+                    processingTime,
+                    tokenCount,
+                });
+                broadcastMessage(persisted);
+            }
+            else {
+                broadcastMessage({
+                    type: 'kp',
+                    sender_name: 'KP',
+                    content: messageContent,
+                    metadata: { processingTime, tokenCount },
+                });
+            }
+        }
+        catch (error) {
+            const processingTime = Math.round((Date.now() - startTime) / 1000);
             replaceThinkingMessage(thinkingMessageId, 'AI 回复失败: ' + error.message, processingTime, null);
-
             pendingMessages = [];
+        }
+        finally {
             isAIThinking = false;
             updateInputState();
-        });
-    }
-
-    function updateInputState() {
-        const chatInput = document.getElementById('chatInput');
-        const sendButton = document.getElementById('sendButton');
-
-        if (isAIThinking) {
-            chatInput.disabled = true;
-            sendButton.disabled = true;
-        } else {
-            chatInput.disabled = false;
-            sendButton.disabled = false;
         }
     }
-
+    function updateInputState() {
+        chatInput.disabled = isAIThinking;
+        sendButton.disabled = isAIThinking;
+    }
     sendButton.addEventListener('click', sendMessage);
-    chatInput.addEventListener('keypress', function(e) {
+    chatInput.addEventListener('keypress', function (e) {
         if (e.key === 'Enter') {
             sendMessage();
         }
     });
 }
-
+async function sendVisibleMessage(type, content) {
+    const room = getCurrentRoom();
+    if (room) {
+        const message = await persistRoomMessage(type, content);
+        renderRoomMessage(message);
+        broadcastMessage(message);
+        return message;
+    }
+    const sender = type === 'player' ? getCurrentUsername() : defaultSenderName(type);
+    addMessage(type, sender, content);
+    broadcastMessage({
+        type,
+        sender_name: sender,
+        content,
+        avatar: getAvatarSrc(type),
+    });
+    return null;
+}
+async function persistRoomMessage(type, content, metadata = {}) {
+    const room = getCurrentRoom();
+    if (!room)
+        return null;
+    const data = await TrpgApi.post(`/api/rooms/${room.id}/messages`, {
+        type,
+        content,
+        metadata,
+    });
+    if (!data.success) {
+        throw new Error(data.message || '保存房间消息失败');
+    }
+    return data.data;
+}
 function updateAIHint() {
     const aiHint = document.getElementById('aiHint');
     if (aiHint) {
         aiHint.textContent = `@${aiName}`;
     }
 }
-
 function setAIName(name) {
     aiName = name;
     updateAIHint();
 }
-
 function renderMarkdown(content) {
     try {
         if (typeof marked === 'function') {
-            marked.setOptions({
-                breaks: true,
-                gfm: true,
-                headerIds: false,
-                mangle: false
-            });
+            marked.setOptions({ breaks: true, gfm: true, headerIds: false, mangle: false });
             return marked(content);
-        } else if (marked && typeof marked.parse === 'function') {
-            return marked.parse(content, {
-                breaks: true,
-                gfm: true,
-                headerIds: false,
-                mangle: false
-            });
-        } else {
-            console.warn('marked库不可用，返回原始内容');
-            return content;
         }
-    } catch (error) {
-        console.error('Markdown渲染失败:', error);
+        if (marked && typeof marked.parse === 'function') {
+            return marked.parse(content, { breaks: true, gfm: true, headerIds: false, mangle: false });
+        }
+        return content;
+    }
+    catch (error) {
+        console.error('Markdown 渲染失败:', error);
         return content;
     }
 }
-
-function getAvatarSrc(type) {
+function getAvatarSrc(type, message = null) {
+    if (message?.avatar) {
+        return message.avatar;
+    }
     switch (type) {
         case 'player':
-            return document.querySelector('.user-avatar img')?.src || 'https://via.placeholder.com/40';
+            return document.querySelector('.user-avatar img')?.src || '/assets/avatars/default.jpg';
         case 'kp':
             return '/assets/avatars/default_kp.jpg';
         case 'dice':
-            return `/assets/avatars/default_dice.jpg?t=${Date.now()}`;
+            return '/assets/avatars/default_dice.jpg';
         case 'system':
             return '/assets/avatars/default_system.jpg';
         default:
-            return 'https://via.placeholder.com/40';
+            return '/assets/avatars/default.jpg';
     }
 }
-
+function defaultSenderName(type) {
+    switch (type) {
+        case 'kp': return 'KP';
+        case 'dice': return '骰娘';
+        case 'system': return '系统';
+        default: return getCurrentUsername();
+    }
+}
 function getMessageClass(type) {
     switch (type) {
         case 'player': return 'player-message';
@@ -236,33 +229,28 @@ function getMessageClass(type) {
         default: return 'other-message';
     }
 }
-
-function addMessage(type, sender, content, messageId, isThinking, processingTime, tokenCount) {
+function addMessage(type, sender, content, messageId = null, isThinking = false, processingTime = null, tokenCount = null, message = null) {
     messageId = messageId || Date.now();
     const chatHistory = document.getElementById('chatHistory');
-
+    if (!chatHistory)
+        return messageId;
     hideWelcomeText();
-
     let messageClass = getMessageClass(type);
-    let avatarSrc = getAvatarSrc(type);
-
-    if (type === 'dice') {
-        sender = '骰娘';
-    }
-
     if (isThinking) {
         messageClass += ' thinking';
     }
-
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${messageClass}`;
     messageDiv.setAttribute('data-id', messageId);
-
-    const now = new Date();
-    const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-
+    if (message?.sender_id) {
+        messageDiv.setAttribute('data-sender-id', String(message.sender_id));
+    }
+    if (message?.avatar) {
+        messageDiv.setAttribute('data-avatar', message.avatar);
+    }
+    const displayTime = message?.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const renderedContent = isThinking ? content : renderMarkdown(content);
-
+    const avatarSrc = getAvatarSrc(type, message);
     let messageHTML = `
         <div class="message-avatar">
             <img src="${avatarSrc}" alt="${sender}">
@@ -270,247 +258,183 @@ function addMessage(type, sender, content, messageId, isThinking, processingTime
         <div class="message-content-container">
             <div class="message-header">
                 <span class="message-sender">${sender}</span>
-                <span class="message-time">${time}</span>
+                <span class="message-time">${displayTime}</span>
             </div>
             <div class="message-content markdown-body">${renderedContent}</div>
     `;
-
-    if (processingTime !== null && type !== 'player') {
+    if (processingTime !== null && type === 'kp') {
         let displayText = `已耗时: ${processingTime}秒`;
         if (tokenCount !== null) {
             displayText += ` 消耗Token：${tokenCount}`;
         }
         messageHTML += `<div class="processing-time">${displayText}</div>`;
     }
-
     messageHTML += '</div>';
     messageDiv.innerHTML = messageHTML;
     chatHistory.appendChild(messageDiv);
-
-    setTimeout(() => {
-        chatHistory.scrollTop = chatHistory.scrollHeight;
-    }, 100);
-
+    chatHistory.scrollTop = chatHistory.scrollHeight;
     return messageId;
 }
-
-function removeMessage(messageId) {
-    const messageDiv = document.querySelector(`.message[data-id="${messageId}"]`);
-    if (messageDiv) {
-        messageDiv.remove();
-    }
-}
-
 function addThinkingMessage(messageId) {
-    hideWelcomeText();
-
-    const chatHistory = document.getElementById('chatHistory');
-    const messageDiv = document.createElement('div');
-    messageDiv.className = 'message kp-message thinking';
-    messageDiv.setAttribute('data-id', messageId);
-
-    const avatarSrc = getAvatarSrc('kp');
-    const now = new Date();
-    const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-
-    messageDiv.innerHTML = `
-        <div class="message-avatar">
-            <img src="${avatarSrc}" alt="KP">
-        </div>
-        <div class="message-content-container">
-            <div class="message-header">
-                <span class="message-sender">KP</span>
-                <span class="message-time">${time}</span>
-            </div>
-            <div class="message-content thinking-content">
-                <div class="thinking-animation">
-                    <span class="thinking-dot"></span>
-                    <span class="thinking-dot"></span>
-                    <span class="thinking-dot"></span>
-                </div>
-                <span class="thinking-text">AI正在思考中...</span>
-            </div>
-        </div>
-    `;
-
-    chatHistory.appendChild(messageDiv);
-    chatHistory.scrollTop = chatHistory.scrollHeight;
+    addMessage('kp', 'KP', 'AI 正在思考中...', messageId, true);
 }
-
 function replaceThinkingMessage(messageId, newContent, processingTime, tokenCount) {
-    const thinkingMessages = document.querySelectorAll('.message.thinking.kp-message');
-
-    let targetMessage = null;
-    if (thinkingMessages.length > 0) {
-        targetMessage = thinkingMessages[0];
-    } else {
-        targetMessage = document.querySelector(`.message[data-id="${messageId}"]`);
-    }
-
-    if (targetMessage) {
-        const contentDiv = targetMessage.querySelector('.message-content');
-        if (contentDiv) {
-            const renderedContent = renderMarkdown(newContent);
-            contentDiv.innerHTML = renderedContent;
-            contentDiv.className = 'message-content markdown-body';
-        }
-
-        targetMessage.classList.remove('thinking');
-
-        if (processingTime !== null) {
-            let processingTimeDiv = targetMessage.querySelector('.processing-time');
-            if (!processingTimeDiv) {
-                processingTimeDiv = document.createElement('div');
-                processingTimeDiv.className = 'processing-time';
-                const contentContainer = targetMessage.querySelector('.message-content-container');
-                if (contentContainer) {
-                    contentContainer.appendChild(processingTimeDiv);
-                }
-            }
-            let displayText = `已耗时: ${processingTime}秒`;
-            if (tokenCount !== null) {
-                displayText += ` 消耗Token：${tokenCount}`;
-            }
-            processingTimeDiv.textContent = displayText;
-        }
-
-        const chatHistory = document.getElementById('chatHistory');
-        chatHistory.scrollTop = chatHistory.scrollHeight;
-    } else {
+    const targetMessage = document.querySelector('.message.thinking.kp-message')
+        || document.querySelector(`.message[data-id="${messageId}"]`);
+    if (!targetMessage) {
         addMessage('kp', 'KP', newContent, null, false, processingTime, tokenCount);
+        return;
+    }
+    const contentDiv = targetMessage.querySelector('.message-content');
+    if (contentDiv) {
+        contentDiv.innerHTML = renderMarkdown(newContent);
+        contentDiv.className = 'message-content markdown-body';
+    }
+    targetMessage.classList.remove('thinking');
+    let processingTimeDiv = targetMessage.querySelector('.processing-time');
+    if (!processingTimeDiv) {
+        processingTimeDiv = document.createElement('div');
+        processingTimeDiv.className = 'processing-time';
+        targetMessage.querySelector('.message-content-container')?.appendChild(processingTimeDiv);
+    }
+    let displayText = `已耗时: ${processingTime}秒`;
+    if (tokenCount !== null) {
+        displayText += ` 消耗Token：${tokenCount}`;
+    }
+    processingTimeDiv.textContent = displayText;
+    const chatHistory = document.getElementById('chatHistory');
+    if (chatHistory) {
+        chatHistory.scrollTop = chatHistory.scrollHeight;
     }
 }
-
 function getCurrentChatMessages() {
     const chatHistory = document.getElementById('chatHistory');
-    if (!chatHistory) return [];
-
-    const messages = [];
-    const messageElements = chatHistory.querySelectorAll('.message');
-
-    messageElements.forEach(msgEl => {
+    if (!chatHistory)
+        return [];
+    return Array.from(chatHistory.querySelectorAll('.message')).map(msgEl => {
         const sender = msgEl.querySelector('.message-sender')?.textContent || '未知';
         const content = msgEl.querySelector('.message-content')?.innerHTML || '';
         const time = msgEl.querySelector('.message-time')?.textContent || '';
-
         let role = 'user';
-        if (msgEl.classList.contains('kp-message')) {
+        if (msgEl.classList.contains('kp-message'))
             role = 'assistant';
-        } else if (msgEl.classList.contains('dice-message')) {
+        if (msgEl.classList.contains('dice-message'))
             role = 'system';
-        } else if (msgEl.classList.contains('user-message') || msgEl.classList.contains('player-message')) {
-            role = 'user';
-        }
-
-        messages.push({
-            role: role,
-            sender: sender,
-            content: content,
-            time: time
-        });
+        return {
+            role,
+            sender,
+            sender_id: msgEl.getAttribute('data-sender-id'),
+            avatar: msgEl.getAttribute('data-avatar'),
+            content,
+            time,
+        };
     });
-
-    return messages;
 }
-
 function renderChatMessages(messages) {
     const chatHistory = document.getElementById('chatHistory');
-    if (!chatHistory) return;
-
+    if (!chatHistory)
+        return;
+    chatHistory.innerHTML = '';
     hideWelcomeText();
-
-    let html = '';
-    messages.forEach(msg => {
-        let messageClass;
-        let avatarSrc;
-
-        if (msg.role === 'assistant' || msg.sender === 'KP') {
-            messageClass = 'kp-message';
-            avatarSrc = '/assets/avatars/default_kp.jpg';
-        } else if (msg.role === 'system' || msg.sender === '骰娘') {
-            messageClass = 'dice-message';
-            avatarSrc = '/assets/avatars/default_dice.jpg';
-        } else {
-            messageClass = 'player-message';
-            avatarSrc = document.querySelector('.user-avatar img')?.src || 'https://via.placeholder.com/40';
-        }
-
-        html += `
-            <div class="message ${messageClass}">
-                <div class="message-avatar">
-                    <img src="${avatarSrc}" alt="${msg.sender}">
-                </div>
-                <div class="message-content-container">
-                    <div class="message-header">
-                        <span class="message-sender">${msg.sender || (msg.role === 'assistant' ? 'KP' : '用户')}</span>
-                        <span class="message-time">${msg.time || new Date().toLocaleTimeString()}</span>
-                    </div>
-                    <div class="message-content markdown-body">${msg.content}</div>
-                </div>
-            </div>
-        `;
-    });
-
-    chatHistory.innerHTML = html;
+    messages.forEach(message => renderRoomMessage(message));
     chatHistory.scrollTop = chatHistory.scrollHeight;
 }
-
+function renderRoomMessage(message) {
+    if (!message)
+        return;
+    const isOwnPlayerMessage = message.type === 'player' && message.sender_id === getCurrentUserId();
+    const type = message.type === 'player' && !isOwnPlayerMessage ? 'other' : message.type;
+    const metadata = message.metadata || {};
+    addMessage(type, message.sender_name || message.sender || defaultSenderName(type), message.content, message.id, false, metadata.processingTime ?? metadata.processing_time ?? null, metadata.tokenCount ?? metadata.token_count ?? null, message);
+}
+function clearChatMessages() {
+    const chatHistory = document.getElementById('chatHistory');
+    if (!chatHistory)
+        return;
+    chatHistory.innerHTML = '<div class="welcome-text">请选择或创建一个房间开始游戏。</div>';
+}
 function hideWelcomeText() {
     const welcomeText = document.querySelector('.welcome-text');
     if (welcomeText) {
         welcomeText.style.display = 'none';
     }
 }
-
 function initWebSocket() {
+    if (!window.currentUser) {
+        return;
+    }
+    if (socket && socket.connected) {
+        return;
+    }
     try {
         socket = io();
-
-        socket.on('connect', function() {
-            console.log('WebSocket已连接到服务器，消息同步已启用');
+        socket.on('connect', function () {
+            const room = getCurrentRoom();
+            if (room) {
+                socket.emit('join_room', { room_id: room.id });
+            }
         });
-
-        socket.on('disconnect', function() {
-            console.log('WebSocket已断开连接');
+        socket.on('session_expired', function () {
+            showNotification('当前账号已在其他会话登录，请重新登录。', 'error');
+            disconnectSocket();
+            window.clearCurrentRoom?.();
+            window.clearChatMessages?.();
+            window.currentUser = null;
+            showAuthModal();
         });
-
-        socket.on('new_message', function(data) {
-            console.log('收到来自其他设备的消息:', data);
+        socket.on('new_message', function (data) {
             handleIncomingMessage(data);
         });
-    } catch (error) {
-        console.warn('WebSocket连接失败，消息同步不可用:', error);
+    }
+    catch (error) {
+        console.warn('WebSocket 连接失败，消息同步不可用:', error);
     }
 }
-
-function broadcastMessage(type, sender, content) {
-    if (socket && socket.connected) {
-        socket.emit('send_message', {
-            type: type,
-            sender: sender,
-            content: content,
-            time: new Date().toLocaleTimeString()
-        });
+function reconnectSocket() {
+    disconnectSocket();
+    initWebSocket();
+}
+function disconnectSocket() {
+    if (socket) {
+        socket.disconnect();
+        socket = null;
     }
 }
-
+function joinSocketRoom(roomId) {
+    if (socket && socket.connected && roomId) {
+        socket.emit('join_room', { room_id: roomId });
+    }
+}
+function leaveSocketRoom(roomId) {
+    if (socket && socket.connected && roomId) {
+        socket.emit('leave_room', { room_id: roomId });
+    }
+}
+function broadcastMessage(message) {
+    if (!socket || !socket.connected || !message)
+        return;
+    socket.emit('send_message', {
+        room_id: getCurrentRoom()?.id || null,
+        message,
+    });
+}
 function handleIncomingMessage(data) {
-    if (!data || !data.type) return;
-
-    switch (data.type) {
-        case 'player':
-            addMessage('other', data.sender || '其他用户', data.content);
-            break;
-        case 'kp':
-            addMessage('kp', 'KP', data.content);
-            break;
-        case 'dice':
-            addMessage('dice', data.sender || '骰娘', data.content);
-            break;
-        case 'system':
-            addMessage('system', data.sender || '系统', data.content);
-            break;
-        default:
-            addMessage('other', data.sender || '未知', data.content);
+    const room = getCurrentRoom();
+    if (data?.room_id && room?.id !== data.room_id) {
+        return;
+    }
+    if (data?.message) {
+        renderRoomMessage(data.message);
+        return;
+    }
+    if (data?.type) {
+        renderRoomMessage(data);
     }
 }
+window.renderChatMessages = renderChatMessages;
+window.getCurrentChatMessages = getCurrentChatMessages;
+window.clearChatMessages = clearChatMessages;
+window.joinSocketRoom = joinSocketRoom;
+window.leaveSocketRoom = leaveSocketRoom;
+window.reconnectSocket = reconnectSocket;
+window.disconnectSocket = disconnectSocket;

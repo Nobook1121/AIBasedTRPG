@@ -5,7 +5,15 @@ from datetime import timedelta
 from flask import Blueprint, current_app, request, session
 
 from trpg_server.responses import error_response, success_response
-from trpg_server.security import is_allowed_upload, safe_join
+from trpg_server.security import (
+    SESSION_TOKEN_KEY,
+    build_public_asset_url,
+    clear_session_token,
+    is_allowed_upload,
+    issue_session_token,
+    normalize_filename,
+    safe_join,
+)
 from trpg_server.settings import AVATARS_DIR
 from user_manager import user_manager
 
@@ -25,7 +33,7 @@ def _user_payload(user):
         "username": user["username"],
         "role": user["role"],
         "email": user.get("email", ""),
-        "avatar": user.get("avatar", "https://via.placeholder.com/40"),
+        "avatar": user.get("avatar", "/assets/avatars/default.jpg"),
     }
 
 
@@ -54,10 +62,10 @@ def register():
             ip_address,
         )
         if not success:
-            logger.info("User registration failed username=%s reason=%s", username, message)
+            logger.debug("User registration failed username=%s reason=%s", username, message)
             return error_response(message, 400, message)
 
-        logger.info("User registered username=%s email=%s ip=%s", username, email, ip_address)
+        logger.debug("User registered username=%s email=%s ip=%s", username, email, ip_address)
         return success_response(message=message, status=201)
     except Exception as exc:
         logger.exception("Failed to register user")
@@ -90,9 +98,9 @@ def login():
         session["user_id"] = user["id"]
         session["username"] = user["username"]
         session["role"] = user["role"]
-        if auto_login:
-            session.permanent = True
-            current_app.permanent_session_lifetime = timedelta(days=7)
+        session[SESSION_TOKEN_KEY] = issue_session_token(user["id"])
+        session.permanent = True
+        current_app.permanent_session_lifetime = timedelta(days=7)
 
         logger.info("User logged in username=%s user_id=%s ip=%s", username, user["id"], ip_address)
         return success_response(_user_payload(user), message)
@@ -108,8 +116,11 @@ def logout():
             return error_response("You are not logged in", 401, "Not logged in")
 
         username = session.get("username")
+        user_id = session.get("user_id")
+        session_token = session.get(SESSION_TOKEN_KEY)
         session.clear()
-        logger.info("User logged out username=%s", username)
+        clear_session_token(user_id, session_token)
+        logger.debug("User logged out username=%s", username)
         return success_response(message="Logged out successfully")
     except Exception as exc:
         logger.exception("Failed to logout user")
@@ -126,7 +137,7 @@ def get_auth_status():
         if not user:
             return error_response("User not found", 404, "User not found")
 
-        logger.info(
+        logger.debug(
             "Auth status user_id=%s username=%s ip=%s",
             session["user_id"],
             session["username"],
@@ -157,22 +168,35 @@ def update_user():
         if not username:
             return error_response("Please provide username", 400, "Incomplete data")
 
-        avatar_path = user.get("avatar", "https://via.placeholder.com/40")
+        avatar_path = user.get("avatar", "/assets/avatars/default.jpg")
         if "avatar" in request.files:
             avatar_path = _save_avatar(request.files["avatar"], user_id)
 
-        user["username"] = username
-        user["nickname"] = nickname
-        user["email"] = email
-        user["avatar"] = avatar_path
-        if password:
-            user["password"] = manager._hash_password(password)
+        if hasattr(manager, "update_profile"):
+            success, message = manager.update_profile(
+                user_id,
+                username=username,
+                email=email,
+                nickname=nickname,
+                avatar=avatar_path,
+                password=password,
+            )
+            if not success:
+                return error_response(message, 400, message)
+            user = manager.get_user_by_id(user_id)
+        else:
+            user["username"] = username
+            user["nickname"] = nickname
+            user["email"] = email
+            user["avatar"] = avatar_path
+            if password:
+                user["password"] = manager._hash_password(password)
 
-        if not manager._save_users():
-            return error_response("Failed to save user data", 500, "Failed to save data")
+            if not manager._save_users():
+                return error_response("Failed to save user data", 500, "Failed to save data")
 
         session["username"] = username
-        logger.info("User profile updated user_id=%s username=%s", user_id, username)
+        logger.debug("User profile updated user_id=%s username=%s", user_id, username)
         return success_response(
             {
                 "user_id": user_id,
@@ -197,8 +221,9 @@ def _save_avatar(avatar, user_id):
     if (avatar.content_length or 0) > 2 * 1024 * 1024:
         raise ValueError("Avatar file size must not exceed 2MB")
 
-    filename = f"{user_id}_{int(time.time())}_{avatar.filename}"
+    uploaded_filename = normalize_filename(avatar.filename or "avatar")
+    filename = f"{user_id}_{int(time.time())}_{uploaded_filename}"
     file_path = safe_join(AVATARS_DIR, filename)
     file_path.parent.mkdir(parents=True, exist_ok=True)
     avatar.save(file_path)
-    return f"/assets/avatars/{filename}"
+    return build_public_asset_url("/assets/avatars", filename)

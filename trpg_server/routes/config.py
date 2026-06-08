@@ -69,7 +69,7 @@ def save_config(config_name):
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(convert_to_toml(config_data), encoding="utf-8")
 
-        logger.info("Config saved file=%s", config_path.name)
+        logger.debug("Config saved file=%s", config_path.name)
         return success_response(message="Config saved successfully")
     except Exception as exc:
         logger.exception("Failed to save config: %s", config_name)
@@ -86,7 +86,7 @@ def save_ai_platform_config(platform):
         config_path = safe_join(_get_ai_platform_dir(), f"{platform}.json")
         write_json_atomic(config_path, config_data)
 
-        logger.info("AI platform config saved platform=%s", platform)
+        logger.debug("AI platform config saved platform=%s", platform)
         return success_response(message="Config saved successfully")
     except Exception as exc:
         logger.exception("Failed to save AI platform config: %s", platform)
@@ -121,7 +121,7 @@ def test_ai_platform_api(platform):
             extra_body = test_payload.pop("extra_body")
             test_payload.update(extra_body)
 
-        logger.info("Testing AI platform API platform=%s base_url=%s", platform, base_url)
+        logger.debug("Testing AI platform API platform=%s base_url=%s", platform, base_url)
         response = requests.post(base_url, headers=headers, json=test_payload, timeout=30)
         response_data = response.json()
         if response.status_code != 200:
@@ -154,7 +154,7 @@ def save_model_js_config():
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(content, encoding="utf-8")
 
-        logger.info("AI model config saved platform=%s model_id=%s", platform, model_id)
+        logger.debug("AI model config saved platform=%s model_id=%s", platform, model_id)
         return success_response(message="Config saved successfully")
     except Exception as exc:
         logger.exception("Failed to save model JS config")
@@ -176,9 +176,9 @@ def delete_model_js_config():
         config_path = safe_join(_get_ai_model_dir(), platform, f"{model_id}.js")
         if config_path.exists():
             config_path.unlink()
-            logger.info("AI model config deleted platform=%s model_id=%s", platform, model_id)
+            logger.debug("AI model config deleted platform=%s model_id=%s", platform, model_id)
         else:
-            logger.info(
+            logger.debug(
                 "AI model config already absent platform=%s model_id=%s",
                 platform,
                 model_id,

@@ -26,9 +26,9 @@
 ## Auth And Users
 
 - `POST /api/auth/register`：注册用户。
-- `POST /api/auth/login`：登录用户。
+- `POST /api/auth/login`：登录用户；同一账号新的登录会使旧会话失效。
 - `POST /api/auth/logout`：退出登录。
-- `GET /api/auth/status`：读取当前认证状态。
+- `GET /api/auth/status`：读取当前认证状态；旧会话失效时返回 `401 Session expired`。
 - `POST /api/auth/update`：更新当前用户资料。
 - `GET /api/users`：列出用户。
 - `PUT /api/users/<user_id>/role`：更新用户角色。
@@ -47,7 +47,7 @@
 
 ## Chat
 
-- `POST /api/chat`：向 AI 发送聊天请求。
+- `POST /api/chat`：向 AI 发送聊天请求，返回 AI 内容和可用的 Token 统计；前端仅在 AI 消息上展示耗时与 Token。
 - `POST /api/messages`：发送主页消息。
 - `POST /api/scenarios/<script_id>/messages`：发送剧本消息。
 
@@ -61,17 +61,22 @@
 - `POST /api/network/penetration/config`：保存穿透配置。
 - `GET /api/network/penetration/status`：读取穿透状态。
 
-## Saves
+## Rooms
 
-- `GET /api/saves`：列出存档。
-- `POST /api/saves`：创建存档。
-- `DELETE /api/saves/<save_id>`：删除存档。
-- `GET /api/saves/<save_id>/nodes`：列出存档节点。
-- `POST /api/saves/<save_id>/nodes`：创建存档节点。
-- `GET /api/saves/<save_id>/nodes/<node_filename>`：读取存档节点。
-- `DELETE /api/saves/<save_id>/nodes/<node_filename>`：删除存档节点。
-- `POST /api/saves/<save_id>/autosave`：写入自动存档。
-- `GET /api/saves/<save_id>/autosave`：读取自动存档。
+- `GET /api/rooms`：列出当前用户可访问的房间；`ADMIN` 和 `OWNER` 可查看全部房间。
+- `POST /api/rooms`：创建房间并生成唯一房间码；普通 `USER` 默认最多创建 3 个房间，`ADMIN` 和 `OWNER` 不限。
+- `POST /api/rooms/join`：通过房间码加入房间。
+- `GET /api/rooms/<room_id>`：读取房间详情、成员和当前房间消息。
+- `DELETE /api/rooms/<room_id>`：删除房间；仅房主、`ADMIN` 或 `OWNER` 可操作。
+- `GET /api/rooms/<room_id>/messages`：读取房间聊天记录。
+- `POST /api/rooms/<room_id>/messages`：写入房间消息，消息包含发送者 ID、用户名和头像。
+- `GET /api/rooms/<room_id>/nodes`：列出房间回档节点。
+- `POST /api/rooms/<room_id>/nodes`：把当前房间全部消息保存为回档节点。
+- `GET /api/rooms/<room_id>/nodes/<node_filename>`：读取回档节点。
+- `POST /api/rooms/<room_id>/nodes/<node_filename>/restore`：把房间消息回档到指定节点。
+- `DELETE /api/rooms/<room_id>/nodes/<node_filename>`：删除回档节点。
+- `POST /api/rooms/<room_id>/autosave`：保存当前房间消息到自动存档。
+- `GET /api/rooms/<room_id>/autosave`：读取房间自动存档。
 
 ## Socket.IO Events
 

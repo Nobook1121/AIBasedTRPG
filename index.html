@@ -32,7 +32,7 @@
                             <a class="nav-link" href="#character" data-tab="character">角色卡管理</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="#save" data-tab="save">存档管理</a>
+                            <a class="nav-link" href="#save" data-tab="save">房间管理</a>
                         </li>
                         <li class="nav-item">
                             <button class="dropdown-btn">小工具
@@ -71,12 +71,12 @@
             <div class="col-10" id="mainContent">
                 <!-- 主页内容 -->
                 <div id="home" class="tab-content active">
-                    <!-- 当前存档状态栏 -->
+                    <!-- 当前房间状态栏 -->
                     <div class="save-status-bar" id="saveStatusBar" style="display: none;">
                         <div class="save-status-content">
                             <i class="fa fa-save"></i>
-                            <span class="save-status-label">当前存档：</span>
-                            <span class="save-status-name" id="saveStatusName">未加载</span>
+                            <span class="save-status-label">当前房间：</span>
+                            <span class="save-status-name" id="saveStatusName">未加入</span>
                             <span class="save-status-divider">|</span>
                             <span class="save-status-scenario" id="saveStatusScenario"></span>
                         </div>
@@ -126,32 +126,36 @@
                     </div>
                 </div>
 
-                <!-- 存档管理内容 -->
+                <!-- 房间管理内容 -->
                 <div id="save" class="tab-content">
                     <div class="p-4">
                         <div id="save-list-view">
                             <div class="d-flex justify-content-between align-items-center mb-4">
-                                <h2>存档管理</h2>
-                                <button class="btn btn-primary" id="createSave">创建存档</button>
+                                <h2>房间管理</h2>
+                                <div class="d-flex gap-2">
+                                    <input type="text" class="form-control" id="roomCodeInput" placeholder="输入房间码">
+                                    <button class="btn btn-outline-primary" id="joinRoom">加入房间</button>
+                                    <button class="btn btn-primary" id="createSave">创建房间</button>
+                                </div>
                             </div>
                             <div class="save-list" id="saveList">
-                                <!-- 存档卡片将在这里动态生成 -->
+                                <!-- 房间卡片将在这里动态生成 -->
                             </div>
                         </div>
                         <div id="save-detail-view" style="display: none;">
                             <div class="d-flex justify-content-between align-items-center mb-4">
                                 <div>
                                     <button class="btn btn-secondary mb-2" id="backToSaveList">
-                                        <i class="fa fa-arrow-left"></i> 返回存档列表
+                                        <i class="fa fa-arrow-left"></i> 返回房间列表
                                     </button>
-                                    <h2 id="saveDetailTitle">存档详情</h2>
+                                    <h2 id="saveDetailTitle">房间详情</h2>
                                 </div>
-                                <button class="btn btn-danger" id="deleteSave">删除存档</button>
+                                <button class="btn btn-danger" id="deleteSave">删除房间</button>
                             </div>
-                            <!-- 存档基本信息 -->
+                            <!-- 房间基本信息 -->
                             <div class="card mb-4">
                                 <div class="card-body">
-                                    <h5 class="card-title">存档信息</h5>
+                                    <h5 class="card-title">房间信息</h5>
                                     <div class="row">
                                         <div class="col-md-4">
                                             <p><strong>创建时间：</strong><span id="saveCreatedAt">-</span></p>
@@ -161,19 +165,20 @@
                                         </div>
                                         <div class="col-md-4">
                                             <p><strong>参与用户：</strong><span id="saveParticipants">-</span></p>
+                                            <p><strong>房间码：</strong><span id="roomDetailCode">-</span></p>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            <!-- 存档节点列表 -->
+                            <!-- 回档节点列表 -->
                             <div class="card">
                                 <div class="card-body">
                                     <div class="d-flex justify-content-between align-items-center mb-3">
-                                        <h5 class="card-title">存档节点</h5>
-                                        <button class="btn btn-primary btn-sm" id="createSaveNode">创建存档节点</button>
+                                        <h5 class="card-title">回档节点</h5>
+                                        <button class="btn btn-primary btn-sm" id="createSaveNode">创建回档节点</button>
                                     </div>
                                     <div class="save-node-list" id="saveNodeList">
-                                        <!-- 存档节点将在这里动态生成 -->
+                                        <!-- 回档节点将在这里动态生成 -->
                                     </div>
                                 </div>
                             </div>
@@ -181,21 +186,21 @@
                     </div>
                 </div>
 
-                <!-- 创建存档向导模态框 -->
+                <!-- 创建房间模态框 -->
                 <div class="modal fade" id="createSaveModal" tabindex="-1" aria-labelledby="createSaveModalLabel" aria-hidden="true">
                     <div class="modal-dialog">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h5 class="modal-title" id="createSaveModalLabel">创建存档</h5>
+                                <h5 class="modal-title" id="createSaveModalLabel">创建房间</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
                             <div class="modal-body">
                                 <div class="form-group">
-                                    <label for="saveName">存档名称 *</label>
-                                    <input type="text" class="form-control" id="saveName" placeholder="请输入存档名称" required>
+                                    <label for="saveName">房间名称 *</label>
+                                    <input type="text" class="form-control" id="saveName" placeholder="请输入房间名称" required>
                                 </div>
                                 <div class="form-group mt-3">
-                                    <label for="saveScenario">绑定剧本 *</label>
+                                    <label for="saveScenario">房间剧本 *</label>
                                     <select class="form-select" id="saveScenario" required>
                                         <option value="">请选择剧本</option>
                                     </select>
@@ -783,12 +788,12 @@
         </div>
     </div>
 
-    <!-- 存档节点预览模态窗口 -->
+    <!-- 回档节点预览模态窗口 -->
     <div class="modal fade" id="saveNodePreviewModal" tabindex="-1" aria-labelledby="saveNodePreviewModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="saveNodePreviewModalLabel">存档节点预览</h5>
+                    <h5 class="modal-title" id="saveNodePreviewModalLabel">回档节点预览</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
@@ -796,7 +801,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
-                    <button type="button" class="btn btn-primary" id="loadNodeFromPreviewBtn">加载此存档节点</button>
+                    <button type="button" class="btn btn-primary" id="loadNodeFromPreviewBtn">回档到此节点</button>
                 </div>
             </div>
         </div>
@@ -817,10 +822,11 @@
     <script src="js/controllers/ScenarioController.js"></script>
     <script src="js/tabs.js"></script>
     <script src="js/platform-ui.js"></script>
+    <script src="js/cookie-consent.js"></script>
     <script src="js/chat.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/network.js"></script>
-    <script src="js/saves.js"></script>
+    <script src="js/rooms.js"></script>
     <script src="js/scenario.js"></script>
     <script src="js/main.js"></script>
 </body>

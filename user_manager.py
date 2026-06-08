@@ -13,6 +13,8 @@ from trpg_server.json_store import read_json, write_json_atomic
 USERS_FILE = "users/users.json"
 USER_IP_CONFIG_DIR = "users/ip_configs"
 logger = logging.getLogger(__name__)
+USERNAME_RE = re.compile(r"^[\w.-]{3,32}$", re.UNICODE)
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 Path("users").mkdir(parents=True, exist_ok=True)
 Path(USER_IP_CONFIG_DIR).mkdir(parents=True, exist_ok=True)
@@ -59,10 +61,40 @@ class UserManager:
     def _verify_password(self, password, hashed_password):
         return bcrypt.checkpw(password.encode("utf-8"), hashed_password.encode("utf-8"))
 
+    def _validate_username(self, username):
+        if not username or not USERNAME_RE.match(str(username)):
+            return False, "Username must be 3-32 characters and contain only letters, numbers, underscore, dot, or hyphen"
+        return True, ""
+
+    def _validate_password(self, password):
+        if not password or len(str(password)) < 8:
+            return False, "Password must be at least 8 characters"
+        return True, ""
+
+    def _validate_email(self, email):
+        if not email or not EMAIL_RE.match(str(email)):
+            return False, "Invalid email address"
+        return True, ""
+
+    def _username_exists(self, username, exclude_user_id=None):
+        normalized = str(username).lower()
+        return any(
+            user["username"].lower() == normalized and user.get("id") != exclude_user_id
+            for user in self.users
+        )
+
     def register(self, username, password, email, ip_address=None):
-        for user in self.users:
-            if user["username"] == username:
-                return False, "Username already exists"
+        valid, message = self._validate_username(username)
+        if not valid:
+            return False, message
+        valid, message = self._validate_password(password)
+        if not valid:
+            return False, message
+        valid, message = self._validate_email(email)
+        if not valid:
+            return False, message
+        if self._username_exists(username):
+            return False, "Username already exists"
 
         user_id = max([user["id"] for user in self.users], default=0) + 1
         new_user = {
@@ -75,13 +107,42 @@ class UserManager:
             "last_login": _now_iso(),
             "character_cards": [],
             "status": "active",
-            "avatar": "https://via.placeholder.com/40",
+            "avatar": "/assets/avatars/default.jpg",
         }
         self.users.append(new_user)
 
         if self._save_users():
             return True, "Registration successful"
         return False, "Registration failed"
+
+    def update_profile(self, user_id, username, email, nickname="", avatar=None, password=None):
+        user = self.get_user_by_id(user_id)
+        if not user:
+            return False, "User does not exist"
+
+        valid, message = self._validate_username(username)
+        if not valid:
+            return False, message
+        valid, message = self._validate_email(email)
+        if not valid:
+            return False, message
+        if password:
+            valid, message = self._validate_password(password)
+            if not valid:
+                return False, message
+        if self._username_exists(username, exclude_user_id=user_id):
+            return False, "Username already exists"
+
+        user["username"] = username
+        user["email"] = email
+        user["nickname"] = nickname or ""
+        if avatar:
+            user["avatar"] = avatar
+        if password:
+            user["password"] = self._hash_password(password)
+        if self._save_users():
+            return True, "Profile updated successfully"
+        return False, "Failed to save user data"
 
     def login(self, username, password, ip_address=None):
         for user in self.users:

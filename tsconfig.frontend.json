@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "none",
+    "moduleResolution": "Classic",
+    "strict": false,
+    "exactOptionalPropertyTypes": false,
+    "noUncheckedIndexedAccess": false,
+    "noEmit": false,
+    "rootDir": "frontend/src",
+    "outDir": "."
+  },
+  "include": [
+    "frontend/src/config/**/*.ts",
+    "frontend/src/js/**/*.ts",
+    "frontend/src/tools/**/*.ts"
+  ],
+  "exclude": []
+}

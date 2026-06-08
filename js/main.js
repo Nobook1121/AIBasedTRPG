@@ -1,61 +1,52 @@
+// @ts-nocheck
 // 主入口文件 - 协调各模块初始化
-
 let toolManager;
-
-document.addEventListener('DOMContentLoaded', async function() {
+document.addEventListener('DOMContentLoaded', async function () {
     const dom = window.TrpgDom;
-
     toolManager = new ToolManager();
-
     initTabs();
-    initChat();
     initScenarioManagement();
     initCharacterManagement();
     initDiceTool();
     initToolTabs();
     initSettingsTabs();
-
     await loadAndApplyConfigs();
-
     initAIPlatforms();
-    initAuth();
+    await initAuth();
+    initChat();
     initNetworkConfig();
-    initSaveManagement();
+    initRoomManagement();
     initSidebarToggle();
-
-    await autoLoadLastSave();
-
-    dom.on(document, 'hidden.bs.modal', function() {
+    await autoLoadLastRoom();
+    dom.on(document, 'hidden.bs.modal', function () {
         setTimeout(() => {
             if (dom.removeModalBackdropsWhenIdle()) {
                 console.log('所有模态框已关闭，已移除所有遮罩层');
-            } else {
+            }
+            else {
                 console.log('还有其他模态框打开，保留遮罩层');
             }
         }, 100);
     });
 });
-
 async function loadAndApplyConfigs() {
     try {
         await configManager.loadConfig('general');
         configManager.applyGeneralSettings();
         configManager.initThemeSystem();
         console.log('配置文件加载和应用完成');
-    } catch (error) {
+    }
+    catch (error) {
         console.error('加载配置文件时出错:', error);
     }
 }
-
 function initCharacterManagement() {
     const createCharacterBtn = document.getElementById('createCharacter');
     const saveCharacterBtn = document.getElementById('saveCharacter');
     const characterModal = new bootstrap.Modal(document.getElementById('characterModal'));
     const characterList = document.getElementById('characterList');
-
     let characters = [];
-
-    createCharacterBtn.addEventListener('click', function() {
+    createCharacterBtn.addEventListener('click', function () {
         document.getElementById('characterName').value = '';
         document.getElementById('playerId').value = '';
         document.getElementById('characterBio').value = '';
@@ -68,8 +59,7 @@ function initCharacterManagement() {
         document.getElementById('characterSkills').value = '';
         characterModal.show();
     });
-
-    saveCharacterBtn.addEventListener('click', function() {
+    saveCharacterBtn.addEventListener('click', function () {
         const character = {
             id: Date.now(),
             name: document.getElementById('characterName').value,
@@ -85,15 +75,12 @@ function initCharacterManagement() {
             },
             skills: document.getElementById('characterSkills').value
         };
-
         characters.push(character);
         updateCharacterList();
         characterModal.hide();
     });
-
     function updateCharacterList() {
         characterList.innerHTML = '';
-
         characters.forEach(character => {
             const card = document.createElement('div');
             card.className = 'character-card';
@@ -110,9 +97,7 @@ function initCharacterManagement() {
             characterList.appendChild(card);
         });
     }
-
     loadMockCharacters();
-
     function loadMockCharacters() {
         characters = [
             {
@@ -141,28 +126,24 @@ function initCharacterManagement() {
         updateCharacterList();
     }
 }
-
 function initDiceTool() {
     const rollDiceBtn = document.getElementById('rollDice');
     const diceType = document.getElementById('diceType');
     const diceResult = document.getElementById('diceResult');
-
-    rollDiceBtn.addEventListener('click', function() {
+    rollDiceBtn.addEventListener('click', function () {
         const type = diceType.value;
         const sides = parseInt(type.replace('d', ''));
         const result = Math.floor(Math.random() * sides) + 1;
         diceResult.textContent = `结果: ${result}`;
     });
 }
-
 function initSidebarToggle() {
     const dom = window.TrpgDom;
     const toggleBtn = dom.byId('sidebarToggle');
     const sidebar = dom.byId('sidebar');
     const mainContent = dom.byId('mainContent');
-
-    if (!toggleBtn || !sidebar || !mainContent) return;
-
+    if (!toggleBtn || !sidebar || !mainContent)
+        return;
     function setSidebarExpanded(isExpanded) {
         sidebar.classList.toggle('sidebar-expanded', isExpanded);
         sidebar.classList.toggle('sidebar-collapsed', !isExpanded);
@@ -175,8 +156,7 @@ function initSidebarToggle() {
             collapsedIconClass: 'fa fa-angle-double-right'
         });
     }
-
-    dom.on(toggleBtn, 'click', function() {
+    dom.on(toggleBtn, 'click', function () {
         const isCollapsed = sidebar.classList.contains('sidebar-collapsed');
         setSidebarExpanded(isCollapsed);
     });

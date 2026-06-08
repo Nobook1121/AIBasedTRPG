@@ -52,7 +52,7 @@ def update_network_config_api():
             return validation_error
 
         saved_config = save_network_config(config_data, _network_config_file())
-        logger.info("Network config updated port=%s", saved_config.get("port"))
+        logger.debug("Network config updated port=%s", saved_config.get("port"))
         return success_response(config_data, "Network config updated successfully")
     except Exception as exc:
         logger.exception("Failed to update network config")
@@ -132,7 +132,7 @@ def update_penetration_config_api():
             return error_response("Please provide penetration config data", 400, "No data")
 
         save_penetration_config(config_data, _penetration_config_file())
-        logger.info("Penetration config updated type=%s", config_data.get("type"))
+        logger.debug("Penetration config updated type=%s", config_data.get("type"))
         return success_response(config_data, "Penetration config updated successfully")
     except Exception as exc:
         logger.exception("Failed to update penetration config")
