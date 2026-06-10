@@ -6,6 +6,7 @@ from trpg_server.app_factory import create_app, socketio
 from trpg_server.network_discovery import (
     find_available_port,
     get_local_ip,
+    get_local_ipv4_addresses,
     get_network_config,
     is_port_available,
 )
@@ -17,9 +18,8 @@ app = create_app()
 
 
 def _log_listening_addresses(local_ip, port):
-    logger.info("listening on http://127.0.0.1:%s", port)
-    if local_ip and local_ip not in {"127.0.0.1", "localhost"}:
-        logger.info("listening on http://%s:%s", local_ip, port)
+    for address in get_local_ipv4_addresses():
+        logger.info("listening on http://%s:%s", address, port)
 
 
 def _select_port(argv):

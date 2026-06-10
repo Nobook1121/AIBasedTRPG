@@ -11,7 +11,6 @@
     "outDir": "."
   },
   "include": [
-    "frontend/src/config/**/*.ts",
     "frontend/src/js/**/*.ts",
     "frontend/src/tools/**/*.ts"
   ],

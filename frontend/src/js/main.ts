@@ -5,6 +5,7 @@ let toolManager;
 
 document.addEventListener('DOMContentLoaded', async function() {
     const dom = window.TrpgDom;
+    window.TrpgI18n?.apply();
 
     toolManager = new ToolManager();
 

@@ -16,7 +16,7 @@
             <div class="col-2 bg-dark text-white sidebar-expanded" id="sidebar">
                 <div class="d-flex flex-column h-100 p-3">
                     <div class="sidebar-header">
-                        <h2 class="sidebar-title">AI TRPG</h2>
+                        <h2 class="sidebar-title" data-i18n="app.title">AI TRPG</h2>
                         <button type="button" class="sidebar-toggle" id="sidebarToggle" title="收起侧边栏" aria-label="收起侧边栏" aria-expanded="true">
                             <i class="fa fa-angle-double-left" aria-hidden="true"></i>
                         </button>
@@ -61,7 +61,7 @@
                             <img src="https://via.placeholder.com/40" alt="用户头像" width="40" height="40">
                         </div>
                         <div class="user-details">
-                            <div class="user-name" id="userName">未登录</div>
+                            <div class="user-name" id="userName" data-i18n="auth.status.guest">未登录</div>
                         </div>
                     </div>
                 </div>
@@ -72,13 +72,18 @@
                 <!-- 主页内容 -->
                 <div id="home" class="tab-content active">
                     <!-- 当前房间状态栏 -->
-                    <div class="save-status-bar" id="saveStatusBar" style="display: none;">
+                    <div class="save-status-bar" id="saveStatusBar" style="display: none;" aria-live="polite">
                         <div class="save-status-content">
-                            <i class="fa fa-save"></i>
-                            <span class="save-status-label">当前房间：</span>
-                            <span class="save-status-name" id="saveStatusName">未加入</span>
-                            <span class="save-status-divider">|</span>
-                            <span class="save-status-scenario" id="saveStatusScenario"></span>
+                            <span class="save-status-pill">
+                                <i class="fa fa-comments-o" aria-hidden="true"></i>
+                                <span class="save-status-label" data-i18n="room.status.current_room">当前房间</span>
+                                <strong class="save-status-name" id="saveStatusName">未加入</strong>
+                            </span>
+                            <span class="save-status-script">
+                                <i class="fa fa-book" aria-hidden="true"></i>
+                                <span data-i18n="room.status.scenario">剧本</span>
+                                <strong id="saveStatusScenario">-</strong>
+                            </span>
                         </div>
                     </div>
                     <!-- 对话记录区 -->
@@ -89,10 +94,9 @@
                     <!-- 对话输入区 -->
                     <div class="chat-input p-3 border-top">
                         <div class="input-group">
-                            <span class="input-group-text ai-hint" id="aiHint">@KP</span>
-                            <input type="text" class="form-control" id="chatInput" placeholder="输入消息，以 @KP 开头发送给AI...">
+                            <input type="text" class="form-control" id="chatInput" placeholder="加入房间后可发送消息，使用 @KP 呼叫 AI" data-i18n-placeholder="chat.placeholder.room_required">
                             <button class="btn btn-primary" id="sendButton">
-                                <i class="fa fa-paper-plane"></i> 发送
+                                <i class="fa fa-paper-plane"></i> <span data-i18n="chat.action.send">发送</span>
                             </button>
                         </div>
                     </div>
@@ -200,8 +204,8 @@
                                     <input type="text" class="form-control" id="saveName" placeholder="请输入房间名称" required>
                                 </div>
                                 <div class="form-group mt-3">
-                                    <label for="saveScenario">房间剧本 *</label>
-                                    <select class="form-select" id="saveScenario" required>
+                                    <label for="roomScenarioSelect">房间剧本 *</label>
+                                    <select class="form-select" id="roomScenarioSelect" required>
                                         <option value="">请选择剧本</option>
                                     </select>
                                 </div>
@@ -246,110 +250,216 @@
                 <div id="auth-modal" class="auth-modal">
                     <div class="auth-modal-content">
                         <div class="auth-modal-header">
-                            <h2>用户认证</h2>
+                            <h2 data-i18n="auth.login.title">登录</h2>
                             <button type="button" id="close-auth-modal" class="close-btn" aria-label="关闭认证弹窗">&times;</button>
                         </div>
                         <div class="auth-modal-body">
-                            <!-- 登录/注册切换 -->
-                            <div class="auth-tabs">
-                                <button class="auth-tab active" data-tab="login">登录</button>
-                                <button class="auth-tab" data-tab="register">注册</button>
-                            </div>
-                            
-                            <!-- 登录表单 -->
-                            <div id="login-form" class="auth-form active">
-                                <div class="form-group">
-                                    <label for="loginUsername">用户名</label>
-                                    <input type="text" class="form-control" id="loginUsername" name="username" placeholder="请输入用户名" autocomplete="username">
+                            <section id="login-view" class="auth-view active" aria-label="登录">
+                                <div class="auth-floating-field">
+                                    <input type="text" class="auth-floating-input" id="loginUsername" name="username" autocomplete="username">
+                                    <label class="auth-floating-label" for="loginUsername">用户名或邮箱</label>
                                 </div>
-                                <div class="form-group mt-2">
-                                    <label for="loginPassword">密码</label>
-                                    <input type="password" class="form-control" id="loginPassword" name="password" placeholder="请输入密码" autocomplete="current-password">
+                                <div class="auth-floating-field">
+                                    <input type="password" class="auth-floating-input" id="loginPassword" name="password" autocomplete="current-password">
+                                    <label class="auth-floating-label" for="loginPassword">密码</label>
                                 </div>
-                                <div class="form-group mt-2">
+                                <div class="auth-options">
                                     <div class="form-check">
                                         <input type="checkbox" class="form-check-input" id="rememberMe">
-                                        <label class="form-check-label" for="rememberMe">记住密码</label>
+                                        <label class="form-check-label" for="rememberMe">记住用户名</label>
                                     </div>
-                                </div>
-                                <div class="form-group mt-2">
-                                    <div class="form-check">
-                                        <input type="checkbox" class="form-check-input" id="stayLoggedIn">
-                                        <label class="form-check-label" for="stayLoggedIn">短期免登录</label>
-                                    </div>
-                                </div>
-                                <div class="form-group mt-2">
                                     <div class="form-check">
                                         <input type="checkbox" class="form-check-input" id="autoLogin">
-                                        <label class="form-check-label" for="autoLogin">自动登录</label>
+                                        <label class="form-check-label" for="autoLogin">保持登录</label>
                                     </div>
                                 </div>
+                                <input type="checkbox" id="stayLoggedIn" class="visually-hidden" checked>
                                 <button class="btn btn-primary mt-3 w-100" id="loginButton">登录</button>
                                 <div class="login-message mt-2" id="loginMessage" aria-live="polite"></div>
-                            </div>
-                            
-                            <!-- 注册表单 -->
-                            <div id="register-form" class="auth-form">
-                                <div class="form-group">
-                                    <label for="registerUsername">用户名</label>
-                                    <input type="text" class="form-control" id="registerUsername" name="username" placeholder="请输入用户名" autocomplete="username">
+                                <div class="auth-switch-line">还没有账号？<button type="button" id="show-register-view">创建新账号</button></div>
+                            </section>
+
+                            <section id="register-view" class="auth-view" aria-label="注册">
+                                <div class="register-form-fields">
+                                    <div class="auth-floating-field">
+                                        <input type="text" class="auth-floating-input" id="registerUsername" name="username" autocomplete="username">
+                                        <label class="auth-floating-label" for="registerUsername">用户名</label>
+                                    </div>
+                                    <div class="auth-floating-field">
+                                        <input type="email" class="auth-floating-input" id="registerEmail" name="email" autocomplete="email">
+                                        <label class="auth-floating-label" for="registerEmail">电子邮件</label>
+                                    </div>
+                                    <div class="auth-floating-field">
+                                        <input type="password" class="auth-floating-input" id="registerPassword" name="new-password" autocomplete="new-password">
+                                        <label class="auth-floating-label" for="registerPassword">密码</label>
+                                    </div>
+                                    <div class="auth-floating-field">
+                                        <input type="password" class="auth-floating-input" id="registerConfirmPassword" name="confirm-password" autocomplete="new-password">
+                                        <label class="auth-floating-label" for="registerConfirmPassword">确认密码</label>
+                                    </div>
                                 </div>
-                                <div class="form-group mt-2">
-                                    <label for="registerPassword">密码</label>
-                                    <input type="password" class="form-control" id="registerPassword" name="new-password" placeholder="请输入密码" autocomplete="new-password">
-                                </div>
-                                <div class="form-group mt-2">
-                                    <label for="registerEmail">邮箱</label>
-                                    <input type="email" class="form-control" id="registerEmail" name="email" placeholder="请输入邮箱" autocomplete="email">
+                                <div class="terms-row">
+                                    <input type="checkbox" id="acceptTerms">
+                                    <label for="acceptTerms">我同意服务条款和隐私协议</label>
                                 </div>
                                 <button class="btn btn-primary mt-3 w-100" id="registerButton">注册</button>
                                 <div class="register-message mt-2" id="registerMessage" aria-live="polite"></div>
+                                <div class="auth-switch-line">已有账号？<button type="button" id="show-login-view">返回登录</button></div>
+                            </section>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="user-card-popover" class="user-card-popover" aria-hidden="true">
+                    <div class="user-card-summary">
+                        <img id="userCardAvatar" src="/assets/avatars/default.jpg" alt="用户头像" width="48" height="48">
+                        <div>
+                            <div id="userCardName" class="user-card-name">未登录</div>
+                            <div id="userCardRole" class="user-card-role">USER</div>
+                        </div>
+                    </div>
+                    <div class="user-card-menu-section">
+                        <button type="button" class="user-card-menu-item" id="open-profile-dialog">
+                            <span class="menu-icon"><i class="fa fa-user" aria-hidden="true"></i></span>
+                            <span>编辑个人资料</span>
+                        </button>
+                    </div>
+                    <div class="user-card-menu-section">
+                        <div class="presence-menu-item">
+                            <button type="button" class="user-card-menu-item" id="presence-menu-button" aria-haspopup="menu" aria-expanded="false">
+                                <span class="menu-icon"><i class="fa fa-circle" aria-hidden="true"></i></span>
+                                <span class="presence-current-label">在线状态</span>
+                                <i class="fa fa-chevron-right menu-chevron" aria-hidden="true"></i>
+                            </button>
+                            <div class="presence-submenu" role="menu" aria-label="切换在线状态">
+                                <button type="button" class="presence-option" data-presence="online" role="menuitem">
+                                    <i class="fa fa-circle presence-dot online" aria-hidden="true"></i>在线
+                                </button>
+                                <button type="button" class="presence-option" data-presence="dnd" role="menuitem">
+                                    <i class="fa fa-minus-circle presence-dot dnd" aria-hidden="true"></i>请勿打扰
+                                </button>
+                                <button type="button" class="presence-option" data-presence="invisible" role="menuitem">
+                                    <i class="fa fa-circle-o presence-dot invisible" aria-hidden="true"></i>隐身
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="user-card-menu-section">
+                        <button type="button" class="user-card-menu-item" id="switchAccountButton">
+                            <span class="menu-icon"><i class="fa fa-exchange" aria-hidden="true"></i></span>
+                            <span>切换账户</span>
+                        </button>
+                        <button type="button" class="user-card-menu-item danger" id="logoutButton">
+                            <span class="menu-icon"><i class="fa fa-sign-out" aria-hidden="true"></i></span>
+                            <span>登出</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="edit-profile-dialog" class="profile-dialog" aria-hidden="true">
+                    <div class="profile-dialog-surface">
+                        <div class="profile-dialog-topbar">
+                            <div>
+                                <div class="profile-dialog-eyebrow">User Settings</div>
+                                <h3>编辑个人资料</h3>
+                            </div>
+                            <button type="button" id="close-settings-panel" class="profile-dialog-close" aria-label="关闭用户设置">
+                                <i class="fa fa-times" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                        <div class="profile-settings-sidebar">
+                            <div class="profile-settings-sidebar-title">用户设置</div>
+                            <details class="profile-nav-group" open>
+                                <summary><span><i class="fa fa-user-circle" aria-hidden="true"></i>账户</span><i class="fa fa-chevron-down" aria-hidden="true"></i></summary>
+                                <div class="profile-subnav">
+                                    <button type="button" class="profile-section-tab active" data-profile-target="profile-account-info">账号信息</button>
+                                    <button type="button" class="profile-section-tab" data-profile-target="profile-password-management">密码管理</button>
+                                </div>
+                            </details>
+                            <details class="profile-nav-group">
+                                <summary><span><i class="fa fa-id-card-o" aria-hidden="true"></i>个人说明</span><i class="fa fa-chevron-down" aria-hidden="true"></i></summary>
+                                <div class="profile-subnav">
+                                    <button type="button" class="profile-section-tab" data-profile-target="profile-public-info">资料展示</button>
+                                </div>
+                            </details>
+                            <details class="profile-nav-group">
+                                <summary><span><i class="fa fa-shield" aria-hidden="true"></i>隐私</span><i class="fa fa-chevron-down" aria-hidden="true"></i></summary>
+                                <div class="profile-subnav">
+                                    <button type="button" class="profile-section-tab" data-profile-target="profile-privacy">可见性</button>
+                                </div>
+                            </details>
+                            <details class="profile-nav-group">
+                                <summary><span><i class="fa fa-bell-o" aria-hidden="true"></i>通知</span><i class="fa fa-chevron-down" aria-hidden="true"></i></summary>
+                                <div class="profile-subnav">
+                                    <button type="button" class="profile-section-tab" data-profile-target="profile-notifications">提醒方式</button>
+                                </div>
+                            </details>
+                        </div>
+                        <div class="profile-settings-content">
+                            <section class="profile-panel-section" id="profile-account-info">
+                                <h4>账号信息</h4>
+                                <div class="avatar-upload-container">
+                                    <div class="avatar-preview">
+                                        <img id="avatarPreview" src="/assets/avatars/default.jpg" alt="用户头像" width="96" height="96">
+                                    </div>
+                                    <input type="file" id="avatarUpload" class="avatar-upload-input" accept="image/*">
+                                    <label for="avatarUpload" class="avatar-upload-label">更换头像</label>
+                                </div>
+                                <label for="editUsername">用户名</label>
+                                <input type="text" class="form-control" id="editUsername" name="username" autocomplete="username">
+                                <label for="editEmail">电子邮件</label>
+                                <input type="email" class="form-control" id="editEmail" name="email" autocomplete="email">
+                                <label for="editNickname">昵称</label>
+                                <input type="text" class="form-control" id="editNickname" name="nickname" autocomplete="nickname">
+                            </section>
+                            <section class="profile-panel-section" id="profile-password-management">
+                                <h4>密码管理</h4>
+                                <p class="profile-placeholder">密码修改会在独立窗口中完成，以避免误保存个人资料时同时修改密码。</p>
+                                <button type="button" class="btn btn-secondary profile-inline-action" id="open-password-dialog">
+                                    <i class="fa fa-lock" aria-hidden="true"></i>修改密码
+                                </button>
+                                <div class="two-factor-disabled">双因素认证被管理员关闭</div>
+                            </section>
+                            <section class="profile-panel-section" id="profile-public-info">
+                                <h4>资料展示</h4>
+                                <p class="profile-placeholder">个人说明、公开身份和展示偏好将在后续版本开放。</p>
+                            </section>
+                            <section class="profile-panel-section" id="profile-privacy">
+                                <h4>可见性</h4>
+                                <p class="profile-placeholder">隐私控制、好友可见范围和房间展示规则将在后续版本开放。</p>
+                            </section>
+                            <section class="profile-panel-section" id="profile-notifications">
+                                <h4>提醒方式</h4>
+                                <p class="profile-placeholder">消息提醒、房间邀请和系统通知设置将在后续版本开放。</p>
+                            </section>
+                            <div class="profile-save-bar">
+                                <div class="settings-message" id="settingsMessage" aria-live="polite"></div>
+                                <button class="btn btn-primary" id="saveUserSettings">
+                                    <i class="fa fa-check" aria-hidden="true"></i>保存编辑
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- 用户信息设置面板 -->
-                <div id="user-settings-panel" class="user-settings-panel">
-                    <div class="user-settings-content">
-                        <div class="user-settings-header">
-                            <h3>用户设置</h3>
-                            <button type="button" id="close-settings-panel" class="close-btn" aria-label="关闭用户设置">&times;</button>
+                <div id="password-dialog" class="password-dialog" aria-hidden="true">
+                    <div class="password-dialog-surface">
+                        <div class="profile-dialog-header">
+                            <h3><i class="fa fa-lock" aria-hidden="true"></i>修改密码</h3>
+                            <button type="button" id="close-password-dialog" class="close-btn" aria-label="关闭密码修改窗口">&times;</button>
                         </div>
-                        <div class="user-settings-body">
-                            <div class="form-group text-center">
-                                <label>头像</label>
-                                <div class="avatar-upload-container">
-                                    <div class="avatar-preview">
-                                        <img id="avatarPreview" src="https://via.placeholder.com/100" alt="用户头像" width="100" height="100">
-                                    </div>
-                                    <input type="file" id="avatarUpload" class="avatar-upload-input" accept="image/*">
-                                    <label for="avatarUpload" class="avatar-upload-label">更换头像</label>
-                                </div>
-                            </div>
-                            <div class="form-group mt-2">
-                                <label for="editUsername">用户名</label>
-                                <input type="text" class="form-control" id="editUsername" name="username" placeholder="请输入用户名" autocomplete="username">
-                            </div>
-                            <div class="form-group mt-2">
-                                <label for="editNickname">昵称</label>
-                                <input type="text" class="form-control" id="editNickname" name="nickname" placeholder="请输入昵称" autocomplete="nickname">
-                            </div>
-                            <div class="form-group mt-2">
-                                <label for="editEmail">邮箱</label>
-                                <input type="email" class="form-control" id="editEmail" name="email" placeholder="请输入邮箱" autocomplete="email">
-                            </div>
-                            <div class="form-group mt-2">
-                                <label for="editPassword">新密码</label>
-                                <input type="password" class="form-control" id="editPassword" name="new-password" placeholder="请输入新密码" autocomplete="new-password">
-                            </div>
-                            <div class="form-group mt-2">
-                                <label for="confirmPassword">确认新密码</label>
-                                <input type="password" class="form-control" id="confirmPassword" name="confirm-password" placeholder="请确认新密码" autocomplete="new-password">
-                            </div>
-                            <button class="btn btn-primary mt-3 w-100" id="saveUserSettings">保存设置</button>
-                            <button class="btn btn-danger mt-2 w-100" id="logoutButton">登出</button>
-                            <div class="settings-message mt-2" id="settingsMessage" aria-live="polite"></div>
+                        <div class="password-dialog-body">
+                            <label for="passwordCurrentPassword">当前密码</label>
+                            <input type="password" class="form-control" id="passwordCurrentPassword" autocomplete="current-password">
+                            <label for="passwordNewPassword">新密码</label>
+                            <input type="password" class="form-control" id="passwordNewPassword" autocomplete="new-password">
+                            <label for="passwordConfirmPassword">确认新密码</label>
+                            <input type="password" class="form-control" id="passwordConfirmPassword" autocomplete="new-password">
+                            <div class="password-message" id="passwordMessage" aria-live="polite"></div>
+                        </div>
+                        <div class="password-dialog-actions">
+                            <button type="button" class="btn btn-secondary" id="cancelPasswordDialog">取消</button>
+                            <button type="button" class="btn btn-primary" id="changePasswordButton">保存密码</button>
                         </div>
                     </div>
                 </div>
@@ -442,9 +552,19 @@
                         
                         <!-- 模型设置内容 -->
                         <div id="model-settings-content" class="settings-content">
+                            <div class="role-config-settings">
+                                <div class="role-config-header">
+                                    <div>
+                                        <h4>角色配置</h4>
+                                        <p class="text-muted">为每个角色配置唤醒词、提示词和使用的大模型提供商。</p>
+                                    </div>
+                                </div>
+                                <div class="role-config-list" id="roleConfigList" aria-live="polite"></div>
+                                <div class="settings-message" id="roleConfigMessage" aria-live="polite"></div>
+                            </div>
                             <div class="mb-4">
-                                <h4>AI平台管理</h4>
-                                <p class="text-muted">管理和配置AI平台连接</p>
+                                <h4>大模型提供商</h4>
+                                <p class="text-muted">管理和配置大模型提供商连接</p>
                             </div>
                             
                             <!-- AI平台配置卡片 -->
@@ -812,10 +932,11 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="tools/diceTool.js"></script>
     <script src="tools/toolManager.js"></script>
-    <script src="config/TestRequestConfig.js"></script>
-    <script src="config/ConfigManager.js"></script>
-    <script src="config/AIPlatformManager.js"></script>
+    <script src="js/config/TestRequestConfig.js"></script>
+    <script src="js/config/ConfigManager.js"></script>
+    <script src="js/config/AIPlatformManager.js"></script>
     <script src="js/api-client.js"></script>
+    <script src="js/i18n.js"></script>
     <script src="js/dom-utils.js"></script>
     <script src="js/models/ScenarioModel.js"></script>
     <script src="js/views/ScenarioView.js"></script>
@@ -824,6 +945,14 @@
     <script src="js/platform-ui.js"></script>
     <script src="js/cookie-consent.js"></script>
     <script src="js/chat.js"></script>
+    <script src="js/auth/api.js"></script>
+    <script src="js/auth/state.js"></script>
+    <script src="js/auth/floating-field.js"></script>
+    <script src="js/auth/login-view.js"></script>
+    <script src="js/auth/register-view.js"></script>
+    <script src="js/auth/profile-dialog.js"></script>
+    <script src="js/auth/user-card.js"></script>
+    <script src="js/auth/index.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/network.js"></script>
     <script src="js/rooms.js"></script>

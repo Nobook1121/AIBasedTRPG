@@ -7,7 +7,8 @@ from flask import Blueprint, current_app, request
 
 from trpg_server.json_store import read_json, write_json_atomic
 from trpg_server.responses import error_response, success_response
-from trpg_server.security import safe_join
+from trpg_server.role_config import enabled_provider_options, load_roles, save_role
+from trpg_server.security import require_permission, safe_join
 from trpg_server.settings import CONFIG_DIR
 
 bp = Blueprint("config", __name__)
@@ -25,6 +26,14 @@ def _get_ai_platform_dir():
 
 def _get_ai_model_dir():
     return current_app.config.get("AI_MODEL_DIR", _get_config_dir() / "aimodel")
+
+
+def _get_kp_prompt_file():
+    return current_app.config.get("KP_PROMPT_FILE", _get_config_dir() / "roles" / "kp.md")
+
+
+def _get_role_config_file():
+    return current_app.config.get("ROLE_CONFIG_FILE", _get_config_dir() / "roles" / "roles.json")
 
 
 def _format_toml_value(value):
@@ -138,7 +147,7 @@ def test_ai_platform_api(platform):
 
 
 @bp.route("/api/config/aimodel/save", methods=["POST"])
-def save_model_js_config():
+def save_model_request_config():
     try:
         config_data = request.get_json(silent=True)
         if not config_data:
@@ -150,19 +159,102 @@ def save_model_js_config():
         if not platform or not model_id or not content:
             return error_response("Platform, model ID, and config content are required", 400)
 
-        config_path = safe_join(_get_ai_model_dir(), platform, f"{model_id}.js")
-        config_path.parent.mkdir(parents=True, exist_ok=True)
-        config_path.write_text(content, encoding="utf-8")
+        if isinstance(content, str):
+            try:
+                content = json.loads(content)
+            except json.JSONDecodeError:
+                return error_response("Model config content must be valid JSON", 400)
+        if not isinstance(content, dict):
+            return error_response("Model config content must be a JSON object", 400)
 
-        logger.debug("AI model config saved platform=%s model_id=%s", platform, model_id)
+        config_path = safe_join(_get_ai_model_dir(), platform, f"{model_id}.json")
+        write_json_atomic(config_path, content)
+
+        legacy_js_path = safe_join(_get_ai_model_dir(), platform, f"{model_id}.js")
+        if legacy_js_path.exists():
+            legacy_js_path.unlink()
+
+        logger.debug("AI model request config saved platform=%s model_id=%s", platform, model_id)
         return success_response(message="Config saved successfully")
     except Exception as exc:
-        logger.exception("Failed to save model JS config")
+        logger.exception("Failed to save model request config")
+        return error_response(f"Save failed: {exc}", 500)
+
+
+@bp.route("/api/config/system-prompt", methods=["GET"])
+@require_permission("ADMIN")
+def get_system_prompt():
+    prompt_path = _get_kp_prompt_file()
+    try:
+        if not prompt_path.exists():
+            return success_response(data={"content": ""})
+        return success_response(data={"content": prompt_path.read_text(encoding="utf-8")})
+    except OSError as exc:
+        logger.exception("Failed to load system prompt")
+        return error_response(f"Load failed: {exc}", 500)
+
+
+@bp.route("/api/config/system-prompt", methods=["POST"])
+@require_permission("ADMIN")
+def save_system_prompt():
+    try:
+        prompt_data = request.get_json(silent=True)
+        if not isinstance(prompt_data, dict):
+            return error_response("Invalid prompt data", 400)
+
+        content = prompt_data.get("content")
+        if not isinstance(content, str):
+            return error_response("Prompt content is required", 400)
+
+        prompt_path = _get_kp_prompt_file()
+        prompt_path.parent.mkdir(parents=True, exist_ok=True)
+        prompt_path.write_text(content, encoding="utf-8")
+
+        logger.info("System prompt saved file=%s", prompt_path.name)
+        return success_response(message="System prompt saved successfully")
+    except Exception as exc:
+        logger.exception("Failed to save system prompt")
+        return error_response(f"Save failed: {exc}", 500)
+
+
+@bp.route("/api/config/roles", methods=["GET"])
+@require_permission("ADMIN")
+def get_role_configs():
+    try:
+        roles = load_roles(_get_role_config_file(), _get_kp_prompt_file(), _get_ai_platform_dir())
+        providers = enabled_provider_options(_get_ai_platform_dir())
+        return success_response(data={"roles": roles, "enabled_providers": providers})
+    except Exception as exc:
+        logger.exception("Failed to load role configs")
+        return error_response(f"Load failed: {exc}", 500)
+
+
+@bp.route("/api/config/roles/<role_id>", methods=["POST"])
+@require_permission("ADMIN")
+def save_role_config(role_id):
+    try:
+        role_data = request.get_json(silent=True)
+        if not isinstance(role_data, dict):
+            return error_response("Invalid role config data", 400)
+
+        roles = save_role(
+            _get_role_config_file(),
+            _get_kp_prompt_file(),
+            _get_ai_platform_dir(),
+            role_id,
+            role_data,
+        )
+        logger.info("Role config saved role_id=%s provider=%s", role_id, role_data.get("provider"))
+        return success_response(message="Role config saved successfully", data={"roles": roles})
+    except ValueError as exc:
+        return error_response(str(exc), 400)
+    except Exception as exc:
+        logger.exception("Failed to save role config: %s", role_id)
         return error_response(f"Save failed: {exc}", 500)
 
 
 @bp.route("/api/config/aimodel/delete", methods=["POST"])
-def delete_model_js_config():
+def delete_model_request_config():
     try:
         config_data = request.get_json(silent=True)
         if not config_data:
@@ -173,18 +265,19 @@ def delete_model_js_config():
         if not platform or not model_id:
             return error_response("Platform and model ID are required", 400)
 
-        config_path = safe_join(_get_ai_model_dir(), platform, f"{model_id}.js")
-        if config_path.exists():
-            config_path.unlink()
-            logger.debug("AI model config deleted platform=%s model_id=%s", platform, model_id)
+        removed = False
+        for suffix in (".json", ".js"):
+            config_path = safe_join(_get_ai_model_dir(), platform, f"{model_id}{suffix}")
+            if config_path.exists():
+                config_path.unlink()
+                removed = True
+
+        if removed:
+            logger.debug("AI model request config deleted platform=%s model_id=%s", platform, model_id)
         else:
-            logger.debug(
-                "AI model config already absent platform=%s model_id=%s",
-                platform,
-                model_id,
-            )
+            logger.debug("AI model request config already absent platform=%s model_id=%s", platform, model_id)
 
         return success_response(message="Config deleted successfully")
     except Exception as exc:
-        logger.exception("Failed to delete model JS config")
+        logger.exception("Failed to delete model request config")
         return error_response(f"Delete failed: {exc}", 500)

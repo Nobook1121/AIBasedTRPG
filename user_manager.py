@@ -1,270 +1,59 @@
-#!/usr/bin/env python3
-"""User management for registration, login, permissions, and IP preferences."""
+"""Compatibility entry point for legacy imports.
 
-import logging
-import re
-import time
+The application now uses ``trpg_server.users.UserService``. This module keeps
+old ``from user_manager import user_manager`` imports working without creating
+or writing user files at import time.
+"""
+
+from __future__ import annotations
+
+import os
+import sqlite3
 from pathlib import Path
 
-import bcrypt
-
-from trpg_server.json_store import read_json, write_json_atomic
-
-USERS_FILE = "users/users.json"
-USER_IP_CONFIG_DIR = "users/ip_configs"
-logger = logging.getLogger(__name__)
-USERNAME_RE = re.compile(r"^[\w.-]{3,32}$", re.UNICODE)
-EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-
-Path("users").mkdir(parents=True, exist_ok=True)
-Path(USER_IP_CONFIG_DIR).mkdir(parents=True, exist_ok=True)
-if not Path(USERS_FILE).exists():
-    write_json_atomic(USERS_FILE, {"users": []})
-
-
-def _now_iso():
-    return time.strftime("%Y-%m-%dT%H:%M:%S") + ".000Z"
-
-
-def _ip_config_path(ip_address):
-    safe_name = re.sub(r"[^A-Za-z0-9_.-]", "_", str(ip_address)).replace(".", "_")
-    return Path(USER_IP_CONFIG_DIR) / f"{safe_name or 'unknown'}.json"
+from trpg_server.settings import USERS_DIR
+from trpg_server.users.database import UserDatabase
+from trpg_server.users.migrations import migrate_json_users
+from trpg_server.users.service import UserService
 
 
 class UserManager:
-    """Manage local users and per-IP configuration files."""
-
-    def __init__(self):
-        self.users = self._load_users()
-
-    def _load_users(self):
-        try:
-            data = read_json(USERS_FILE, default={"users": []})
-            return data.get("users", [])
-        except Exception:
-            logger.exception("Failed to load user data")
-            return []
-
-    def _save_users(self):
-        try:
-            write_json_atomic(USERS_FILE, {"users": self.users})
-            return True
-        except Exception:
-            logger.exception("Failed to save user data")
-            return False
-
-    def _hash_password(self, password):
-        salt = bcrypt.gensalt()
-        hashed = bcrypt.hashpw(password.encode("utf-8"), salt)
-        return hashed.decode("utf-8")
-
-    def _verify_password(self, password, hashed_password):
-        return bcrypt.checkpw(password.encode("utf-8"), hashed_password.encode("utf-8"))
-
-    def _validate_username(self, username):
-        if not username or not USERNAME_RE.match(str(username)):
-            return False, "Username must be 3-32 characters and contain only letters, numbers, underscore, dot, or hyphen"
-        return True, ""
-
-    def _validate_password(self, password):
-        if not password or len(str(password)) < 8:
-            return False, "Password must be at least 8 characters"
-        return True, ""
-
-    def _validate_email(self, email):
-        if not email or not EMAIL_RE.match(str(email)):
-            return False, "Invalid email address"
-        return True, ""
-
-    def _username_exists(self, username, exclude_user_id=None):
-        normalized = str(username).lower()
-        return any(
-            user["username"].lower() == normalized and user.get("id") != exclude_user_id
-            for user in self.users
+    def __init__(
+        self,
+        database_file: str | Path | None = None,
+        users_file: str | Path | None = None,
+        ip_config_dir: str | Path | None = None,
+    ) -> None:
+        self.database_file = Path(
+            database_file
+            or os.environ.get("AI_TRPG_USER_DATABASE_FILE")
+            or USERS_DIR / "users.sqlite3"
         )
+        self.users_file = Path(
+            users_file
+            or os.environ.get("AI_TRPG_USERS_FILE")
+            or USERS_DIR / "users.json"
+        )
+        self.ip_config_dir = Path(
+            ip_config_dir
+            or os.environ.get("AI_TRPG_USER_IP_CONFIG_DIR")
+            or USERS_DIR / "ip_configs"
+        )
+        self._service: UserService | None = None
 
-    def register(self, username, password, email, ip_address=None):
-        valid, message = self._validate_username(username)
-        if not valid:
-            return False, message
-        valid, message = self._validate_password(password)
-        if not valid:
-            return False, message
-        valid, message = self._validate_email(email)
-        if not valid:
-            return False, message
-        if self._username_exists(username):
-            return False, "Username already exists"
+    def _get_service(self) -> UserService:
+        if self._service is None:
+            db = UserDatabase(self.database_file)
+            db.initialize()
+            try:
+                migrate_json_users(self.users_file, db)
+            except (ValueError, sqlite3.Error):
+                pass
+            self._service = UserService(db, ip_config_dir=self.ip_config_dir)
+        return self._service
 
-        user_id = max([user["id"] for user in self.users], default=0) + 1
-        new_user = {
-            "id": user_id,
-            "username": username,
-            "password": self._hash_password(password),
-            "email": email,
-            "role": "USER",
-            "created_at": _now_iso(),
-            "last_login": _now_iso(),
-            "character_cards": [],
-            "status": "active",
-            "avatar": "/assets/avatars/default.jpg",
-        }
-        self.users.append(new_user)
-
-        if self._save_users():
-            return True, "Registration successful"
-        return False, "Registration failed"
-
-    def update_profile(self, user_id, username, email, nickname="", avatar=None, password=None):
-        user = self.get_user_by_id(user_id)
-        if not user:
-            return False, "User does not exist"
-
-        valid, message = self._validate_username(username)
-        if not valid:
-            return False, message
-        valid, message = self._validate_email(email)
-        if not valid:
-            return False, message
-        if password:
-            valid, message = self._validate_password(password)
-            if not valid:
-                return False, message
-        if self._username_exists(username, exclude_user_id=user_id):
-            return False, "Username already exists"
-
-        user["username"] = username
-        user["email"] = email
-        user["nickname"] = nickname or ""
-        if avatar:
-            user["avatar"] = avatar
-        if password:
-            user["password"] = self._hash_password(password)
-        if self._save_users():
-            return True, "Profile updated successfully"
-        return False, "Failed to save user data"
-
-    def login(self, username, password, ip_address=None):
-        for user in self.users:
-            if user["username"] == username and user["status"] == "active":
-                if self._verify_password(password, user["password"]):
-                    user["last_login"] = _now_iso()
-                    self._save_users()
-                    return True, "Login successful", user
-                return False, "Incorrect password", None
-
-        return False, "User does not exist", None
-
-    def get_user_by_id(self, user_id):
-        for user in self.users:
-            if user["id"] == user_id:
-                return user
-        return None
-
-    def get_user_by_username(self, username):
-        for user in self.users:
-            if user["username"] == username:
-                return user
-        return None
-
-    def update_user_role(self, user_id, role):
-        for user in self.users:
-            if user["id"] == user_id:
-                user["role"] = role
-                self._save_users()
-                return True, "Role updated successfully"
-        return False, "User does not exist"
-
-    def update_user_status(self, user_id, status):
-        for user in self.users:
-            if user["id"] == user_id:
-                user["status"] = status
-                self._save_users()
-                return True, "Status updated successfully"
-        return False, "User does not exist"
-
-    def get_all_users(self):
-        return self.users
-
-    def check_permission(self, user_id, required_role):
-        user = self.get_user_by_id(user_id)
-        if not user:
-            return False
-
-        role_levels = {
-            "OWNER": 3,
-            "ADMIN": 2,
-            "USER": 1,
-        }
-        user_level = role_levels.get(user["role"], 0)
-        required_level = role_levels.get(required_role, 0)
-        return user_level >= required_level
-
-    def create_ip_config(self, ip_address):
-        config = {
-            "ip_address": ip_address,
-            "created_at": _now_iso(),
-            "last_accessed": _now_iso(),
-            "settings": {},
-            "preferences": {},
-        }
-        try:
-            write_json_atomic(_ip_config_path(ip_address), config)
-            return True
-        except Exception:
-            logger.exception("Failed to create IP config")
-            return False
-
-    def get_ip_config(self, ip_address):
-        config_file = _ip_config_path(ip_address)
-        try:
-            if not config_file.exists():
-                return None
-
-            config = read_json(config_file, default={})
-            config["last_accessed"] = _now_iso()
-            write_json_atomic(config_file, config)
-            return config
-        except Exception:
-            logger.exception("Failed to get IP config")
-            return None
-
-    def update_ip_config(self, ip_address, config_data):
-        config_file = _ip_config_path(ip_address)
-        try:
-            if not config_file.exists():
-                return False
-
-            config = read_json(config_file, default={})
-            config.update(config_data)
-            config["last_accessed"] = _now_iso()
-            write_json_atomic(config_file, config)
-            return True
-        except Exception:
-            logger.exception("Failed to update IP config")
-            return False
-
-    def delete_ip_config(self, ip_address):
-        config_file = _ip_config_path(ip_address)
-        try:
-            if config_file.exists():
-                config_file.unlink()
-                return True
-            return False
-        except Exception:
-            logger.exception("Failed to delete IP config")
-            return False
-
-    def get_all_ip_configs(self):
-        configs = []
-        try:
-            for config_file in Path(USER_IP_CONFIG_DIR).glob("*.json"):
-                if config_file.is_file():
-                    configs.append(read_json(config_file, default={}))
-            return configs
-        except Exception:
-            logger.exception("Failed to list IP configs")
-            return []
+    def __getattr__(self, name):
+        return getattr(self._get_service(), name)
 
 
 user_manager = UserManager()

@@ -10,9 +10,18 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-本项目还需要本机可用的 `node`，用于执行前端 JavaScript 语法检查。
+本项目还需要本机可用的 `node`，用于从 TypeScript 源码构建浏览器运行脚本。
 
 ## 启动
+
+从 GitHub 克隆源码后，先安装依赖并构建前端：
+
+```powershell
+npm install
+npm run build:frontend
+```
+
+然后启动后端服务：
 
 ```powershell
 python server.py
@@ -24,7 +33,7 @@ python server.py
 python server.py 8090
 ```
 
-如果目标端口已被占用，服务会尝试寻找附近可用端口，并在日志中输出监听地址，例如 `listening on http://127.0.0.1:8086` 和局域网地址。
+如果目标端口已被占用，服务会尝试寻找附近可用端口，并在日志中输出监听地址，例如 `listening on http://127.0.0.1:8086`、局域网地址和 ZeroTier/Tailscale 等虚拟网卡地址。
 
 ## 验证
 
@@ -40,7 +49,10 @@ python server.py 8090
 
 - `trpg_server/`：Flask app factory、蓝图路由、Socket.IO 事件、日志、安全与 JSON 存储工具。
 - `tests/`：后端单元测试和 API smoke tests。
-- `js/`、`tools/`、`config/`：前端脚本、工具和客户端配置加载逻辑。
+- `frontend/src/`：TypeScript 前端源码。
+- `js/`：TypeScript 构建生成的浏览器运行脚本，默认不提交到 Git。
+- `tools/`：前端工具脚本。
+- `config/`：TOML、JSON、角色提示词等运行配置数据。
 - `scenarios/`：剧本 JSON 数据。
 - `rooms/`：房间、房间消息、回档节点和自动存档数据。
 - `users/`：用户数据与用户 IP 配置。
@@ -124,6 +136,20 @@ http://192.168.1.23:8086
 
 本程序不内置内网穿透、异地组网、端口映射或公网代理能力。用户可以自行使用 frp、ZeroTier、Tailscale、WireGuard、路由器端口映射或其他工具，把主机地址暴露给好友。
 
+使用 ZeroTier、Tailscale 或 WireGuard 这类异地组网时，好友应访问主机在虚拟网卡上的 IP，而不是主机物理局域网 IP。主机启动日志会列出多个 `listening on http://<ip>:<port>` 地址；如果电脑的 ZeroTier 地址是 `192.168.192.31`，端口是 `8086`，手机应访问：
+
+```text
+http://192.168.192.31:8086
+```
+
+如果访问超时，优先检查：
+
+- ZeroTier Central 中电脑和手机是否都已 `Authorized`。
+- 手机 ZeroTier 客户端是否已连接同一个网络。
+- Windows 防火墙是否允许 Python 或本程序端口对 ZeroTier 网络入站访问。
+- 手机是否能 ping 通主机 ZeroTier IP，或能访问同网段其他服务。
+- 启动日志是否包含对应端口的 `listening on http://<ZeroTier IP>:<port>`。
+
 无论使用哪种网络方式，都建议：
 
 - 使用强 `AI_TRPG_SECRET_KEY`。
@@ -131,6 +157,8 @@ http://192.168.1.23:8086
 - 不把管理账号给普通玩家使用。
 - 仅暴露本程序端口，不暴露项目目录、远程桌面或系统管理端口。
 - 定期备份 `scenarios/`、`rooms/`、`users/`、`assets/avatars/` 和 `assets/scenario_covers/`。
+
+联机访问本程序时，页面和 REST API 使用 HTTP；实时聊天同步使用 Socket.IO，底层由 Engine.IO 管理，优先使用 WebSocket，必要时回退到 HTTP long-polling。ZeroTier 只提供虚拟网络通道，本程序本身不实现 ZeroTier 协议。若部署在反向代理和 HTTPS 后面，对外访问会变为 HTTPS，实时通道对应为 WSS。
 
 ### 云服务器部署
 
@@ -165,7 +193,7 @@ location / {
 
 ### 前端开发构建
 
-普通运行不需要手动构建前端。修改 TypeScript 源码后运行：
+`js/` 是构建产物，源码仓库默认不提交该目录。首次克隆、拉取前端源码更新，或修改 TypeScript 源码后运行：
 
 ```powershell
 npm install
@@ -173,7 +201,7 @@ npm run typecheck
 npm run build:frontend
 ```
 
-生成的浏览器文件仍输出到现有 `js/`、`tools/` 和 `config/` 路径，保证 `python server.py` 的启动方式不变。
+生成的浏览器文件输出到 `js/`、`tools/` 路径。未构建前端时，`python server.py` 可以启动后端，但浏览器页面会缺少脚本而无法正常使用。
 
 ## 进一步文档
 

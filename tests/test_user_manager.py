@@ -1,53 +1,38 @@
-import json
+import importlib
 
 import user_manager as user_manager_module
-from user_manager import UserManager
+from trpg_server.users.service import UserService
 
 
-def test_save_users_creates_missing_parent_directory(tmp_path, monkeypatch):
-    users_file = tmp_path / "nested" / "users.json"
-    monkeypatch.setattr(user_manager_module, "USERS_FILE", users_file)
-    manager = UserManager()
-    manager.users = [
-        {"id": 1, "username": "owner", "role": "OWNER", "status": "active"}
-    ]
+def test_user_manager_import_has_no_filesystem_side_effects(tmp_path, monkeypatch):
+    users_file = tmp_path / "users.json"
+    database_file = tmp_path / "users.sqlite3"
+    ip_config_dir = tmp_path / "ip_configs"
+    monkeypatch.setenv("AI_TRPG_USER_DATABASE_FILE", str(database_file))
+    monkeypatch.setenv("AI_TRPG_USERS_FILE", str(users_file))
+    monkeypatch.setenv("AI_TRPG_USER_IP_CONFIG_DIR", str(ip_config_dir))
 
-    assert manager._save_users() is True
-    data = json.loads(users_file.read_text(encoding="utf-8"))
-    assert data["users"][0]["username"] == "owner"
+    importlib.reload(user_manager_module)
 
-
-def test_create_ip_config_creates_missing_directory(tmp_path, monkeypatch):
-    config_dir = tmp_path / "ip_configs"
-    monkeypatch.setattr(user_manager_module, "USER_IP_CONFIG_DIR", config_dir)
-    manager = UserManager()
-
-    assert manager.create_ip_config("127.0.0.1") is True
-    assert (config_dir / "127_0_0_1.json").exists()
+    assert users_file.exists() is False
+    assert database_file.exists() is False
+    assert ip_config_dir.exists() is False
 
 
-def test_create_ip_config_keeps_unsafe_ip_inside_config_dir(tmp_path, monkeypatch):
-    config_dir = tmp_path / "ip_configs"
-    monkeypatch.setattr(user_manager_module, "USER_IP_CONFIG_DIR", config_dir)
-    manager = UserManager()
+def test_user_manager_lazy_wrapper_delegates_to_user_service(tmp_path):
+    manager = user_manager_module.UserManager(
+        database_file=tmp_path / "users.sqlite3",
+        users_file=tmp_path / "users.json",
+        ip_config_dir=tmp_path / "ip_configs",
+    )
 
-    assert manager.create_ip_config("127.0.0.1/../../escape") is True
+    ok, message, user = manager.register(
+        "Alice",
+        "StrongPass1",
+        "alice@example.com",
+        terms_accepted=True,
+    )
 
-    created_files = list(config_dir.glob("*.json"))
-    assert len(created_files) == 1
-    assert created_files[0].parent == config_dir
-    assert not (tmp_path / "escape.json").exists()
-
-
-def test_check_permission_owner_has_admin_access():
-    manager = UserManager()
-    manager.users = [{"id": 1, "username": "owner", "role": "OWNER", "status": "active"}]
-
-    assert manager.check_permission(1, "ADMIN")
-
-
-def test_check_permission_user_lacks_admin_access():
-    manager = UserManager()
-    manager.users = [{"id": 1, "username": "user", "role": "USER", "status": "active"}]
-
-    assert not manager.check_permission(1, "ADMIN")
+    assert ok is True
+    assert isinstance(manager._get_service(), UserService)
+    assert manager.get_user_by_id(user["id"])["username"] == "Alice"

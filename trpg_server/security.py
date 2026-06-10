@@ -89,6 +89,15 @@ def clear_session_token(user_id, token):
         active_sessions.pop(user_key, None)
 
 
+def _is_session_current(manager, user_id, token):
+    if hasattr(manager, "is_session_current"):
+        return manager.is_session_current(user_id, token)
+
+    active_sessions = current_app.config.setdefault(ACTIVE_SESSION_REGISTRY_KEY, {})
+    active_token = active_sessions.get(str(user_id))
+    return not (active_token and token != active_token)
+
+
 def register_session_guard(app):
     @app.before_request
     def _enforce_single_session():
@@ -99,9 +108,12 @@ def register_session_guard(app):
         if "user_id" not in session:
             return None
 
-        active_sessions = current_app.config.setdefault(ACTIVE_SESSION_REGISTRY_KEY, {})
-        active_token = active_sessions.get(str(session["user_id"]))
-        if active_token and session.get(SESSION_TOKEN_KEY) != active_token:
+        manager = get_user_manager()
+        if not _is_session_current(
+            manager,
+            session["user_id"],
+            session.get(SESSION_TOKEN_KEY),
+        ):
             session.clear()
             return error_response("Session expired", 401, "Session expired")
 
@@ -115,13 +127,15 @@ def require_permission(required_role):
             if "user_id" not in session:
                 return error_response("Please login first", 401, "Not logged in")
 
-            active_sessions = current_app.config.setdefault(ACTIVE_SESSION_REGISTRY_KEY, {})
-            active_token = active_sessions.get(str(session["user_id"]))
-            if active_token and session.get(SESSION_TOKEN_KEY) != active_token:
+            manager = get_user_manager()
+            if not _is_session_current(
+                manager,
+                session["user_id"],
+                session.get(SESSION_TOKEN_KEY),
+            ):
                 session.clear()
                 return error_response("Session expired", 401, "Session expired")
 
-            manager = get_user_manager()
             if not manager.check_permission(session["user_id"], required_role):
                 return error_response("Permission denied", 403, "Permission denied")
 

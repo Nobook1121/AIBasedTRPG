@@ -42,8 +42,8 @@
 - `POST /api/config/<config_name>`：保存通用配置。
 - `POST /api/config/aiplatform/<platform>`：保存 AI 平台配置。
 - `POST /api/config/aiplatform/<platform>/test`：测试 AI 平台连接。
-- `POST /api/config/aimodel/save`：保存 AI 模型配置脚本。
-- `POST /api/config/aimodel/delete`：删除 AI 模型配置脚本。
+- `POST /api/config/aimodel/save`：保存 AI 模型请求 JSON 配置。
+- `POST /api/config/aimodel/delete`：删除 AI 模型请求 JSON 配置。
 
 ## Chat
 

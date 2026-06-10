@@ -5,6 +5,7 @@ let isAIThinking = false;
 let messageTimestamps = [];
 let pendingMessages = [];
 let aiName = 'KP';
+let aiRoles = [{ id: 'kp', name: 'KP', wake_words: ['@KP'] }];
 let socket = null;
 
 function getCurrentUsername() {
@@ -28,11 +29,21 @@ function initChat() {
     const sendButton = document.getElementById('sendButton');
 
     updateAIHint();
+    loadAIRoles();
     initWebSocket();
 
     async function sendMessage() {
         const rawMessage = chatInput.value.trim();
         if (!rawMessage) return;
+        if (!window.currentUser) {
+            showNotification('请先登录后再发送消息', 'error');
+            showAuthModal?.();
+            return;
+        }
+        if (!getCurrentRoom()) {
+            showNotification('请先加入房间后再发送消息', 'error');
+            return;
+        }
 
         if (isAIThinking && document.getElementById('enableAIResponseLock')?.checked) {
             showNotification('请等待 AI 回复完成后再发送消息', 'error');
@@ -50,8 +61,9 @@ function initChat() {
             messageTimestamps.push(now);
         }
 
-        const isAIMessage = rawMessage.startsWith(`@${aiName}`);
-        const message = isAIMessage ? rawMessage.substring(aiName.length + 1).trim() : rawMessage;
+        const matchedRole = findRoleForMessage(rawMessage);
+        const isAIMessage = Boolean(matchedRole);
+        const message = rawMessage;
         if (!message) {
             showNotification('请输入消息内容', 'error');
             return;
@@ -78,6 +90,7 @@ function initChat() {
         pendingMessages.push({
             sender: getCurrentUsername(),
             content: message,
+            role: matchedRole,
             time: new Date().toLocaleTimeString(),
         });
 
@@ -97,6 +110,7 @@ function initChat() {
 
         const thinkingMessageId = Date.now();
         const startTime = Date.now();
+        const role = pendingMessages[0]?.role || aiRoles[0] || { id: 'kp', name: 'KP' };
         addThinkingMessage(thinkingMessageId);
 
         try {
@@ -105,6 +119,7 @@ function initChat() {
                 body: {
                     content: pendingMessages.map(m => m.content).join('\n'),
                     messages: pendingMessages,
+                    role_id: role.id || 'kp',
                     user_id: getCurrentUserId(),
                     room_id: getCurrentRoom()?.id || null,
                 },
@@ -125,14 +140,17 @@ function initChat() {
                 const persisted = await persistRoomMessage('kp', messageContent, {
                     processingTime,
                     tokenCount,
+                    roleId: role.id,
+                    senderName: role.name || 'KP',
                 });
+                if (persisted) persisted.sender_name = role.name || 'KP';
                 broadcastMessage(persisted);
             } else {
                 broadcastMessage({
                     type: 'kp',
-                    sender_name: 'KP',
+                    sender_name: role.name || 'KP',
                     content: messageContent,
-                    metadata: { processingTime, tokenCount },
+                    metadata: { processingTime, tokenCount, roleId: role.id },
                 });
             }
         } catch (error) {
@@ -182,11 +200,16 @@ async function persistRoomMessage(type, content, metadata = {}) {
     const room = getCurrentRoom();
     if (!room) return null;
 
-    const data = await TrpgApi.post(`/api/rooms/${room.id}/messages`, {
+    const payload = {
         type,
         content,
         metadata,
-    });
+    };
+    if (metadata.senderName) {
+        payload.sender_name = metadata.senderName;
+    }
+
+    const data = await TrpgApi.post(`/api/rooms/${room.id}/messages`, payload);
     if (!data.success) {
         throw new Error(data.message || '保存房间消息失败');
     }
@@ -198,6 +221,24 @@ function updateAIHint() {
     if (aiHint) {
         aiHint.textContent = `@${aiName}`;
     }
+}
+
+async function loadAIRoles() {
+    try {
+        const response = await TrpgApi.get('/api/config/roles');
+        if (response.success && response.data?.roles?.length) {
+            aiRoles = response.data.roles;
+            aiName = aiRoles[0]?.name || 'KP';
+            updateAIHint();
+        }
+    } catch (error) {
+        console.warn('加载AI角色配置失败，使用默认KP角色:', error);
+    }
+}
+
+function findRoleForMessage(message) {
+    const trimmedMessage = message.trim();
+    return aiRoles.find(role => (role.wake_words || []).some(wakeWord => trimmedMessage.startsWith(wakeWord)));
 }
 
 function setAIName(name) {
@@ -498,3 +539,4 @@ window.joinSocketRoom = joinSocketRoom;
 window.leaveSocketRoom = leaveSocketRoom;
 window.reconnectSocket = reconnectSocket;
 window.disconnectSocket = disconnectSocket;
+window.loadAIRoles = loadAIRoles;

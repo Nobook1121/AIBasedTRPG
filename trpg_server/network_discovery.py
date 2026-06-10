@@ -71,6 +71,27 @@ def get_local_ip():
         return "127.0.0.1"
 
 
+def get_local_ipv4_addresses():
+    addresses = ["127.0.0.1"]
+    candidates = [get_local_ip()]
+
+    try:
+        hostname = socket.gethostname()
+        candidates.extend(socket.gethostbyname_ex(hostname)[2])
+    except OSError:
+        logger.exception("Failed to enumerate local IPv4 addresses")
+
+    for address in candidates:
+        if not address:
+            continue
+        if address.startswith("169.254."):
+            continue
+        if address not in addresses:
+            addresses.append(address)
+
+    return addresses
+
+
 def get_network_config(path=NETWORK_CONFIG_FILE):
     data = read_json(path, default=None)
     if not data:

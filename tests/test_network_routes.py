@@ -1,6 +1,7 @@
 import json
 
 from trpg_server.app_factory import create_app
+import trpg_server.network_discovery as network_discovery
 from trpg_server.network_discovery import get_network_config, get_penetration_config
 
 
@@ -108,3 +109,21 @@ def test_default_penetration_config_returns_independent_nested_copy(tmp_path):
     second = get_penetration_config(missing_config)
 
     assert second["settings"]["auth_token"] == ""
+
+
+def test_get_local_ipv4_addresses_includes_hostname_addresses(monkeypatch):
+    monkeypatch.setattr(network_discovery.socket, "gethostname", lambda: "host")
+    monkeypatch.setattr(
+        network_discovery.socket,
+        "gethostbyname_ex",
+        lambda hostname: (
+            hostname,
+            [],
+            ["192.168.192.31", "192.168.0.169", "169.254.1.2", "127.0.0.1", "192.168.192.31"],
+        ),
+    )
+    monkeypatch.setattr(network_discovery, "get_local_ip", lambda: "10.0.0.5")
+
+    addresses = network_discovery.get_local_ipv4_addresses()
+
+    assert addresses == ["127.0.0.1", "10.0.0.5", "192.168.192.31", "192.168.0.169"]

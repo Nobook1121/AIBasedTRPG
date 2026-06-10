@@ -339,7 +339,13 @@ def create_room_message(room_id):
     _write_messages(room_dir, messages)
     _write_room(room_dir, info)
 
-    logger.info("Room message room_id=%s sender_id=%s type=%s", room_id, session["user_id"], message["type"])
+    logger.info(
+        "Room message room_id=%s sender_id=%s type=%s content=%s",
+        room_id,
+        session["user_id"],
+        message["type"],
+        content,
+    )
     return success_response(message, "Room message saved successfully", 201)
 
 

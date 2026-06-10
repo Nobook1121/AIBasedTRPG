@@ -28,7 +28,7 @@ function getLastRoomStorageKey() {
 }
 
 async function openCreateRoomModal() {
-    const scenarioSelect = document.getElementById('saveScenario');
+    const scenarioSelect = document.getElementById('roomScenarioSelect');
     if (scenarioSelect) {
         scenarioSelect.innerHTML = '<option value="">请选择剧本</option>';
         try {
@@ -54,7 +54,7 @@ async function openCreateRoomModal() {
 
 async function createRoom() {
     const roomName = document.getElementById('saveName')?.value?.trim();
-    const scenarioSelect = document.getElementById('saveScenario');
+    const scenarioSelect = document.getElementById('roomScenarioSelect');
     const scenarioId = scenarioSelect?.value;
     const selectedOption = scenarioSelect?.options[scenarioSelect?.selectedIndex];
     const scenarioTitle = selectedOption?.dataset?.title || '';
@@ -222,7 +222,7 @@ function updateRoomStatusBar(room) {
 
     statusBar.style.display = 'block';
     if (statusName) statusName.textContent = room.name;
-    if (statusScenario) statusScenario.textContent = room.scenario_title ? `剧本：${room.scenario_title}` : '';
+    if (statusScenario) statusScenario.textContent = room.scenario_title || '-';
 }
 
 async function deleteCurrentRoom() {

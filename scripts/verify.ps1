@@ -46,9 +46,9 @@ try {
   $jsFiles = @(
     "tools\diceTool.js",
     "tools\toolManager.js",
-    "config\TestRequestConfig.js",
-    "config\ConfigManager.js",
-    "config\AIPlatformManager.js",
+    "js\config\TestRequestConfig.js",
+    "js\config\ConfigManager.js",
+    "js\config\AIPlatformManager.js",
     "js\api-client.js",
     "js\dom-utils.js",
     "js\models\ScenarioModel.js",

@@ -5,6 +5,8 @@ async function initAIPlatforms() {
     try {
         const platforms = await aiPlatformManager.loadPlatforms();
         renderPlatforms(platforms);
+        bindRoleConfigSettings();
+        await loadRoleConfigs();
         bindAddModelEvents();
         bindAPITestEvents();
         console.log('AI平台管理初始化完成');
@@ -22,6 +24,124 @@ function renderPlatforms(platforms) {
         const card = createPlatformCard(platform);
         container.appendChild(card);
     });
+}
+
+function bindRoleConfigSettings() {
+    const list = document.getElementById('roleConfigList');
+    if (!list || list.dataset.bound === 'true') return;
+
+    list.dataset.bound = 'true';
+    list.addEventListener('click', async function(event) {
+        const button = event.target.closest('.save-role-config');
+        if (!button) return;
+        await saveRoleConfig(button.getAttribute('data-role-id'));
+    });
+}
+
+async function loadRoleConfigs() {
+    const list = document.getElementById('roleConfigList');
+    if (!list) return;
+
+    try {
+        const response = await TrpgApi.get('/api/config/roles');
+        if (!response.success) {
+            setRoleConfigMessage(response.error || response.message || '加载角色配置失败', true);
+            return;
+        }
+        renderRoleConfigCards(response.data?.roles || [], response.data?.enabled_providers || []);
+        setRoleConfigMessage('');
+    } catch (error) {
+        console.error('加载角色配置失败:', error);
+        setRoleConfigMessage('加载角色配置失败，请确认当前账号具有管理员权限', true);
+    }
+}
+
+function renderRoleConfigCards(roles, providers) {
+    const list = document.getElementById('roleConfigList');
+    if (!list) return;
+
+    if (!roles.length) {
+        list.innerHTML = '<div class="role-config-card">暂无角色配置</div>';
+        return;
+    }
+
+    list.innerHTML = roles.map(role => {
+        const providerOptions = providers.map(provider => {
+            const selected = provider.id === role.provider ? 'selected' : '';
+            return `<option value="${escapeHtml(provider.id)}" ${selected}>${escapeHtml(provider.name)}</option>`;
+        }).join('');
+        const wakeWords = (role.wake_words || []).join(', ');
+        return `
+            <article class="role-config-card" data-role-id="${escapeHtml(role.id)}">
+                <div class="role-config-card-header">
+                    <div>
+                        <h5 class="role-config-card-title">${escapeHtml(role.name)}</h5>
+                        <div class="role-config-wake">${escapeHtml(wakeWords || '@' + role.name)}</div>
+                    </div>
+                    <button type="button" class="btn btn-primary save-role-config" data-role-id="${escapeHtml(role.id)}">
+                        <i class="fa fa-floppy-o" aria-hidden="true"></i> 保存
+                    </button>
+                </div>
+                <label class="form-label" for="roleWakeWords-${escapeHtml(role.id)}">唤醒词</label>
+                <input class="form-control role-wake-input" id="roleWakeWords-${escapeHtml(role.id)}" value="${escapeHtml(wakeWords)}" placeholder="@KP, @Keeper">
+                <label class="form-label" for="roleProvider-${escapeHtml(role.id)}">大模型提供商</label>
+                <select class="form-control role-provider-select" id="roleProvider-${escapeHtml(role.id)}">
+                    ${providerOptions}
+                </select>
+                <label class="form-label" for="rolePrompt-${escapeHtml(role.id)}">角色提示词</label>
+                <textarea class="form-control role-config-prompt" id="rolePrompt-${escapeHtml(role.id)}" rows="8">${escapeHtml(role.prompt || '')}</textarea>
+            </article>
+        `;
+    }).join('');
+}
+
+async function saveRoleConfig(roleId) {
+    const card = document.querySelector(`.role-config-card[data-role-id="${CSS.escape(roleId)}"]`);
+    if (!card) return;
+
+    const wakeWords = card.querySelector('.role-wake-input').value
+        .split(',')
+        .map(item => item.trim())
+        .filter(Boolean);
+    const provider = card.querySelector('.role-provider-select').value;
+    const prompt = card.querySelector('.role-config-prompt').value;
+
+    try {
+        const response = await TrpgApi.post(`/api/config/roles/${encodeURIComponent(roleId)}`, {
+            name: card.querySelector('.role-config-card-title')?.textContent || roleId,
+            wake_words: wakeWords,
+            provider,
+            prompt
+        });
+        if (!response.success) {
+            setRoleConfigMessage(response.error || response.message || '保存角色配置失败', true);
+            return;
+        }
+        setRoleConfigMessage('角色配置已保存');
+        window.loadAIRoles?.();
+        await loadRoleConfigs();
+    } catch (error) {
+        console.error('保存角色配置失败:', error);
+        setRoleConfigMessage('保存角色配置失败，请稍后重试', true);
+    }
+}
+
+function setRoleConfigMessage(message, isError = false) {
+    const messageElement = document.getElementById('roleConfigMessage');
+    if (!messageElement) return;
+
+    messageElement.textContent = message;
+    messageElement.classList.toggle('error', Boolean(isError));
+    messageElement.classList.toggle('success', Boolean(message && !isError));
+}
+
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 function createPlatformCard(platform) {
@@ -528,24 +648,26 @@ async function configModel(platform, modelId) {
         const model = platformConfig.models.find(m => m.id === modelId);
         if (!model) throw new Error('模型不存在');
 
-        let modelJSConfig = '';
+        let modelRequestConfig = '';
         try {
-            const response = await fetch(`config/aimodel/${platform}/${modelId}.js`);
+            const response = await fetch(`config/aimodel/${platform}/${modelId}.json`);
             if (response.ok) {
-                modelJSConfig = await response.text();
+                modelRequestConfig = JSON.stringify(await response.json(), null, 2);
             } else {
-                const defaultResponse = await fetch('config/aiplatform/default.js');
+                const defaultResponse = await fetch('config/aiplatform/default-request.json');
                 if (defaultResponse.ok) {
-                    modelJSConfig = await defaultResponse.text();
-                    modelJSConfig = modelJSConfig.replace(/model: '1'/g, `model: '${modelId}'`);
+                    const defaultConfig = await defaultResponse.json();
+                    defaultConfig.model = modelId;
+                    modelRequestConfig = JSON.stringify(defaultConfig, null, 2);
                 }
             }
         } catch (error) {
-            console.error('加载模型JS配置失败:', error);
-            const defaultResponse = await fetch('config/aiplatform/default.js');
+            console.error('加载模型请求配置失败:', error);
+            const defaultResponse = await fetch('config/aiplatform/default-request.json');
             if (defaultResponse.ok) {
-                modelJSConfig = await defaultResponse.text();
-                modelJSConfig = modelJSConfig.replace(/model: '1'/g, `model: '${modelId}'`);
+                const defaultConfig = await defaultResponse.json();
+                defaultConfig.model = modelId;
+                modelRequestConfig = JSON.stringify(defaultConfig, null, 2);
             }
         }
 
@@ -565,8 +687,8 @@ async function configModel(platform, modelId) {
                     </div>
                     <div class="modal-body">
                         <div class="form-group">
-                            <label for="modelJSConfig">JS配置</label>
-                            <textarea class="form-control" id="modelJSConfig" rows="20">${modelJSConfig}</textarea>
+                            <label for="modelRequestConfig">JSON配置</label>
+                            <textarea class="form-control" id="modelRequestConfig" rows="20">${modelRequestConfig}</textarea>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -584,26 +706,26 @@ async function configModel(platform, modelId) {
 
         document.getElementById('saveModelConfigBtn').addEventListener('click', async function() {
             try {
-                const jsConfig = document.getElementById('modelJSConfig').value;
+                const requestConfig = JSON.parse(document.getElementById('modelRequestConfig').value);
 
                 const { response: saveResponse } = await TrpgApi.requestWithResponse('/api/config/aimodel/save', {
                     method: 'POST',
                     body: {
                         platform: platform,
                         modelId: modelId,
-                        content: jsConfig
+                        content: requestConfig
                     }
                 });
 
                 if (saveResponse.ok) {
-                    alert('JS配置保存成功');
+                    alert('JSON配置保存成功');
                     modal.hide();
                 } else {
-                    throw new Error('保存JS配置失败');
+                    throw new Error('保存JSON配置失败');
                 }
             } catch (error) {
-                console.error('保存JS配置失败:', error);
-                alert('保存JS配置失败: ' + error.message);
+                console.error('保存JSON配置失败:', error);
+                alert('保存JSON配置失败: ' + error.message);
             }
         });
 

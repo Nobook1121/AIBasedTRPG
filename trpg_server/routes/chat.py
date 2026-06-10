@@ -7,6 +7,7 @@ from flask import Blueprint, current_app, request
 
 from trpg_server.json_store import read_json, write_json_atomic
 from trpg_server.responses import error_response, success_response
+from trpg_server.role_config import load_roles, select_role_for_content
 from trpg_server.settings import BASE_DIR, CONFIG_DIR
 
 bp = Blueprint("chat", __name__)
@@ -41,13 +42,19 @@ def _get_kp_prompt_file():
     return current_app.config.get("KP_PROMPT_FILE", CONFIG_DIR / "roles" / "kp.md")
 
 
-def _load_enabled_platform():
+def _get_role_config_file():
+    return current_app.config.get("ROLE_CONFIG_FILE", CONFIG_DIR / "roles" / "roles.json")
+
+
+def _load_enabled_platform(provider_id=None):
     platform_dir = _get_ai_platform_dir()
     if not platform_dir.exists():
         logger.warning("AI platform config directory does not exist: %s", platform_dir)
         return None, None
 
     for path in platform_dir.glob("*.json"):
+        if provider_id and path.stem != provider_id:
+            continue
         try:
             config = read_json(path, default={})
         except (json.JSONDecodeError, OSError):
@@ -58,6 +65,11 @@ def _load_enabled_platform():
             return path.stem, config
 
     return None, None
+
+
+def _load_role_for_content(content):
+    roles = load_roles(_get_role_config_file(), _get_kp_prompt_file(), _get_ai_platform_dir())
+    return select_role_for_content(roles, content)
 
 
 def _load_kp_prompt():
@@ -128,7 +140,8 @@ def chat():
 
         user_id = message_data.get("user_id", "unknown")
         content = message_data.get("content", "")
-        selected_platform, platform_config = _load_enabled_platform()
+        role_config = _load_role_for_content(content)
+        selected_platform, platform_config = _load_enabled_platform(role_config.get("provider"))
         if not platform_config:
             return error_response(
                 "No enabled AI platform",
@@ -156,7 +169,7 @@ def chat():
 
         history_file, history = _load_history(user_id)
         request_data = {
-            "messages": _build_messages(_load_kp_prompt(), history, content),
+            "messages": _build_messages(role_config.get("prompt") or _load_kp_prompt(), history, content),
             "model": _select_model(platform_config),
             "max_tokens": 4096,
             "temperature": 0.7,
@@ -168,11 +181,13 @@ def chat():
         }
 
         logger.info(
-            "Sending chat request platform=%s base_url=%s model=%s user_id=%s",
+            "Sending chat request role=%s platform=%s base_url=%s model=%s user_id=%s request_content=%s",
+            role_config.get("id"),
             selected_platform,
             base_url,
             request_data["model"],
             user_id,
+            content,
         )
         response = requests.post(base_url, headers=headers, json=request_data, timeout=300)
         if not response.ok:
@@ -190,6 +205,13 @@ def chat():
                 400,
                 "No response",
             )
+        logger.info(
+            "AI response received platform=%s model=%s user_id=%s ai_response=%s",
+            selected_platform,
+            request_data["model"],
+            user_id,
+            ai_response,
+        )
 
         history.extend(
             [
