@@ -7,4 +7,6 @@ __pycache__/
 history/
 .worktrees/
 node_modules/
-tests/
+/js/
+tests/**/__pycache__/
+users/*.sqlite3
