@@ -1,55 +1,37 @@
-// @ts-nocheck
-// 工具管理器模块
-// 改为普通脚本，使用全局变量
+"use strict";
 class ToolManager {
+    tools;
+    commands;
     constructor() {
         this.tools = {
-            dice: new DiceTool()
+            dice: new DiceTool(),
         };
         this.commands = {
-            '/dice': this.handleDiceCommand.bind(this)
+            "/dice": this.handleDiceCommand.bind(this),
         };
     }
-    /**
-     * 处理骰子命令
-     * @param {string} command - 完整的命令，如 '/dice 1d6'
-     * @returns {string} 命令执行结果
-     */
     handleDiceCommand(command) {
         return this.tools.dice.handleDiceCommand(command);
     }
-    /**
-     * 处理命令
-     * @param {string} command - 完整的命令
-     * @returns {string|null} 命令执行结果，如果不是命令则返回 null
-     */
     handleCommand(command) {
-        // 检查是否是命令格式
-        if (!command.startsWith('/')) {
+        if (!command.startsWith("/")) {
             return null;
         }
-        // 提取命令名称
-        const commandName = command.split(' ')[0].toLowerCase();
-        // 检查是否是已注册的命令
-        if (this.commands[commandName]) {
-            return this.commands[commandName](command);
-        }
-        return '未知命令，请查看可用命令列表';
+        const commandName = (command.split(" ")[0] || "").toLowerCase();
+        const handler = this.commands[commandName];
+        return handler ? handler(command) : "未知命令，请查看可用命令列表";
     }
-    /**
-     * 获取所有工具
-     * @returns {Object} 工具对象
-     */
     getTools() {
         return this.tools;
     }
-    /**
-     * 获取所有命令
-     * @returns {Array} 命令列表
-     */
     getCommands() {
         return Object.keys(this.commands);
     }
+    recordCharacterChange(payload) {
+        if (typeof window.recordCharacterChange === "function") {
+            return window.recordCharacterChange(payload);
+        }
+        return Promise.resolve(null);
+    }
 }
-// 导出为全局变量
 window.ToolManager = ToolManager;

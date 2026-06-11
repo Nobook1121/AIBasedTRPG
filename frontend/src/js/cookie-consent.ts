@@ -1,44 +1,40 @@
-// @ts-nocheck
-// Optional preference-cookie consent and small cookie helpers.
-
-(function initCookieConsent(global) {
-    const CONSENT_COOKIE = 'trpg_cookie_consent';
+(function initCookieConsent(global: Window): void {
+    const CONSENT_COOKIE = "trpg_cookie_consent";
     const MAX_AGE_DAYS = 180;
 
-    function get(name) {
+    function get(name: string): string {
         const prefix = `${encodeURIComponent(name)}=`;
         const item = document.cookie
-            .split(';')
-            .map(part => part.trim())
-            .find(part => part.startsWith(prefix));
-        if (!item) return '';
-        return decodeURIComponent(item.slice(prefix.length));
+            .split(";")
+            .map((part) => part.trim())
+            .find((part) => part.startsWith(prefix));
+        return item ? decodeURIComponent(item.slice(prefix.length)) : "";
     }
 
-    function set(name, value, days = MAX_AGE_DAYS) {
+    function set(name: string, value: string, days = MAX_AGE_DAYS): void {
         if (!hasConsent() && name !== CONSENT_COOKIE) return;
         const maxAge = Math.max(1, days) * 24 * 60 * 60;
-        document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value || '')}; Max-Age=${maxAge}; Path=/; SameSite=Lax`;
+        document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value || "")}; Max-Age=${maxAge}; Path=/; SameSite=Lax`;
     }
 
-    function remove(name) {
+    function remove(name: string): void {
         document.cookie = `${encodeURIComponent(name)}=; Max-Age=0; Path=/; SameSite=Lax`;
     }
 
-    function hasConsent() {
-        return get(CONSENT_COOKIE) === 'accepted';
+    function hasConsent(): boolean {
+        return get(CONSENT_COOKIE) === "accepted";
     }
 
-    function hasAnswered() {
-        return ['accepted', 'declined'].includes(get(CONSENT_COOKIE));
+    function hasAnswered(): boolean {
+        return ["accepted", "declined"].includes(get(CONSENT_COOKIE));
     }
 
-    function showCookieConsentBanner() {
-        if (hasAnswered() || document.getElementById('cookieConsentBanner')) return;
+    function showCookieConsentBanner(): void {
+        if (hasAnswered() || document.getElementById("cookieConsentBanner")) return;
 
-        const banner = document.createElement('div');
-        banner.id = 'cookieConsentBanner';
-        banner.className = 'cookie-consent-banner';
+        const banner = document.createElement("div");
+        banner.id = "cookieConsentBanner";
+        banner.className = "cookie-consent-banner";
         banner.innerHTML = `
             <div class="cookie-consent-text">
                 本应用使用必要登录 Cookie 保持会话；可选 Cookie 用于记住上次用户名和房间偏好。
@@ -50,11 +46,11 @@
         `;
         document.body.appendChild(banner);
 
-        document.getElementById('acceptCookieConsent').addEventListener('click', function() {
-            set(CONSENT_COOKIE, 'accepted');
+        document.getElementById("acceptCookieConsent")?.addEventListener("click", () => {
+            set(CONSENT_COOKIE, "accepted");
             banner.remove();
         });
-        document.getElementById('declineCookieConsent').addEventListener('click', function() {
+        document.getElementById("declineCookieConsent")?.addEventListener("click", () => {
             document.cookie = `${CONSENT_COOKIE}=declined; Max-Age=${MAX_AGE_DAYS * 24 * 60 * 60}; Path=/; SameSite=Lax`;
             banner.remove();
         });
@@ -69,5 +65,5 @@
     };
     window.TrpgCookies = global.TrpgCookies;
 
-    document.addEventListener('DOMContentLoaded', showCookieConsentBanner);
+    document.addEventListener("DOMContentLoaded", showCookieConsentBanner);
 })(window);

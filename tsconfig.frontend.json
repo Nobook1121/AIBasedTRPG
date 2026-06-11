@@ -3,9 +3,7 @@
   "compilerOptions": {
     "module": "none",
     "moduleResolution": "Classic",
-    "strict": false,
-    "exactOptionalPropertyTypes": false,
-    "noUncheckedIndexedAccess": false,
+    "strict": true,
     "noEmit": false,
     "rootDir": "frontend/src",
     "outDir": "."

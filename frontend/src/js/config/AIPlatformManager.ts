@@ -1,359 +1,188 @@
-// @ts-nocheck
-// AI平台管理模块
-// 负责加载、管理和配置AI平台
-
-// 改为普通脚本，使用全局变量
 class AIPlatformManager {
-    constructor() {
-        this.platforms = {};
-        this.platformsPath = 'config/aiplatform';
-        this.currentPlatform = null;
+    private readonly platforms: Record<string, AIPlatformConfig> = {};
+    private readonly platformsPath = "config/aiplatform";
+
+    async loadPlatforms(): Promise<AIPlatformConfig[]> {
+        const platformIds = ["aliyun", "siliconflow", "deepseek", "openrouter", "lmstudio"];
+        const results = await Promise.all(platformIds.map((platform) => this.loadPlatform(platform)));
+        return results.filter((platform): platform is AIPlatformConfig => platform !== null);
     }
 
-    /**
-     * 加载所有AI平台配置
-     * @returns {Promise<Array>} 平台列表
-     */
-    async loadPlatforms() {
-        try {
-            const platforms = ['aliyun', 'siliconflow', 'deepseek', 'openrouter', 'lmstudio'];
-            const platformPromises = platforms.map(async (platform) => {
-                try {
-                    const response = await fetch(`${this.platformsPath}/${platform}.json`);
-                    if (!response.ok) {
-                        throw new Error(`无法加载平台配置: ${platform}`);
-                    }
-                    const config = await response.json();
-                    this.platforms[platform] = config;
-                    return config;
-                } catch (error) {
-                    console.error(`加载平台 ${platform} 失败:`, error);
-                    return null;
-                }
-            });
-
-            const results = await Promise.all(platformPromises);
-            return results.filter(Boolean);
-        } catch (error) {
-            console.error('加载平台配置失败:', error);
-            return [];
-        }
-    }
-
-    /**
-     * 获取平台配置
-     * @param {string} platform - 平台名称
-     * @returns {Object|null} 平台配置
-     */
-    getPlatform(platform) {
+    getPlatform(platform: string): AIPlatformConfig | null {
         return this.platforms[platform] || null;
     }
 
-    /**
-     * 获取所有平台
-     * @returns {Array} 平台列表
-     */
-    getAllPlatforms() {
+    getAllPlatforms(): AIPlatformConfig[] {
         return Object.values(this.platforms);
     }
 
-    /**
-     * 启用/禁用平台
-     * @param {string} platform - 平台名称
-     * @param {boolean} enabled - 是否启用
-     * @returns {Promise<boolean>} 是否成功
-     */
-    async setPlatformEnabled(platform, enabled) {
-        try {
-            const config = this.platforms[platform];
-            if (!config) {
-                throw new Error('平台不存在');
-            }
-
-            config.enabled = enabled;
-            await this.savePlatformConfig(platform, config);
-            this.platforms[platform] = config;
-            return true;
-        } catch (error) {
-            console.error('设置平台状态失败:', error);
-            return false;
-        }
+    async setPlatformEnabled(platform: string, enabled: boolean): Promise<boolean> {
+        const config = this.getPlatform(platform);
+        if (!config) return false;
+        config.enabled = enabled;
+        return this.updatePlatformConfig(platform, config);
     }
 
-    /**
-     * 更新平台配置
-     * @param {string} platform - 平台名称
-     * @param {Object} config - 配置对象
-     * @returns {Promise<boolean>} 是否成功
-     */
-    async updatePlatformConfig(platform, config) {
+    async updatePlatformConfig(platform: string, config: AIPlatformConfig): Promise<boolean> {
         try {
             await this.savePlatformConfig(platform, config);
             this.platforms[platform] = config;
             return true;
         } catch (error) {
-            console.error('更新平台配置失败:', error);
+            console.error("更新平台配置失败:", error);
             return false;
         }
     }
 
-    /**
-     * 保存平台配置
-     * @param {string} platform - 平台名称
-     * @param {Object} config - 配置对象
-     * @returns {Promise<void>}
-     */
-    async savePlatformConfig(platform, config) {
-        try {
-            const { response, data } = await TrpgApi.requestWithResponse(`/api/config/aiplatform/${platform}`, {
-                method: 'POST',
-                body: config
-            });
+    async savePlatformConfig(platform: string, config: AIPlatformConfig): Promise<boolean> {
+        const { response, data } = await TrpgApi.requestWithResponse<ApiResponse>(`/api/config/aiplatform/${platform}`, {
+            method: "POST",
+            body: config,
+        });
 
-            if (!response.ok) {
-                throw new Error('保存配置失败');
-            }
-
-            const result = data;
-            if (!result.success) {
-                throw new Error(result.message || '保存配置失败');
-            }
-            
-            return true;
-        } catch (error) {
-            console.error('保存平台配置失败:', error);
-            throw error;
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || data.error || "保存配置失败");
         }
+        return true;
     }
 
-    /**
-     * 添加模型
-     * @param {string} platform - 平台名称
-     * @param {Object} model - 模型对象
-     * @returns {Promise<boolean>} 是否成功
-     */
-    async addModel(platform, model) {
+    async addModel(
+        platform: string,
+        model: Pick<AIModelConfig, "id" | "name"> & Partial<Pick<AIModelConfig, "description">>,
+    ): Promise<boolean> {
         try {
-            const config = this.platforms[platform];
-            if (!config) {
-                throw new Error('平台不存在');
-            }
+            const config = this.getPlatform(platform);
+            if (!config) throw new Error("平台不存在");
 
             config.models.push({
                 id: model.id,
                 name: model.name,
-                description: model.description || '',
+                description: model.description || "",
                 enabled: true,
                 params: {
                     context_window: 8192,
                     temperature: 0.7,
                     top_p: 0.95,
-                    max_tokens: 4096
-                }
+                    max_tokens: 4096,
+                },
             });
 
-            // 生成模型请求配置文件
             await this.generateModelRequestConfig(platform, model.id);
-
             await this.savePlatformConfig(platform, config);
             this.platforms[platform] = config;
             return true;
         } catch (error) {
-            console.error('添加模型失败:', error);
+            console.error("添加模型失败:", error);
             return false;
         }
     }
 
-    /**
-     * 生成模型请求配置文件
-     * @param {string} platform - 平台名称
-     * @param {string} modelId - 模型ID
-     * @returns {Promise<void>}
-     */
-    async generateModelRequestConfig(platform, modelId) {
+    async removeModel(platform: string, modelId: string): Promise<boolean> {
         try {
-            const response = await fetch('config/aiplatform/default-request.json');
-            if (!response.ok) {
-                throw new Error('无法加载默认模型请求配置');
-            }
-            const requestConfig = await response.json();
-            requestConfig.model = modelId;
+            const config = this.getPlatform(platform);
+            if (!config) throw new Error("平台不存在");
 
-            const filePath = `config/aimodel/${platform}/${modelId}.json`;
-            
-            const { response: saveResponse } = await TrpgApi.requestWithResponse('/api/config/aimodel/save', {
-                method: 'POST',
-                body: {
-                    platform: platform,
-                    modelId: modelId,
-                    content: requestConfig
-                }
-            });
-
-            if (!saveResponse.ok) {
-                throw new Error('保存模型请求配置失败');
-            }
-
-            console.log(`模型请求配置已生成: ${filePath}`);
-        } catch (error) {
-            console.error('生成模型请求配置失败:', error);
-            throw error;
-        }
-    }
-
-    /**
-     * 移除模型
-     * @param {string} platform - 平台名称
-     * @param {string} modelId - 模型ID
-     * @returns {Promise<boolean>} 是否成功
-     */
-    async removeModel(platform, modelId) {
-        try {
-            const config = this.platforms[platform];
-            if (!config) {
-                throw new Error('平台不存在');
-            }
-
-            const modelIndex = config.models.findIndex(m => m.id === modelId);
-            if (modelIndex === -1) {
-                throw new Error('模型不存在');
-            }
+            const modelIndex = config.models.findIndex((model) => model.id === modelId);
+            if (modelIndex === -1) throw new Error("模型不存在");
 
             config.models.splice(modelIndex, 1);
-            
-            // 删除模型请求配置文件
             await this.deleteModelRequestConfig(platform, modelId);
-            
             await this.savePlatformConfig(platform, config);
             this.platforms[platform] = config;
             return true;
         } catch (error) {
-            console.error('移除模型失败:', error);
+            console.error("移除模型失败:", error);
             return false;
         }
     }
 
-    /**
-     * 删除模型请求配置文件
-     * @param {string} platform - 平台名称
-     * @param {string} modelId - 模型ID
-     * @returns {Promise<void>}
-     */
-    async deleteModelRequestConfig(platform, modelId) {
+    async generateModelRequestConfig(platform: string, modelId: string): Promise<void> {
+        const defaultConfig = await this.getDefaultRequestConfig();
+        const requestConfig: Record<string, unknown> = {
+            ...defaultConfig,
+            model: modelId,
+        };
+
+        const { response } = await TrpgApi.requestWithResponse<ApiResponse>("/api/config/aimodel/save", {
+            method: "POST",
+            body: {
+                platform,
+                modelId,
+                content: requestConfig,
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error("保存模型请求配置失败");
+        }
+        console.log(`模型请求配置已生成: config/aimodel/${platform}/${modelId}.json`);
+    }
+
+    async deleteModelRequestConfig(platform: string, modelId: string): Promise<void> {
         try {
-            const { response: deleteResponse } = await TrpgApi.requestWithResponse('/api/config/aimodel/delete', {
-                method: 'POST',
+            const { response } = await TrpgApi.requestWithResponse<ApiResponse>("/api/config/aimodel/delete", {
+                method: "POST",
                 body: {
-                    platform: platform,
-                    modelId: modelId
-                }
+                    platform,
+                    modelId,
+                },
             });
 
-            if (!deleteResponse.ok) {
-                throw new Error('删除模型请求配置失败');
+            if (!response.ok) {
+                throw new Error("删除模型请求配置失败");
             }
-
             console.log(`模型请求配置已删除: config/aimodel/${platform}/${modelId}.json`);
         } catch (error) {
-            console.error('删除模型请求配置失败:', error);
+            console.error("删除模型请求配置失败:", error);
         }
     }
 
-    /**
-     * 获取默认模型请求配置
-     * @returns {Object} 默认模型请求配置
-     */
-    async getDefaultRequestConfig() {
+    async getDefaultRequestConfig(): Promise<Record<string, unknown>> {
         try {
-            const response = await fetch('config/aiplatform/default-request.json');
-            if (!response.ok) {
-                throw new Error('无法加载默认模型请求配置');
-            }
-            return await response.json();
+            const response = await fetch("config/aiplatform/default-request.json");
+            if (!response.ok) throw new Error("无法加载默认模型请求配置");
+            const parsed = await response.json() as unknown;
+            return aiPlatformIsRecord(parsed) ? parsed : {};
         } catch (error) {
-            console.error('获取默认模型请求配置失败:', error);
+            console.error("获取默认模型请求配置失败:", error);
             return {};
         }
     }
 
-    /**
-     * 测试API连接
-     * @param {string} platform - 平台名称
-     * @param {string} modelId - 模型ID
-     * @returns {Promise<Object>} 测试结果
-     */
-    async testAPI(platform, modelId) {
+    async testAPI(platform: string, modelId: string): Promise<AITestResult> {
         try {
-            const config = this.platforms[platform];
-            if (!config) {
-                throw new Error('平台不存在');
-            }
+            const config = this.getPlatform(platform);
+            if (!config) throw new Error("平台配置不存在");
+            if (!config.enabled) throw new Error("平台未启用");
+            if (!config.config.api_key && platform !== "lmstudio") throw new Error("API Key 未设置");
 
-            if (!config.enabled) {
-                throw new Error('平台未启用');
-            }
+            const model = config.models.find((item) => item.id === modelId);
+            if (!model) throw new Error("模型不存在");
 
-            // LMStudio平台可以跳过API Key检查，因为LMStudio会忽略API Key
-            if (!config.config.api_key && platform !== 'lmstudio') {
-                throw new Error('API Key未设置');
-            }
-
-            const model = config.models.find(m => m.id === modelId);
-            if (!model) {
-                throw new Error('模型不存在');
-            }
-
-            // 记录测试开始时间
             const startTime = Date.now();
-
-            // 从配置文件中获取测试请求配置
-            const testConfig = getTestRequestConfig(modelId);
-            
-            // 构建测试请求
             const testRequest = {
                 model: modelId,
-                ...testConfig
+                ...getTestRequestConfig(modelId),
             };
 
-            // 在控制台输出请求的消息
-            console.log('API测试请求:', testRequest);
+            console.log("API 测试请求:", testRequest);
+            const { response, data } = await TrpgApi.requestWithResponse<AIPlatformTestResponse>(
+                `/api/config/aiplatform/${platform}/test`,
+                {
+                    method: "POST",
+                    body: testRequest,
+                    timeout: config.config.timeout * 1000,
+                },
+            );
 
-            // 发送测试请求到服务器端，由服务器端转发并记录日志
-            const { response, data } = await TrpgApi.requestWithResponse(`/api/config/aiplatform/${platform}/test`, {
-                method: 'POST',
-                body: testRequest,
-                timeout: config.config.timeout * 1000
-            });
-
-            // 记录测试结束时间
-            const endTime = Date.now();
-            const duration = (endTime - startTime) / 1000;
-
-            if (!response.ok) {
-                const errorData = data || {};
-                throw new Error(errorData.error || `API请求失败: ${response.status}`);
+            const duration = (Date.now() - startTime) / 1000;
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || data.message || `API 请求失败: ${response.status}`);
             }
 
-            const serverResponse = data;
-
-            // 在控制台输出模型回复的消息
-            console.log('API测试响应:', serverResponse);
-
-            // 处理服务器端返回的响应格式
-            if (!serverResponse.success) {
-                throw new Error(serverResponse.error || 'API测试失败');
-            }
-
-            const result = serverResponse.response;
-
-            // 处理阿里云百炼API的响应格式
-            let totalTokens = 0;
-            if (result.usage) {
-                totalTokens = result.usage.total_tokens || 0;
-            } else if (result.output && result.output.usage) {
-                totalTokens = result.output.usage.total_tokens || 0;
-            }
-            const tokenSpeed = totalTokens / duration;
+            const result = data.response;
+            const totalTokens = extractTotalTokens(result);
+            const tokenSpeed = duration > 0 ? totalTokens / duration : 0;
 
             return {
                 success: true,
@@ -362,22 +191,75 @@ class AIPlatformManager {
                 speed: `${tokenSpeed.toFixed(2)} token/s`,
                 consumption: `${totalTokens} tokens`,
                 duration: `${duration.toFixed(2)}s`,
-                response: result
+                response: result,
             };
         } catch (error) {
-            console.error('API测试失败:', error);
+            console.error("API 测试失败:", error);
             return {
                 success: false,
-                error: error.message
+                error: aiPlatformErrorMessage(error),
             };
         }
     }
 
+    private async loadPlatform(platform: string): Promise<AIPlatformConfig | null> {
+        try {
+            const response = await fetch(`${this.platformsPath}/${platform}.json`);
+            if (!response.ok) throw new Error(`无法加载平台配置: ${platform}`);
+            const config = await response.json() as unknown;
+            if (!isAIPlatformConfig(config)) throw new Error(`平台配置格式错误: ${platform}`);
+            this.platforms[platform] = config;
+            return config;
+        } catch (error) {
+            console.error(`加载平台 ${platform} 失败:`, error);
+            return null;
+        }
+    }
 }
 
+interface AIPlatformTestResponse extends ApiResponse {
+    response?: unknown;
+}
 
-// 创建全局AI平台管理器实例
+function aiPlatformIsRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null;
+}
+
+function isAIPlatformConfig(value: unknown): value is AIPlatformConfig {
+    if (!aiPlatformIsRecord(value)) return false;
+    return typeof value.platform === "string"
+        && typeof value.name === "string"
+        && typeof value.description === "string"
+        && typeof value.icon === "string"
+        && typeof value.enabled === "boolean"
+        && aiPlatformIsRecord(value.config)
+        && typeof value.config.base_url === "string"
+        && typeof value.config.timeout === "number"
+        && Array.isArray(value.models)
+        && value.models.every(isAIModelConfig);
+}
+
+function isAIModelConfig(value: unknown): value is AIModelConfig {
+    if (!aiPlatformIsRecord(value)) return false;
+    return typeof value.id === "string"
+        && typeof value.name === "string"
+        && typeof value.description === "string"
+        && typeof value.enabled === "boolean";
+}
+
+function extractTotalTokens(result: unknown): number {
+    if (!aiPlatformIsRecord(result)) return 0;
+    const usage = aiPlatformIsRecord(result.usage) ? result.usage : null;
+    if (usage && typeof usage.total_tokens === "number") return usage.total_tokens;
+
+    const output = aiPlatformIsRecord(result.output) ? result.output : null;
+    const outputUsage = output && aiPlatformIsRecord(output.usage) ? output.usage : null;
+    return outputUsage && typeof outputUsage.total_tokens === "number" ? outputUsage.total_tokens : 0;
+}
+
+function aiPlatformErrorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
+}
+
 const aiPlatformManager = new AIPlatformManager();
-
-// 导出为全局变量
 window.aiPlatformManager = aiPlatformManager;

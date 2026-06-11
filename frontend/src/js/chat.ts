@@ -1,91 +1,132 @@
-// @ts-nocheck
-// Chat module. Room-aware messages are persisted by the backend.
-
-let isAIThinking = false;
-let messageTimestamps = [];
-let pendingMessages = [];
-let aiName = 'KP';
-let aiRoles = [{ id: 'kp', name: 'KP', wake_words: ['@KP'] }];
-let socket = null;
-
-function getCurrentUsername() {
-    const username = document.getElementById('userName')?.textContent?.trim();
-    if (username && username !== '未登录') {
-        return username;
-    }
-    return window.currentUser?.username || '用户';
+interface ChatRoleConfig {
+    id: string;
+    name: string;
+    wake_words?: string[];
 }
 
-function getCurrentUserId() {
+interface PendingAIMessage {
+    sender: string;
+    content: string;
+    role: ChatRoleConfig;
+    time: string;
+}
+
+interface CommandDefinition {
+    name: string;
+    usage: string;
+    description: string;
+}
+
+interface ChatApiResponse {
+    content?: string;
+    error?: string;
+    message?: string;
+    token_count?: number;
+}
+
+interface IncomingSocketMessage {
+    room_id?: string;
+    message?: ChatMessage;
+    type?: string;
+    content?: string;
+}
+
+let isAIThinking = false;
+let messageTimestamps: number[] = [];
+let pendingMessages: PendingAIMessage[] = [];
+let aiName = "KP";
+let aiRoles: ChatRoleConfig[] = [{ id: "kp", name: "KP", wake_words: ["@KP"] }];
+let socket: SocketLike | null = null;
+
+const COMMAND_DEFINITIONS: CommandDefinition[] = [
+    { name: "/dice", usage: "/dice {dice}", description: "掷骰" },
+    { name: "/record", usage: "/record {damage/san} {username} {int} {reason?}", description: "管理员记录房间角色伤害或 San 损失" },
+];
+
+function getCurrentUsername(): string {
+    const username = document.getElementById("userName")?.textContent?.trim();
+    if (username && username !== "未登录") {
+        return username;
+    }
+    return window.currentUser?.username || "用户";
+}
+
+function getCurrentUserId(): string | number | null {
     return window.currentUser?.user_id || null;
 }
 
-function getCurrentRoom() {
+function getCurrentRoom(): Room | null {
     return window.currentRoom || null;
 }
 
-function initChat() {
-    const chatInput = document.getElementById('chatInput');
-    const sendButton = document.getElementById('sendButton');
+function initChat(): void {
+    const chatInput = document.getElementById("chatInput") as HTMLInputElement | null;
+    const sendButton = document.getElementById("sendButton") as HTMLButtonElement | null;
+    if (!chatInput || !sendButton) return;
+    const activeChatInput = chatInput;
+    const activeSendButton = sendButton;
 
     updateAIHint();
-    loadAIRoles();
+    void loadAIRoles();
     initWebSocket();
+    initCommandPalette(activeChatInput);
 
-    async function sendMessage() {
-        const rawMessage = chatInput.value.trim();
+    async function sendMessage(): Promise<void> {
+        const rawMessage = activeChatInput.value.trim();
         if (!rawMessage) return;
         if (!window.currentUser) {
-            showNotification('请先登录后再发送消息', 'error');
+            showNotification("请先登录后再发送消息", "error");
             showAuthModal?.();
             return;
         }
         if (!getCurrentRoom()) {
-            showNotification('请先加入房间后再发送消息', 'error');
+            showNotification("请先加入房间后再发送消息", "error");
             return;
         }
 
-        if (isAIThinking && document.getElementById('enableAIResponseLock')?.checked) {
-            showNotification('请等待 AI 回复完成后再发送消息', 'error');
+        const lockInput = document.getElementById("enableAIResponseLock") as HTMLInputElement | null;
+        if (isAIThinking && lockInput?.checked) {
+            showNotification("请等待 AI 回复完成后再发送消息", "error");
             return;
         }
 
-        const rateLimit = parseInt(document.getElementById('messageRateLimit')?.value) || 0;
-        if (rateLimit > 0) {
-            const now = Date.now();
-            messageTimestamps = messageTimestamps.filter(ts => now - ts < 60000);
-            if (messageTimestamps.length >= rateLimit) {
-                showNotification(`消息发送过于频繁，请稍后再试（限制 ${rateLimit} 条/分钟）`, 'error');
-                return;
-            }
-            messageTimestamps.push(now);
+        const rateLimitInput = document.getElementById("messageRateLimit") as HTMLInputElement | null;
+        const rateLimit = Number.parseInt(rateLimitInput?.value || "0", 10) || 0;
+        if (rateLimit > 0 && isRateLimited(rateLimit)) {
+            showNotification(`消息发送过于频繁，请稍后再试（限制 ${rateLimit} 条/分钟）`, "error");
+            return;
         }
 
         const matchedRole = findRoleForMessage(rawMessage);
         const isAIMessage = Boolean(matchedRole);
         const message = rawMessage;
         if (!message) {
-            showNotification('请输入消息内容', 'error');
+            showNotification("请输入消息内容", "error");
             return;
         }
 
-        const commandResult = toolManager.handleCommand(message);
-        chatInput.value = '';
+        if (message.toLowerCase().startsWith("/record")) {
+            activeChatInput.value = "";
+            await sendVisibleMessage("player", message);
+            const recordResult = await handleRecordCommand(message);
+            await sendVisibleMessage("system", recordResult);
+            return;
+        }
+
+        const commandResult = window.toolManager?.handleCommand(message) || null;
+        activeChatInput.value = "";
 
         if (commandResult) {
-            await sendVisibleMessage('player', message);
-            const commandType = message.toLowerCase().startsWith('/dice') ? 'dice' : 'system';
-            setTimeout(() => {
-                sendVisibleMessage(commandType, commandResult);
+            await sendVisibleMessage("player", message);
+            const commandType = message.toLowerCase().startsWith("/dice") ? "dice" : "system";
+            window.setTimeout(() => {
+                void sendVisibleMessage(commandType, commandResult);
             }, 300);
             return;
         }
 
-        await sendVisibleMessage('player', message);
-
-        if (!isAIMessage) {
-            return;
-        }
+        await sendVisibleMessage("player", message);
+        if (!isAIMessage || !matchedRole) return;
 
         pendingMessages.push({
             sender: getCurrentUsername(),
@@ -95,97 +136,207 @@ function initChat() {
         });
 
         if (isAIThinking) {
-            showNotification('消息已加入队列，请等待 AI 回复完成后发送', 'info');
+            showNotification("消息已加入队列，请等待 AI 回复完成后发送", "info");
             return;
         }
 
-        sendToAI();
+        await sendToAI(activeChatInput, activeSendButton);
     }
 
-    async function sendToAI() {
-        if (pendingMessages.length === 0) return;
-
-        isAIThinking = true;
-        updateInputState();
-
-        const thinkingMessageId = Date.now();
-        const startTime = Date.now();
-        const role = pendingMessages[0]?.role || aiRoles[0] || { id: 'kp', name: 'KP' };
-        addThinkingMessage(thinkingMessageId);
-
-        try {
-            const { response, data } = await TrpgApi.requestWithResponse('/api/chat', {
-                method: 'POST',
-                body: {
-                    content: pendingMessages.map(m => m.content).join('\n'),
-                    messages: pendingMessages,
-                    role_id: role.id || 'kp',
-                    user_id: getCurrentUserId(),
-                    room_id: getCurrentRoom()?.id || null,
-                },
-            });
-            if (!response.ok) {
-                throw new Error(data?.message || `API 请求失败: ${response.status}`);
-            }
-
-            const processingTime = Math.round((Date.now() - startTime) / 1000);
-            const tokenCount = data.token_count || null;
-            const messageContent = data.content || data.error || 'AI 回复失败: 未知错误';
-
-            pendingMessages = [];
-            replaceThinkingMessage(thinkingMessageId, messageContent, processingTime, tokenCount);
-
-            const room = getCurrentRoom();
-            if (room) {
-                const persisted = await persistRoomMessage('kp', messageContent, {
-                    processingTime,
-                    tokenCount,
-                    roleId: role.id,
-                    senderName: role.name || 'KP',
-                });
-                if (persisted) persisted.sender_name = role.name || 'KP';
-                broadcastMessage(persisted);
-            } else {
-                broadcastMessage({
-                    type: 'kp',
-                    sender_name: role.name || 'KP',
-                    content: messageContent,
-                    metadata: { processingTime, tokenCount, roleId: role.id },
-                });
-            }
-        } catch (error) {
-            const processingTime = Math.round((Date.now() - startTime) / 1000);
-            replaceThinkingMessage(thinkingMessageId, 'AI 回复失败: ' + error.message, processingTime, null);
-            pendingMessages = [];
-        } finally {
-            isAIThinking = false;
-            updateInputState();
-        }
-    }
-
-    function updateInputState() {
-        chatInput.disabled = isAIThinking;
-        sendButton.disabled = isAIThinking;
-    }
-
-    sendButton.addEventListener('click', sendMessage);
-    chatInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            sendMessage();
-        }
+    activeSendButton.addEventListener("click", () => {
+        void sendMessage();
+    });
+    activeChatInput.addEventListener("keypress", (event) => {
+        if (event.key === "Enter") void sendMessage();
     });
 }
 
-async function sendVisibleMessage(type, content) {
+function isRateLimited(rateLimit: number): boolean {
+    const now = Date.now();
+    messageTimestamps = messageTimestamps.filter((timestamp) => now - timestamp < 60000);
+    if (messageTimestamps.length >= rateLimit) return true;
+    messageTimestamps.push(now);
+    return false;
+}
+
+async function sendToAI(chatInput: HTMLInputElement, sendButton: HTMLButtonElement): Promise<void> {
+    if (pendingMessages.length === 0) return;
+
+    isAIThinking = true;
+    updateInputState(chatInput, sendButton);
+
+    const thinkingMessageId = Date.now();
+    const startTime = Date.now();
+    const role = pendingMessages[0]?.role || aiRoles[0] || { id: "kp", name: "KP" };
+    addThinkingMessage(thinkingMessageId);
+
+    try {
+        const { response, data } = await TrpgApi.requestWithResponse<ChatApiResponse>("/api/chat", {
+            method: "POST",
+            body: {
+                content: pendingMessages.map((message) => message.content).join("\n"),
+                messages: pendingMessages,
+                role_id: role.id || "kp",
+                user_id: getCurrentUserId(),
+                room_id: getCurrentRoom()?.id || null,
+            },
+        });
+        if (!response.ok) {
+            throw new Error(data.message || `API 请求失败: ${response.status}`);
+        }
+
+        const processingTime = Math.round((Date.now() - startTime) / 1000);
+        const tokenCount = data.token_count ?? null;
+        const messageContent = data.content || data.error || "AI 回复失败: 未知错误";
+
+        pendingMessages = [];
+        replaceThinkingMessage(thinkingMessageId, messageContent, processingTime, tokenCount);
+
+        const persisted = await persistRoomMessage("kp", messageContent, {
+            processingTime,
+            tokenCount,
+            roleId: role.id,
+            senderName: role.name || "KP",
+        });
+        if (persisted) {
+            persisted.sender_name = role.name || "KP";
+            broadcastMessage(persisted);
+        }
+    } catch (error) {
+        const processingTime = Math.round((Date.now() - startTime) / 1000);
+        replaceThinkingMessage(thinkingMessageId, `AI 回复失败: ${chatErrorMessage(error)}`, processingTime, null);
+        pendingMessages = [];
+    } finally {
+        isAIThinking = false;
+        updateInputState(chatInput, sendButton);
+    }
+}
+
+function updateInputState(chatInput: HTMLInputElement, sendButton: HTMLButtonElement): void {
+    chatInput.disabled = isAIThinking;
+    sendButton.disabled = isAIThinking;
+}
+
+function isCurrentUserAdmin(): boolean {
+    return ["ADMIN", "OWNER"].includes(window.currentUser?.role || "");
+}
+
+async function handleRecordCommand(command: string): Promise<string> {
+    if (!isCurrentUserAdmin()) {
+        return "只有管理员可以使用 /record 命令";
+    }
+    const currentRoom = getCurrentRoom();
+    if (!currentRoom?.name) {
+        return "请先进入房间后再使用 /record 命令";
+    }
+    const parts = command.trim().split(/\s+/);
+    const type = (parts[1] || "").toLowerCase();
+    const username = parts[2] || "";
+    const valueText = parts[3] || "";
+    const validationError = validateRecordCommandParts(type, username, valueText);
+    if (validationError) return validationError;
+    const value = Number.parseInt(valueText, 10);
+    const reason = parts.slice(4).join(" ") || "未知";
+
+    const result = await window.recordCharacterChange?.({
+        roomName: currentRoom.name,
+        username,
+        type,
+        value,
+        reason,
+    });
+    if (!result) return "记录失败";
+    return `已记录 ${username} ${type} ${value}，原因：${reason}`;
+}
+
+function validateRecordCommandParts(type: string, username: string, valueText: string): string | null {
+    if (type !== "damage" && type !== "san") {
+        return "第 1 个参数必须是 {damage/san}";
+    }
+    if (!username) {
+        return "第 2 个参数必须是 {username}";
+    }
+    if (!/^[1-9]\d*$/.test(valueText)) {
+        return "第 3 个参数必须是正整数 {int}";
+    }
+    return null;
+}
+
+function getRecordCommandDraftHint(value: string): string {
+    const parts = value.trim().split(/\s+/);
+    const type = (parts[1] || "").toLowerCase();
+    const username = parts[2] || "";
+    const valueText = parts[3] || "";
+    if (!parts[1]) return "下一项：{damage/san}";
+    if (type !== "damage" && type !== "san") return "第 1 个参数必须是 {damage/san}";
+    if (!parts[2]) return "下一项：{username}";
+    if (!username) return "第 2 个参数必须是 {username}";
+    if (!parts[3]) return "下一项：{int}";
+    if (!/^[1-9]\d*$/.test(valueText)) return "第 3 个参数必须是正整数 {int}";
+    return "可选：{reason?}";
+}
+
+function initCommandPalette(chatInput: HTMLInputElement): void {
+    if (document.getElementById("commandPalette")) return;
+    const palette = document.createElement("div");
+    palette.id = "commandPalette";
+    palette.className = "command-palette list-group shadow-sm";
+    palette.style.display = "none";
+    chatInput.parentElement?.appendChild(palette);
+
+    chatInput.addEventListener("input", () => showCommandPalette(chatInput, palette));
+    chatInput.addEventListener("blur", () => window.setTimeout(() => {
+        palette.style.display = "none";
+    }, 120));
+}
+
+function showCommandPalette(chatInput: HTMLInputElement, palette: HTMLElement): void {
+    const value = chatInput.value.trimStart();
+    if (!value.startsWith("/")) {
+        palette.style.display = "none";
+        return;
+    }
+    const commandName = value.split(/\s+/)[0]?.toLowerCase() || "";
+    const matches = COMMAND_DEFINITIONS.filter((command) => command.name.startsWith(commandName));
+    if (matches.length === 0) {
+        palette.style.display = "none";
+        return;
+    }
+    palette.innerHTML = matches.map((command) => {
+        const hint = command.name === "/record" ? getRecordCommandDraftHint(value) : "";
+        return `
+        <button type="button" class="list-group-item list-group-item-action command-palette-item" data-command="${chatEscapeHtml(command.name)}">
+            <span>
+                <strong>${chatEscapeHtml(command.usage)}</strong>
+                <span class="text-muted ms-2">${chatEscapeHtml(command.description)}</span>
+            </span>
+            ${hint ? `<small class="command-palette-hint">${chatEscapeHtml(hint)}</small>` : ""}
+        </button>
+    `;
+    }).join("");
+    palette.querySelectorAll<HTMLButtonElement>("[data-command]").forEach((button) => {
+        button.addEventListener("mousedown", (event) => {
+            event.preventDefault();
+            chatInput.value = `${button.dataset.command || ""} `;
+            palette.style.display = "none";
+            chatInput.focus();
+        });
+    });
+    palette.style.display = "block";
+}
+
+async function sendVisibleMessage(type: string, content: string): Promise<ChatMessage | null> {
     const room = getCurrentRoom();
     if (room) {
         const message = await persistRoomMessage(type, content);
-        renderRoomMessage(message);
-        broadcastMessage(message);
+        if (message) {
+            renderRoomMessage(message);
+            broadcastMessage(message);
+        }
         return message;
     }
 
-    const sender = type === 'player' ? getCurrentUsername() : defaultSenderName(type);
+    const sender = type === "player" ? getCurrentUsername() : defaultSenderName(type);
     addMessage(type, sender, content);
     broadcastMessage({
         type,
@@ -196,340 +347,337 @@ async function sendVisibleMessage(type, content) {
     return null;
 }
 
-async function persistRoomMessage(type, content, metadata = {}) {
+async function persistRoomMessage(type: string, content: string, metadata: Record<string, unknown> = {}): Promise<ChatMessage | null> {
     const room = getCurrentRoom();
     if (!room) return null;
 
-    const payload = {
+    const payload: ChatMessage = {
         type,
         content,
         metadata,
     };
-    if (metadata.senderName) {
-        payload.sender_name = metadata.senderName;
-    }
+    const senderName = typeof metadata.senderName === "string" ? metadata.senderName : null;
+    if (senderName) payload.sender_name = senderName;
 
-    const data = await TrpgApi.post(`/api/rooms/${room.id}/messages`, payload);
-    if (!data.success) {
-        throw new Error(data.message || '保存房间消息失败');
-    }
-    return data.data;
+    const data = await TrpgApi.post<ApiResponse<ChatMessage>>(`/api/rooms/${room.id}/messages`, payload);
+    if (!data.success) throw new Error(data.message || "保存房间消息失败");
+    return data.data || null;
 }
 
-function updateAIHint() {
-    const aiHint = document.getElementById('aiHint');
-    if (aiHint) {
-        aiHint.textContent = `@${aiName}`;
-    }
+function updateAIHint(): void {
+    const aiHint = document.getElementById("aiHint");
+    if (aiHint) aiHint.textContent = `@${aiName}`;
 }
 
-async function loadAIRoles() {
+async function loadAIRoles(): Promise<void> {
     try {
-        const response = await TrpgApi.get('/api/config/roles');
+        const response = await TrpgApi.get<ApiResponse<{ roles: ChatRoleConfig[] }>>("/api/config/roles");
         if (response.success && response.data?.roles?.length) {
             aiRoles = response.data.roles;
-            aiName = aiRoles[0]?.name || 'KP';
+            aiName = aiRoles[0]?.name || "KP";
             updateAIHint();
         }
     } catch (error) {
-        console.warn('加载AI角色配置失败，使用默认KP角色:', error);
+        console.warn("加载 AI 角色配置失败，使用默认 KP 角色:", error);
     }
 }
 
-function findRoleForMessage(message) {
+function findRoleForMessage(message: string): ChatRoleConfig | undefined {
     const trimmedMessage = message.trim();
-    return aiRoles.find(role => (role.wake_words || []).some(wakeWord => trimmedMessage.startsWith(wakeWord)));
+    return aiRoles.find((role) => (role.wake_words || []).some((wakeWord) => trimmedMessage.startsWith(wakeWord)));
 }
 
-function setAIName(name) {
+function setAIName(name: string): void {
     aiName = name;
     updateAIHint();
 }
 
-function renderMarkdown(content) {
+function renderMarkdown(content: string): string {
     try {
-        if (typeof marked === 'function') {
-            marked.setOptions({ breaks: true, gfm: true, headerIds: false, mangle: false });
-            return marked(content);
+        const parser = window.marked;
+        if (parser) {
+            parser.setOptions({ breaks: true, gfm: true, headerIds: false, mangle: false });
+            return parser.parse(content);
         }
-        if (marked && typeof marked.parse === 'function') {
-            return marked.parse(content, { breaks: true, gfm: true, headerIds: false, mangle: false });
-        }
-        return content;
+        return chatEscapeHtml(content);
     } catch (error) {
-        console.error('Markdown 渲染失败:', error);
-        return content;
+        console.error("Markdown 渲染失败:", error);
+        return chatEscapeHtml(content);
     }
 }
 
-function getAvatarSrc(type, message = null) {
-    if (message?.avatar) {
-        return message.avatar;
-    }
+function getAvatarSrc(type: string, message: ChatMessage | null = null): string {
+    if (message?.avatar) return message.avatar;
     switch (type) {
-        case 'player':
-            return document.querySelector('.user-avatar img')?.src || '/assets/avatars/default.jpg';
-        case 'kp':
-            return '/assets/avatars/default_kp.jpg';
-        case 'dice':
-            return '/assets/avatars/default_dice.jpg';
-        case 'system':
-            return '/assets/avatars/default_system.jpg';
+        case "player":
+            return document.querySelector<HTMLImageElement>(".user-avatar img")?.src || "/assets/avatars/default.jpg";
+        case "kp":
+            return "/assets/avatars/default_kp.jpg";
+        case "dice":
+            return "/assets/avatars/default_dice.jpg";
+        case "system":
+            return "/assets/avatars/default_system.jpg";
         default:
-            return '/assets/avatars/default.jpg';
+            return "/assets/avatars/default.jpg";
     }
 }
 
-function defaultSenderName(type) {
+function defaultSenderName(type: string): string {
     switch (type) {
-        case 'kp': return 'KP';
-        case 'dice': return '骰娘';
-        case 'system': return '系统';
+        case "kp": return "KP";
+        case "dice": return "骰娘";
+        case "system": return "系统";
         default: return getCurrentUsername();
     }
 }
 
-function getMessageClass(type) {
+function getMessageClass(type: string): string {
     switch (type) {
-        case 'player': return 'player-message';
-        case 'kp': return 'kp-message';
-        case 'dice': return 'dice-message';
-        case 'system': return 'other-message';
-        case 'other': return 'other-message';
-        default: return 'other-message';
+        case "player": return "player-message";
+        case "kp": return "kp-message";
+        case "dice": return "dice-message";
+        case "system": return "other-message";
+        case "other": return "other-message";
+        default: return "other-message";
     }
 }
 
-function addMessage(type, sender, content, messageId = null, isThinking = false, processingTime = null, tokenCount = null, message = null) {
-    messageId = messageId || Date.now();
-    const chatHistory = document.getElementById('chatHistory');
-    if (!chatHistory) return messageId;
+function addMessage(
+    type: string,
+    sender: string,
+    content: string,
+    messageId: string | number | null = null,
+    isThinking = false,
+    processingTime: number | null = null,
+    tokenCount: number | null = null,
+    message: ChatMessage | null = null,
+): string | number {
+    const resolvedMessageId = messageId || Date.now();
+    const chatHistory = document.getElementById("chatHistory");
+    if (!chatHistory) return resolvedMessageId;
 
     hideWelcomeText();
-
     let messageClass = getMessageClass(type);
-    if (isThinking) {
-        messageClass += ' thinking';
-    }
+    if (isThinking) messageClass += " thinking";
 
-    const messageDiv = document.createElement('div');
+    const messageDiv = document.createElement("div");
     messageDiv.className = `message ${messageClass}`;
-    messageDiv.setAttribute('data-id', messageId);
-    if (message?.sender_id) {
-        messageDiv.setAttribute('data-sender-id', String(message.sender_id));
+    messageDiv.setAttribute("data-id", String(resolvedMessageId));
+    if (message?.sender_id !== undefined && message.sender_id !== null) {
+        messageDiv.setAttribute("data-sender-id", String(message.sender_id));
     }
-    if (message?.avatar) {
-        messageDiv.setAttribute('data-avatar', message.avatar);
-    }
+    if (message?.avatar) messageDiv.setAttribute("data-avatar", message.avatar);
 
-    const displayTime = message?.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const renderedContent = isThinking ? content : renderMarkdown(content);
+    const displayTime = message?.time || message?.timestamp || new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const renderedContent = isThinking ? chatEscapeHtml(content) : renderMarkdown(content);
     const avatarSrc = getAvatarSrc(type, message);
 
     let messageHTML = `
         <div class="message-avatar">
-            <img src="${avatarSrc}" alt="${sender}">
+            <img src="${chatEscapeHtml(avatarSrc)}" alt="${chatEscapeHtml(sender)}">
         </div>
         <div class="message-content-container">
             <div class="message-header">
-                <span class="message-sender">${sender}</span>
-                <span class="message-time">${displayTime}</span>
+                <span class="message-sender">${chatEscapeHtml(sender)}</span>
+                <span class="message-time">${chatEscapeHtml(displayTime)}</span>
             </div>
             <div class="message-content markdown-body">${renderedContent}</div>
     `;
 
     if (processingTime !== null && type === 'kp') {
         let displayText = `已耗时: ${processingTime}秒`;
-        if (tokenCount !== null) {
-            displayText += ` 消耗Token：${tokenCount}`;
-        }
-        messageHTML += `<div class="processing-time">${displayText}</div>`;
+        if (tokenCount !== null) displayText += ` 消耗Token：${tokenCount}`;
+        messageHTML += `<div class="processing-time">${chatEscapeHtml(displayText)}</div>`;
     }
 
-    messageHTML += '</div>';
+    messageHTML += "</div>";
     messageDiv.innerHTML = messageHTML;
     chatHistory.appendChild(messageDiv);
     chatHistory.scrollTop = chatHistory.scrollHeight;
-    return messageId;
+    return resolvedMessageId;
 }
 
-function addThinkingMessage(messageId) {
-    addMessage('kp', 'KP', 'AI 正在思考中...', messageId, true);
+function addThinkingMessage(messageId: string | number): void {
+    addMessage("kp", "KP", "AI 正在思考中...", messageId, true);
 }
 
-function replaceThinkingMessage(messageId, newContent, processingTime, tokenCount) {
-    const targetMessage = document.querySelector('.message.thinking.kp-message')
-        || document.querySelector(`.message[data-id="${messageId}"]`);
+function replaceThinkingMessage(messageId: string | number, newContent: string, processingTime: number, tokenCount: number | null): void {
+    const targetMessage = document.querySelector<HTMLElement>(".message.thinking.kp-message")
+        || document.querySelector<HTMLElement>(`.message[data-id="${messageId}"]`);
 
     if (!targetMessage) {
-        addMessage('kp', 'KP', newContent, null, false, processingTime, tokenCount);
+        addMessage("kp", "KP", newContent, null, false, processingTime, tokenCount);
         return;
     }
 
-    const contentDiv = targetMessage.querySelector('.message-content');
+    const contentDiv = targetMessage.querySelector<HTMLElement>(".message-content");
     if (contentDiv) {
         contentDiv.innerHTML = renderMarkdown(newContent);
-        contentDiv.className = 'message-content markdown-body';
+        contentDiv.className = "message-content markdown-body";
     }
-    targetMessage.classList.remove('thinking');
+    targetMessage.classList.remove("thinking");
 
-    let processingTimeDiv = targetMessage.querySelector('.processing-time');
+    let processingTimeDiv = targetMessage.querySelector<HTMLElement>(".processing-time");
     if (!processingTimeDiv) {
-        processingTimeDiv = document.createElement('div');
-        processingTimeDiv.className = 'processing-time';
-        targetMessage.querySelector('.message-content-container')?.appendChild(processingTimeDiv);
+        processingTimeDiv = document.createElement("div");
+        processingTimeDiv.className = "processing-time";
+        targetMessage.querySelector(".message-content-container")?.appendChild(processingTimeDiv);
     }
 
     let displayText = `已耗时: ${processingTime}秒`;
-    if (tokenCount !== null) {
-        displayText += ` 消耗Token：${tokenCount}`;
-    }
+    if (tokenCount !== null) displayText += ` 消耗Token：${tokenCount}`;
     processingTimeDiv.textContent = displayText;
 
-    const chatHistory = document.getElementById('chatHistory');
-    if (chatHistory) {
-        chatHistory.scrollTop = chatHistory.scrollHeight;
-    }
+    const chatHistory = document.getElementById("chatHistory");
+    if (chatHistory) chatHistory.scrollTop = chatHistory.scrollHeight;
 }
 
-function getCurrentChatMessages() {
-    const chatHistory = document.getElementById('chatHistory');
+function getCurrentChatMessages(): ChatMessage[] {
+    const chatHistory = document.getElementById("chatHistory");
     if (!chatHistory) return [];
 
-    return Array.from(chatHistory.querySelectorAll('.message')).map(msgEl => {
-        const sender = msgEl.querySelector('.message-sender')?.textContent || '未知';
-        const content = msgEl.querySelector('.message-content')?.innerHTML || '';
-        const time = msgEl.querySelector('.message-time')?.textContent || '';
-        let role = 'user';
-        if (msgEl.classList.contains('kp-message')) role = 'assistant';
-        if (msgEl.classList.contains('dice-message')) role = 'system';
-        return {
+    return Array.from(chatHistory.querySelectorAll<HTMLElement>(".message")).map((messageElement) => {
+        const sender = messageElement.querySelector(".message-sender")?.textContent || "未知";
+        const content = messageElement.querySelector(".message-content")?.innerHTML || "";
+        const time = messageElement.querySelector(".message-time")?.textContent || "";
+        const avatar = messageElement.getAttribute("data-avatar");
+        let role = "user";
+        if (messageElement.classList.contains("kp-message")) role = "assistant";
+        if (messageElement.classList.contains("dice-message")) role = "system";
+        const message: ChatMessage = {
             role,
             sender,
-            sender_id: msgEl.getAttribute('data-sender-id'),
-            avatar: msgEl.getAttribute('data-avatar'),
+            sender_id: messageElement.getAttribute("data-sender-id"),
             content,
             time,
         };
+        if (avatar) message.avatar = avatar;
+        return message;
     });
 }
 
-function renderChatMessages(messages) {
-    const chatHistory = document.getElementById('chatHistory');
+function renderChatMessages(messages: ChatMessage[]): void {
+    const chatHistory = document.getElementById("chatHistory");
     if (!chatHistory) return;
 
-    chatHistory.innerHTML = '';
+    chatHistory.innerHTML = "";
     hideWelcomeText();
-    messages.forEach(message => renderRoomMessage(message));
+    messages.forEach((message) => renderRoomMessage(message));
     chatHistory.scrollTop = chatHistory.scrollHeight;
 }
 
-function renderRoomMessage(message) {
+function renderRoomMessage(message: ChatMessage | null): void {
     if (!message) return;
-
-    const isOwnPlayerMessage = message.type === 'player' && message.sender_id === getCurrentUserId();
-    const type = message.type === 'player' && !isOwnPlayerMessage ? 'other' : message.type;
+    const isOwnPlayerMessage = message.type === "player" && message.sender_id === getCurrentUserId();
+    const type = message.type === "player" && !isOwnPlayerMessage ? "other" : message.type || "other";
     const metadata = message.metadata || {};
     addMessage(
         type,
         message.sender_name || message.sender || defaultSenderName(type),
         message.content,
-        message.id,
+        message.id || null,
         false,
-        metadata.processingTime ?? metadata.processing_time ?? null,
-        metadata.tokenCount ?? metadata.token_count ?? null,
+        numericMetadata(metadata, "processingTime") ?? numericMetadata(metadata, "processing_time"),
+        numericMetadata(metadata, "tokenCount") ?? numericMetadata(metadata, "token_count"),
         message,
     );
 }
 
-function clearChatMessages() {
-    const chatHistory = document.getElementById('chatHistory');
+function clearChatMessages(): void {
+    const chatHistory = document.getElementById("chatHistory");
     if (!chatHistory) return;
     chatHistory.innerHTML = '<div class="welcome-text">请选择或创建一个房间开始游戏。</div>';
 }
 
-function hideWelcomeText() {
-    const welcomeText = document.querySelector('.welcome-text');
-    if (welcomeText) {
-        welcomeText.style.display = 'none';
-    }
+function hideWelcomeText(): void {
+    const welcomeText = document.querySelector<HTMLElement>(".welcome-text");
+    if (welcomeText) welcomeText.style.display = "none";
 }
 
-function initWebSocket() {
-    if (!window.currentUser) {
-        return;
-    }
-    if (socket && socket.connected) {
-        return;
-    }
+function initWebSocket(): void {
+    if (!window.currentUser) return;
+    if (socket?.connected) return;
     try {
         socket = io();
-        socket.on('connect', function() {
+        socket.on("connect", () => {
             const room = getCurrentRoom();
-            if (room) {
-                socket.emit('join_room', { room_id: room.id });
-            }
+            if (room) socket?.emit("join_room", { room_id: room.id });
         });
-        socket.on('session_expired', function() {
-            showNotification('当前账号已在其他会话登录，请重新登录。', 'error');
+        socket.on("session_expired", () => {
+            showNotification("当前账号已在其他会话登录，请重新登录。", "error");
             disconnectSocket();
             window.clearCurrentRoom?.();
             window.clearChatMessages?.();
             window.currentUser = null;
             showAuthModal();
         });
-        socket.on('new_message', function(data) {
-            handleIncomingMessage(data);
-        });
+        socket.on("new_message", (data) => handleIncomingMessage(data));
     } catch (error) {
-        console.warn('WebSocket 连接失败，消息同步不可用:', error);
+        console.warn("WebSocket 连接失败，消息同步不可用:", error);
     }
 }
 
-function reconnectSocket() {
+function reconnectSocket(): void {
     disconnectSocket();
     initWebSocket();
 }
 
-function disconnectSocket() {
+function disconnectSocket(): void {
     if (socket) {
         socket.disconnect();
         socket = null;
     }
 }
 
-function joinSocketRoom(roomId) {
-    if (socket && socket.connected && roomId) {
-        socket.emit('join_room', { room_id: roomId });
-    }
+function joinSocketRoom(roomId: string): void {
+    if (socket?.connected && roomId) socket.emit("join_room", { room_id: roomId });
 }
 
-function leaveSocketRoom(roomId) {
-    if (socket && socket.connected && roomId) {
-        socket.emit('leave_room', { room_id: roomId });
-    }
+function leaveSocketRoom(roomId: string): void {
+    if (socket?.connected && roomId) socket.emit("leave_room", { room_id: roomId });
 }
 
-function broadcastMessage(message) {
-    if (!socket || !socket.connected || !message) return;
-    socket.emit('send_message', {
+function broadcastMessage(message: ChatMessage | null): void {
+    if (!socket?.connected || !message) return;
+    socket.emit("send_message", {
         room_id: getCurrentRoom()?.id || null,
         message,
     });
 }
 
-function handleIncomingMessage(data) {
+function handleIncomingMessage(data: unknown): void {
+    const incoming = normalizeIncomingMessage(data);
+    if (!incoming) return;
     const room = getCurrentRoom();
-    if (data?.room_id && room?.id !== data.room_id) {
+    if (incoming.room_id && room?.id !== incoming.room_id) return;
+    if (incoming.message) {
+        renderRoomMessage(incoming.message);
         return;
     }
-    if (data?.message) {
-        renderRoomMessage(data.message);
-        return;
-    }
-    if (data?.type) {
-        renderRoomMessage(data);
-    }
+    if (incoming.type && incoming.content) renderRoomMessage(incoming as ChatMessage);
+}
+
+function normalizeIncomingMessage(data: unknown): IncomingSocketMessage | null {
+    if (typeof data !== "object" || data === null) return null;
+    return data as IncomingSocketMessage;
+}
+
+function numericMetadata(metadata: Record<string, unknown>, key: string): number | null {
+    const value = metadata[key];
+    return typeof value === "number" ? value : null;
+}
+
+function chatEscapeHtml(value: unknown): string {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function chatErrorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
 }
 
 window.renderChatMessages = renderChatMessages;

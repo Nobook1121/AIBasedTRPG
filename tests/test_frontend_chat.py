@@ -55,3 +55,19 @@ def test_ai_mentions_keep_kp_prefix_for_visible_message_and_ai_request():
     assert "findRoleForMessage(rawMessage)" in source
     assert "trimmedMessage.startsWith(wakeWord)" in source
     assert "rawMessage.substring(aiName.length + 1)" not in source
+
+
+def test_record_command_and_command_palette_are_available():
+    source = _chat_source()
+
+    assert "COMMAND_DEFINITIONS" in source
+    assert "/record" in source
+    assert "/record {damage/san} {username} {int} {reason?}" in source
+    assert "/record damage 玩家名 3 原因" not in source
+    assert "validateRecordCommandParts" in source
+    assert "第 1 个参数必须是 {damage/san}" in source
+    assert "第 3 个参数必须是正整数 {int}" in source
+    assert "showCommandPalette" in source
+    assert "handleRecordCommand" in source
+    assert "currentRoom.name" in source
+    assert "window.recordCharacterChange" in source

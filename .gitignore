@@ -10,3 +10,4 @@ node_modules/
 /js/
 tests/**/__pycache__/
 users/*.sqlite3
+room/*

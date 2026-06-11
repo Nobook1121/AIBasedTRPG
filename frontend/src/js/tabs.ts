@@ -1,232 +1,196 @@
-// @ts-nocheck
-// 标签页切换模块
-
-function initTabs() {
+function initTabs(): void {
     try {
-        const navLinks = document.querySelectorAll('#sidebar .nav-link');
-        const tabContents = document.querySelectorAll('.tab-content');
+        const navLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>("#sidebar .nav-link"));
+        const tabContents = Array.from(document.querySelectorAll<HTMLElement>(".tab-content"));
 
         if (navLinks.length === 0 || tabContents.length === 0) {
-            console.error('无法找到导航链接或标签内容');
+            console.error("无法找到导航链接或标签内容");
             return;
         }
 
-        function updateNavigationState(activeLink) {
-            navLinks.forEach(link => {
-                if (link === activeLink) {
-                    link.setAttribute('aria-current', 'page');
-                } else {
-                    link.removeAttribute('aria-current');
-                }
-            });
-        }
+        updateNavigationState(document.querySelector<HTMLAnchorElement>("#sidebar .nav-link.active"), navLinks);
 
-        updateNavigationState(document.querySelector('#sidebar .nav-link.active'));
-
-        navLinks.forEach(link => {
-            link.addEventListener('click', function(e) {
-                e.preventDefault();
-
-                const isInDropdown = this.closest('.dropdown-container');
-
-                if (!isInDropdown) {
-                    const dropdownBtns = document.querySelectorAll('.dropdown-btn');
-                    dropdownBtns.forEach(btn => {
-                        btn.classList.remove('active');
-                        const dropdownContent = btn.nextElementSibling;
-                        if (dropdownContent) {
-                            dropdownContent.style.display = 'none';
-                        }
-                    });
-                }
-
-                navLinks.forEach(l => l.classList.remove('active'));
-                tabContents.forEach(tab => tab.classList.remove('active'));
-
-                this.classList.add('active');
-                updateNavigationState(this);
-                const tabId = this.getAttribute('data-tab');
-
-                if (!tabId) {
-                    console.error('导航链接缺少data-tab属性');
-                    return;
-                }
-
-                const targetTab = document.getElementById(tabId);
-                if (!targetTab) {
-                    console.error(`找不到id为${tabId}的标签内容`);
-                    return;
-                }
-
-                targetTab.classList.add('active');
-                console.log(`切换到标签页: ${tabId}`);
-
-                if (tabId === 'settings') {
-                    const settingsLink = this.getAttribute('href');
-                    if (settingsLink) {
-                        const settingsTab = settingsLink.replace('#', '');
-                        const tabName = settingsTab.replace('settings-', '');
-                        switchSettingsTab(tabName);
-                    }
-                }
-
-                if (tabId === 'tools') {
-                    const toolsLink = this.getAttribute('href');
-                    if (toolsLink) {
-                        const toolsTab = toolsLink.replace('#', '');
-                        if (toolsTab === 'tools-dice') {
-                            switchToolTab('dice');
-                        }
-                    }
-                }
+        navLinks.forEach((link) => {
+            link.addEventListener("click", (event) => {
+                event.preventDefault();
+                handleMainNavigationClick(link, navLinks, tabContents);
             });
         });
 
-        const dropdownBtns = document.querySelectorAll('.dropdown-btn');
-        dropdownBtns.forEach(btn => {
-            btn.setAttribute('aria-expanded', btn.classList.contains('active') ? 'true' : 'false');
-
-            btn.addEventListener('click', function() {
-                this.classList.toggle('active');
-
-                const dropdownContent = this.nextElementSibling;
-                const isExpanded = dropdownContent.style.display !== 'block';
-
-                if (isExpanded) {
-                    dropdownContent.style.display = 'block';
-                } else {
-                    dropdownContent.style.display = 'none';
-                }
-                this.setAttribute('aria-expanded', String(isExpanded));
-
-                dropdownBtns.forEach(otherBtn => {
-                    if (otherBtn !== this) {
-                        otherBtn.classList.remove('active');
-                        otherBtn.setAttribute('aria-expanded', 'false');
-                        const otherContent = otherBtn.nextElementSibling;
-                        if (otherContent) {
-                            otherContent.style.display = 'none';
-                        }
-                    }
-                });
-            });
-        });
-
-        console.log('标签切换初始化成功');
+        bindDropdownButtons();
+        console.log("标签切换初始化成功");
     } catch (error) {
-        console.error('初始化标签切换时出错:', error);
+        console.error("初始化标签切换时出错:", error);
     }
 }
 
-function switchSettingsTab(tabName) {
-    const settingsTabs = document.querySelectorAll('.settings-tab');
-    const settingsContents = document.querySelectorAll('.settings-content');
+function handleMainNavigationClick(
+    link: HTMLAnchorElement,
+    navLinks: HTMLAnchorElement[],
+    tabContents: HTMLElement[],
+): void {
+    const isInDropdown = Boolean(link.closest(".dropdown-container"));
+    if (!isInDropdown) {
+        closeDropdownButtons();
+    }
 
-    settingsTabs.forEach(tab => {
-        tab.classList.remove('active');
-        tab.setAttribute('aria-selected', 'false');
+    navLinks.forEach((item) => item.classList.remove("active"));
+    tabContents.forEach((tab) => tab.classList.remove("active"));
+
+    link.classList.add("active");
+    updateNavigationState(link, navLinks);
+
+    const tabId = link.dataset.tab;
+    if (!tabId) {
+        console.error("导航链接缺少 data-tab 属性");
+        return;
+    }
+
+    const targetTab = document.getElementById(tabId);
+    if (!targetTab) {
+        console.error(`找不到 id 为 ${tabId} 的标签内容`);
+        return;
+    }
+
+    targetTab.classList.add("active");
+    console.log(`切换到标签页: ${tabId}`);
+
+    if (tabId === "settings") {
+        const settingsTab = link.hash.replace("#", "").replace("settings-", "");
+        if (settingsTab) switchSettingsTab(settingsTab);
+    }
+
+    if (tabId === "tools") {
+        const toolsTab = link.hash.replace("#", "");
+        if (toolsTab === "tools-dice") switchToolTab("dice");
+    }
+}
+
+function updateNavigationState(activeLink: HTMLAnchorElement | null, navLinks: HTMLAnchorElement[]): void {
+    navLinks.forEach((link) => {
+        if (link === activeLink) {
+            link.setAttribute("aria-current", "page");
+        } else {
+            link.removeAttribute("aria-current");
+        }
     });
-    settingsContents.forEach(content => content.classList.remove('active'));
+}
 
-    const targetTab = document.querySelector(`.settings-tab[data-settings="${tabName}"]`);
+function bindDropdownButtons(): void {
+    document.querySelectorAll<HTMLElement>(".dropdown-btn").forEach((button) => {
+        button.setAttribute("aria-expanded", button.classList.contains("active") ? "true" : "false");
+        button.addEventListener("click", () => {
+            const dropdownContent = button.nextElementSibling as HTMLElement | null;
+            if (!dropdownContent) return;
+
+            const isExpanded = dropdownContent.style.display !== "block";
+            button.classList.toggle("active", isExpanded);
+            button.setAttribute("aria-expanded", String(isExpanded));
+            dropdownContent.style.display = isExpanded ? "block" : "none";
+
+            document.querySelectorAll<HTMLElement>(".dropdown-btn").forEach((otherButton) => {
+                if (otherButton === button) return;
+                otherButton.classList.remove("active");
+                otherButton.setAttribute("aria-expanded", "false");
+                const otherContent = otherButton.nextElementSibling as HTMLElement | null;
+                if (otherContent) otherContent.style.display = "none";
+            });
+        });
+    });
+}
+
+function closeDropdownButtons(): void {
+    document.querySelectorAll<HTMLElement>(".dropdown-btn").forEach((button) => {
+        button.classList.remove("active");
+        const dropdownContent = button.nextElementSibling as HTMLElement | null;
+        if (dropdownContent) dropdownContent.style.display = "none";
+    });
+}
+
+function switchSettingsTab(tabName: string): void {
+    const settingsTabs = document.querySelectorAll<HTMLElement>(".settings-tab");
+    const settingsContents = document.querySelectorAll<HTMLElement>(".settings-content");
+
+    settingsTabs.forEach((tab) => {
+        tab.classList.remove("active");
+        tab.setAttribute("aria-selected", "false");
+    });
+    settingsContents.forEach((content) => content.classList.remove("active"));
+
+    const targetTab = document.querySelector<HTMLElement>(`.settings-tab[data-settings="${CSS.escape(tabName)}"]`);
     const targetContent = document.getElementById(`${tabName}-settings-content`);
-
-    if (targetTab) {
-        targetTab.classList.add('active');
-        targetTab.setAttribute('aria-selected', 'true');
-    }
-    if (targetContent) targetContent.classList.add('active');
+    targetTab?.classList.add("active");
+    targetTab?.setAttribute("aria-selected", "true");
+    targetContent?.classList.add("active");
 }
 
-function switchToolTab(toolName) {
-    const toolTabs = document.querySelectorAll('.tool-tab');
-    const toolContents = document.querySelectorAll('.tool-content');
+function switchToolTab(toolName: string): void {
+    const toolTabs = document.querySelectorAll<HTMLElement>(".tool-tab");
+    const toolContents = document.querySelectorAll<HTMLElement>(".tool-content");
 
-    toolTabs.forEach(tab => {
-        tab.classList.remove('active');
-        tab.setAttribute('aria-selected', 'false');
+    toolTabs.forEach((tab) => {
+        tab.classList.remove("active");
+        tab.setAttribute("aria-selected", "false");
     });
-    toolContents.forEach(content => content.classList.remove('active'));
+    toolContents.forEach((content) => content.classList.remove("active"));
 
-    const targetTab = document.querySelector(`.tool-tab[data-tool="${toolName}"]`);
+    const targetTab = document.querySelector<HTMLElement>(`.tool-tab[data-tool="${CSS.escape(toolName)}"]`);
     const targetContent = document.getElementById(`${toolName}-tool-content`);
-
-    if (targetTab) {
-        targetTab.classList.add('active');
-        targetTab.setAttribute('aria-selected', 'true');
-    }
-    if (targetContent) targetContent.classList.add('active');
+    targetTab?.classList.add("active");
+    targetTab?.setAttribute("aria-selected", "true");
+    targetContent?.classList.add("active");
 }
 
-function initToolTabs() {
-    const toolTabs = document.querySelectorAll('.tool-tab');
-    const toolContents = document.querySelectorAll('.tool-content');
-
+function initToolTabs(): void {
+    const toolTabs = document.querySelectorAll<HTMLElement>(".tool-tab");
+    const toolContents = document.querySelectorAll<HTMLElement>(".tool-content");
     if (toolTabs.length === 0 || toolContents.length === 0) {
-        console.error('无法找到工具标签或工具内容');
+        console.error("无法找到工具标签或工具内容");
         return;
     }
 
-    toolTabs.forEach(tab => {
-        tab.setAttribute('role', 'tab');
-        tab.setAttribute('aria-selected', tab.classList.contains('active') ? 'true' : 'false');
+    toolTabs.forEach((tab) => {
+        tab.setAttribute("role", "tab");
+        tab.setAttribute("aria-selected", tab.classList.contains("active") ? "true" : "false");
+        tab.addEventListener("click", () => switchToolTab(tab.dataset.tool || ""));
     });
-
-    toolTabs.forEach(tab => {
-        tab.addEventListener('click', function() {
-            const toolName = this.getAttribute('data-tool');
-            switchToolTab(toolName);
-        });
-    });
-
-    console.log('工具标签页初始化成功');
 }
 
-function initSettingsTabs() {
-    const settingsTabs = document.querySelectorAll('.settings-tab');
-    const settingsContents = document.querySelectorAll('.settings-content');
-
+function initSettingsTabs(): void {
+    const settingsTabs = document.querySelectorAll<HTMLElement>(".settings-tab");
+    const settingsContents = document.querySelectorAll<HTMLElement>(".settings-content");
     if (settingsTabs.length === 0 || settingsContents.length === 0) {
-        console.error('无法找到设置标签或设置内容');
+        console.error("无法找到设置标签或设置内容");
         return;
     }
 
-    settingsTabs.forEach(tab => {
-        tab.setAttribute('role', 'tab');
-        tab.setAttribute('aria-selected', tab.classList.contains('active') ? 'true' : 'false');
+    settingsTabs.forEach((tab) => {
+        tab.setAttribute("role", "tab");
+        tab.setAttribute("aria-selected", tab.classList.contains("active") ? "true" : "false");
+        tab.addEventListener("click", () => switchSettingsTab(tab.dataset.settings || ""));
     });
 
-    settingsTabs.forEach(tab => {
-        tab.addEventListener('click', function() {
-            const settingsName = this.getAttribute('data-settings');
-            switchSettingsTab(settingsName);
-        });
-    });
-
-    const temperatureSlider = document.getElementById('temperature');
-    const temperatureValue = document.getElementById('temperatureValue');
+    const temperatureSlider = document.getElementById("temperature") as HTMLInputElement | null;
+    const temperatureValue = document.getElementById("temperatureValue");
     if (temperatureSlider && temperatureValue) {
-        temperatureSlider.addEventListener('input', function() {
-            temperatureValue.textContent = this.value;
+        temperatureSlider.addEventListener("input", () => {
+            temperatureValue.textContent = temperatureSlider.value;
         });
     }
 
-    const themeSelect = document.getElementById('themeSelect');
+    const themeSelect = document.getElementById("themeSelect") as HTMLSelectElement | null;
     if (themeSelect) {
-        themeSelect.addEventListener('change', async function() {
-            const themeValue = this.value;
-
-            const generalConfig = configManager.getConfig('general') || {};
-
-            if (!generalConfig.appearance) {
-                generalConfig.appearance = {};
-            }
-            generalConfig.appearance.theme = themeValue;
-
-            await configManager.saveConfig('general', generalConfig);
+        themeSelect.addEventListener("change", async () => {
+            const generalConfig = configManager.getConfig("general");
+            const appearance = isConfigObject(generalConfig.appearance) ? generalConfig.appearance : {};
+            appearance.theme = themeSelect.value;
+            generalConfig.appearance = appearance;
+            await configManager.saveConfig("general", generalConfig);
             configManager.applyTheme();
         });
     }
+}
 
-    console.log('设置标签页初始化成功');
+function isConfigObject(value: unknown): value is TomlConfig {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
 }

@@ -1,13 +1,5 @@
-interface TrpgApiClient {
-    get<T = any>(url: string): Promise<T>;
-    post<T = any>(url: string, body?: unknown): Promise<T>;
-    put<T = any>(url: string, body?: unknown): Promise<T>;
-}
-
-declare const TrpgApi: TrpgApiClient;
-
 namespace AuthModule {
-    export interface ApiResponse<T = any> {
+    export interface ApiResponse<T = unknown> {
         success: boolean;
         message?: string;
         error?: string;

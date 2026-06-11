@@ -1,0 +1,61 @@
+{
+  "id": "sample-investigator",
+  "name": "林雨衡",
+  "playerId": "示例玩家",
+  "gender": "male",
+  "age": 42,
+  "avatar": "",
+  "occupationId": "detective",
+  "residence": "上海",
+  "birthplace": "宁波",
+  "attributes": {
+    "STR": 50,
+    "CON": 60,
+    "SIZ": 70,
+    "DEX": 55,
+    "APP": 45,
+    "INT": 80,
+    "POW": 65,
+    "EDU": 70,
+    "LUK": 50,
+    "AGE": 42
+  },
+  "skills": [
+    { "id": "spotHidden", "name": "侦查", "value": 65, "base": 25, "category": "探索", "checked": true },
+    { "id": "libraryUse", "name": "图书馆使用", "value": 70, "base": 20, "category": "知识", "checked": true },
+    { "id": "listen", "name": "聆听", "value": 55, "base": 20, "category": "探索", "checked": true },
+    { "id": "cthulhuMythos", "name": "克苏鲁神话", "value": 5, "base": 0, "category": "神话", "checked": false }
+  ],
+  "weapons": [
+    { "name": "左轮手枪", "skill": "射击", "damage": "1D10", "range": "15m", "attacks": 1, "ammo": 6, "malfunction": 100 }
+  ],
+  "equipment": [
+    { "name": "急救包", "quantity": 1, "weight": 0.8, "volume": 1, "notes": "医疗用品" },
+    { "name": "旧笔记本", "quantity": 1, "weight": 0.3, "volume": 1, "notes": "案件记录" }
+  ],
+  "assets": {
+    "cash": 20,
+    "spendingLevel": 10,
+    "assetsText": "一辆旧车，一间租住公寓"
+  },
+  "background": {
+    "appearance": "深色风衣，左手有旧烧伤疤痕。",
+    "ideology": "真相应当被记录，即使无人愿意相信。",
+    "significantPeople": "陈教授，曾经的导师。",
+    "meaningfulLocations": "废弃档案馆。",
+    "treasuredPossessions": "父亲留下的怀表。",
+    "traits": "谨慎、记忆力强；对火焰有明显恐惧。",
+    "injuriesScars": "左手烧伤疤痕。",
+    "phobiasManias": "火焰恐惧。",
+    "arcaneTomes": "残缺的拉丁文笔记。",
+    "encounters": "曾在失踪人口案件中接触到无法解释的符号。",
+    "story": "一名长期追查异常案件的私家侦探。",
+    "education": "地方大学犯罪心理学肄业。",
+    "raceType": "人类"
+  },
+  "relationships": [
+    { "name": "陈教授", "description": "导师，提供学术帮助。" }
+  ],
+  "createdAt": "2026-06-11T00:00:00.000Z",
+  "updatedAt": "2026-06-11T00:00:00.000Z"
+}

@@ -117,15 +117,59 @@
                     </div>
                 </div>
 
-                <!-- 角色卡管理内容 -->
+                <!-- COC7 调查员角色卡管理内容 -->
                 <div id="character" class="tab-content">
-                    <div class="p-4">
-                        <h2>角色卡管理</h2>
-                        <div class="mb-4">
-                            <button class="btn btn-primary" id="createCharacter">创建角色卡</button>
+                    <div class="character-workspace p-4" id="characterWorkspace">
+                        <div class="character-matrix-bg" aria-hidden="true"></div>
+                        <header class="character-command-header">
+                            <div>
+                                <p class="character-kicker"><i class="fa fa-terminal" aria-hidden="true"></i> COC7 INVESTIGATOR NODE</p>
+                                <h2>克苏鲁调查员角色卡</h2>
+                                <p class="character-subtitle">基于 COC 第七版规则管理属性、技能、装备、伤势与 San 值记录。</p>
+                            </div>
+                            <div class="character-command-actions">
+                                <button class="character-command-button secondary" id="exportCharacter" type="button" title="导出当前角色">
+                                    <i class="fa fa-download" aria-hidden="true"></i>
+                                    <span>导出</span>
+                                </button>
+                                <button class="character-command-button" id="createCharacter" type="button" title="创建调查员">
+                                    <i class="fa fa-user-plus" aria-hidden="true"></i>
+                                    <span>新建</span>
+                                </button>
+                            </div>
+                        </header>
+
+                        <div class="character-list-view" id="character-list-view">
+                            <section class="character-roster-panel" aria-label="角色卡列表">
+                                <div class="character-panel-title">
+                                    <i class="fa fa-address-card-o" aria-hidden="true"></i>
+                                    <span>调查员档案</span>
+                                </div>
+                                <div class="skill-filter-strip" id="skillLevelFilters" aria-label="技能等级筛选">
+                                    <button type="button" class="skill-rank-pill active" data-rank-filter="all">全部</button>
+                                    <button type="button" class="skill-rank-pill" data-rank-filter="新手">新手</button>
+                                    <button type="button" class="skill-rank-pill" data-rank-filter="学习">学习</button>
+                                    <button type="button" class="skill-rank-pill" data-rank-filter="熟修">熟修</button>
+                                    <button type="button" class="skill-rank-pill" data-rank-filter="主修">主修</button>
+                                </div>
+                                <div class="character-list" id="characterList" aria-live="polite"></div>
+                            </section>
                         </div>
-                        <div class="character-list" id="characterList">
-                            <!-- 角色卡将在这里动态生成 -->
+
+                        <div class="character-detail-page" id="character-detail-page" hidden>
+                            <div class="character-detail-toolbar">
+                                <button class="character-command-button secondary" id="backToCharacterList" type="button">
+                                    <i class="fa fa-arrow-left" aria-hidden="true"></i>
+                                    <span>返回角色卡列表</span>
+                                </button>
+                            </div>
+                            <section class="character-inspector" id="characterInspector" aria-live="polite">
+                                <div class="character-empty-state">
+                                    <i class="fa fa-id-badge" aria-hidden="true"></i>
+                                    <p>选择或创建一张角色卡。</p>
+                                </div>
+                                <div class="character-detail-view" id="characterDetailView" hidden></div>
+                            </section>
                         </div>
                     </div>
                 </div>
@@ -136,8 +180,11 @@
                         <div id="save-list-view">
                             <div class="d-flex justify-content-between align-items-center mb-4">
                                 <h2>房间管理</h2>
-                                <div class="d-flex gap-2">
+                                <div class="room-join-toolbar d-flex gap-2">
                                     <input type="text" class="form-control" id="roomCodeInput" placeholder="输入房间码">
+                                    <select class="form-select" id="joinRoomCharacterSelect" aria-label="绑定角色卡">
+                                        <option value="">请选择角色卡</option>
+                                    </select>
                                     <button class="btn btn-outline-primary" id="joinRoom">加入房间</button>
                                     <button class="btn btn-primary" id="createSave">创建房间</button>
                                 </div>
@@ -172,6 +219,12 @@
                                             <p><strong>房间码：</strong><span id="roomDetailCode">-</span></p>
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+                            <div class="card mb-4">
+                                <div class="card-body">
+                                    <h5 class="card-title">玩家角色绑定与记录</h5>
+                                    <div id="roomCharacterBindings" class="room-character-bindings" aria-live="polite"></div>
                                 </div>
                             </div>
                             <!-- 回档节点列表 -->
@@ -209,6 +262,12 @@
                                         <option value="">请选择剧本</option>
                                     </select>
                                 </div>
+                                <div class="form-group mt-3">
+                                    <label for="roomCharacterSelect">绑定角色卡 *</label>
+                                    <select class="form-select" id="roomCharacterSelect" required>
+                                        <option value="">请选择角色卡</option>
+                                    </select>
+                                </div>
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
@@ -225,6 +284,7 @@
                         <!-- 工具子标签页 -->
                         <div class="tool-tabs mb-4">
                             <button class="tool-tab active" data-tool="dice">骰子工具</button>
+                            <button class="tool-tab" data-tool="character-record">房间角色记录</button>
                         </div>
                         
                         <!-- 骰子工具内容 -->
@@ -241,6 +301,42 @@
                                 </select>
                                 <button class="btn btn-primary" id="rollDice">投掷</button>
                                 <div class="dice-result mt-2" id="diceResult" aria-live="polite"></div>
+                            </div>
+                        </div>
+                        <div id="character-record-tool-content" class="tool-content">
+                            <div class="card mt-4">
+                                <div class="card-body">
+                                    <h5 class="card-title">房间角色记录</h5>
+                                    <div class="row g-3">
+                                        <div class="col-md-3">
+                                            <label class="form-label" for="recordRoomName">房间名</label>
+                                            <input type="text" class="form-control" id="recordRoomName" placeholder="当前房间名">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label" for="recordUsername">用户名</label>
+                                            <input type="text" class="form-control" id="recordUsername" placeholder="玩家用户名">
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label" for="recordType">类型</label>
+                                            <select class="form-select" id="recordType">
+                                                <option value="damage">damage</option>
+                                                <option value="san">san</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label" for="recordValue">数值</label>
+                                            <input type="number" class="form-control" id="recordValue" min="1" value="1">
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label" for="recordReason">原因</label>
+                                            <input type="text" class="form-control" id="recordReason" placeholder="未知">
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-primary mt-3" id="submitCharacterRecord" type="button">
+                                        <i class="fa fa-plus-circle" aria-hidden="true"></i> 记录
+                                    </button>
+                                    <div class="text-muted mt-2" id="recordToolResult" aria-live="polite"></div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -729,57 +825,118 @@
     </div>
 
     <div class="modal fade" id="characterModal" tabindex="-1" aria-labelledby="characterModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="characterModalLabel">创建角色卡</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="form-group">
-                        <label>角色名称</label>
-                        <input type="text" class="form-control" id="characterName">
-                    </div>
-                    <div class="form-group">
-                        <label>玩家ID</label>
-                        <input type="text" class="form-control" id="playerId">
-                    </div>
-                    <div class="form-group">
-                        <label>简介</label>
-                        <textarea class="form-control" id="characterBio" rows="3"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>属性</label>
-                        <div class="row">
-                            <div class="col-6">
-                                <label>力量</label>
-                                <input type="number" class="form-control" id="strength">
+                    <input type="hidden" id="characterEditingId">
+                    <div class="character-form-grid">
+                        <section class="character-form-section">
+                            <h6><i class="fa fa-user-circle-o" aria-hidden="true"></i> 基础信息</h6>
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label" for="characterAvatarUpload">头像</label>
+                                    <input type="file" class="form-control" id="characterAvatarUpload" accept="image/*">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="characterName">角色名称</label>
+                                    <input type="text" class="form-control" id="characterName" maxlength="40">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="randomizeCharacterName">随机姓名</button>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="playerId">玩家ID</label>
+                                    <input type="text" class="form-control" id="playerId" maxlength="40">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="characterOccupation">职业</label>
+                                    <select class="form-select" id="characterOccupation"></select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="raceType">种族类型</label>
+                                    <input type="text" class="form-control" id="raceType" placeholder="人类 / 混血 / 其他">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="characterResidence">居住地</label>
+                                    <input type="text" class="form-control" id="characterResidence">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="characterBirthplace">出生地</label>
+                                    <input type="text" class="form-control" id="characterBirthplace">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="currentHp">当前生命值</label>
+                                    <input type="number" class="form-control" id="currentHp" min="0">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="currentSan">当前 San 值</label>
+                                    <input type="number" class="form-control" id="currentSan" min="0">
+                                </div>
                             </div>
-                            <div class="col-6">
-                                <label>体质</label>
-                                <input type="number" class="form-control" id="constitution">
+                        </section>
+
+                        <section class="character-form-section">
+                            <h6><i class="fa fa-sliders" aria-hidden="true"></i> 基础属性</h6>
+                            <button type="button" class="btn btn-sm btn-outline-secondary mb-3" id="randomizeAttributes">随机属性</button>
+                            <div class="attribute-editor-grid">
+                                <label>STR<input type="number" class="form-control character-attribute-input" id="attributeSTR" min="1" max="99"></label>
+                                <label>CON<input type="number" class="form-control character-attribute-input" id="attributeCON" min="1" max="99"></label>
+                                <label>SIZ<input type="number" class="form-control character-attribute-input" id="attributeSIZ" min="1" max="99"></label>
+                                <label>DEX<input type="number" class="form-control character-attribute-input" id="attributeDEX" min="1" max="99"></label>
+                                <label>APP<input type="number" class="form-control character-attribute-input" id="attributeAPP" min="1" max="99"></label>
+                                <label>INT<input type="number" class="form-control character-attribute-input" id="attributeINT" min="1" max="99"></label>
+                                <label>POW<input type="number" class="form-control character-attribute-input" id="attributePOW" min="1" max="99"></label>
+                                <label>EDU<input type="number" class="form-control character-attribute-input" id="attributeEDU" min="1" max="99"></label>
+                                <label>LUK<input type="number" class="form-control character-attribute-input" id="attributeLUK" min="1" max="99"></label>
+                                <label>AGE<input type="number" class="form-control character-attribute-input" id="attributeAGE" min="15" max="99"></label>
                             </div>
-                            <div class="col-6">
-                                <label>敏捷</label>
-                                <input type="number" class="form-control" id="dexterity">
+                        </section>
+
+                        <section class="character-form-section">
+                            <h6><i class="fa fa-graduation-cap" aria-hidden="true"></i> 背景信息</h6>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label" for="appearance">外貌特征</label>
+                                    <textarea class="form-control" id="appearance" rows="2"></textarea>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="education">教育背景</label>
+                                    <textarea class="form-control" id="education" rows="2"></textarea>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="characterBio">故事经历</label>
+                                    <textarea class="form-control" id="characterBio" rows="3"></textarea>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="traits">弱点优势</label>
+                                    <textarea class="form-control" id="traits" rows="3"></textarea>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="characterRelationships">人际关系</label>
+                                    <textarea class="form-control" id="characterRelationships" rows="3"></textarea>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="characterMythos">克苏鲁神话经历</label>
+                                    <textarea class="form-control" id="characterMythos" rows="3"></textarea>
+                                </div>
                             </div>
-                            <div class="col-6">
-                                <label>智力</label>
-                                <input type="number" class="form-control" id="intelligence">
-                            </div>
-                            <div class="col-6">
-                                <label>意志</label>
-                                <input type="number" class="form-control" id="willpower">
-                            </div>
-                            <div class="col-6">
-                                <label>幸运</label>
-                                <input type="number" class="form-control" id="luck">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label>技能</label>
-                        <textarea class="form-control" id="characterSkills" rows="3" placeholder="技能1:数值,技能2:数值..."></textarea>
+                        </section>
+
+                        <section class="character-form-section">
+                            <h6><i class="fa fa-cubes" aria-hidden="true"></i> 快速录入</h6>
+                            <label class="form-label" for="characterSkillChecklist">技能复选</label>
+                            <div class="skill-check-grid" id="characterSkillChecklist"></div>
+                            <label class="form-label" for="characterSkills">技能列表</label>
+                            <textarea class="form-control" id="characterSkills" rows="4" placeholder="侦查:65:熟修:物理；图书馆使用:70:主修:学术"></textarea>
+                            <label class="form-label mt-3" for="characterWeapons">武器</label>
+                            <textarea class="form-control" id="characterWeapons" rows="3" placeholder="左轮手枪:射击:1D10:15m:1:6:100"></textarea>
+                            <label class="form-label mt-3" for="characterEquipment">装备列表</label>
+                            <textarea class="form-control" id="characterEquipment" rows="3" placeholder="左轮手枪:1.2:2；急救包:0.8:3"></textarea>
+                            <label class="form-label mt-3" for="characterAssets">资产</label>
+                            <textarea class="form-control" id="characterAssets" rows="2" placeholder="现金:20；消费水平:10；资产:旧车"></textarea>
+                        </section>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -957,6 +1114,7 @@
     <script src="js/network.js"></script>
     <script src="js/rooms.js"></script>
     <script src="js/scenario.js"></script>
+    <script src="js/character-sheet.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>

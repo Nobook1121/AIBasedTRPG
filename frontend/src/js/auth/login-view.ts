@@ -1,8 +1,3 @@
-declare const TrpgCookies: {
-    get(name: string): string | null;
-    set(name: string, value: string): void;
-};
-
 namespace AuthModule {
     export function showLoginView(): void {
         document.getElementById("login-view")?.classList.add("active");

@@ -1,63 +1,65 @@
-// @ts-nocheck
-// 剧本管理模块 - 封面处理
+interface ScenarioCoverUploadResponse {
+    cover_url: string;
+}
 
-function initScenarioManagement() {
+function initScenarioManagement(): void {
     new ScenarioController();
 
-    document.addEventListener('change', function(e) {
-        if (e.target.id === 'coverUpload') {
-            handleCoverUpload(e);
+    document.addEventListener("change", (event) => {
+        const target = event.target as HTMLElement | null;
+        if (target?.id === "coverUpload") {
+            void handleCoverUpload(event);
         }
     });
 }
 
-function handleCoverUpload(e) {
-    const file = e.target.files[0];
+async function handleCoverUpload(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement | null;
+    const file = input?.files?.[0];
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-        showNotification('封面文件大小不能超过5MB', 'error');
+        showNotification("封面文件大小不能超过 5MB", "error");
         return;
     }
 
-    if (!file.type.startsWith('image/')) {
-        showNotification('请上传图片文件', 'error');
+    if (!file.type.startsWith("image/")) {
+        showNotification("请上传图片文件", "error");
         return;
     }
 
     const reader = new FileReader();
-    reader.onload = function(e) {
-        document.getElementById('coverPreview').src = e.target.result;
+    reader.onload = () => {
+        const preview = document.getElementById("coverPreview") as HTMLImageElement | null;
+        if (preview) preview.src = String(reader.result || "");
     };
     reader.readAsDataURL(file);
 
     window.uploadedCoverFile = file;
 
     const formData = new FormData();
-    formData.append('cover', file);
-    const scenarioTitle = document.getElementById('scenarioTitle').value.trim() || 'unknown_scenario';
-    formData.append('scenario_title', scenarioTitle);
+    formData.append("cover", file);
+    const scenarioTitle = (document.getElementById("scenarioTitle") as HTMLInputElement | null)?.value.trim() || "unknown_scenario";
+    formData.append("scenario_title", scenarioTitle);
 
-    TrpgApi.requestWithResponse('/api/scenarios/cover', {
-        method: 'POST',
-        body: formData
-    })
-    .then(({ response, data }) => {
-        if (!response.ok) {
-            throw new Error(data.message || '上传失败');
+    try {
+        const { response, data } = await TrpgApi.requestWithResponse<ApiResponse<ScenarioCoverUploadResponse>>("/api/scenarios/cover", {
+            method: "POST",
+            body: formData,
+        });
+        if (!response.ok || !data.success || !data.data) {
+            throw new Error(data.message || data.error || "上传失败");
         }
-        return data;
-    })
-    .then(data => {
-        if (data.success) {
-            showNotification('封面上传成功', 'success');
-            document.getElementById('scenarioCoverUrl').value = data.data.cover_url;
-        } else {
-            showNotification(data.message, 'error');
-        }
-    })
-    .catch(error => {
-        console.error('上传封面失败:', error);
-        showNotification('上传封面失败: ' + error.message, 'error');
-    });
+
+        showNotification("封面上传成功", "success");
+        const coverUrlInput = document.getElementById("scenarioCoverUrl") as HTMLInputElement | null;
+        if (coverUrlInput) coverUrlInput.value = data.data.cover_url;
+    } catch (error) {
+        console.error("上传封面失败:", error);
+        showNotification(`上传封面失败: ${scenarioUploadErrorMessage(error)}`, "error");
+    }
+}
+
+function scenarioUploadErrorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
 }

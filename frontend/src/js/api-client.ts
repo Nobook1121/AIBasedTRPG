@@ -1,39 +1,3 @@
-type JsonValue =
-    | string
-    | number
-    | boolean
-    | null
-    | JsonValue[]
-    | { [key: string]: JsonValue };
-
-type RequestBody = BodyInit | JsonValue | Record<string, unknown> | null;
-
-interface TrpgRequestOptions extends Omit<RequestInit, "body"> {
-    body?: RequestBody;
-    method?: string;
-}
-
-interface TrpgResponse<T = unknown> {
-    response: Response;
-    data: T;
-}
-
-interface TrpgApiClient {
-    request<T = unknown>(url: string, options?: TrpgRequestOptions): Promise<T>;
-    requestWithResponse<T = unknown>(url: string, options?: TrpgRequestOptions): Promise<TrpgResponse<T>>;
-    get<T = unknown>(url: string, options?: TrpgRequestOptions): Promise<T>;
-    post<T = unknown>(url: string, body?: RequestBody, options?: TrpgRequestOptions): Promise<T>;
-    put<T = unknown>(url: string, body?: RequestBody, options?: TrpgRequestOptions): Promise<T>;
-    del<T = unknown>(url: string, options?: TrpgRequestOptions): Promise<T>;
-}
-
-interface Window {
-    TRPG?: {
-        api?: TrpgApiClient;
-    };
-    TrpgApi?: TrpgApiClient;
-}
-
 (function initializeApiClient(global: Window) {
     "use strict";
 
