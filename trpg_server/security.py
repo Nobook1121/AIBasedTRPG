@@ -70,7 +70,7 @@ def build_public_asset_url(prefix, filename):
 
 
 def get_user_manager():
-    from user_manager import user_manager
+    from trpg_server.users.manager import user_manager
 
     return current_app.config.get("USER_MANAGER", user_manager)
 

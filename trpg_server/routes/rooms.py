@@ -108,7 +108,7 @@ def _current_member(character_card=None):
     try:
         user = current_app.config.get("USER_MANAGER").get_user_by_id(user_id)
     except AttributeError:
-        from user_manager import user_manager
+        from trpg_server.users.manager import user_manager
 
         user = user_manager.get_user_by_id(user_id)
 

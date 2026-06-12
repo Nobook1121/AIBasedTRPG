@@ -23,7 +23,7 @@ from trpg_server.users.tokens import (
     email_verification_available,
     password_reset_available,
 )
-from user_manager import user_manager
+from trpg_server.users.manager import user_manager
 
 bp = Blueprint("auth", __name__)
 logger = logging.getLogger(__name__)

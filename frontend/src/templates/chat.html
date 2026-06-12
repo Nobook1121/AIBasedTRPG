@@ -1,0 +1,35 @@
+<template id="chat-command-palette-item">
+<button type="button" class="list-group-item list-group-item-action command-palette-item" data-command="{{ commandName }}">
+    <span>
+        <strong>{{ usage }}</strong>
+        <span class="text-muted ms-2">{{ description }}</span>
+    </span>
+    {{{ hintHtml }}}
+</button>
+</template>
+
+<template id="chat-command-palette-hint">
+<small class="command-palette-hint">{{ hint }}</small>
+</template>
+
+<template id="chat-message">
+<div class="message-avatar">
+    <img src="{{ avatarSrc }}" alt="{{ sender }}">
+</div>
+<div class="message-content-container">
+    <div class="message-header">
+        <span class="message-sender">{{ sender }}</span>
+        <span class="message-time">{{ displayTime }}</span>
+    </div>
+    <div class="message-content markdown-body">{{{ contentHtml }}}</div>
+    {{{ processingHtml }}}
+</div>
+</template>
+
+<template id="chat-processing-time">
+<div class="processing-time">{{ text }}</div>
+</template>
+
+<template id="chat-welcome">
+<div class="welcome-text">请选择或创建一个房间开始游戏。</div>
+</template>

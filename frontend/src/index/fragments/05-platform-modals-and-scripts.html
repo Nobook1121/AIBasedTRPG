@@ -1,0 +1,170 @@
+﻿    <div class="modal fade" id="addModelModal" tabindex="-1" aria-labelledby="addModelModalLabel" aria-hidden="true">
+        <div class="modal-dialog" style="max-width: 500px;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addModelModalLabel">添加模型</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="modelName" class="form-label">模型名称 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="modelName" placeholder="请输入模型名称" maxlength="50">
+                        <div class="invalid-feedback" id="modelNameError"></div>
+                    </div>
+                    <div class="form-group mt-3">
+                        <label for="modelId" class="form-label">模型ID <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="modelId" placeholder="请输入模型ID" maxlength="100">
+                        <div class="invalid-feedback" id="modelIdError"></div>
+                    </div>
+                    <div class="form-group mt-3">
+                        <label for="modelDescription" class="form-label">模型描述</label>
+                        <textarea class="form-control" id="modelDescription" rows="3" placeholder="请输入模型描述" maxlength="200"></textarea>
+                        <div class="invalid-feedback" id="modelDescriptionError"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="addModelBtn" disabled>确认</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- API测试模态窗口 -->
+    <div class="modal fade" id="apiTestModal" tabindex="-1" aria-labelledby="apiTestModalLabel" aria-hidden="true">
+        <div class="modal-dialog" style="max-width: 600px;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="apiTestModalLabel">API连接测试</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="test-status mb-4">
+                        <div id="testStatus" class="d-none">
+                            <div class="test-status-indicator test-status-pending mb-2"></div>
+                            <p class="test-status-text">测试中...</p>
+                        </div>
+                        <div id="testResult" class="d-none">
+                            <div class="test-status-indicator test-status-success mb-2"></div>
+                            <p class="test-status-text test-status-success-text">测试成功</p>
+                        </div>
+                        <div id="testError" class="d-none">
+                            <div class="test-status-indicator test-status-error mb-2"></div>
+                            <p class="test-status-text test-status-error-text">测试失败</p>
+                            <p id="errorMessage" class="text-sm text-muted mt-2"></p>
+                        </div>
+                    </div>
+                    <div id="testDetails" class="d-none">
+                        <h6>测试详情</h6>
+                        <div class="test-details-grid">
+                            <div class="test-detail-item">
+                                <span class="test-detail-label">测试时间：</span>
+                                <span id="testTime" class="test-detail-value"></span>
+                            </div>
+                            <div class="test-detail-item">
+                                <span class="test-detail-label">测试类型：</span>
+                                <span class="test-detail-value">文本对话测试</span>
+                            </div>
+                            <div class="test-detail-item">
+                                <span class="test-detail-label">模型类型：</span>
+                                <span id="testModel" class="test-detail-value"></span>
+                            </div>
+                            <div class="test-detail-item">
+                                <span class="test-detail-label">平均速度：</span>
+                                <span id="testSpeed" class="test-detail-value"></span>
+                            </div>
+                            <div class="test-detail-item">
+                                <span class="test-detail-label">测试消耗：</span>
+                                <span id="testConsumption" class="test-detail-value"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="testLoading" class="d-none">
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">加载中...</span>
+                            </div>
+                            <p class="mt-2">正在测试API连接...</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                    <button type="button" class="btn btn-primary" id="reTestBtn" style="display: none;">重新测试</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 平台配置模态窗口 -->
+    <div class="modal fade" id="platformConfigModal" tabindex="-1" aria-labelledby="platformConfigModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="platformConfigModalLabel">平台配置</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="platformConfigContent"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                    <button type="button" class="btn btn-primary" id="savePlatformConfigBtn">保存配置</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 回档节点预览模态窗口 -->
+    <div class="modal fade" id="saveNodePreviewModal" tabindex="-1" aria-labelledby="saveNodePreviewModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="saveNodePreviewModalLabel">回档节点预览</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="saveNodePreviewContent"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                    <button type="button" class="btn btn-primary" id="loadNodeFromPreviewBtn">回档到此节点</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="tools/diceTool.js"></script>
+    <script src="tools/toolManager.js"></script>
+    <script src="js/config/TestRequestConfig.js"></script>
+    <script src="js/config/ConfigManager.js"></script>
+    <script src="js/config/AIPlatformManager.js"></script>
+    <script src="js/api-client.js"></script>
+    <script src="js/i18n.js"></script>
+    <script src="js/dom-utils.js"></script>
+    <script src="js/models/ScenarioModel.js"></script>
+    <script src="js/views/ScenarioView.js"></script>
+    <script src="js/controllers/ScenarioController.js"></script>
+    <script src="js/tabs.js"></script>
+    <script src="js/platform-ui.js"></script>
+    <script src="js/cookie-consent.js"></script>
+    <script src="js/generated/templates.js"></script>
+    <script src="js/chat.js"></script>
+    <script src="js/auth/api.js"></script>
+    <script src="js/auth/state.js"></script>
+    <script src="js/auth/floating-field.js"></script>
+    <script src="js/auth/login-view.js"></script>
+    <script src="js/auth/register-view.js"></script>
+    <script src="js/auth/profile-dialog.js"></script>
+    <script src="js/auth/user-card.js"></script>
+    <script src="js/auth/index.js"></script>
+    <script src="js/network.js"></script>
+    <script src="js/rooms.js"></script>
+    <script src="js/scenario.js"></script>
+    <script src="js/character-sheet.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

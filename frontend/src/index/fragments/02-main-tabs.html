@@ -1,0 +1,175 @@
+﻿            <div class="col-10" id="mainContent">
+                <!-- 主页内容 -->
+                <div id="home" class="tab-content active">
+                    <!-- 当前房间状态栏 -->
+                    <div class="save-status-bar" id="saveStatusBar" style="display: none;" aria-live="polite">
+                        <div class="save-status-content">
+                            <span class="save-status-pill">
+                                <i class="fa fa-comments-o" aria-hidden="true"></i>
+                                <span class="save-status-label" data-i18n="room.status.current_room">当前房间</span>
+                                <strong class="save-status-name" id="saveStatusName">未加入</strong>
+                            </span>
+                            <span class="save-status-script">
+                                <i class="fa fa-book" aria-hidden="true"></i>
+                                <span data-i18n="room.status.scenario">剧本</span>
+                                <strong id="saveStatusScenario">-</strong>
+                            </span>
+                        </div>
+                    </div>
+                    <!-- 对话记录区 -->
+                    <div class="chat-history" id="chatHistory">
+                        <div class="welcome-text">欢迎来到AI TRPG系统，请选择一个剧本开始游戏</div>
+                    </div>
+
+                    <!-- 对话输入区 -->
+                    <div class="chat-input p-3 border-top">
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="chatInput" placeholder="加入房间后可发送消息，使用 @KP 呼叫 AI" data-i18n-placeholder="chat.placeholder.room_required">
+                            <button class="btn btn-primary" id="sendButton">
+                                <i class="fa fa-paper-plane"></i> <span data-i18n="chat.action.send">发送</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 剧本管理内容 -->
+                <div id="scenario" class="tab-content">
+                    <div class="p-4">
+                        <h2>剧本管理</h2>
+                        <div class="mb-4">
+                            <button class="btn btn-primary" id="createScenario">创建剧本</button>
+                            <button class="btn btn-secondary" id="importScenario">导入剧本</button>
+                            <input type="file" id="importScenarioFile" accept=".json" style="display: none;" multiple>
+                        </div>
+                        <div class="scenario-list" id="scenarioList">
+                            <!-- 剧本卡片将在这里动态生成 -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- COC7 调查员角色卡管理内容 -->
+                <div id="character" class="tab-content">
+                    <div class="character-workspace p-4" id="characterWorkspace">
+                        <div class="character-matrix-bg" aria-hidden="true"></div>
+                        <header class="character-command-header">
+                            <div>
+                                <p class="character-kicker"><i class="fa fa-terminal" aria-hidden="true"></i> COC7 INVESTIGATOR NODE</p>
+                                <h2>克苏鲁调查员角色卡</h2>
+                                <p class="character-subtitle">基于 COC 第七版规则管理属性、技能、装备、伤势与 San 值记录。</p>
+                            </div>
+                            <div class="character-command-actions">
+                                <button class="character-command-button secondary" id="exportCharacter" type="button" title="导出当前角色">
+                                    <i class="fa fa-download" aria-hidden="true"></i>
+                                    <span>导出</span>
+                                </button>
+                                <button class="character-command-button" id="createCharacter" type="button" title="创建调查员">
+                                    <i class="fa fa-user-plus" aria-hidden="true"></i>
+                                    <span>新建</span>
+                                </button>
+                            </div>
+                        </header>
+
+                        <div class="character-list-view" id="character-list-view">
+                            <section class="character-roster-panel" aria-label="角色卡列表">
+                                <div class="character-panel-title">
+                                    <i class="fa fa-address-card-o" aria-hidden="true"></i>
+                                    <span>调查员档案</span>
+                                </div>
+                                <div class="skill-filter-strip" id="skillLevelFilters" aria-label="技能等级筛选">
+                                    <button type="button" class="skill-rank-pill active" data-rank-filter="all">全部</button>
+                                    <button type="button" class="skill-rank-pill" data-rank-filter="新手">新手</button>
+                                    <button type="button" class="skill-rank-pill" data-rank-filter="学习">学习</button>
+                                    <button type="button" class="skill-rank-pill" data-rank-filter="熟修">熟修</button>
+                                    <button type="button" class="skill-rank-pill" data-rank-filter="主修">主修</button>
+                                </div>
+                                <div class="character-list" id="characterList" aria-live="polite"></div>
+                            </section>
+                        </div>
+
+                        <div class="character-detail-page" id="character-detail-page" hidden>
+                            <div class="character-detail-toolbar">
+                                <button class="character-command-button secondary" id="backToCharacterList" type="button">
+                                    <i class="fa fa-arrow-left" aria-hidden="true"></i>
+                                    <span>返回角色卡列表</span>
+                                </button>
+                            </div>
+                            <section class="character-inspector" id="characterInspector" aria-live="polite">
+                                <div class="character-empty-state">
+                                    <i class="fa fa-id-badge" aria-hidden="true"></i>
+                                    <p>选择或创建一张角色卡。</p>
+                                </div>
+                                <div class="character-detail-view" id="characterDetailView" hidden></div>
+                            </section>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 房间管理内容 -->
+                <div id="save" class="tab-content">
+                    <div class="p-4">
+                        <div id="save-list-view">
+                            <div class="d-flex justify-content-between align-items-center mb-4">
+                                <h2>房间管理</h2>
+                                <div class="room-join-toolbar d-flex gap-2">
+                                    <input type="text" class="form-control" id="roomCodeInput" placeholder="输入房间码">
+                                    <select class="form-select" id="joinRoomCharacterSelect" aria-label="绑定角色卡">
+                                        <option value="">请选择角色卡</option>
+                                    </select>
+                                    <button class="btn btn-outline-primary" id="joinRoom">加入房间</button>
+                                    <button class="btn btn-primary" id="createSave">创建房间</button>
+                                </div>
+                            </div>
+                            <div class="save-list" id="saveList">
+                                <!-- 房间卡片将在这里动态生成 -->
+                            </div>
+                        </div>
+                        <div id="save-detail-view" style="display: none;">
+                            <div class="d-flex justify-content-between align-items-center mb-4">
+                                <div>
+                                    <button class="btn btn-secondary mb-2" id="backToSaveList">
+                                        <i class="fa fa-arrow-left"></i> 返回房间列表
+                                    </button>
+                                    <h2 id="saveDetailTitle">房间详情</h2>
+                                </div>
+                                <button class="btn btn-danger" id="deleteSave">删除房间</button>
+                            </div>
+                            <!-- 房间基本信息 -->
+                            <div class="card mb-4">
+                                <div class="card-body">
+                                    <h5 class="card-title">房间信息</h5>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <p><strong>创建时间：</strong><span id="saveCreatedAt">-</span></p>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <p><strong>绑定剧本：</strong><span id="saveScenarioTitle">-</span></p>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <p><strong>参与用户：</strong><span id="saveParticipants">-</span></p>
+                                            <p><strong>房间码：</strong><span id="roomDetailCode">-</span></p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card mb-4">
+                                <div class="card-body">
+                                    <h5 class="card-title">玩家角色绑定与记录</h5>
+                                    <div id="roomCharacterBindings" class="room-character-bindings" aria-live="polite"></div>
+                                </div>
+                            </div>
+                            <!-- 回档节点列表 -->
+                            <div class="card">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h5 class="card-title">回档节点</h5>
+                                        <button class="btn btn-primary btn-sm" id="createSaveNode">创建回档节点</button>
+                                    </div>
+                                    <div class="save-node-list" id="saveNodeList">
+                                        <!-- 回档节点将在这里动态生成 -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+

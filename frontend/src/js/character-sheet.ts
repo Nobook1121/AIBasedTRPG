@@ -1,7 +1,9 @@
-type COC7AttributeKey = "STR" | "CON" | "SIZ" | "DEX" | "APP" | "INT" | "POW" | "EDU" | "LUK" | "AGE";
+type COC7CoreAttributeKey = "STR" | "DEX" | "SIZ" | "APP" | "CON" | "INT" | "POW" | "EDU" | "LUC";
+type COC7AttributeKey = COC7CoreAttributeKey | "AGE";
 type SkillRank = "新手" | "学习" | "熟修" | "主修";
 type SkillCategory = "探索" | "社交" | "知识" | "战斗" | "行动" | "神话";
-type InvestigatorGender = "male" | "female";
+type InvestigatorGender = "male" | "female" | "unknown";
+type NameRegion = "china" | "japan" | "korea" | "western" | "russia" | "india" | "france" | "germany" | "spain" | "italy";
 
 interface COC7Attributes {
     STR: number;
@@ -12,8 +14,12 @@ interface COC7Attributes {
     INT: number;
     POW: number;
     EDU: number;
-    LUK: number;
+    LUC: number;
     AGE: number;
+}
+
+interface LegacyAttributesInput extends Partial<COC7Attributes> {
+    LUK?: number;
 }
 
 interface COC7Skill {
@@ -23,6 +29,8 @@ interface COC7Skill {
     base: number;
     category: SkillCategory | string;
     checked: boolean;
+    occupation?: boolean;
+    specialty?: string;
     rank?: SkillRank;
 }
 
@@ -76,26 +84,83 @@ interface COC7Occupation {
     name: string;
     creditRating: [number, number];
     occupationSkills: string[];
+    pointsFormula: Array<COC7AttributeKey>;
     skillBonuses: Record<string, number>;
     specialties: string[];
     passiveEffects: string[];
+}
+
+interface COC7HalfAndFifth {
+    half: number;
+    fifth: number;
+}
+
+interface AttributeDisplayValues {
+    half: number;
+    ratio: number;
+}
+
+interface AttributeRollFormula {
+    dice: number;
+    sides: number;
+    bonus: number;
+    multiplier: number;
+}
+
+type AttributeRollFormulaMap = Record<COC7CoreAttributeKey, string>;
+
+interface CharacterRuleSettings {
+    attributeRatioPercent: number;
+    attributeRolls: AttributeRollFormulaMap;
+}
+
+interface CharacterRuleSettingsInput {
+    attributeRatioPercent?: unknown;
+    attributeRolls?: Partial<Record<COC7CoreAttributeKey, string>>;
+}
+
+interface CharacterStatusFlags {
+    majorWound: boolean;
+    unconscious: boolean;
+    dead: boolean;
+    temporaryInsanity: boolean;
+    permanentInsanity: boolean;
+    indefiniteInsanity: boolean;
+}
+
+interface COC7SkillAllocationSummary {
+    selectedOccupationSkills: number;
+    requiredOccupationSkills: number;
+    creditRatingValid: boolean;
+    occupationPoints: number;
+    personalInterestPoints: number;
 }
 
 interface COC7CharacterCard {
     id: string;
     name: string;
     playerId: string;
-    gender: InvestigatorGender;
+    era: string;
+    gender: string;
     age: number;
     avatar: string;
     occupationId: string;
+    occupationName: string;
+    creditRating: number;
     residence: string;
     birthplace: string;
     attributes: COC7Attributes;
     maxHp: number;
     currentHp: number;
     maxSan: number;
+    initialSan: number;
     currentSan: number;
+    magicPoints: number;
+    currentMp: number;
+    maxMp: number;
+    status: CharacterStatusFlags;
+    occupationSkillPoints: number;
+    personalInterestPoints: number;
     mov: number;
     build: number;
     damageBonus: string;
@@ -109,6 +174,11 @@ interface COC7CharacterCard {
     updatedAt: string;
 }
 
+type COC7CharacterCardInput = Partial<Omit<COC7CharacterCard, "attributes" | "gender">> & {
+    attributes?: LegacyAttributesInput;
+    gender?: string;
+};
+
 interface AttributeCheckResult {
     roll: number;
     target: number;
@@ -117,22 +187,33 @@ interface AttributeCheckResult {
 }
 
 interface CharacterApi {
-    ATTRIBUTE_KEYS: COC7AttributeKey[];
+    ATTRIBUTE_KEYS: COC7CoreAttributeKey[];
     SKILL_RANKS: SkillRank[];
+    BASE_SKILLS: COC7Skill[];
     PRESET_OCCUPATIONS: COC7Occupation[];
+    calculateHalfAndFifth: (value: number) => COC7HalfAndFifth;
+    calculateAttributeDisplayValues: (value: number, ratioPercent?: number) => AttributeDisplayValues;
     calculateMaxHp: (attributes: COC7Attributes) => number;
     calculateMaxSan: (attributes: COC7Attributes) => number;
+    calculateMaxMp: (attributes: COC7Attributes) => number;
     calculateMov: (attributes: COC7Attributes) => number;
+    calculateOccupationSkillPoints: (attributes: COC7Attributes, occupationId: string) => number;
+    calculatePersonalInterestPoints: (attributes: COC7Attributes) => number;
     calculateBuildAndDamageBonus: (attributes: Pick<COC7Attributes, "STR" | "SIZ">) => { build: number; damageBonus: string };
     calculateEquipmentLoad: (equipment: COC7EquipmentItem[]) => { totalWeight: number; totalVolume: number };
     groupSkillsByCategory: (skills: COC7Skill[]) => Record<string, number>;
     countSkillsByRank: (skills: COC7Skill[]) => Record<SkillRank, number>;
     countSelectedOccupationSkills: (skills: COC7Skill[]) => number;
+    validateOccupationSkillSelection: (card: COC7CharacterCard) => COC7SkillAllocationSummary;
+    autoAllocateOccupationSkills: (card: COC7CharacterCard) => COC7CharacterCard;
     getOccupationPassiveEffects: (card: COC7CharacterCard) => string[];
     rollAttributeCheck: (attributes: COC7Attributes, attributeKey: COC7AttributeKey, roller?: () => number) => AttributeCheckResult;
     generateInvestigatorName: (gender?: InvestigatorGender, random?: () => number) => string;
-    randomizeAttributes: (random?: () => number) => COC7Attributes;
-    createCharacterCard: (input?: Partial<COC7CharacterCard>) => COC7CharacterCard;
+    generateRegionalName: (region?: NameRegion, gender?: InvestigatorGender, random?: () => number) => string;
+    parseAttributeRollFormula: (formulaText: string) => AttributeRollFormula | null;
+    rollAttributeFormula: (formula: AttributeRollFormula, random?: () => number) => number;
+    randomizeAttributes: (random?: () => number, settings?: CharacterRuleSettings) => COC7Attributes;
+    createCharacterCard: (input?: COC7CharacterCardInput) => COC7CharacterCard;
     listCharacterCards: () => COC7CharacterCard[];
     getCharacterCardSnapshot: (cardId: string) => Partial<COC7CharacterCard> | null;
     initCharacterSheet: () => void;
@@ -147,19 +228,65 @@ interface Window {
 
     const STORAGE_KEY = "ai-trpg:coc7-character-cards";
     const ACTIVE_STORAGE_KEY = "ai-trpg:coc7-active-character";
+    const RULE_SETTINGS_STORAGE_KEY = "ai-trpg:coc7-character-rule-settings";
     const SAMPLE_CHARACTER_URL = "frontend/data/characters/sample-investigator.json";
-    const ATTRIBUTE_KEYS: COC7AttributeKey[] = ["STR", "CON", "SIZ", "DEX", "APP", "INT", "POW", "EDU", "LUK", "AGE"];
+    const ATTRIBUTE_KEYS: COC7CoreAttributeKey[] = ["STR", "DEX", "SIZ", "APP", "CON", "INT", "POW", "EDU", "LUC"];
+    const PLAYER_UNBOUND_LABEL = "未绑定玩家";
+    const ATTRIBUTE_LABELS: Record<COC7CoreAttributeKey, string> = {
+        STR: "力量",
+        DEX: "敏捷",
+        SIZ: "体型",
+        APP: "外貌",
+        CON: "体质",
+        INT: "智力",
+        POW: "意志",
+        EDU: "教育",
+        LUC: "幸运"
+    };
+    const DEFAULT_ATTRIBUTE_ROLLS: AttributeRollFormulaMap = {
+        STR: "3d6x5",
+        DEX: "3d6x5",
+        SIZ: "(2d6+6)x5",
+        APP: "3d6x5",
+        CON: "3d6x5",
+        INT: "(2d6+6)x5",
+        POW: "3d6x5",
+        EDU: "(2d6+6)x5",
+        LUC: "3d6x5"
+    };
+    const DEFAULT_RULE_SETTINGS: CharacterRuleSettings = {
+        attributeRatioPercent: 20,
+        attributeRolls: DEFAULT_ATTRIBUTE_ROLLS
+    };
+    const STATUS_FIELD_IDS: Record<keyof CharacterStatusFlags, string> = {
+        majorWound: "characterStatusMajorWound",
+        unconscious: "characterStatusUnconscious",
+        dead: "characterStatusDead",
+        temporaryInsanity: "characterStatusTemporaryInsanity",
+        permanentInsanity: "characterStatusPermanentInsanity",
+        indefiniteInsanity: "characterStatusIndefiniteInsanity"
+    };
     const SKILL_RANKS: SkillRank[] = ["新手", "学习", "熟修", "主修"];
-    const LAST_NAMES = ["林", "陈", "顾", "沈", "周", "陆", "许", "梁"];
-    const MALE_NAMES = ["雨衡", "明远", "怀瑾", "景行", "子昂", "修文"];
-    const FEMALE_NAMES = ["若宁", "清荷", "知遥", "南枝", "书瑶", "映雪"];
+    const REGIONAL_NAMES: Record<NameRegion, { family: string[]; male: string[]; female: string[]; neutral: string[]; westernOrder?: boolean }> = {
+        china: { family: ["林", "陈", "顾", "沈", "周", "陆", "许", "梁"], male: ["雨衡", "明远", "怀瑾", "景行", "子昂", "修文"], female: ["若宁", "清荷", "知遥", "南枝", "书瑶", "映雪"], neutral: ["安和", "知远", "星河"] },
+        japan: { family: ["藤原", "佐藤", "高桥", "田中", "渡边", "伊藤"], male: ["悠真", "莲", "翔太", "拓海"], female: ["香里", "美咲", "结衣", "葵"], neutral: ["遥", "光", "律"] },
+        korea: { family: ["金", "李", "朴", "崔", "郑", "韩"], male: ["俊浩", "民载", "道允", "志勋"], female: ["素贤", "智雅", "恩彩", "瑞妍"], neutral: ["贤宇", "智安", "夏仁"] },
+        western: { family: ["Carter", "Miller", "Bennett", "Morgan", "Reed", "Howard"], male: ["Arthur", "Edward", "Henry", "Victor"], female: ["Eleanor", "Clara", "Grace", "Helen"], neutral: ["Alex", "Robin", "Taylor"], westernOrder: true },
+        russia: { family: ["Ivanov", "Petrov", "Sokolov", "Volkov", "Morozov"], male: ["Dmitri", "Nikolai", "Alexei", "Viktor"], female: ["Anastasia", "Irina", "Svetlana", "Katerina"], neutral: ["Sasha", "Valya", "Zhenya"], westernOrder: true },
+        india: { family: ["Sharma", "Patel", "Iyer", "Nair", "Kapoor"], male: ["Arjun", "Rahul", "Vikram", "Dev"], female: ["Anika", "Priya", "Meera", "Kavya"], neutral: ["Kiran", "Adi", "Arya"], westernOrder: true },
+        france: { family: ["Dubois", "Moreau", "Lefevre", "Laurent", "Bernard"], male: ["Louis", "Henri", "Luc", "Etienne"], female: ["Claire", "Camille", "Elise", "Juliette"], neutral: ["Claude", "Dominique", "Noel"], westernOrder: true },
+        germany: { family: ["Muller", "Schmidt", "Weber", "Fischer", "Wagner"], male: ["Karl", "Otto", "Lukas", "Felix"], female: ["Anna", "Greta", "Lena", "Marta"], neutral: ["Alex", "Toni", "Mika"], westernOrder: true },
+        spain: { family: ["Garcia", "Lopez", "Martinez", "Sanchez", "Romero"], male: ["Diego", "Mateo", "Javier", "Rafael"], female: ["Lucia", "Sofia", "Isabel", "Carmen"], neutral: ["Cruz", "Angel", "Sol"], westernOrder: true },
+        italy: { family: ["Rossi", "Bianchi", "Romano", "Ricci", "Marino"], male: ["Marco", "Luca", "Giovanni", "Matteo"], female: ["Giulia", "Sofia", "Elena", "Bianca"], neutral: ["Andrea", "Noa", "Vale"], westernOrder: true }
+    };
 
     const PRESET_OCCUPATIONS: COC7Occupation[] = [
         {
             id: "detective",
             name: "私家侦探",
             creditRating: [9, 30],
-            occupationSkills: ["artCraft", "disguise", "law", "libraryUse", "psychology", "spotHidden", "stealth", "social"],
+            occupationSkills: ["artCraft", "disguise", "law", "libraryUse", "psychology", "spotHidden", "stealth", "fastTalk"],
+            pointsFormula: ["EDU", "EDU", "DEX", "DEX"],
             skillBonuses: { spotHidden: 20, listen: 15, psychology: 15, libraryUse: 10 },
             specialties: ["调查", "跟踪", "线索整合"],
             passiveEffects: ["调查场景中第一次侦查或聆听检定可获得 +10 情境加值。"]
@@ -168,7 +295,8 @@ interface Window {
             id: "doctor",
             name: "医生",
             creditRating: [30, 80],
-            occupationSkills: ["firstAid", "medicine", "psychology", "science", "biology", "pharmacy", "languageOther", "social"],
+            occupationSkills: ["firstAid", "medicine", "psychology", "science", "scienceBiology", "sciencePharmacy", "languageOther", "persuade"],
+            pointsFormula: ["EDU", "EDU", "EDU", "EDU"],
             skillBonuses: { medicine: 25, firstAid: 20, psychology: 10, science: 10 },
             specialties: ["治疗", "诊断", "解剖"],
             passiveEffects: ["处理伤势时，急救成功后可额外恢复 1 点生命值。"]
@@ -177,16 +305,88 @@ interface Window {
             id: "professor",
             name: "大学教授",
             creditRating: [20, 70],
-            occupationSkills: ["libraryUse", "languageOwn", "history", "archaeology", "science", "psychology", "languageOther", "social"],
+            occupationSkills: ["libraryUse", "languageOwn", "history", "archaeology", "science", "psychology", "languageOther", "persuade"],
+            pointsFormula: ["EDU", "EDU", "EDU", "EDU"],
             skillBonuses: { libraryUse: 25, languageOwn: 20, history: 15, archaeology: 15 },
             specialties: ["学术研究", "文献检索", "古物辨识"],
             passiveEffects: ["学术分组技能检定成功后，可额外获得一条背景线索。"]
+        },
+        {
+            id: "journalist",
+            name: "记者",
+            creditRating: [9, 30],
+            occupationSkills: ["artCraft", "history", "libraryUse", "languageOwn", "psychology", "fastTalk", "photography", "persuade"],
+            pointsFormula: ["EDU", "EDU", "APP", "APP"],
+            skillBonuses: { libraryUse: 20, fastTalk: 15, psychology: 10, photography: 10 },
+            specialties: ["采访", "摄影", "舆论调查"],
+            passiveEffects: ["公开场合收集传闻时，话术或说服检定可获得 +10 情境加值。"]
+        },
+        {
+            id: "police",
+            name: "警探",
+            creditRating: [20, 50],
+            occupationSkills: ["fightingBrawl", "firearmsHandgun", "firstAid", "law", "listen", "psychology", "spotHidden", "driveAuto"],
+            pointsFormula: ["EDU", "EDU", "STR", "DEX"],
+            skillBonuses: { law: 15, spotHidden: 15, firearmsHandgun: 10, psychology: 10 },
+            specialties: ["执法", "审讯", "现场控制"],
+            passiveEffects: ["面对普通市民或地方机构时，可获得一次身份便利。"]
+        },
+        {
+            id: "occultist",
+            name: "神秘学者",
+            creditRating: [9, 30],
+            occupationSkills: ["anthropology", "history", "libraryUse", "occult", "languageOther", "psychology", "spotHidden", "cthulhuMythos"],
+            pointsFormula: ["EDU", "EDU", "INT", "INT"],
+            skillBonuses: { occult: 25, libraryUse: 15, history: 10, languageOther: 10 },
+            specialties: ["仪式", "民俗", "禁书"],
+            passiveEffects: ["辨识神秘符号、仪式或民俗时可获得 +10 情境加值。"]
+        },
+        {
+            id: "antiquarian",
+            name: "古董商",
+            creditRating: [30, 70],
+            occupationSkills: ["appraise", "artCraft", "history", "libraryUse", "languageOther", "occult", "persuade", "spotHidden"],
+            pointsFormula: ["EDU", "EDU", "APP", "APP"],
+            skillBonuses: { appraise: 25, history: 15, persuade: 10, spotHidden: 10 },
+            specialties: ["估价", "古物", "交易"],
+            passiveEffects: ["鉴定古物、赝品或收藏来源时可获得 +10 情境加值。"]
+        },
+        {
+            id: "soldier",
+            name: "士兵",
+            creditRating: [9, 30],
+            occupationSkills: ["climb", "dodge", "fightingBrawl", "firearmsRifle", "firstAid", "stealth", "survival", "throw"],
+            pointsFormula: ["EDU", "EDU", "STR", "DEX"],
+            skillBonuses: { firearmsRifle: 20, fightingBrawl: 15, firstAid: 10, survival: 10 },
+            specialties: ["战斗", "野外", "纪律"],
+            passiveEffects: ["战斗轮开始前第一次运动类行动可获得 +10 情境加值。"]
+        },
+        {
+            id: "criminal",
+            name: "罪犯",
+            creditRating: [5, 65],
+            occupationSkills: ["appraise", "disguise", "fightingBrawl", "firearmsHandgun", "locksmith", "sleightOfHand", "stealth", "fastTalk"],
+            pointsFormula: ["EDU", "EDU", "DEX", "DEX"],
+            skillBonuses: { stealth: 20, locksmith: 15, sleightOfHand: 15, fastTalk: 10 },
+            specialties: ["潜入", "黑市", "伪装"],
+            passiveEffects: ["处理非法交易、潜入或销赃线索时可获得 +10 情境加值。"]
+        },
+        {
+            id: "engineer",
+            name: "工程师",
+            creditRating: [30, 60],
+            occupationSkills: ["electricalRepair", "mechanicalRepair", "operateHeavyMachinery", "science", "scienceEngineering", "libraryUse", "mathematics", "spotHidden"],
+            pointsFormula: ["EDU", "EDU", "EDU", "EDU"],
+            skillBonuses: { mechanicalRepair: 25, electricalRepair: 20, scienceEngineering: 15, operateHeavyMachinery: 10 },
+            specialties: ["机械", "电气", "结构"],
+            passiveEffects: ["修复机械、电气设备或分析工程结构时可获得 +10 情境加值。"]
         }
     ];
 
     const BASE_SKILLS: COC7Skill[] = [
         { id: "accounting", name: "会计", base: 5, value: 5, category: "知识", checked: false },
         { id: "anthropology", name: "人类学", base: 1, value: 1, category: "知识", checked: false },
+        { id: "appraise", name: "估价", base: 5, value: 5, category: "知识", checked: false },
         { id: "archaeology", name: "考古学", base: 1, value: 1, category: "知识", checked: false },
         { id: "artCraft", name: "艺术/手艺", base: 5, value: 5, category: "知识", checked: false },
         { id: "charm", name: "魅惑", base: 15, value: 15, category: "社交", checked: false },
@@ -195,9 +395,11 @@ interface Window {
         { id: "disguise", name: "乔装", base: 5, value: 5, category: "社交", checked: false },
         { id: "dodge", name: "闪避", base: 25, value: 25, category: "战斗", checked: false },
         { id: "driveAuto", name: "汽车驾驶", base: 20, value: 20, category: "行动", checked: false },
+        { id: "electricalRepair", name: "电气维修", base: 10, value: 10, category: "行动", checked: false },
         { id: "fastTalk", name: "话术", base: 5, value: 5, category: "社交", checked: false },
         { id: "fightingBrawl", name: "格斗", base: 25, value: 25, category: "战斗", checked: false },
         { id: "firearmsHandgun", name: "射击/手枪", base: 20, value: 20, category: "战斗", checked: false },
+        { id: "firearmsRifle", name: "射击/步枪霰弹枪", base: 25, value: 25, category: "战斗", checked: false },
         { id: "firstAid", name: "急救", base: 30, value: 30, category: "探索", checked: false },
         { id: "history", name: "历史", base: 5, value: 5, category: "知识", checked: false },
         { id: "intimidate", name: "恐吓", base: 15, value: 15, category: "社交", checked: false },
@@ -207,23 +409,38 @@ interface Window {
         { id: "libraryUse", name: "图书馆使用", base: 20, value: 20, category: "知识", checked: false },
         { id: "listen", name: "聆听", base: 20, value: 20, category: "探索", checked: false },
         { id: "locksmith", name: "锁匠", base: 1, value: 1, category: "探索", checked: false },
+        { id: "mechanicalRepair", name: "机械维修", base: 10, value: 10, category: "行动", checked: false },
         { id: "medicine", name: "医学", base: 1, value: 1, category: "知识", checked: false },
         { id: "naturalWorld", name: "博物学", base: 10, value: 10, category: "知识", checked: false },
         { id: "navigate", name: "导航", base: 10, value: 10, category: "行动", checked: false },
         { id: "occult", name: "神秘学", base: 5, value: 5, category: "神话", checked: false },
+        { id: "operateHeavyMachinery", name: "操作重型机械", base: 1, value: 1, category: "行动", checked: false },
         { id: "persuade", name: "说服", base: 10, value: 10, category: "社交", checked: false },
+        { id: "photography", name: "摄影", base: 5, value: 5, category: "知识", checked: false },
+        { id: "pilot", name: "驾驶/飞行器", base: 1, value: 1, category: "行动", checked: false },
+        { id: "psychoanalysis", name: "精神分析", base: 1, value: 1, category: "探索", checked: false },
         { id: "psychology", name: "心理学", base: 10, value: 10, category: "社交", checked: false },
+        { id: "ride", name: "骑术", base: 5, value: 5, category: "行动", checked: false },
         { id: "science", name: "科学", base: 1, value: 1, category: "知识", checked: false },
+        { id: "scienceBiology", name: "科学/生物学", base: 1, value: 1, category: "知识", checked: false },
+        { id: "scienceEngineering", name: "科学/工程学", base: 1, value: 1, category: "知识", checked: false },
+        { id: "sciencePharmacy", name: "科学/药学", base: 1, value: 1, category: "知识", checked: false },
+        { id: "mathematics", name: "数学", base: 10, value: 10, category: "知识", checked: false },
         { id: "sleightOfHand", name: "妙手", base: 10, value: 10, category: "行动", checked: false },
         { id: "spotHidden", name: "侦查", base: 25, value: 25, category: "探索", checked: false },
         { id: "stealth", name: "潜行", base: 20, value: 20, category: "行动", checked: false },
         { id: "survival", name: "生存", base: 10, value: 10, category: "行动", checked: false },
+        { id: "swim", name: "游泳", base: 20, value: 20, category: "行动", checked: false },
+        { id: "throw", name: "投掷", base: 20, value: 20, category: "行动", checked: false },
         { id: "track", name: "追踪", base: 10, value: 10, category: "探索", checked: false }
     ];
 
     let cards: COC7CharacterCard[] = [];
     let activeCardId = "";
     let modal: BootstrapModalInstance | null = null;
+    let nameGeneratorModal: BootstrapModalInstance | null = null;
+    let occupationTemplateModal: BootstrapModalInstance | null = null;
+    let pendingGeneratedName = "";
 
     function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
         const parsed = Number(value);
@@ -231,23 +448,100 @@ interface Window {
         return Math.min(max, Math.max(min, Math.round(parsed)));
     }
 
-    function rollD6(random: () => number): number {
-        return Math.floor(random() * 6) + 1;
+    function rollDie(sides: number, random: () => number): number {
+        return Math.floor(random() * sides) + 1;
     }
 
-    function randomizeAttributes(random: () => number = Math.random): COC7Attributes {
-        const roll3d6 = (): number => (rollD6(random) + rollD6(random) + rollD6(random)) * 5;
-        const roll2d6plus6 = (): number => (rollD6(random) + rollD6(random) + 6) * 5;
+    function parseAttributeRollFormula(formulaText: string): AttributeRollFormula | null {
+        const normalized = formulaText.trim().toLowerCase().replace(/\s+/g, "");
+        const match = normalized.match(/^\(?(?<dice>\d+)d(?<sides>\d+)(?<bonus>[+-]\d+)?\)?(?:x(?<multiplier>\d+))?$/);
+        if (!match?.groups) return null;
+        const dice = clampNumber(match.groups.dice, 1, 20, 3);
+        const sides = clampNumber(match.groups.sides, 2, 100, 6);
+        const bonus = clampNumber(match.groups.bonus || 0, -100, 100, 0);
+        const multiplier = clampNumber(match.groups.multiplier || 1, 1, 100, 5);
+        return { dice, sides, bonus, multiplier };
+    }
+
+    function formatAttributeRollFormula(formula: AttributeRollFormula): string {
+        const bonusText = formula.bonus > 0 ? `+${formula.bonus}` : formula.bonus < 0 ? String(formula.bonus) : "";
+        const base = `${formula.dice}d${formula.sides}${bonusText}`;
+        const wrapped = formula.bonus === 0 ? base : `(${base})`;
+        return `${wrapped}x${formula.multiplier}`;
+    }
+
+    function rollAttributeFormula(formula: AttributeRollFormula, random: () => number = Math.random): number {
+        let total = formula.bonus;
+        for (let index = 0; index < formula.dice; index += 1) {
+            total += rollDie(formula.sides, random);
+        }
+        return clampNumber(total * formula.multiplier, 1, 999, 50);
+    }
+
+    function normalizeRuleSettings(input?: CharacterRuleSettingsInput): CharacterRuleSettings {
+        const rawRolls = input?.attributeRolls || DEFAULT_ATTRIBUTE_ROLLS;
+        const attributeRolls = ATTRIBUTE_KEYS.reduce((settings, key) => {
+            const parsed = parseAttributeRollFormula(rawRolls[key] || DEFAULT_ATTRIBUTE_ROLLS[key]);
+            settings[key] = parsed ? formatAttributeRollFormula(parsed) : DEFAULT_ATTRIBUTE_ROLLS[key];
+            return settings;
+        }, {} as AttributeRollFormulaMap);
         return {
-            STR: roll3d6(),
-            CON: roll3d6(),
-            SIZ: roll2d6plus6(),
-            DEX: roll3d6(),
-            APP: roll3d6(),
-            INT: roll2d6plus6(),
-            POW: roll3d6(),
-            EDU: roll2d6plus6(),
-            LUK: roll3d6(),
+            attributeRatioPercent: clampNumber(input?.attributeRatioPercent, 1, 100, DEFAULT_RULE_SETTINGS.attributeRatioPercent),
+            attributeRolls
+        };
+    }
+
+    function getConfigSection(name: string): Record<string, unknown> | null {
+        const section = global.configManager?.getSection("general", name);
+        return section && typeof section === "object" && !Array.isArray(section) ? section as Record<string, unknown> : null;
+    }
+
+    function loadRuleSettings(): CharacterRuleSettings {
+        const configSection = getConfigSection("character_rules");
+        const configRolls = ATTRIBUTE_KEYS.reduce((rolls, key) => {
+            const value = configSection?.[`attribute_roll_${key.toLowerCase()}`];
+            if (typeof value === "string") rolls[key] = value;
+            return rolls;
+        }, { ...DEFAULT_ATTRIBUTE_ROLLS } as AttributeRollFormulaMap);
+        const storage = safeStorage();
+        const localSettings = storage ? parseRuleSettingsFromStorage(storage.getItem(RULE_SETTINGS_STORAGE_KEY)) : null;
+        return normalizeRuleSettings({
+            attributeRatioPercent: localSettings?.attributeRatioPercent ?? configSection?.attribute_ratio_percent ?? DEFAULT_RULE_SETTINGS.attributeRatioPercent,
+            attributeRolls: localSettings?.attributeRolls || configRolls
+        });
+    }
+
+    function parseRuleSettingsFromStorage(raw: string | null): CharacterRuleSettings | null {
+        if (!raw) return null;
+        try {
+            const parsed = JSON.parse(raw) as CharacterRuleSettingsInput;
+            return normalizeRuleSettings(parsed);
+        } catch {
+            return null;
+        }
+    }
+
+    function persistRuleSettings(settings: CharacterRuleSettings): void {
+        const storage = safeStorage();
+        if (storage) storage.setItem(RULE_SETTINGS_STORAGE_KEY, JSON.stringify(normalizeRuleSettings(settings)));
+    }
+
+    function randomizeAttributes(random: () => number = Math.random, settings: CharacterRuleSettings = loadRuleSettings()): COC7Attributes {
+        const normalizedSettings = normalizeRuleSettings(settings);
+        const roll = (key: COC7CoreAttributeKey): number => {
+            const formula = parseAttributeRollFormula(normalizedSettings.attributeRolls[key]) || parseAttributeRollFormula(DEFAULT_ATTRIBUTE_ROLLS[key]);
+            return formula ? rollAttributeFormula(formula, random) : 50;
+        };
+        return {
+            STR: roll("STR"),
+            DEX: roll("DEX"),
+            SIZ: roll("SIZ"),
+            APP: roll("APP"),
+            CON: roll("CON"),
+            INT: roll("INT"),
+            POW: roll("POW"),
+            EDU: roll("EDU"),
+            LUC: roll("LUC"),
             AGE: 25
         };
     }
@@ -258,6 +552,35 @@ interface Window {
 
     function calculateMaxSan(attributes: COC7Attributes): number {
         return attributes.POW;
+    }
+
+    function calculateMaxMp(attributes: COC7Attributes): number {
+        return Math.floor(attributes.POW / 5);
+    }
+
+    function calculateHalfAndFifth(value: number): COC7HalfAndFifth {
+        const normalized = clampNumber(value, 0, 999, 0);
+        return {
+            half: Math.floor(normalized / 2),
+            fifth: Math.floor(normalized / 5)
+        };
+    }
+
+    function calculateAttributeDisplayValues(value: number, ratioPercent: number = loadRuleSettings().attributeRatioPercent): AttributeDisplayValues {
+        const normalized = clampNumber(value, 0, 999, 0);
+        return {
+            half: Math.floor(normalized / 2),
+            ratio: Math.floor(normalized * clampNumber(ratioPercent, 1, 100, 20) / 100)
+        };
+    }
+
+    function calculateOccupationSkillPoints(attributes: COC7Attributes, occupationId: string): number {
+        const occupation = getOccupationById(occupationId);
+        return occupation.pointsFormula.reduce((total, key) => total + attributes[key], 0);
+    }
+
+    function calculatePersonalInterestPoints(attributes: COC7Attributes): number {
+        return attributes.INT * 2;
     }
 
     function calculateMov(attributes: COC7Attributes): number {
@@ -313,15 +636,62 @@ interface Window {
     }
 
     function countSelectedOccupationSkills(skills: COC7Skill[]): number {
-        return skills.filter((skill) => skill.checked).length;
+        return skills.filter((skill) => skill.checked || skill.occupation).length;
+    }
+
+    function getOccupationById(occupationId: string): COC7Occupation {
+        return PRESET_OCCUPATIONS.find((occupation) => occupation.id === occupationId) || PRESET_OCCUPATIONS[0] as COC7Occupation;
+    }
+
+    function resolveOccupationFromInput(value: string): COC7Occupation {
+        const normalized = value.trim();
+        return PRESET_OCCUPATIONS.find((occupation) => occupation.id === normalized || occupation.name === normalized) || getOccupationById("detective");
+    }
+
+    function resolveOccupationIdFromInput(value: string): string {
+        return resolveOccupationFromInput(value).id;
+    }
+
+    function resolveOccupationNameFromInput(value: string): string {
+        return value.trim() || resolveOccupationFromInput(value).name;
     }
 
     function getOccupation(card: COC7CharacterCard): COC7Occupation {
-        return PRESET_OCCUPATIONS.find((occupation) => occupation.id === card.occupationId) || PRESET_OCCUPATIONS[0] as COC7Occupation;
+        return getOccupationById(card.occupationId);
     }
 
     function getOccupationPassiveEffects(card: COC7CharacterCard): string[] {
         return [...getOccupation(card).passiveEffects];
+    }
+
+    function validateOccupationSkillSelection(card: COC7CharacterCard): COC7SkillAllocationSummary {
+        const occupation = getOccupation(card);
+        return {
+            selectedOccupationSkills: countSelectedOccupationSkills(card.skills),
+            requiredOccupationSkills: occupation.occupationSkills.length,
+            creditRatingValid: card.creditRating >= occupation.creditRating[0] && card.creditRating <= occupation.creditRating[1],
+            occupationPoints: card.occupationSkillPoints,
+            personalInterestPoints: card.personalInterestPoints
+        };
+    }
+
+    function autoAllocateOccupationSkills(card: COC7CharacterCard): COC7CharacterCard {
+        const occupation = getOccupation(card);
+        const bonusEntries = Object.entries(occupation.skillBonuses);
+        const skills = card.skills.map((skill) => {
+            const occupationSkill = occupation.occupationSkills.includes(skill.id);
+            const bonusEntry = bonusEntries.find(([skillId]) => skillId === skill.id);
+            const bonus = bonusEntry ? bonusEntry[1] : 0;
+            const value = clampNumber(skill.value + bonus, 0, 99, skill.value);
+            return {
+                ...skill,
+                checked: skill.checked || occupationSkill,
+                occupation: skill.occupation || occupationSkill,
+                value,
+                rank: rankFromValue(value)
+            };
+        });
+        return createCharacterCard({ ...card, skills });
     }
 
     function rollAttributeCheck(attributes: COC7Attributes, attributeKey: COC7AttributeKey, roller: () => number = () => Math.floor(Math.random() * 100) + 1): AttributeCheckResult {
@@ -337,51 +707,78 @@ interface Window {
     }
 
     function generateInvestigatorName(gender: InvestigatorGender = "male", random: () => number = Math.random): string {
-        const last = LAST_NAMES[Math.floor(random() * LAST_NAMES.length)] || LAST_NAMES[0];
-        const pool = gender === "female" ? FEMALE_NAMES : MALE_NAMES;
-        return `${last}${pool[Math.floor(random() * pool.length)] || pool[0]}`;
+        return generateRegionalName("china", gender, random);
     }
 
-    function normalizeAttributes(input?: Partial<COC7Attributes>): COC7Attributes {
+    function generateRegionalName(region: NameRegion = "china", gender: InvestigatorGender = "unknown", random: () => number = Math.random): string {
+        const source = REGIONAL_NAMES[region] || REGIONAL_NAMES.china;
+        const givenPool = gender === "male" ? source.male : gender === "female" ? source.female : source.neutral;
+        const family = pickRandom(source.family, random);
+        const given = pickRandom(givenPool.length ? givenPool : source.neutral, random);
+        return source.westernOrder ? `${given} ${family}` : `${family}${given}`;
+    }
+
+    function pickRandom(pool: string[], random: () => number): string {
+        return pool[Math.floor(random() * pool.length)] || pool[0] || "";
+    }
+
+    function normalizeAttributes(input?: LegacyAttributesInput): COC7Attributes {
         return {
             STR: clampNumber(input?.STR, 1, 99, 50),
-            CON: clampNumber(input?.CON, 1, 99, 50),
-            SIZ: clampNumber(input?.SIZ, 1, 99, 50),
             DEX: clampNumber(input?.DEX, 1, 99, 50),
+            SIZ: clampNumber(input?.SIZ, 1, 99, 50),
             APP: clampNumber(input?.APP, 1, 99, 50),
+            CON: clampNumber(input?.CON, 1, 99, 50),
             INT: clampNumber(input?.INT, 1, 99, 50),
             POW: clampNumber(input?.POW, 1, 99, 50),
             EDU: clampNumber(input?.EDU, 1, 99, 50),
-            LUK: clampNumber(input?.LUK, 1, 99, 50),
+            LUC: clampNumber(input?.LUC ?? input?.LUK, 1, 99, 50),
             AGE: clampNumber(input?.AGE, 15, 99, 25)
         };
     }
 
-    function createCharacterCard(input: Partial<COC7CharacterCard> = {}): COC7CharacterCard {
+    function normalizeNameGender(value: string | undefined): InvestigatorGender {
+        return value === "male" || value === "female" || value === "unknown" ? value : "unknown";
+    }
+
+    function createCharacterCard(input: COC7CharacterCardInput = {}): COC7CharacterCard {
         const attributes = normalizeAttributes(input.attributes);
         const maxHp = calculateMaxHp(attributes);
         const maxSan = calculateMaxSan(attributes);
+        const maxMp = calculateMaxMp(attributes);
         const damage = calculateBuildAndDamageBonus(attributes);
+        const occupationId = input.occupationId || resolveOccupationIdFromInput(input.occupationName || "");
+        const occupation = getOccupationById(occupationId);
         const now = new Date().toISOString();
         return {
             id: input.id || `investigator-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            name: input.name || generateInvestigatorName(input.gender || "male"),
-            playerId: input.playerId || "未指定玩家",
-            gender: input.gender || "male",
+            name: input.name || generateInvestigatorName(normalizeNameGender(input.gender)),
+            playerId: input.playerId || "",
+            era: input.era || "1920s",
+            gender: input.gender || "",
             age: attributes.AGE,
             avatar: input.avatar || "",
-            occupationId: input.occupationId || PRESET_OCCUPATIONS[0]?.id || "detective",
+            occupationId,
+            occupationName: input.occupationName || occupation.name,
+            creditRating: clampNumber(input.creditRating, occupation.creditRating[0], occupation.creditRating[1], occupation.creditRating[0]),
             residence: input.residence || "",
             birthplace: input.birthplace || "",
             attributes,
             maxHp,
             currentHp: clampNumber(input.currentHp, 0, maxHp, maxHp),
             maxSan,
+            initialSan: clampNumber(input.initialSan, 0, maxSan, maxSan),
             currentSan: clampNumber(input.currentSan, 0, maxSan, maxSan),
+            magicPoints: clampNumber(input.magicPoints ?? input.currentMp, 0, maxMp, maxMp),
+            currentMp: clampNumber(input.currentMp ?? input.magicPoints, 0, maxMp, maxMp),
+            maxMp,
+            status: normalizeStatus(input.status),
+            occupationSkillPoints: calculateOccupationSkillPoints(attributes, occupationId),
+            personalInterestPoints: calculatePersonalInterestPoints(attributes),
             mov: calculateMov(attributes),
             build: damage.build,
             damageBonus: damage.damageBonus,
-            skills: normalizeSkills(input.skills),
+            skills: normalizeSkills(input.skills, attributes, occupation),
             weapons: normalizeWeapons(input.weapons),
             equipment: normalizeEquipment(input.equipment),
             assets: {
@@ -396,17 +793,35 @@ interface Window {
         };
     }
 
-    function normalizeSkills(skills?: COC7Skill[]): COC7Skill[] {
-        const source = skills && skills.length ? skills : BASE_SKILLS;
-        return source.map((skill) => ({
+    function normalizeSkills(skills?: COC7Skill[], attributes?: COC7Attributes, occupation?: COC7Occupation): COC7Skill[] {
+        const source = skills && skills.length ? mergeSkillCatalog(skills) : BASE_SKILLS;
+        return source.map((skill) => {
+            const base = calculateSkillBase(skill, attributes);
+            const value = clampNumber(skill.value, 0, 99, Math.max(skill.base, base));
+            const occupationSkill = occupation?.occupationSkills.includes(skill.id) || Boolean(skill.occupation);
+            return {
             id: skill.id || slugify(skill.name),
             name: String(skill.name || "未命名技能").slice(0, 40),
-            base: clampNumber(skill.base, 0, 99, 0),
-            value: clampNumber(skill.value, 0, 99, skill.base || 0),
+            base,
+            value,
             category: skill.category || "知识",
-            checked: Boolean(skill.checked),
-            rank: skill.rank || rankFromValue(skill.value)
-        }));
+            checked: Boolean(skill.checked || occupationSkill),
+            occupation: occupationSkill,
+            specialty: skill.specialty || "",
+            rank: skill.rank || rankFromValue(value)
+        };
+        });
+    }
+
+    function mergeSkillCatalog(skills: COC7Skill[]): COC7Skill[] {
+        const byId = new Map(skills.map((skill) => [skill.id, skill]));
+        return BASE_SKILLS.map((base) => ({ ...base, ...(byId.get(base.id) || {}) }));
+    }
+
+    function calculateSkillBase(skill: COC7Skill, attributes?: COC7Attributes): number {
+        if (skill.id === "dodge" && attributes) return Math.floor(attributes.DEX / 2);
+        if (skill.id === "languageOwn" && attributes) return attributes.EDU;
+        return clampNumber(skill.base, 0, 99, 0);
     }
 
     function normalizeWeapons(weapons?: COC7Weapon[]): COC7Weapon[] {
@@ -449,6 +864,17 @@ interface Window {
         };
     }
 
+    function normalizeStatus(status?: Partial<CharacterStatusFlags>): CharacterStatusFlags {
+        return {
+            majorWound: Boolean(status?.majorWound),
+            unconscious: Boolean(status?.unconscious),
+            dead: Boolean(status?.dead),
+            temporaryInsanity: Boolean(status?.temporaryInsanity),
+            permanentInsanity: Boolean(status?.permanentInsanity),
+            indefiniteInsanity: Boolean(status?.indefiniteInsanity)
+        };
+    }
+
     function normalizeRelationships(relationships?: COC7Relationship[]): COC7Relationship[] {
         return (relationships || []).map((item) => ({
             name: item.name || "未命名关系",
@@ -468,10 +894,31 @@ interface Window {
         try { return global.localStorage || null; } catch { return null; }
     }
 
+    function currentPlayerId(): string {
+        return String(global.currentUser?.user_id ?? "");
+    }
+
+    function currentPlayerLabel(): string {
+        const user = global.currentUser;
+        if (!user) return "";
+        return String(user.username || user.user_id || "");
+    }
+
+    function isBoundToCurrentPlayer(playerId: string): boolean {
+        if (!playerId) return true;
+        const user = global.currentUser;
+        if (!user) return false;
+        return playerId === String(user.user_id) || playerId === user.username;
+    }
+
+    function isCurrentUserElevated(): boolean {
+        return ["ADMIN", "OWNER"].includes(global.currentUser?.role || "");
+    }
+
     async function loadSampleCharacter(): Promise<COC7CharacterCard> {
         try {
             const response = await fetch(SAMPLE_CHARACTER_URL);
-            if (response.ok) return createCharacterCard(await response.json() as Partial<COC7CharacterCard>);
+            if (response.ok) return createCharacterCard(await response.json() as COC7CharacterCardInput);
         } catch (error) {
             console.warn("加载示例角色失败:", error);
         }
@@ -484,7 +931,7 @@ interface Window {
             try {
                 const parsed = JSON.parse(storage.getItem(STORAGE_KEY) || "[]") as unknown;
                 if (Array.isArray(parsed) && parsed.length) {
-                    cards = parsed.map((card) => createCharacterCard(card as Partial<COC7CharacterCard>));
+                    cards = parsed.map((card) => createCharacterCard(card as COC7CharacterCardInput));
                     activeCardId = storage.getItem(ACTIVE_STORAGE_KEY) || cards[0]?.id || "";
                     return;
                 }
@@ -514,6 +961,10 @@ interface Window {
         workspace.dataset.initialized = "true";
         const modalElement = byId("characterModal");
         modal = modalElement && typeof bootstrap !== "undefined" ? new bootstrap.Modal(modalElement) : null;
+        const nameModalElement = byId("nameGeneratorModal");
+        nameGeneratorModal = nameModalElement && typeof bootstrap !== "undefined" ? new bootstrap.Modal(nameModalElement) : null;
+        const occupationModalElement = byId("occupationTemplateModal");
+        occupationTemplateModal = occupationModalElement && typeof bootstrap !== "undefined" ? new bootstrap.Modal(occupationModalElement) : null;
         hydrateOccupationSelect();
         hydrateSkillChecklist();
         bindEvents();
@@ -525,38 +976,76 @@ interface Window {
         byId("saveCharacter")?.addEventListener("click", saveFromEditor);
         byId("exportCharacter")?.addEventListener("click", exportActiveCard);
         byId("backToCharacterList")?.addEventListener("click", showCharacterList);
-        byId("randomizeCharacterName")?.addEventListener("click", () => setInputValue("characterName", generateInvestigatorName()));
+        byId("randomizeCharacterName")?.addEventListener("click", openNameGenerator);
+        byId("regenerateName")?.addEventListener("click", regenerateNamePreview);
+        byId("confirmGeneratedName")?.addEventListener("click", confirmGeneratedName);
+        byId("cancelGeneratedName")?.addEventListener("click", () => nameGeneratorModal?.hide());
+        byId("nameRegionSelect")?.addEventListener("change", regenerateNamePreview);
+        byId("nameGenderSelect")?.addEventListener("change", regenerateNamePreview);
+        byId("openOccupationTemplatePicker")?.addEventListener("click", openOccupationTemplatePicker);
+        byId("characterAvatarPreview")?.addEventListener("click", () => byId<HTMLInputElement>("characterAvatarUpload")?.click());
+        byId("unbindCharacterPlayer")?.addEventListener("click", unbindCharacterPlayerFromEditor);
         byId("randomizeAttributes")?.addEventListener("click", () => {
             const attributes = randomizeAttributes();
             ATTRIBUTE_KEYS.forEach((key) => setInputValue(`attribute${key}`, attributes[key]));
+            setInputValue("characterAge", attributes.AGE);
+            refreshEditorRuleSummary();
+        });
+        byId("saveCharacterRuleSettings")?.addEventListener("click", saveRuleSettingsFromPanel);
+        byId("autoAllocateOccupationSkills")?.addEventListener("click", autoAllocateEditorOccupationSkills);
+        byId("characterOccupation")?.addEventListener("input", () => {
+            hydrateSkillChecklist(readChecklistSkills());
+            refreshEditorRuleSummary();
+        });
+        byId("characterCreditRating")?.addEventListener("input", refreshEditorRuleSummary);
+        document.querySelectorAll<HTMLInputElement>(".character-attribute-input").forEach((input) => {
+            input.addEventListener("input", () => {
+                refreshEditorRuleSummary();
+            });
+        });
+        byId("characterAge")?.addEventListener("input", () => {
+            refreshEditorRuleSummary();
+        });
+        ["characterCurrentHp", "characterCurrentMp", "characterCurrentSan", "characterInitialSan"].forEach((fieldId) => {
+            byId(fieldId)?.addEventListener("input", refreshEditorRuleSummary);
         });
         byId<HTMLInputElement>("characterAvatarUpload")?.addEventListener("change", handleAvatarUpload);
+        hydrateRuleSettingsPanel();
     }
 
     function hydrateOccupationSelect(): void {
-        const select = byId<HTMLSelectElement>("characterOccupation");
-        if (!select) return;
-        select.innerHTML = PRESET_OCCUPATIONS.map((occupation) => `<option value="${escapeHtml(occupation.id)}">${escapeHtml(occupation.name)}</option>`).join("");
+        const list = byId<HTMLDataListElement>("characterOccupationOptions");
+        if (!list) return;
+        list.innerHTML = PRESET_OCCUPATIONS.map((occupation) => `<option value="${escapeHtml(occupation.name)}"></option>`).join("");
     }
 
     function hydrateSkillChecklist(skills: COC7Skill[] = BASE_SKILLS): void {
         const container = byId("characterSkillChecklist");
         if (!container) return;
-        container.innerHTML = skills.map((skill) => `
+        const occupation = resolveOccupationFromInput(getInputValue("characterOccupation"));
+        container.innerHTML = normalizeSkills(skills, readAttributes(), occupation).map((skill) => `
             <label class="skill-check-item">
                 <input type="checkbox" data-skill-id="${escapeHtml(skill.id)}" ${skill.checked ? "checked" : ""}>
-                <span>${escapeHtml(skill.name)}</span>
+                <span>${escapeHtml(skill.name)}${skill.occupation ? " · 职业" : ""}</span>
                 <input type="number" min="0" max="99" value="${skill.value}" data-skill-value="${escapeHtml(skill.id)}">
             </label>
         `).join("");
     }
 
     function openEditor(card?: COC7CharacterCard): void {
+        if (card?.playerId && !isCurrentUserElevated() && !isBoundToCurrentPlayer(card.playerId)) {
+            notify("该角色卡已绑定其他玩家，当前玩家不能编辑。", "error");
+            return;
+        }
         const target = card ? cloneCard(card) : createCharacterCard();
         setInputValue("characterEditingId", card?.id || "");
         setInputValue("characterName", target.name);
-        setInputValue("playerId", target.playerId);
-        setInputValue("characterOccupation", target.occupationId);
+        setInputValue("characterBoundPlayer", target.playerId && target.playerId !== PLAYER_UNBOUND_LABEL ? target.playerId : (currentPlayerLabel() || PLAYER_UNBOUND_LABEL));
+        setInputValue("characterEra", target.era);
+        setInputValue("characterOccupation", target.occupationName || getOccupation(target).name);
+        setInputValue("characterCreditRating", target.creditRating);
+        setInputValue("characterAge", target.age);
+        setInputValue("characterGender", target.gender);
         setInputValue("raceType", target.background.raceType);
         setInputValue("characterResidence", target.residence);
         setInputValue("characterBirthplace", target.birthplace);
@@ -571,8 +1060,88 @@ interface Window {
         setInputValue("characterWeapons", formatWeapons(target.weapons));
         setInputValue("characterEquipment", formatEquipment(target.equipment));
         setInputValue("characterAssets", formatAssets(target.assets));
+        setInputValue("characterCurrentHp", target.currentHp);
+        setInputValue("characterMaxHp", target.maxHp);
+        setInputValue("characterCurrentMp", target.currentMp);
+        setInputValue("characterMaxMp", target.maxMp);
+        setInputValue("characterCurrentSan", target.currentSan);
+        setInputValue("characterInitialSan", target.initialSan);
+        setInputValue("characterMaxSan", target.maxSan);
+        setEditorStatus(target.status);
+        updateUnbindButton(target.playerId);
+        updateAvatarPreview(target.avatar);
         hydrateSkillChecklist(target.skills);
+        refreshEditorRuleSummary();
         modal?.show();
+    }
+
+    function openNameGenerator(): void {
+        const gender = normalizeNameGender(getInputValue("characterGender"));
+        setInputValue("nameGenderSelect", gender);
+        regenerateNamePreview();
+        nameGeneratorModal?.show();
+    }
+
+    function regenerateNamePreview(): void {
+        const region = (getInputValue("nameRegionSelect") || "china") as NameRegion;
+        const gender = (getInputValue("nameGenderSelect") || "unknown") as InvestigatorGender;
+        pendingGeneratedName = generateRegionalName(region, gender);
+        setText("generatedNamePreview", pendingGeneratedName);
+    }
+
+    function confirmGeneratedName(): void {
+        if (pendingGeneratedName) setInputValue("characterName", pendingGeneratedName);
+        nameGeneratorModal?.hide();
+    }
+
+    function openOccupationTemplatePicker(): void {
+        const container = byId("occupationTemplateList");
+        if (!container) return;
+        container.innerHTML = PRESET_OCCUPATIONS.map((occupation) => `
+            <button type="button" class="occupation-template-card" data-occupation-id="${escapeHtml(occupation.id)}">
+                <strong>${escapeHtml(occupation.name)}</strong>
+                <span>信用评级 ${occupation.creditRating[0]}-${occupation.creditRating[1]}</span>
+                <small>职业点：${occupation.pointsFormula.join(" + ")}</small>
+                <small>本职技能：${occupation.occupationSkills.map(skillNameById).join("、")}</small>
+            </button>
+        `).join("");
+        container.querySelectorAll<HTMLButtonElement>("[data-occupation-id]").forEach((button) => {
+            button.addEventListener("click", () => applyOccupationTemplate(button.dataset.occupationId || "detective"));
+        });
+        occupationTemplateModal?.show();
+    }
+
+    function applyOccupationTemplate(occupationId: string): void {
+        const occupation = getOccupationById(occupationId);
+        setInputValue("characterOccupation", occupation.name);
+        setInputValue("characterCreditRating", occupation.creditRating[0]);
+        hydrateSkillChecklist(readChecklistSkills());
+        refreshEditorRuleSummary();
+        occupationTemplateModal?.hide();
+    }
+
+    function hydrateRuleSettingsPanel(): void {
+        const settings = loadRuleSettings();
+        setInputValue("attributeRatioPercent", settings.attributeRatioPercent);
+        ATTRIBUTE_KEYS.forEach((key) => setInputValue(`attributeRoll${key}`, settings.attributeRolls[key]));
+        setText("characterRuleSettingsMessage", "");
+    }
+
+    function saveRuleSettingsFromPanel(): void {
+        const nextSettings = normalizeRuleSettings({
+            attributeRatioPercent: Number(getInputValue("attributeRatioPercent")),
+            attributeRolls: ATTRIBUTE_KEYS.reduce((rolls, key) => {
+                rolls[key] = getInputValue(`attributeRoll${key}`) || DEFAULT_ATTRIBUTE_ROLLS[key];
+                return rolls;
+            }, {} as AttributeRollFormulaMap)
+        });
+        persistRuleSettings(nextSettings);
+        setText("characterRuleSettingsMessage", "角色卡规则已保存到当前浏览器");
+        refreshEditorRuleSummary();
+    }
+
+    function skillNameById(skillId: string): string {
+        return BASE_SKILLS.find((skill) => skill.id === skillId)?.name || skillId;
     }
 
     function handleAvatarUpload(event: Event): void {
@@ -582,8 +1151,15 @@ interface Window {
         const reader = new FileReader();
         reader.onload = () => {
             input.dataset.avatar = String(reader.result || "");
+            updateAvatarPreview(input.dataset.avatar);
         };
         reader.readAsDataURL(file);
+    }
+
+    function updateAvatarPreview(src: string): void {
+        const image = byId<HTMLImageElement>("characterAvatarPreviewImage");
+        if (!image) return;
+        image.src = src || "/assets/avatars/default.jpg";
     }
 
     function setInputValue(id: string, value: unknown): void {
@@ -591,38 +1167,179 @@ interface Window {
         if (field) field.value = String(value ?? "");
     }
 
+    function setCheckboxValue(id: string, checked: boolean): void {
+        const field = byId<HTMLInputElement>(id);
+        if (field) field.checked = checked;
+    }
+
+    function setText(id: string, value: string): void {
+        const element = byId(id);
+        if (element) element.textContent = value;
+    }
+
     function getInputValue(id: string): string {
         return byId<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(id)?.value.trim() || "";
     }
 
+    function getCheckboxValue(id: string): boolean {
+        return byId<HTMLInputElement>(id)?.checked || false;
+    }
+
     function readAttributes(): COC7Attributes {
-        return normalizeAttributes(Object.fromEntries(ATTRIBUTE_KEYS.map((key) => [key, Number(getInputValue(`attribute${key}`))])) as Partial<COC7Attributes>);
+        const coreAttributes = Object.fromEntries(ATTRIBUTE_KEYS.map((key) => [key, Number(getInputValue(`attribute${key}`))])) as LegacyAttributesInput;
+        coreAttributes.AGE = Number(getInputValue("characterAge"));
+        return normalizeAttributes(coreAttributes);
+    }
+
+    function setEditorStatus(status: CharacterStatusFlags): void {
+        (Object.keys(STATUS_FIELD_IDS) as Array<keyof CharacterStatusFlags>).forEach((key) => {
+            setCheckboxValue(STATUS_FIELD_IDS[key], status[key]);
+        });
+    }
+
+    function readEditorStatus(): CharacterStatusFlags {
+        return (Object.keys(STATUS_FIELD_IDS) as Array<keyof CharacterStatusFlags>).reduce((status, key) => {
+            status[key] = getCheckboxValue(STATUS_FIELD_IDS[key]);
+            return status;
+        }, normalizeStatus());
+    }
+
+    function updateUnbindButton(playerId: string): void {
+        const button = byId<HTMLButtonElement>("unbindCharacterPlayer");
+        if (!button) return;
+        button.hidden = !isCurrentUserElevated() || !playerId || playerId === PLAYER_UNBOUND_LABEL;
+    }
+
+    function unbindCharacterPlayerFromEditor(): void {
+        if (!isCurrentUserElevated()) {
+            notify("只有管理员可以解绑角色卡玩家。", "error");
+            return;
+        }
+        setInputValue("characterBoundPlayer", PLAYER_UNBOUND_LABEL);
+        updateUnbindButton("");
+    }
+
+    function syncAttributeDerivedFields(attributes: COC7Attributes = readAttributes()): void {
+        const ratioPercent = loadRuleSettings().attributeRatioPercent;
+        ATTRIBUTE_KEYS.forEach((key) => {
+            const derived = calculateAttributeDisplayValues(attributes[key], ratioPercent);
+            setInputValue(`attribute${key}Half`, derived.half);
+            setInputValue(`attribute${key}Ratio`, derived.ratio);
+        });
+    }
+
+    function syncEditorResourceLimits(attributes: COC7Attributes = readAttributes()): void {
+        const maxHp = calculateMaxHp(attributes);
+        const maxMp = calculateMaxMp(attributes);
+        const maxSan = calculateMaxSan(attributes);
+        setInputValue("characterMaxHp", maxHp);
+        setInputValue("characterMaxMp", maxMp);
+        setInputValue("characterMaxSan", maxSan);
+        setInputValue("characterCurrentHp", clampNumber(getInputValue("characterCurrentHp"), 0, maxHp, maxHp));
+        setInputValue("characterCurrentMp", clampNumber(getInputValue("characterCurrentMp"), 0, maxMp, maxMp));
+        setInputValue("characterCurrentSan", clampNumber(getInputValue("characterCurrentSan"), 0, maxSan, maxSan));
+        setInputValue("characterInitialSan", clampNumber(getInputValue("characterInitialSan"), 0, maxSan, maxSan));
+    }
+
+    function updateAttributeRollHints(): void {
+        const settings = loadRuleSettings();
+        document.querySelectorAll<HTMLElement>("[data-attribute-roll]").forEach((element) => {
+            const key = element.dataset.attributeRoll as COC7CoreAttributeKey | undefined;
+            if (key && ATTRIBUTE_KEYS.includes(key)) element.textContent = settings.attributeRolls[key];
+        });
     }
 
     function readChecklistSkills(): COC7Skill[] {
         const container = byId("characterSkillChecklist");
         if (!container) return parseSkills(getInputValue("characterSkills"));
+        const occupation = resolveOccupationFromInput(getInputValue("characterOccupation"));
         return BASE_SKILLS.map((base) => {
             const checked = container.querySelector<HTMLInputElement>(`[data-skill-id="${CSS.escape(base.id)}"]`)?.checked || false;
             const value = Number(container.querySelector<HTMLInputElement>(`[data-skill-value="${CSS.escape(base.id)}"]`)?.value || base.value);
-            return { ...base, checked, value: clampNumber(value, 0, 99, base.base), rank: rankFromValue(value) };
+            const occupationSkill = occupation.occupationSkills.includes(base.id);
+            return { ...base, checked, occupation: occupationSkill, value: clampNumber(value, 0, 99, base.base), rank: rankFromValue(value) };
         });
+    }
+
+    function refreshEditorRuleSummary(): void {
+        const attributes = readAttributes();
+        syncAttributeDerivedFields(attributes);
+        syncEditorResourceLimits(attributes);
+        updateAttributeRollHints();
+    }
+
+    function autoAllocateEditorOccupationSkills(): void {
+        const card = createCharacterCard({
+            occupationId: resolveOccupationIdFromInput(getInputValue("characterOccupation")),
+            occupationName: resolveOccupationNameFromInput(getInputValue("characterOccupation")),
+            creditRating: Number(getInputValue("characterCreditRating") || "0"),
+            attributes: readAttributes(),
+            skills: readChecklistSkills()
+        });
+        hydrateSkillChecklist(autoAllocateOccupationSkills(card).skills);
+        refreshEditorRuleSummary();
+    }
+
+    function resolveEditorPlayerId(existing?: COC7CharacterCard): string {
+        const boundDisplayValue = getInputValue("characterBoundPlayer");
+        if (isCurrentUserElevated() && boundDisplayValue === PLAYER_UNBOUND_LABEL) return "";
+        if (existing?.playerId && existing.playerId !== PLAYER_UNBOUND_LABEL) return existing.playerId;
+        return currentPlayerId();
+    }
+
+    function validatePlayerBinding(cardId: string, playerId: string, existing?: COC7CharacterCard): boolean {
+        if (!playerId) return true;
+        if (!isCurrentUserElevated() && existing?.playerId && !isBoundToCurrentPlayer(existing.playerId)) {
+            notify("该角色卡已绑定其他玩家，当前玩家不能使用。", "error");
+            return false;
+        }
+        const occupiedByOther = cards.find((card) => card.id !== cardId && card.playerId === playerId);
+        if (occupiedByOther) {
+            notify("一个玩家同时只能绑定一张角色卡，请先由管理员解绑已有角色卡。", "error");
+            return false;
+        }
+        if (!isCurrentUserElevated() && existing?.playerId && existing.playerId !== playerId) {
+            notify("该角色卡已绑定其他玩家，只有管理员可以解绑后重新绑定。", "error");
+            return false;
+        }
+        return true;
     }
 
     function saveFromEditor(): void {
         const editingId = getInputValue("characterEditingId");
         const existing = cards.find((card) => card.id === editingId);
         const attributes = readAttributes();
+        const maxHp = calculateMaxHp(attributes);
+        const maxMp = calculateMaxMp(attributes);
+        const maxSan = calculateMaxSan(attributes);
+        const nextCardId = editingId || `investigator-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const playerId = resolveEditorPlayerId(existing);
+        if (!validatePlayerBinding(nextCardId, playerId, existing)) return;
         const avatarInput = byId<HTMLInputElement>("characterAvatarUpload");
+        const age = Number(getInputValue("characterAge") || attributes.AGE);
+        attributes.AGE = clampNumber(age, 15, 99, attributes.AGE);
+        const occupationName = resolveOccupationNameFromInput(getInputValue("characterOccupation"));
         const cardInput: Partial<COC7CharacterCard> = {
             ...existing,
+            id: nextCardId,
             name: getInputValue("characterName") || generateInvestigatorName(),
-            playerId: getInputValue("playerId") || "未指定玩家",
-            occupationId: getInputValue("characterOccupation") || "detective",
+            playerId,
+            era: getInputValue("characterEra") || "1920s",
+            gender: getInputValue("characterGender"),
+            occupationId: resolveOccupationIdFromInput(occupationName),
+            occupationName,
+            creditRating: Number(getInputValue("characterCreditRating") || "0"),
             avatar: avatarInput?.dataset.avatar || existing?.avatar || "",
             residence: getInputValue("characterResidence"),
             birthplace: getInputValue("characterBirthplace"),
             attributes,
+            currentHp: clampNumber(getInputValue("characterCurrentHp"), 0, maxHp, maxHp),
+            currentMp: clampNumber(getInputValue("characterCurrentMp"), 0, maxMp, maxMp),
+            magicPoints: clampNumber(getInputValue("characterCurrentMp"), 0, maxMp, maxMp),
+            maxMp,
+            initialSan: clampNumber(getInputValue("characterInitialSan"), 0, maxSan, maxSan),
+            currentSan: clampNumber(getInputValue("characterCurrentSan"), 0, maxSan, maxSan),
+            status: readEditorStatus(),
             skills: mergeManualSkills(readChecklistSkills(), parseSkills(getInputValue("characterSkills"))),
             weapons: parseWeapons(getInputValue("characterWeapons")),
             equipment: parseEquipment(getInputValue("characterEquipment")),
@@ -638,8 +1355,8 @@ interface Window {
             },
             relationships: parseRelationships(getInputValue("characterRelationships"))
         };
-        if (editingId) cardInput.id = editingId;
         const card = createCharacterCard(cardInput);
+        if (!validatePlayerBinding(card.id, card.playerId, existing)) return;
         cards = existing ? cards.map((item) => item.id === editingId ? card : item) : [card, ...cards];
         activeCardId = card.id;
         persistCards();
@@ -677,8 +1394,8 @@ interface Window {
                 <h5>${escapeHtml(card.name)}</h5>
                 <p>${escapeHtml(getOccupation(card).name)} · ${escapeHtml(card.residence || "未知居住地")}</p>
                 <div class="character-card-metrics">
-                    <span>HP ${card.currentHp}/${card.maxHp}</span>
-                    <span>SAN ${card.currentSan}/${card.maxSan}</span>
+                    <span>HP 上限 ${card.maxHp}</span>
+                    <span>SAN 上限 ${card.maxSan}</span>
                     <span>MOV ${card.mov}</span>
                 </div>
                 <div class="character-card-actions">
@@ -724,21 +1441,24 @@ interface Window {
         const occupation = getOccupation(card);
         const load = calculateEquipmentLoad(card.equipment);
         const groups = groupSkillsByCategory(card.skills);
+        const allocation = validateOccupationSkillSelection(card);
         return `
             <header class="character-inspector-header">
                 <div>
                     <h3>${escapeHtml(card.name)}</h3>
                     <div class="character-tag-row">
                         <span class="character-tag">${escapeHtml(occupation.name)}</span>
+                        <span class="character-tag">绑定玩家 ${escapeHtml(card.playerId || PLAYER_UNBOUND_LABEL)}</span>
                         <span class="character-tag">信用评级 ${occupation.creditRating[0]}-${occupation.creditRating[1]}</span>
+                        <span class="character-tag">当前信用 ${card.creditRating}</span>
                         <span class="character-tag">伤害加值 ${escapeHtml(card.damageBonus)}</span>
                         <span class="character-tag">体格 ${card.build}</span>
                     </div>
                 </div>
                 <div class="character-inline-actions"><button type="button" data-character-edit-active><i class="fa fa-pencil"></i> 编辑角色卡</button></div>
             </header>
-            <section class="character-section"><h4>属性</h4><div class="character-attribute-grid">${ATTRIBUTE_KEYS.map((key) => `<div class="attribute-chip"><span>${key}</span><strong>${card.attributes[key]}</strong></div>`).join("")}</div></section>
-            <section class="character-section"><h4>状态</h4><div class="character-vital-grid">${statCard("生命值", `${card.currentHp}/${card.maxHp}`)}${statCard("San 值", `${card.currentSan}/${card.maxSan}`)}${statCard("幸运", card.attributes.LUK)}${statCard("移动速度", card.mov)}</div></section>
+            <section class="character-section"><h4>属性</h4><div class="character-attribute-grid">${ATTRIBUTE_KEYS.map((key) => renderAttributeChip(key, card.attributes[key])).join("")}</div></section>
+            <section class="character-section"><h4>状态</h4><div class="character-vital-grid">${statCard("生命 HP", `${card.currentHp} / ${card.maxHp}`)}${statCard("魔法 MP", `${card.currentMp} / ${card.maxMp}`)}${statCard("理智 SAN", `${card.currentSan} / ${card.initialSan} / ${card.maxSan}`)}${statCard("人物状态", statusSummary(card.status))}${statCard("幸运", card.attributes.LUC)}${statCard("移动速度", card.mov)}${statCard("职业技能点", card.occupationSkillPoints)}${statCard("兴趣点", card.personalInterestPoints)}${statCard("职业技能", `${allocation.selectedOccupationSkills}/${allocation.requiredOccupationSkills}`)}</div></section>
             <section class="character-section"><h4>技能等级</h4><div class="character-card-metrics">${Object.entries(groups).map(([group, total]) => `<span>${escapeHtml(group)} ${total}</span>`).join("")}</div><div class="character-skill-grid">${card.skills.map(renderSkillCard).join("")}</div></section>
             <section class="character-section"><h4>武器</h4>${card.weapons.map((weapon) => `<div class="equipment-row"><strong>${escapeHtml(weapon.name)}</strong><br><small>${escapeHtml(weapon.skill)} · ${escapeHtml(weapon.damage)} · ${escapeHtml(weapon.range)}</small></div>`).join("") || `<div class="background-note">暂无武器</div>`}</section>
             <section class="character-section"><h4>战斗物品与装备资产</h4>${statCard("总重量", `${load.totalWeight} kg`)}${statCard("现金", card.assets.cash)}${statCard("消费水平", card.assets.spendingLevel)}<div class="background-note">${escapeHtml(card.assets.assetsText || "暂无资产")}</div>${card.equipment.map(renderEquipmentRow).join("")}</section>
@@ -756,6 +1476,24 @@ interface Window {
 
     function statCard(label: string, value: unknown): string {
         return `<div class="character-stat-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
+    }
+
+    function statusSummary(status: CharacterStatusFlags): string {
+        const labels: Array<[keyof CharacterStatusFlags, string]> = [
+            ["majorWound", "重伤"],
+            ["unconscious", "昏迷"],
+            ["dead", "死亡"],
+            ["temporaryInsanity", "临时疯狂"],
+            ["permanentInsanity", "永久疯狂"],
+            ["indefiniteInsanity", "不定期疯狂"]
+        ];
+        const active = labels.filter(([key]) => status[key]).map(([, label]) => label);
+        return active.length ? active.join("、") : "正常";
+    }
+
+    function renderAttributeChip(key: COC7CoreAttributeKey, value: number): string {
+        const derived = calculateAttributeDisplayValues(value);
+        return `<div class="attribute-chip"><span>${ATTRIBUTE_LABELS[key]} (${key})</span><strong>${value}</strong><small>半 ${derived.half} / 比 ${derived.ratio}</small></div>`;
     }
 
     function renderSkillCard(skill: COC7Skill): string {
@@ -843,7 +1581,10 @@ interface Window {
     }
 
     function listCharacterCards(): COC7CharacterCard[] {
-        return cards.map(cloneCard);
+        const availableCards = isCurrentUserElevated()
+            ? cards
+            : cards.filter((card) => !card.playerId || isBoundToCurrentPlayer(card.playerId));
+        return availableCards.map(cloneCard);
     }
 
     function getCharacterCardSnapshot(cardId: string): Partial<COC7CharacterCard> | null {
@@ -868,18 +1609,29 @@ interface Window {
     const api: CharacterApi = {
         ATTRIBUTE_KEYS,
         SKILL_RANKS,
+        BASE_SKILLS,
         PRESET_OCCUPATIONS,
+        calculateHalfAndFifth,
+        calculateAttributeDisplayValues,
         calculateMaxHp,
         calculateMaxSan,
+        calculateMaxMp,
         calculateMov,
+        calculateOccupationSkillPoints,
+        calculatePersonalInterestPoints,
         calculateBuildAndDamageBonus,
         calculateEquipmentLoad,
         groupSkillsByCategory,
         countSkillsByRank,
         countSelectedOccupationSkills,
+        validateOccupationSkillSelection,
+        autoAllocateOccupationSkills,
         getOccupationPassiveEffects,
         rollAttributeCheck,
         generateInvestigatorName,
+        generateRegionalName,
+        parseAttributeRollFormula,
+        rollAttributeFormula,
         randomizeAttributes,
         createCharacterCard,
         listCharacterCards,
@@ -889,3 +1641,4 @@ interface Window {
 
     global.COC7CharacterSheet = api;
 })(typeof window !== "undefined" ? window : globalThis as Window & typeof globalThis);
+

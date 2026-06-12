@@ -20,8 +20,9 @@ def test_player_messages_use_current_username_instead_of_me_label():
 def test_processing_metadata_is_rendered_only_for_ai_messages():
     source = _chat_source()
 
-    assert "processingTime !== null && type === 'kp'" in source
-    assert "type === 'kp'" in source
+    assert "function renderProcessingTime(type, processingTime, tokenCount)" in source
+    assert 'type !== "kp"' in source
+    assert "chat-processing-time" in source
 
 
 def test_room_messages_compare_sender_id_instead_of_session_label():

@@ -2,7 +2,6 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-AUTH_JS = PROJECT_ROOT / "js" / "auth.js"
 AUTH_LOGIN_JS = PROJECT_ROOT / "js" / "auth" / "login-view.js"
 ROOMS_JS = PROJECT_ROOT / "js" / "rooms.js"
 COOKIE_JS = PROJECT_ROOT / "js" / "cookie-consent.js"
@@ -17,7 +16,7 @@ def test_cookie_consent_script_is_loaded_before_auth_and_rooms():
     source = _read(INDEX_HTML)
 
     assert 'src="js/cookie-consent.js"' in source
-    assert source.index('src="js/cookie-consent.js"') < source.index('src="js/auth.js"')
+    assert source.index('src="js/cookie-consent.js"') < source.index('src="js/auth/index.js"')
     assert source.index('src="js/cookie-consent.js"') < source.index('src="js/rooms.js"')
 
 

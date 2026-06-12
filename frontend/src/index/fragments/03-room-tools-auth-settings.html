@@ -1,0 +1,516 @@
+﻿                <!-- 创建房间模态框 -->
+                <div class="modal fade" id="createSaveModal" tabindex="-1" aria-labelledby="createSaveModalLabel" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="createSaveModalLabel">创建房间</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="form-group">
+                                    <label for="saveName">房间名称 *</label>
+                                    <input type="text" class="form-control" id="saveName" placeholder="请输入房间名称" required>
+                                </div>
+                                <div class="form-group mt-3">
+                                    <label for="roomScenarioSelect">房间剧本 *</label>
+                                    <select class="form-select" id="roomScenarioSelect" required>
+                                        <option value="">请选择剧本</option>
+                                    </select>
+                                </div>
+                                <div class="form-group mt-3">
+                                    <label for="roomCharacterSelect">绑定角色卡 *</label>
+                                    <select class="form-select" id="roomCharacterSelect" required>
+                                        <option value="">请选择角色卡</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                                <button type="button" class="btn btn-primary" id="confirmCreateSave">创建</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 小工具内容 -->
+                <div id="tools" class="tab-content">
+                    <div class="p-4">
+                        <h2>小工具</h2>
+                        <!-- 工具子标签页 -->
+                        <div class="tool-tabs mb-4">
+                            <button class="tool-tab active" data-tool="dice">骰子工具</button>
+                            <button class="tool-tab" data-tool="character-record">房间角色记录</button>
+                        </div>
+                        
+                        <!-- 骰子工具内容 -->
+                        <div id="dice-tool-content" class="tool-content active">
+                            <div class="dice-tool">
+                                <select class="form-select" id="diceType">
+                                    <option value="d4">D4</option>
+                                    <option value="d6">D6</option>
+                                    <option value="d8">D8</option>
+                                    <option value="d10">D10</option>
+                                    <option value="d12">D12</option>
+                                    <option value="d20">D20</option>
+                                    <option value="d100">D100</option>
+                                </select>
+                                <button class="btn btn-primary" id="rollDice">投掷</button>
+                                <div class="dice-result mt-2" id="diceResult" aria-live="polite"></div>
+                            </div>
+                        </div>
+                        <div id="character-record-tool-content" class="tool-content">
+                            <div class="card mt-4">
+                                <div class="card-body">
+                                    <h5 class="card-title">房间角色记录</h5>
+                                    <div class="row g-3">
+                                        <div class="col-md-3">
+                                            <label class="form-label" for="recordRoomName">房间名</label>
+                                            <input type="text" class="form-control" id="recordRoomName" placeholder="当前房间名">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label" for="recordUsername">用户名</label>
+                                            <input type="text" class="form-control" id="recordUsername" placeholder="玩家用户名">
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label" for="recordType">类型</label>
+                                            <select class="form-select" id="recordType">
+                                                <option value="damage">damage</option>
+                                                <option value="san">san</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label" for="recordValue">数值</label>
+                                            <input type="number" class="form-control" id="recordValue" min="1" value="1">
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label" for="recordReason">原因</label>
+                                            <input type="text" class="form-control" id="recordReason" placeholder="未知">
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-primary mt-3" id="submitCharacterRecord" type="button">
+                                        <i class="fa fa-plus-circle" aria-hidden="true"></i> 记录
+                                    </button>
+                                    <div class="text-muted mt-2" id="recordToolResult" aria-live="polite"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 登录/注册中央弹窗 -->
+                <div id="auth-modal" class="auth-modal">
+                    <div class="auth-modal-content">
+                        <div class="auth-modal-header">
+                            <h2 data-i18n="auth.login.title">登录</h2>
+                            <button type="button" id="close-auth-modal" class="close-btn" aria-label="关闭认证弹窗">&times;</button>
+                        </div>
+                        <div class="auth-modal-body">
+                            <section id="login-view" class="auth-view active" aria-label="登录">
+                                <div class="auth-floating-field">
+                                    <input type="text" class="auth-floating-input" id="loginUsername" name="username" autocomplete="username">
+                                    <label class="auth-floating-label" for="loginUsername">用户名或邮箱</label>
+                                </div>
+                                <div class="auth-floating-field">
+                                    <input type="password" class="auth-floating-input" id="loginPassword" name="password" autocomplete="current-password">
+                                    <label class="auth-floating-label" for="loginPassword">密码</label>
+                                </div>
+                                <div class="auth-options">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="rememberMe">
+                                        <label class="form-check-label" for="rememberMe">记住用户名</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="autoLogin">
+                                        <label class="form-check-label" for="autoLogin">保持登录</label>
+                                    </div>
+                                </div>
+                                <input type="checkbox" id="stayLoggedIn" class="visually-hidden" checked>
+                                <button class="btn btn-primary mt-3 w-100" id="loginButton">登录</button>
+                                <div class="login-message mt-2" id="loginMessage" aria-live="polite"></div>
+                                <div class="auth-switch-line">还没有账号？<button type="button" id="show-register-view">创建新账号</button></div>
+                            </section>
+
+                            <section id="register-view" class="auth-view" aria-label="注册">
+                                <div class="register-form-fields">
+                                    <div class="auth-floating-field">
+                                        <input type="text" class="auth-floating-input" id="registerUsername" name="username" autocomplete="username">
+                                        <label class="auth-floating-label" for="registerUsername">用户名</label>
+                                    </div>
+                                    <div class="auth-floating-field">
+                                        <input type="email" class="auth-floating-input" id="registerEmail" name="email" autocomplete="email">
+                                        <label class="auth-floating-label" for="registerEmail">电子邮件</label>
+                                    </div>
+                                    <div class="auth-floating-field">
+                                        <input type="password" class="auth-floating-input" id="registerPassword" name="new-password" autocomplete="new-password">
+                                        <label class="auth-floating-label" for="registerPassword">密码</label>
+                                    </div>
+                                    <div class="auth-floating-field">
+                                        <input type="password" class="auth-floating-input" id="registerConfirmPassword" name="confirm-password" autocomplete="new-password">
+                                        <label class="auth-floating-label" for="registerConfirmPassword">确认密码</label>
+                                    </div>
+                                </div>
+                                <div class="terms-row">
+                                    <input type="checkbox" id="acceptTerms">
+                                    <label for="acceptTerms">我同意服务条款和隐私协议</label>
+                                </div>
+                                <button class="btn btn-primary mt-3 w-100" id="registerButton">注册</button>
+                                <div class="register-message mt-2" id="registerMessage" aria-live="polite"></div>
+                                <div class="auth-switch-line">已有账号？<button type="button" id="show-login-view">返回登录</button></div>
+                            </section>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="user-card-popover" class="user-card-popover" aria-hidden="true">
+                    <div class="user-card-summary">
+                        <img id="userCardAvatar" src="/assets/avatars/default.jpg" alt="用户头像" width="48" height="48">
+                        <div>
+                            <div id="userCardName" class="user-card-name">未登录</div>
+                            <div id="userCardRole" class="user-card-role">USER</div>
+                        </div>
+                    </div>
+                    <div class="user-card-menu-section">
+                        <button type="button" class="user-card-menu-item" id="open-profile-dialog">
+                            <span class="menu-icon"><i class="fa fa-user" aria-hidden="true"></i></span>
+                            <span>编辑个人资料</span>
+                        </button>
+                    </div>
+                    <div class="user-card-menu-section">
+                        <div class="presence-menu-item">
+                            <button type="button" class="user-card-menu-item" id="presence-menu-button" aria-haspopup="menu" aria-expanded="false">
+                                <span class="menu-icon"><i class="fa fa-circle" aria-hidden="true"></i></span>
+                                <span class="presence-current-label">在线状态</span>
+                                <i class="fa fa-chevron-right menu-chevron" aria-hidden="true"></i>
+                            </button>
+                            <div class="presence-submenu" role="menu" aria-label="切换在线状态">
+                                <button type="button" class="presence-option" data-presence="online" role="menuitem">
+                                    <i class="fa fa-circle presence-dot online" aria-hidden="true"></i>在线
+                                </button>
+                                <button type="button" class="presence-option" data-presence="dnd" role="menuitem">
+                                    <i class="fa fa-minus-circle presence-dot dnd" aria-hidden="true"></i>请勿打扰
+                                </button>
+                                <button type="button" class="presence-option" data-presence="invisible" role="menuitem">
+                                    <i class="fa fa-circle-o presence-dot invisible" aria-hidden="true"></i>隐身
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="user-card-menu-section">
+                        <button type="button" class="user-card-menu-item" id="switchAccountButton">
+                            <span class="menu-icon"><i class="fa fa-exchange" aria-hidden="true"></i></span>
+                            <span>切换账户</span>
+                        </button>
+                        <button type="button" class="user-card-menu-item danger" id="logoutButton">
+                            <span class="menu-icon"><i class="fa fa-sign-out" aria-hidden="true"></i></span>
+                            <span>登出</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="edit-profile-dialog" class="profile-dialog" aria-hidden="true">
+                    <div class="profile-dialog-surface">
+                        <div class="profile-dialog-topbar">
+                            <div>
+                                <div class="profile-dialog-eyebrow">User Settings</div>
+                                <h3>编辑个人资料</h3>
+                            </div>
+                            <button type="button" id="close-settings-panel" class="profile-dialog-close" aria-label="关闭用户设置">
+                                <i class="fa fa-times" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                        <div class="profile-settings-sidebar">
+                            <div class="profile-settings-sidebar-title">用户设置</div>
+                            <details class="profile-nav-group" open>
+                                <summary><span><i class="fa fa-user-circle" aria-hidden="true"></i>账户</span><i class="fa fa-chevron-down" aria-hidden="true"></i></summary>
+                                <div class="profile-subnav">
+                                    <button type="button" class="profile-section-tab active" data-profile-target="profile-account-info">账号信息</button>
+                                    <button type="button" class="profile-section-tab" data-profile-target="profile-password-management">密码管理</button>
+                                </div>
+                            </details>
+                            <details class="profile-nav-group">
+                                <summary><span><i class="fa fa-id-card-o" aria-hidden="true"></i>个人说明</span><i class="fa fa-chevron-down" aria-hidden="true"></i></summary>
+                                <div class="profile-subnav">
+                                    <button type="button" class="profile-section-tab" data-profile-target="profile-public-info">资料展示</button>
+                                </div>
+                            </details>
+                            <details class="profile-nav-group">
+                                <summary><span><i class="fa fa-shield" aria-hidden="true"></i>隐私</span><i class="fa fa-chevron-down" aria-hidden="true"></i></summary>
+                                <div class="profile-subnav">
+                                    <button type="button" class="profile-section-tab" data-profile-target="profile-privacy">可见性</button>
+                                </div>
+                            </details>
+                            <details class="profile-nav-group">
+                                <summary><span><i class="fa fa-bell-o" aria-hidden="true"></i>通知</span><i class="fa fa-chevron-down" aria-hidden="true"></i></summary>
+                                <div class="profile-subnav">
+                                    <button type="button" class="profile-section-tab" data-profile-target="profile-notifications">提醒方式</button>
+                                </div>
+                            </details>
+                        </div>
+                        <div class="profile-settings-content">
+                            <section class="profile-panel-section" id="profile-account-info">
+                                <h4>账号信息</h4>
+                                <div class="avatar-upload-container">
+                                    <div class="avatar-preview">
+                                        <img id="avatarPreview" src="/assets/avatars/default.jpg" alt="用户头像" width="96" height="96">
+                                    </div>
+                                    <input type="file" id="avatarUpload" class="avatar-upload-input" accept="image/*">
+                                    <label for="avatarUpload" class="avatar-upload-label">更换头像</label>
+                                </div>
+                                <label for="editUsername">用户名</label>
+                                <input type="text" class="form-control" id="editUsername" name="username" autocomplete="username">
+                                <label for="editEmail">电子邮件</label>
+                                <input type="email" class="form-control" id="editEmail" name="email" autocomplete="email">
+                                <label for="editNickname">昵称</label>
+                                <input type="text" class="form-control" id="editNickname" name="nickname" autocomplete="nickname">
+                            </section>
+                            <section class="profile-panel-section" id="profile-password-management">
+                                <h4>密码管理</h4>
+                                <p class="profile-placeholder">密码修改会在独立窗口中完成，以避免误保存个人资料时同时修改密码。</p>
+                                <button type="button" class="btn btn-secondary profile-inline-action" id="open-password-dialog">
+                                    <i class="fa fa-lock" aria-hidden="true"></i>修改密码
+                                </button>
+                                <div class="two-factor-disabled">双因素认证被管理员关闭</div>
+                            </section>
+                            <section class="profile-panel-section" id="profile-public-info">
+                                <h4>资料展示</h4>
+                                <p class="profile-placeholder">个人说明、公开身份和展示偏好将在后续版本开放。</p>
+                            </section>
+                            <section class="profile-panel-section" id="profile-privacy">
+                                <h4>可见性</h4>
+                                <p class="profile-placeholder">隐私控制、好友可见范围和房间展示规则将在后续版本开放。</p>
+                            </section>
+                            <section class="profile-panel-section" id="profile-notifications">
+                                <h4>提醒方式</h4>
+                                <p class="profile-placeholder">消息提醒、房间邀请和系统通知设置将在后续版本开放。</p>
+                            </section>
+                            <div class="profile-save-bar">
+                                <div class="settings-message" id="settingsMessage" aria-live="polite"></div>
+                                <button class="btn btn-primary" id="saveUserSettings">
+                                    <i class="fa fa-check" aria-hidden="true"></i>保存编辑
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="password-dialog" class="password-dialog" aria-hidden="true">
+                    <div class="password-dialog-surface">
+                        <div class="profile-dialog-header">
+                            <h3><i class="fa fa-lock" aria-hidden="true"></i>修改密码</h3>
+                            <button type="button" id="close-password-dialog" class="close-btn" aria-label="关闭密码修改窗口">&times;</button>
+                        </div>
+                        <div class="password-dialog-body">
+                            <label for="passwordCurrentPassword">当前密码</label>
+                            <input type="password" class="form-control" id="passwordCurrentPassword" autocomplete="current-password">
+                            <label for="passwordNewPassword">新密码</label>
+                            <input type="password" class="form-control" id="passwordNewPassword" autocomplete="new-password">
+                            <label for="passwordConfirmPassword">确认新密码</label>
+                            <input type="password" class="form-control" id="passwordConfirmPassword" autocomplete="new-password">
+                            <div class="password-message" id="passwordMessage" aria-live="polite"></div>
+                        </div>
+                        <div class="password-dialog-actions">
+                            <button type="button" class="btn btn-secondary" id="cancelPasswordDialog">取消</button>
+                            <button type="button" class="btn btn-primary" id="changePasswordButton">保存密码</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 设置内容 -->
+                <div id="settings" class="tab-content">
+                    <div class="p-4">
+                        <h2>设置</h2>
+                        <!-- 设置子标签页 -->
+                        <div class="settings-tabs mb-4">
+                            <button class="settings-tab active" data-settings="general">常规设置</button>
+                            <button class="settings-tab" data-settings="model">模型设置</button>
+                            <button class="settings-tab" data-settings="network">网络配置</button>
+                            <button class="settings-tab" data-settings="character">角色卡规则</button>
+                            <button class="settings-tab" data-settings="about">关于应用</button>
+                        </div>
+                        
+                        <!-- 常规设置内容 -->
+                        <div id="general-settings-content" class="settings-content active">
+                            <div class="mb-4">
+                                <h4>界面设置</h4>
+                                <div class="form-group">
+                                    <label>主题</label>
+                                    <select class="form-select" id="themeSelect">
+                                        <option value="light">浅色</option>
+                                        <option value="dark">深色</option>
+                                        <option value="system">跟随系统</option>
+                                    </select>
+                                </div>
+                                <div class="form-group mt-2">
+                                    <label>语言</label>
+                                    <select class="form-select" id="languageSelect">
+                                        <option value="zh-CN">简体中文</option>
+                                        <option value="en-US">English</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="mb-4">
+                                <h4>通知设置</h4>
+                                <div class="form-group">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="enableSound">
+                                        <label class="form-check-label" for="enableSound">启用提示音</label>
+                                    </div>
+                                </div>
+                                <div class="form-group mt-2">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="enableNotification">
+                                        <label class="form-check-label" for="enableNotification">启用桌面通知</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-4">
+                                <h4>自动保存设置</h4>
+                                <div class="form-group">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="enableAutosave">
+                                        <label class="form-check-label" for="enableAutosave">启用自动保存</label>
+                                    </div>
+                                </div>
+                                <div class="form-group mt-2">
+                                    <label>自动保存间隔（秒）</label>
+                                    <input type="number" class="form-control" id="autosaveInterval" value="300" min="30" max="3600">
+                                </div>
+                            </div>
+                            <div class="mb-4">
+                                <h4>聊天设置</h4>
+                                <div class="form-group">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="showTimestamp" checked>
+                                        <label class="form-check-label" for="showTimestamp">显示消息时间戳</label>
+                                    </div>
+                                </div>
+                                <div class="form-group mt-2">
+                                    <label>消息字体大小（像素）</label>
+                                    <input type="number" class="form-control" id="messageFontSize" value="14" min="10" max="24">
+                                </div>
+                                <div class="form-group mt-3">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="enableAIResponseLock">
+                                        <label class="form-check-label" for="enableAIResponseLock">AI回复期间锁定输入（AI回复完成后才能发送新消息）</label>
+                                    </div>
+                                </div>
+                                <div class="form-group mt-2">
+                                    <label>消息发送频率限制（条/分钟）</label>
+                                    <input type="number" class="form-control" id="messageRateLimit" value="10" min="0" max="60">
+                                    <small class="text-muted">设置为0表示不限制</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 模型设置内容 -->
+                        <div id="model-settings-content" class="settings-content">
+                            <div class="role-config-settings">
+                                <div class="role-config-header">
+                                    <div>
+                                        <h4>角色配置</h4>
+                                        <p class="text-muted">为每个角色配置唤醒词、提示词和使用的大模型提供商。</p>
+                                    </div>
+                                </div>
+                                <div class="role-config-list" id="roleConfigList" aria-live="polite"></div>
+                                <div class="settings-message" id="roleConfigMessage" aria-live="polite"></div>
+                            </div>
+                            <div class="mb-4">
+                                <h4>大模型提供商</h4>
+                                <p class="text-muted">管理和配置大模型提供商连接</p>
+                            </div>
+                            
+                            <!-- AI平台配置卡片 -->
+                            <div id="ai-platforms-container" class="ai-platforms-container">
+                                <!-- 平台卡片将在这里动态生成 -->
+                            </div>
+                        </div>
+                        
+                        <!-- 网络配置内容 -->
+                        <div id="network-settings-content" class="settings-content">
+                            <div class="mb-4">
+                                <h4>网络配置</h4>
+                                <div class="network-config">
+                                    <div class="form-group">
+                                        <label>端口号</label>
+                                        <input type="number" class="form-control" id="networkPort" min="1" max="65535" value="8086">
+                                    </div>
+                                    <div class="form-group mt-2">
+                                        <div class="form-check">
+                                            <input type="checkbox" class="form-check-input" id="enableDiscovery">
+                                            <label class="form-check-label" for="enableDiscovery">启用局域网服务发现</label>
+                                        </div>
+                                    </div>
+                                    <div class="form-group mt-3">
+                                        <button class="btn btn-primary" id="saveNetworkConfig">保存网络配置</button>
+                                        <button class="btn btn-secondary ml-2" id="testNetworkConnection">测试网络连接</button>
+                                    </div>
+                                    <div class="network-status mt-3 p-3 border rounded">
+                                        <h5>网络状态</h5>
+                                        <div class="status-item">
+                                            <span>服务器状态：</span>
+                                            <span id="serverStatus" class="status-value">未知</span>
+                                        </div>
+                                        <div class="status-item">
+                                            <span>局域网IP：</span>
+                                            <span id="lanIp" class="status-value">未知</span>
+                                        </div>
+                                        <div class="status-item">
+                                            <span>外部可访问性：</span>
+                                            <span id="externalAccess" class="status-value">未知</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <div id="character-settings-content" class="settings-content">
+                            <div class="mb-4">
+                                <h4>角色卡规则变量</h4>
+                                <p class="text-muted">配置 COC7 调查员属性栏第三格比例值，以及默认随机属性投骰公式。</p>
+                                <div class="form-group">
+                                    <label for="attributeRatioPercent">属性第三格比例（%）</label>
+                                    <input type="number" class="form-control" id="attributeRatioPercent" min="1" max="100" value="20">
+                                    <small class="text-muted">默认为属性值的 20%。保存后会影响角色卡编辑页的第三格显示。</small>
+                                </div>
+                            </div>
+                            <div class="character-roll-settings-grid" aria-label="属性随机生成公式">
+                                <label>力量 STR<input type="text" class="form-control" id="attributeRollSTR" placeholder="3d6x5"></label>
+                                <label>敏捷 DEX<input type="text" class="form-control" id="attributeRollDEX" placeholder="3d6x5"></label>
+                                <label>体型 SIZ<input type="text" class="form-control" id="attributeRollSIZ" placeholder="(2d6+6)x5"></label>
+                                <label>外貌 APP<input type="text" class="form-control" id="attributeRollAPP" placeholder="3d6x5"></label>
+                                <label>体质 CON<input type="text" class="form-control" id="attributeRollCON" placeholder="3d6x5"></label>
+                                <label>智力 INT<input type="text" class="form-control" id="attributeRollINT" placeholder="(2d6+6)x5"></label>
+                                <label>意志 POW<input type="text" class="form-control" id="attributeRollPOW" placeholder="3d6x5"></label>
+                                <label>教育 EDU<input type="text" class="form-control" id="attributeRollEDU" placeholder="(2d6+6)x5"></label>
+                                <label>幸运 LUC<input type="text" class="form-control" id="attributeRollLUC" placeholder="3d6x5"></label>
+                            </div>
+                            <div class="mt-3 d-flex align-items-center gap-3">
+                                <button class="btn btn-primary" id="saveCharacterRuleSettings" type="button">保存角色卡规则</button>
+                                <span class="settings-message" id="characterRuleSettingsMessage" aria-live="polite"></span>
+                            </div>
+                        </div>
+                        
+                        <!-- 关于应用内容 -->
+                        <div id="about-settings-content" class="settings-content">
+                            <div class="mb-4">
+                                <h4>应用信息</h4>
+                                <div class="about-info">
+                                    <p><strong>应用名称：</strong> AI TRPG 系统</p>
+                                    <p><strong>版本：</strong> 0.0.6</p>
+                                    <p><strong>开发者：</strong> Nobook1121</p>
+                                    <p><strong>描述：</strong> 一个基于人工智能的TRPG跑团系统</p>
+                                </div>
+                            </div>
+                            <div class="mb-4">
+                                <h4>许可证</h4>
+                                <p class="text-muted">本软件遵循 MIT 许可证开源发布。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+

@@ -4,9 +4,9 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 INDEX_HTML = PROJECT_ROOT / "index.html"
 STYLE_CSS = PROJECT_ROOT / "style.css"
-AUTH_TS = PROJECT_ROOT / "frontend" / "src" / "js" / "auth.ts"
 AUTH_DIR = PROJECT_ROOT / "frontend" / "src" / "js" / "auth"
-AUTH_JS = PROJECT_ROOT / "js" / "auth.js"
+AUTH_LOGIN_JS = PROJECT_ROOT / "js" / "auth" / "login-view.js"
+AUTH_USER_CARD_JS = PROJECT_ROOT / "js" / "auth" / "user-card.js"
 
 
 def _read(path):
@@ -65,7 +65,8 @@ def test_register_fields_have_spacing_css():
 
 
 def test_auth_typescript_no_longer_uses_nocheck():
-    assert "@ts-nocheck" not in _read(AUTH_TS)
+    for source_path in AUTH_DIR.glob("*.ts"):
+        assert "@ts-nocheck" not in _read(source_path)
 
 
 def test_auth_module_split_exists():
@@ -82,21 +83,22 @@ def test_init_auth_prefills_before_binding_floating_fields():
     assert source.index("prefillRememberedUsername()") < source.index("bindFloatingFields()")
 
 
-def test_auth_split_scripts_load_before_auth_entry():
+def test_auth_uses_split_entry_without_legacy_wrapper():
     source = _read(INDEX_HTML)
 
-    assert source.index('src="js/auth/index.js"') < source.index('src="js/auth.js"')
+    assert 'src="js/auth/index.js"' in source
+    assert 'src="js/auth.js"' not in source
 
 
 def test_login_reconnects_socket_and_reloads_user_scoped_room():
-    source = _read(AUTH_JS)
+    source = _read(AUTH_LOGIN_JS)
 
     assert "window.reconnectSocket?.()" in source
     assert "window.autoLoadLastRoom?.()" in source
 
 
 def test_switch_account_clears_room_and_chat():
-    source = _read(AUTH_JS)
+    source = _read(AUTH_USER_CARD_JS)
 
     assert "switchAccount" in source
     assert "window.clearCurrentRoom?.()" in source

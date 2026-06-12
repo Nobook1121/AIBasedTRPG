@@ -2,7 +2,8 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-AUTH_JS = PROJECT_ROOT / "js" / "auth.js"
+AUTH_LOGIN_JS = PROJECT_ROOT / "js" / "auth" / "login-view.js"
+AUTH_USER_CARD_JS = PROJECT_ROOT / "js" / "auth" / "user-card.js"
 ROOMS_JS = PROJECT_ROOT / "js" / "rooms.js"
 MAIN_JS = PROJECT_ROOT / "js" / "main.js"
 
@@ -20,14 +21,14 @@ def test_auth_initialization_is_awaited_before_room_autoload():
 
 
 def test_login_reconnects_socket_and_reloads_user_scoped_room():
-    source = _read(AUTH_JS)
+    source = _read(AUTH_LOGIN_JS)
 
     assert "window.reconnectSocket?.()" in source
     assert "window.autoLoadLastRoom?.()" in source
 
 
 def test_logout_clears_room_and_chat_before_account_switch():
-    source = _read(AUTH_JS)
+    source = _read(AUTH_USER_CARD_JS)
 
     assert "window.clearCurrentRoom?.()" in source
     assert "window.clearChatMessages?.()" in source

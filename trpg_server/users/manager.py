@@ -1,8 +1,9 @@
-"""Compatibility entry point for legacy imports.
+"""Lazy user service entry point.
 
-The application now uses ``trpg_server.users.UserService``. This module keeps
-old ``from user_manager import user_manager`` imports working without creating
-or writing user files at import time.
+The application uses :class:`trpg_server.users.service.UserService` for all
+user operations. This module keeps the small lazy wrapper close to the users
+package, so importing the manager does not create user files or initialize the
+database until a user operation is actually requested.
 """
 
 from __future__ import annotations
@@ -52,7 +53,7 @@ class UserManager:
             self._service = UserService(db, ip_config_dir=self.ip_config_dir)
         return self._service
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str):
         return getattr(self._get_service(), name)
 
 

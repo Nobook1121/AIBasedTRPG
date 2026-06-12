@@ -58,6 +58,11 @@ interface TrpgNamespace {
     dom?: TrpgDomClient;
 }
 
+interface TrpgTemplateRenderer {
+    render(templateId: string, values?: Record<string, unknown>): string;
+    escapeHtml(value: unknown): string;
+}
+
 interface BootstrapModalInstance {
     show(): void;
     hide(): void;
@@ -185,6 +190,7 @@ interface Window {
     TRPG?: TrpgNamespace;
     TrpgApi: TrpgApiClient;
     TrpgDom: TrpgDomClient;
+    TrpgTemplates: TrpgTemplateRenderer;
     ScenarioModel: ScenarioModelConstructor;
     ScenarioView: ScenarioViewConstructor;
     ScenarioController: { new(): unknown };

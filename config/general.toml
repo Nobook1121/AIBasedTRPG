@@ -17,6 +17,18 @@ show_timestamp = true
 message_font_size = 14
 max_history_messages = 1000
 
+[character_rules]
+attribute_ratio_percent = 20
+attribute_roll_str = "3d6x5"
+attribute_roll_dex = "3d6x5"
+attribute_roll_siz = "(2d6+6)x5"
+attribute_roll_app = "3d6x5"
+attribute_roll_con = "3d6x5"
+attribute_roll_int = "(2d6+6)x5"
+attribute_roll_pow = "3d6x5"
+attribute_roll_edu = "(2d6+6)x5"
+attribute_roll_luc = "3d6x5"
+
 [window]
 remember_window_size = true
 window_width = 1200

@@ -2,10 +2,12 @@
   "id": "sample-investigator",
   "name": "林雨衡",
   "playerId": "示例玩家",
-  "gender": "male",
+  "era": "1920s",
+  "gender": "男性",
   "age": 42,
   "avatar": "",
   "occupationId": "detective",
+  "creditRating": 20,
   "residence": "上海",
   "birthplace": "宁波",
   "attributes": {
@@ -17,13 +19,15 @@
     "INT": 80,
     "POW": 65,
     "EDU": 70,
-    "LUK": 50,
+    "LUC": 50,
     "AGE": 42
   },
   "skills": [
-    { "id": "spotHidden", "name": "侦查", "value": 65, "base": 25, "category": "探索", "checked": true },
-    { "id": "libraryUse", "name": "图书馆使用", "value": 70, "base": 20, "category": "知识", "checked": true },
+    { "id": "spotHidden", "name": "侦查", "value": 65, "base": 25, "category": "探索", "checked": true, "occupation": true },
+    { "id": "libraryUse", "name": "图书馆使用", "value": 70, "base": 20, "category": "知识", "checked": true, "occupation": true },
     { "id": "listen", "name": "聆听", "value": 55, "base": 20, "category": "探索", "checked": true },
+    { "id": "law", "name": "法律", "value": 35, "base": 5, "category": "知识", "checked": true, "occupation": true },
+    { "id": "psychology", "name": "心理学", "value": 55, "base": 10, "category": "社交", "checked": true, "occupation": true },
     { "id": "cthulhuMythos", "name": "克苏鲁神话", "value": 5, "base": 0, "category": "神话", "checked": false }
   ],
   "weapons": [

@@ -1,6 +1,6 @@
 import importlib
 
-import user_manager as user_manager_module
+from trpg_server.users import manager as user_manager_module
 from trpg_server.users.service import UserService
 
 

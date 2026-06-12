@@ -304,15 +304,13 @@ function showCommandPalette(chatInput: HTMLInputElement, palette: HTMLElement): 
     }
     palette.innerHTML = matches.map((command) => {
         const hint = command.name === "/record" ? getRecordCommandDraftHint(value) : "";
-        return `
-        <button type="button" class="list-group-item list-group-item-action command-palette-item" data-command="${chatEscapeHtml(command.name)}">
-            <span>
-                <strong>${chatEscapeHtml(command.usage)}</strong>
-                <span class="text-muted ms-2">${chatEscapeHtml(command.description)}</span>
-            </span>
-            ${hint ? `<small class="command-palette-hint">${chatEscapeHtml(hint)}</small>` : ""}
-        </button>
-    `;
+        const hintHtml = hint ? window.TrpgTemplates.render("chat-command-palette-hint", { hint }) : "";
+        return window.TrpgTemplates.render("chat-command-palette-item", {
+            commandName: command.name,
+            usage: command.usage,
+            description: command.description,
+            hintHtml,
+        });
     }).join("");
     palette.querySelectorAll<HTMLButtonElement>("[data-command]").forEach((button) => {
         button.addEventListener("mousedown", (event) => {
@@ -472,29 +470,23 @@ function addMessage(
     const renderedContent = isThinking ? chatEscapeHtml(content) : renderMarkdown(content);
     const avatarSrc = getAvatarSrc(type, message);
 
-    let messageHTML = `
-        <div class="message-avatar">
-            <img src="${chatEscapeHtml(avatarSrc)}" alt="${chatEscapeHtml(sender)}">
-        </div>
-        <div class="message-content-container">
-            <div class="message-header">
-                <span class="message-sender">${chatEscapeHtml(sender)}</span>
-                <span class="message-time">${chatEscapeHtml(displayTime)}</span>
-            </div>
-            <div class="message-content markdown-body">${renderedContent}</div>
-    `;
-
-    if (processingTime !== null && type === 'kp') {
-        let displayText = `已耗时: ${processingTime}秒`;
-        if (tokenCount !== null) displayText += ` 消耗Token：${tokenCount}`;
-        messageHTML += `<div class="processing-time">${chatEscapeHtml(displayText)}</div>`;
-    }
-
-    messageHTML += "</div>";
-    messageDiv.innerHTML = messageHTML;
+    messageDiv.innerHTML = window.TrpgTemplates.render("chat-message", {
+        avatarSrc,
+        sender,
+        displayTime,
+        contentHtml: renderedContent,
+        processingHtml: renderProcessingTime(type, processingTime, tokenCount),
+    });
     chatHistory.appendChild(messageDiv);
     chatHistory.scrollTop = chatHistory.scrollHeight;
     return resolvedMessageId;
+}
+
+function renderProcessingTime(type: string, processingTime: number | null, tokenCount: number | null): string {
+    if (processingTime === null || type !== "kp") return "";
+    let displayText = `已耗时: ${processingTime}秒`;
+    if (tokenCount !== null) displayText += ` 消耗Token：${tokenCount}`;
+    return window.TrpgTemplates.render("chat-processing-time", { text: displayText });
 }
 
 function addThinkingMessage(messageId: string | number): void {
@@ -586,7 +578,7 @@ function renderRoomMessage(message: ChatMessage | null): void {
 function clearChatMessages(): void {
     const chatHistory = document.getElementById("chatHistory");
     if (!chatHistory) return;
-    chatHistory.innerHTML = '<div class="welcome-text">请选择或创建一个房间开始游戏。</div>';
+    chatHistory.innerHTML = window.TrpgTemplates.render("chat-welcome");
 }
 
 function hideWelcomeText(): void {

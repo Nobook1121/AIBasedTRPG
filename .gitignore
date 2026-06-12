@@ -3,11 +3,12 @@
 # 忽略所有的临时文件
 *.tmp
 __pycache__/
-.gitignore
-history/
-.worktrees/
-node_modules/
+/history/
+/.worktrees/
+/node_modules/
 /js/
+/tools/*.js
 tests/**/__pycache__/
-users/*.sqlite3
-room/*
+/users/*.sqlite3
+/rooms/
+/logs/

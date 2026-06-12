@@ -36,7 +36,7 @@ function Test-OnlyConftestBaseline {
 
 Push-Location $RepositoryRoot
 try {
-  Invoke-Checked python -m py_compile server.py user_manager.py
+  Invoke-Checked python -m py_compile server.py trpg_server\users\manager.py
 
   if (Test-Path "package.json") {
     Invoke-Checked npm run typecheck
@@ -57,11 +57,21 @@ try {
     "js\tabs.js",
     "js\platform-ui.js",
     "js\cookie-consent.js",
+    "js\generated\templates.js",
     "js\chat.js",
-    "js\auth.js",
+    "js\auth\api.js",
+    "js\auth\state.js",
+    "js\auth\floating-field.js",
+    "js\auth\login-view.js",
+    "js\auth\register-view.js",
+    "js\auth\profile-dialog.js",
+    "js\auth\user-card.js",
+    "js\auth\index.js",
+    "js\i18n.js",
     "js\network.js",
     "js\rooms.js",
     "js\scenario.js",
+    "js\character-sheet.js",
     "js\main.js"
   )
 

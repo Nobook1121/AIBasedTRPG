@@ -68,6 +68,7 @@
             </div>
 
             <!-- 中间内容区 -->
+
             <div class="col-10" id="mainContent">
                 <!-- 主页内容 -->
                 <div id="home" class="tab-content active">
@@ -242,6 +243,7 @@
                         </div>
                     </div>
                 </div>
+
 
                 <!-- 创建房间模态框 -->
                 <div class="modal fade" id="createSaveModal" tabindex="-1" aria-labelledby="createSaveModalLabel" aria-hidden="true">
@@ -569,6 +571,7 @@
                             <button class="settings-tab active" data-settings="general">常规设置</button>
                             <button class="settings-tab" data-settings="model">模型设置</button>
                             <button class="settings-tab" data-settings="network">网络配置</button>
+                            <button class="settings-tab" data-settings="character">角色卡规则</button>
                             <button class="settings-tab" data-settings="about">关于应用</button>
                         </div>
                         
@@ -707,6 +710,33 @@
                             </div>
 
                         </div>
+
+                        <div id="character-settings-content" class="settings-content">
+                            <div class="mb-4">
+                                <h4>角色卡规则变量</h4>
+                                <p class="text-muted">配置 COC7 调查员属性栏第三格比例值，以及默认随机属性投骰公式。</p>
+                                <div class="form-group">
+                                    <label for="attributeRatioPercent">属性第三格比例（%）</label>
+                                    <input type="number" class="form-control" id="attributeRatioPercent" min="1" max="100" value="20">
+                                    <small class="text-muted">默认为属性值的 20%。保存后会影响角色卡编辑页的第三格显示。</small>
+                                </div>
+                            </div>
+                            <div class="character-roll-settings-grid" aria-label="属性随机生成公式">
+                                <label>力量 STR<input type="text" class="form-control" id="attributeRollSTR" placeholder="3d6x5"></label>
+                                <label>敏捷 DEX<input type="text" class="form-control" id="attributeRollDEX" placeholder="3d6x5"></label>
+                                <label>体型 SIZ<input type="text" class="form-control" id="attributeRollSIZ" placeholder="(2d6+6)x5"></label>
+                                <label>外貌 APP<input type="text" class="form-control" id="attributeRollAPP" placeholder="3d6x5"></label>
+                                <label>体质 CON<input type="text" class="form-control" id="attributeRollCON" placeholder="3d6x5"></label>
+                                <label>智力 INT<input type="text" class="form-control" id="attributeRollINT" placeholder="(2d6+6)x5"></label>
+                                <label>意志 POW<input type="text" class="form-control" id="attributeRollPOW" placeholder="3d6x5"></label>
+                                <label>教育 EDU<input type="text" class="form-control" id="attributeRollEDU" placeholder="(2d6+6)x5"></label>
+                                <label>幸运 LUC<input type="text" class="form-control" id="attributeRollLUC" placeholder="3d6x5"></label>
+                            </div>
+                            <div class="mt-3 d-flex align-items-center gap-3">
+                                <button class="btn btn-primary" id="saveCharacterRuleSettings" type="button">保存角色卡规则</button>
+                                <span class="settings-message" id="characterRuleSettingsMessage" aria-live="polite"></span>
+                            </div>
+                        </div>
                         
                         <!-- 关于应用内容 -->
                         <div id="about-settings-content" class="settings-content">
@@ -730,6 +760,7 @@
 
         </div>
     </div>
+
 
     <!-- 模态框 -->
     <div class="modal fade" id="scenarioModal" tabindex="-1" aria-labelledby="scenarioModalLabel" aria-hidden="true">
@@ -835,63 +866,131 @@
                     <input type="hidden" id="characterEditingId">
                     <div class="character-form-grid">
                         <section class="character-form-section">
-                            <h6><i class="fa fa-user-circle-o" aria-hidden="true"></i> 基础信息</h6>
-                            <div class="row g-3">
-                                <div class="col-md-4">
-                                    <label class="form-label" for="characterAvatarUpload">头像</label>
-                                    <input type="file" class="form-control" id="characterAvatarUpload" accept="image/*">
+                            <h6 class="character-section-title"><i class="fa fa-user-circle-o" aria-hidden="true"></i> <span>基础信息</span><small>Basic Information</small></h6>
+                            <div class="character-basic-info-layout" id="characterBasicInfoLayout">
+                                <div class="character-avatar-column">
+                                    <button type="button" class="character-avatar-preview" id="characterAvatarPreview" aria-label="上传角色头像">
+                                        <img id="characterAvatarPreviewImage" alt="角色头像预览">
+                                        <i class="fa fa-camera" aria-hidden="true"></i>
+                                    </button>
+                                    <input type="file" class="character-avatar-file" id="characterAvatarUpload" accept="image/*">
                                 </div>
-                                <div class="col-md-4">
-                                    <label class="form-label" for="characterName">角色名称</label>
-                                    <input type="text" class="form-control" id="characterName" maxlength="40">
-                                    <button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="randomizeCharacterName">随机姓名</button>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label" for="playerId">玩家ID</label>
-                                    <input type="text" class="form-control" id="playerId" maxlength="40">
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label" for="characterOccupation">职业</label>
-                                    <select class="form-select" id="characterOccupation"></select>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label" for="raceType">种族类型</label>
-                                    <input type="text" class="form-control" id="raceType" placeholder="人类 / 混血 / 其他">
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label" for="characterResidence">居住地</label>
-                                    <input type="text" class="form-control" id="characterResidence">
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label" for="characterBirthplace">出生地</label>
-                                    <input type="text" class="form-control" id="characterBirthplace">
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label" for="currentHp">当前生命值</label>
-                                    <input type="number" class="form-control" id="currentHp" min="0">
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label" for="currentSan">当前 San 值</label>
-                                    <input type="number" class="form-control" id="currentSan" min="0">
+                                <div class="character-basic-fields">
+                                    <div class="character-basic-row">
+                                        <label class="character-field" for="characterName">
+                                            <span>姓名</span>
+                                            <div class="character-input-shell">
+                                                <input type="text" class="form-control" id="characterName" maxlength="40">
+                                                <button type="button" class="character-input-action" id="randomizeCharacterName" title="随机生成姓名">
+                                                    <i class="fa fa-random" aria-hidden="true"></i>
+                                                </button>
+                                            </div>
+                                        </label>
+                                        <label class="character-field character-bound-player-field" for="characterBoundPlayer">
+                                            <span>绑定玩家</span>
+                                            <div class="character-input-shell">
+                                                <input type="text" class="form-control" id="characterBoundPlayer" maxlength="80" readonly>
+                                                <button type="button" class="character-input-action" id="unbindCharacterPlayer" title="管理员解绑玩家">
+                                                    <i class="fa fa-unlink" aria-hidden="true"></i>
+                                                </button>
+                                            </div>
+                                        </label>
+                                    </div>
+                                    <div class="character-basic-row">
+                                        <label class="character-field" for="characterEra">
+                                            <span>时代</span>
+                                            <input type="text" class="form-control" id="characterEra" placeholder="1920s / 现代 / 自定义年代">
+                                        </label>
+                                        <label class="character-field" for="raceType">
+                                            <span>种族类型</span>
+                                            <input type="text" class="form-control" id="raceType" placeholder="人类 / 混血 / 其他">
+                                        </label>
+                                    </div>
+                                    <label class="character-field" for="characterOccupation">
+                                        <span>职业</span>
+                                        <div class="character-input-shell">
+                                            <input type="text" class="form-control" id="characterOccupation" list="characterOccupationOptions" placeholder="选择或输入自定义职业">
+                                            <datalist id="characterOccupationOptions"></datalist>
+                                            <button type="button" class="character-input-action" id="openOccupationTemplatePicker" title="选择职业模板">
+                                                <i class="fa fa-briefcase" aria-hidden="true"></i>
+                                            </button>
+                                        </div>
+                                    </label>
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="character-field" for="characterAge"><span>年龄</span></label>
+                                            <input type="number" class="form-control" id="characterAge" min="15" max="99">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="character-field" for="characterGender"><span>性别</span></label>
+                                            <input type="text" class="form-control" id="characterGender" maxlength="30" placeholder="自由填写">
+                                        </div>
+                                    </div>
+                                    <label class="character-field" for="characterResidence">
+                                        <span>现居地</span>
+                                        <input type="text" class="form-control" id="characterResidence">
+                                    </label>
+                                    <label class="character-field" for="characterBirthplace">
+                                        <span>出生地</span>
+                                        <input type="text" class="form-control" id="characterBirthplace">
+                                    </label>
                                 </div>
                             </div>
                         </section>
 
                         <section class="character-form-section">
-                            <h6><i class="fa fa-sliders" aria-hidden="true"></i> 基础属性</h6>
-                            <button type="button" class="btn btn-sm btn-outline-secondary mb-3" id="randomizeAttributes">随机属性</button>
-                            <div class="attribute-editor-grid">
-                                <label>STR<input type="number" class="form-control character-attribute-input" id="attributeSTR" min="1" max="99"></label>
-                                <label>CON<input type="number" class="form-control character-attribute-input" id="attributeCON" min="1" max="99"></label>
-                                <label>SIZ<input type="number" class="form-control character-attribute-input" id="attributeSIZ" min="1" max="99"></label>
-                                <label>DEX<input type="number" class="form-control character-attribute-input" id="attributeDEX" min="1" max="99"></label>
-                                <label>APP<input type="number" class="form-control character-attribute-input" id="attributeAPP" min="1" max="99"></label>
-                                <label>INT<input type="number" class="form-control character-attribute-input" id="attributeINT" min="1" max="99"></label>
-                                <label>POW<input type="number" class="form-control character-attribute-input" id="attributePOW" min="1" max="99"></label>
-                                <label>EDU<input type="number" class="form-control character-attribute-input" id="attributeEDU" min="1" max="99"></label>
-                                <label>LUK<input type="number" class="form-control character-attribute-input" id="attributeLUK" min="1" max="99"></label>
-                                <label>AGE<input type="number" class="form-control character-attribute-input" id="attributeAGE" min="15" max="99"></label>
+                            <div class="character-section-heading">
+                                <h6 class="character-section-title"><i class="fa fa-sliders" aria-hidden="true"></i> <span>属性</span><small>Attributes</small></h6>
+                                <button type="button" class="character-icon-button" id="randomizeAttributes" title="随机生成属性" aria-label="随机生成属性">
+                                    <i class="fa fa-random" aria-hidden="true"></i>
+                                </button>
                             </div>
+                            <div class="attribute-editor-grid">
+                                <label class="attribute-editor-card"><span class="attribute-name">力量 <small>STR</small></span><small class="attribute-roll-hint" data-attribute-roll="STR">3d6x5</small><div class="attribute-value-row"><input type="number" class="form-control character-attribute-input" id="attributeSTR" min="1" max="99" aria-label="力量属性值"><input type="number" class="form-control" id="attributeSTRHalf" readonly aria-label="力量半值"><input type="number" class="form-control" id="attributeSTRRatio" readonly aria-label="力量五分之一值"></div></label>
+                                <label class="attribute-editor-card"><span class="attribute-name">敏捷 <small>DEX</small></span><small class="attribute-roll-hint" data-attribute-roll="DEX">3d6x5</small><div class="attribute-value-row"><input type="number" class="form-control character-attribute-input" id="attributeDEX" min="1" max="99" aria-label="敏捷属性值"><input type="number" class="form-control" id="attributeDEXHalf" readonly aria-label="敏捷半值"><input type="number" class="form-control" id="attributeDEXRatio" readonly aria-label="敏捷五分之一值"></div></label>
+                                <label class="attribute-editor-card"><span class="attribute-name">体型 <small>SIZ</small></span><small class="attribute-roll-hint" data-attribute-roll="SIZ">(2d6+6)x5</small><div class="attribute-value-row"><input type="number" class="form-control character-attribute-input" id="attributeSIZ" min="1" max="99" aria-label="体型属性值"><input type="number" class="form-control" id="attributeSIZHalf" readonly aria-label="体型半值"><input type="number" class="form-control" id="attributeSIZRatio" readonly aria-label="体型五分之一值"></div></label>
+                                <label class="attribute-editor-card"><span class="attribute-name">外貌 <small>APP</small></span><small class="attribute-roll-hint" data-attribute-roll="APP">3d6x5</small><div class="attribute-value-row"><input type="number" class="form-control character-attribute-input" id="attributeAPP" min="1" max="99" aria-label="外貌属性值"><input type="number" class="form-control" id="attributeAPPHalf" readonly aria-label="外貌半值"><input type="number" class="form-control" id="attributeAPPRatio" readonly aria-label="外貌五分之一值"></div></label>
+                                <label class="attribute-editor-card"><span class="attribute-name">体质 <small>CON</small></span><small class="attribute-roll-hint" data-attribute-roll="CON">3d6x5</small><div class="attribute-value-row"><input type="number" class="form-control character-attribute-input" id="attributeCON" min="1" max="99" aria-label="体质属性值"><input type="number" class="form-control" id="attributeCONHalf" readonly aria-label="体质半值"><input type="number" class="form-control" id="attributeCONRatio" readonly aria-label="体质五分之一值"></div></label>
+                                <label class="attribute-editor-card"><span class="attribute-name">智力 <small>INT</small></span><small class="attribute-roll-hint" data-attribute-roll="INT">(2d6+6)x5</small><div class="attribute-value-row"><input type="number" class="form-control character-attribute-input" id="attributeINT" min="1" max="99" aria-label="智力属性值"><input type="number" class="form-control" id="attributeINTHalf" readonly aria-label="智力半值"><input type="number" class="form-control" id="attributeINTRatio" readonly aria-label="智力五分之一值"></div></label>
+                                <label class="attribute-editor-card"><span class="attribute-name">意志 <small>POW</small></span><small class="attribute-roll-hint" data-attribute-roll="POW">3d6x5</small><div class="attribute-value-row"><input type="number" class="form-control character-attribute-input" id="attributePOW" min="1" max="99" aria-label="意志属性值"><input type="number" class="form-control" id="attributePOWHalf" readonly aria-label="意志半值"><input type="number" class="form-control" id="attributePOWRatio" readonly aria-label="意志五分之一值"></div></label>
+                                <label class="attribute-editor-card"><span class="attribute-name">教育 <small>EDU</small></span><small class="attribute-roll-hint" data-attribute-roll="EDU">(2d6+6)x5</small><div class="attribute-value-row"><input type="number" class="form-control character-attribute-input" id="attributeEDU" min="1" max="99" aria-label="教育属性值"><input type="number" class="form-control" id="attributeEDUHalf" readonly aria-label="教育半值"><input type="number" class="form-control" id="attributeEDURatio" readonly aria-label="教育五分之一值"></div></label>
+                                <label class="attribute-editor-card"><span class="attribute-name">幸运 <small>LUC</small></span><small class="attribute-roll-hint" data-attribute-roll="LUC">3d6x5</small><div class="attribute-value-row attribute-value-row-single"><input type="number" class="form-control character-attribute-input" id="attributeLUC" min="1" max="99" aria-label="幸运属性值"></div></label>
+                            </div>
+                            <div class="character-resource-grid" aria-label="生命、魔法与理智">
+                                <section class="character-resource-card">
+                                    <h6 class="character-section-title"><i class="fa fa-heartbeat" aria-hidden="true"></i> <span>生命（HP）</span><small>Health</small></h6>
+                                    <div class="character-resource-values">
+                                        <label class="character-mini-field" for="characterCurrentHp"><span>现有值</span><input type="number" class="form-control" id="characterCurrentHp" min="0"></label>
+                                        <label class="character-mini-field" for="characterMaxHp"><span>最大值</span><input type="number" class="form-control" id="characterMaxHp" min="0" readonly></label>
+                                    </div>
+                                </section>
+                                <section class="character-resource-card">
+                                    <h6 class="character-section-title"><i class="fa fa-flask" aria-hidden="true"></i> <span>魔法（MP）</span><small>Magic</small></h6>
+                                    <div class="character-resource-values">
+                                        <label class="character-mini-field" for="characterCurrentMp"><span>现有值</span><input type="number" class="form-control" id="characterCurrentMp" min="0"></label>
+                                        <label class="character-mini-field" for="characterMaxMp"><span>最大值</span><input type="number" class="form-control" id="characterMaxMp" min="0" readonly></label>
+                                    </div>
+                                </section>
+                                <section class="character-resource-card">
+                                    <h6 class="character-section-title"><i class="fa fa-eye" aria-hidden="true"></i> <span>理智（SAN）</span><small>Sanity</small></h6>
+                                    <div class="character-resource-values character-resource-values-three">
+                                        <label class="character-mini-field" for="characterCurrentSan"><span>现有值</span><input type="number" class="form-control" id="characterCurrentSan" min="0"></label>
+                                        <label class="character-mini-field" for="characterInitialSan"><span>初始值</span><input type="number" class="form-control" id="characterInitialSan" min="0"></label>
+                                        <label class="character-mini-field" for="characterMaxSan"><span>最大值</span><input type="number" class="form-control" id="characterMaxSan" min="0" readonly></label>
+                                    </div>
+                                </section>
+                            </div>
+                            <section class="character-status-panel">
+                                <h6 class="character-section-title"><i class="fa fa-medkit" aria-hidden="true"></i> <span>人物状态</span><small>Character Status</small></h6>
+                                <div class="character-status-grid">
+                                    <label class="character-status-item"><input type="checkbox" id="characterStatusMajorWound"><span>重伤</span></label>
+                                    <label class="character-status-item"><input type="checkbox" id="characterStatusUnconscious"><span>昏迷</span></label>
+                                    <label class="character-status-item"><input type="checkbox" id="characterStatusDead"><span>死亡</span></label>
+                                    <label class="character-status-item"><input type="checkbox" id="characterStatusTemporaryInsanity"><span>临时疯狂</span></label>
+                                    <label class="character-status-item"><input type="checkbox" id="characterStatusPermanentInsanity"><span>永久疯狂</span></label>
+                                    <label class="character-status-item"><input type="checkbox" id="characterStatusIndefiniteInsanity"><span>不定期疯狂</span></label>
+                                </div>
+                            </section>
                         </section>
 
                         <section class="character-form-section">
@@ -926,6 +1025,12 @@
 
                         <section class="character-form-section">
                             <h6><i class="fa fa-cubes" aria-hidden="true"></i> 快速录入</h6>
+                            <div class="character-occupation-settings">
+                                <label class="form-label" for="characterCreditRating">信用评级</label>
+                                <input type="number" class="form-control" id="characterCreditRating" min="0" max="99">
+                                <small class="text-muted">请根据所选职业模板允许的信用评级范围填写。</small>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary mb-3" id="autoAllocateOccupationSkills">自动分配职业技能</button>
                             <label class="form-label" for="characterSkillChecklist">技能复选</label>
                             <div class="skill-check-grid" id="characterSkillChecklist"></div>
                             <label class="form-label" for="characterSkills">技能列表</label>
@@ -947,7 +1052,66 @@
         </div>
     </div>
 
+    <div class="modal fade" id="nameGeneratorModal" tabindex="-1" aria-labelledby="nameGeneratorModalLabel" aria-hidden="true">
+        <div class="modal-dialog" style="max-width: 520px;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="nameGeneratorModalLabel">随机生成姓名</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="nameRegionSelect">国家/地区</label>
+                            <select class="form-select" id="nameRegionSelect">
+                                <option value="china">中国</option>
+                                <option value="japan">日本</option>
+                                <option value="korea">韩国</option>
+                                <option value="western">欧美</option>
+                                <option value="russia">俄罗斯</option>
+                                <option value="india">印度</option>
+                                <option value="france">法国</option>
+                                <option value="germany">德国</option>
+                                <option value="spain">西班牙</option>
+                                <option value="italy">意大利</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="nameGenderSelect">性别</label>
+                            <select class="form-select" id="nameGenderSelect">
+                                <option value="male">男性</option>
+                                <option value="female">女性</option>
+                                <option value="unknown">未知</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="generated-name-preview" id="generatedNamePreview" aria-live="polite">-</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="cancelGeneratedName">取消</button>
+                    <button type="button" class="btn btn-outline-secondary" id="regenerateName">重新生成</button>
+                    <button type="button" class="btn btn-primary" id="confirmGeneratedName">确认</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="occupationTemplateModal" tabindex="-1" aria-labelledby="occupationTemplateModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="occupationTemplateModalLabel">选择职业模板</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="occupation-template-list" id="occupationTemplateList" aria-live="polite"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- 添加模型模态窗口 -->
+
     <div class="modal fade" id="addModelModal" tabindex="-1" aria-labelledby="addModelModalLabel" aria-hidden="true">
         <div class="modal-dialog" style="max-width: 500px;">
             <div class="modal-content">
@@ -1101,6 +1265,7 @@
     <script src="js/tabs.js"></script>
     <script src="js/platform-ui.js"></script>
     <script src="js/cookie-consent.js"></script>
+    <script src="js/generated/templates.js"></script>
     <script src="js/chat.js"></script>
     <script src="js/auth/api.js"></script>
     <script src="js/auth/state.js"></script>
@@ -1110,7 +1275,6 @@
     <script src="js/auth/profile-dialog.js"></script>
     <script src="js/auth/user-card.js"></script>
     <script src="js/auth/index.js"></script>
-    <script src="js/auth.js"></script>
     <script src="js/network.js"></script>
     <script src="js/rooms.js"></script>
     <script src="js/scenario.js"></script>

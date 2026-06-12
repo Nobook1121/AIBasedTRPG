@@ -13,7 +13,6 @@ async function initializeApplication(): Promise<void> {
 
     initTabs();
     initScenarioManagement();
-    initCharacterManagement();
     initDiceTool();
     initToolTabs();
     initSettingsTabs();
@@ -22,6 +21,7 @@ async function initializeApplication(): Promise<void> {
 
     await initAIPlatforms();
     await initAuth();
+    initCharacterManagement();
     initChat();
     await initNetworkConfig();
     initRoomManagement();

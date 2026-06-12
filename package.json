@@ -4,8 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "build:frontend": "tsc --project tsconfig.frontend.json"
+    "prepare:frontend": "node scripts/build-frontend.mjs --assets-only",
+    "typecheck": "npm run prepare:frontend && tsc --noEmit",
+    "build:frontend": "npm run prepare:frontend && tsc --project tsconfig.frontend.json"
   },
   "devDependencies": {
     "typescript": "^5.8.3"

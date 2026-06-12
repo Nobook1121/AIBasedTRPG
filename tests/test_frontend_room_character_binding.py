@@ -47,6 +47,11 @@ def test_room_controls_use_compact_layout_classes():
 
     assert "room-join-toolbar" in html
     assert ".room-join-toolbar" in css
+    assert "flex-wrap: nowrap" in css
+    assert ".room-join-toolbar #roomCodeInput" in css
+    assert "flex: 0 0 150px" in css
+    assert ".room-join-toolbar #joinRoomCharacterSelect" in css
+    assert "flex: 0 0 180px" in css
     assert "min-height: 36px" in css
 
 

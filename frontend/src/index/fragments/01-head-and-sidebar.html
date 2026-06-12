@@ -1,0 +1,70 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI TRPG 系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://www.w3schools.cn/cdnjs/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="notification-container"></div>
+    <div class="container-fluid">
+        <div class="row h-100">
+            <!-- 左侧导航栏 -->
+            <div class="col-2 bg-dark text-white sidebar-expanded" id="sidebar">
+                <div class="d-flex flex-column h-100 p-3">
+                    <div class="sidebar-header">
+                        <h2 class="sidebar-title" data-i18n="app.title">AI TRPG</h2>
+                        <button type="button" class="sidebar-toggle" id="sidebarToggle" title="收起侧边栏" aria-label="收起侧边栏" aria-expanded="true">
+                            <i class="fa fa-angle-double-left" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                    <ul class="nav flex-column mt-4">
+                        <li class="nav-item">
+                            <a class="nav-link active" href="#home" data-tab="home">主页</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#scenario" data-tab="scenario">剧本管理</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#character" data-tab="character">角色卡管理</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#save" data-tab="save">房间管理</a>
+                        </li>
+                        <li class="nav-item">
+                            <button class="dropdown-btn">小工具
+                                <i class="fa fa-caret-down"></i>
+                            </button>
+                            <div class="dropdown-container">
+                                <a class="nav-link" href="#tools-dice" data-tab="tools">骰子工具</a>
+                                <a class="nav-link" href="#tools-other" data-tab="tools">其他工具</a>
+                            </div>
+                        </li>
+                        <li class="nav-item">
+                            <button class="dropdown-btn">设置
+                                <i class="fa fa-caret-down"></i>
+                            </button>
+                            <div class="dropdown-container">
+                                <a class="nav-link" href="#settings-general" data-tab="settings">常规设置</a>
+                                <a class="nav-link" href="#settings-model" data-tab="settings">模型设置</a>
+                                <a class="nav-link" href="#settings-network" data-tab="settings">网络配置</a>
+                                <a class="nav-link" href="#settings-about" data-tab="settings">关于应用</a>
+                            </div>
+                        </li>
+                    </ul>
+                    <!-- 用户信息区域 -->
+                    <div class="user-info mt-auto" id="userInfo" role="button" tabindex="0" aria-label="打开用户设置">
+                        <div class="user-avatar" id="userAvatar">
+                            <img src="https://via.placeholder.com/40" alt="用户头像" width="40" height="40">
+                        </div>
+                        <div class="user-details">
+                            <div class="user-name" id="userName" data-i18n="auth.status.guest">未登录</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 中间内容区 -->
