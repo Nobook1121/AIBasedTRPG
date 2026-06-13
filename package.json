@@ -6,7 +6,7 @@
   "scripts": {
     "prepare:frontend": "node scripts/build-frontend.mjs --assets-only",
     "typecheck": "npm run prepare:frontend && tsc --noEmit && tsc --project tsconfig.react.json --noEmit",
-    "build:react": "esbuild frontend/src/react/main.tsx --bundle --format=iife --target=es2022 --minify --outfile=js/react/main.js",
+    "build:react": "esbuild frontend/src/react/main.tsx --bundle --format=iife --target=es2022 --jsx=automatic --minify --outfile=js/react/main.js",
     "build:frontend": "npm run prepare:frontend && tsc --project tsconfig.frontend.json && npm run build:react"
   },
   "devDependencies": {

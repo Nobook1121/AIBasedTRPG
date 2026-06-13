@@ -16,6 +16,8 @@ COOKIE_TS = PROJECT_ROOT / "frontend" / "src" / "js" / "cookie-consent.ts"
 SCENARIO_VIEW_TS = PROJECT_ROOT / "frontend" / "src" / "js" / "views" / "ScenarioView.ts"
 ROOMS_TS = PROJECT_ROOT / "frontend" / "src" / "js" / "rooms.ts"
 REACT_ENTRY = PROJECT_ROOT / "frontend" / "src" / "react" / "main.tsx"
+REACT_SIDEBAR = PROJECT_ROOT / "frontend" / "src" / "react" / "shell" / "Sidebar.tsx"
+REACT_SIDEBAR_CSS = PROJECT_ROOT / "frontend" / "src" / "react" / "shell" / "sidebar.css"
 REACT_TSCONFIG = PROJECT_ROOT / "tsconfig.react.json"
 
 
@@ -86,8 +88,31 @@ def test_react_framework_is_bundled_before_application_scripts():
     assert '"react-dom"' in package_source
     assert '"esbuild"' in package_source
     assert '"build:react"' in package_source
+    assert "--jsx=automatic" in package_source
     assert REACT_TSCONFIG.exists()
     assert 'createRoot' in react_source
     assert 'data-framework="react"' in react_source
     assert "alpinejs" not in package_source
     assert "vendor/alpine.js" not in html
+
+
+def test_sidebar_shell_is_rendered_by_react_but_keeps_legacy_dom_contracts():
+    html = _read(INDEX_HTML)
+    index_source = _read(PROJECT_ROOT / "frontend" / "src" / "index" / "fragments" / "01-head-and-sidebar.html")
+    react_entry = _read(REACT_ENTRY)
+    sidebar_source = _read(REACT_SIDEBAR)
+    sidebar_css = _read(REACT_SIDEBAR_CSS)
+    style_manifest = _read(STYLE_MANIFEST)
+
+    assert 'id="react-sidebar-root"' in html
+    assert 'id="react-sidebar-root"' in index_source
+    assert 'id="sidebar"' not in index_source
+    assert "flushSync" in react_entry
+    assert 'document.getElementById("react-sidebar-root")' in react_entry
+    assert 'id="sidebar"' in sidebar_source
+    assert 'id="sidebarToggle"' in sidebar_source
+    assert 'id="userInfo"' in sidebar_source
+    assert 'tab: "home"' in sidebar_source
+    assert "data-tab={tab}" in sidebar_source
+    assert "#sidebar .nav-link" in sidebar_css
+    assert "../react/shell/sidebar.css" in style_manifest

@@ -1,0 +1,80 @@
+/* React shell sidebar */
+.sidebar-title {
+    margin: 0;
+    white-space: nowrap;
+    font-size: clamp(1rem, 1.6vw, 1.5rem);
+    line-height: 1.1;
+}
+
+#sidebar {
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1000;
+    overflow-y: hidden;
+    transition: width 0.3s ease;
+}
+
+#sidebar .nav-link {
+    color: #ccc;
+    transition: color 0.2s ease, background-color 0.2s ease;
+    position: relative;
+    display: block;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-sm);
+    text-decoration: none;
+}
+
+#sidebar .nav-link:hover {
+    color: white;
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+#sidebar .nav-link.active {
+    color: white;
+    background-color: rgba(255, 255, 255, 0.2);
+    border-left: 4px solid var(--color-primary);
+}
+
+#sidebar .dropdown-btn {
+    padding: 6px 8px 6px 16px;
+    text-decoration: none;
+    font-size: 16px;
+    color: #ccc;
+    display: block;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+#sidebar .dropdown-btn:hover {
+    color: white;
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+#sidebar .dropdown-btn.active {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: white;
+    border-left: 4px solid var(--color-primary);
+}
+
+#sidebar .dropdown-container {
+    display: none;
+    background-color: #212529;
+    padding-left: 8px;
+}
+
+#sidebar .fa-caret-down {
+    float: right;
+    padding-right: 8px;
+    transition: transform 0.3s ease;
+}
+
+#sidebar .dropdown-btn.active .fa-caret-down {
+    transform: rotate(180deg);
+}
