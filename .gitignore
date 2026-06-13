@@ -3,12 +3,13 @@
 # 忽略所有的临时文件
 *.tmp
 __pycache__/
-/history/
 /.worktrees/
 /node_modules/
 /js/
 /tools/*.js
 tests/**/__pycache__/
-/users/*.sqlite3
-/rooms/
-/logs/
+/data/history/
+/data/rooms/
+/data/logs/
+/data/users/*.sqlite3
+/data/users/ip_configs/

@@ -8,7 +8,7 @@ from flask import Blueprint, current_app, request
 from trpg_server.json_store import read_json, write_json_atomic
 from trpg_server.responses import error_response, success_response
 from trpg_server.role_config import load_roles, select_role_for_content
-from trpg_server.settings import BASE_DIR, CONFIG_DIR
+from trpg_server.settings import CONFIG_DIR, HISTORY_DIR
 
 bp = Blueprint("chat", __name__)
 logger = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ def _get_ai_platform_dir():
 
 
 def _get_history_dir():
-    return current_app.config.get("HISTORY_DIR", BASE_DIR / "history")
+    return current_app.config.get("HISTORY_DIR", HISTORY_DIR)
 
 
 def _get_kp_prompt_file():

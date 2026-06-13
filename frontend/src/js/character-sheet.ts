@@ -229,7 +229,7 @@ interface Window {
     const STORAGE_KEY = "ai-trpg:coc7-character-cards";
     const ACTIVE_STORAGE_KEY = "ai-trpg:coc7-active-character";
     const RULE_SETTINGS_STORAGE_KEY = "ai-trpg:coc7-character-rule-settings";
-    const SAMPLE_CHARACTER_URL = "frontend/data/characters/sample-investigator.json";
+    const SAMPLE_CHARACTER_URL = "/data/characters/sample-investigator.json";
     const ATTRIBUTE_KEYS: COC7CoreAttributeKey[] = ["STR", "DEX", "SIZ", "APP", "CON", "INT", "POW", "EDU", "LUC"];
     const PLAYER_UNBOUND_LABEL = "未绑定玩家";
     const ATTRIBUTE_LABELS: Record<COC7CoreAttributeKey, string> = {

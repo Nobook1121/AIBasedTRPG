@@ -27,7 +27,7 @@ npm run build:frontend
 python server.py
 ```
 
-服务默认读取 `config/network.json` 中的端口配置，未配置时使用 `8086`。也可以通过命令行传入端口：
+服务默认读取 `data/config/network.json` 中的端口配置，未配置时使用 `8086`。也可以通过命令行传入端口：
 
 ```powershell
 python server.py 8090
@@ -51,13 +51,15 @@ python server.py 8090
 - `tests/`：后端单元测试和 API smoke tests。
 - `frontend/src/`：TypeScript 前端源码。
 - `js/`：TypeScript 构建生成的浏览器运行脚本，默认不提交到 Git。
-- `tools/`：前端工具脚本。
-- `config/`：TOML、JSON、角色提示词等运行配置数据。
-- `scenarios/`：剧本 JSON 数据。
-- `rooms/`：房间、房间消息、回档节点和自动存档数据。
-- `users/`：用户数据与用户 IP 配置。
-- `assets/`：头像、剧本封面和 AI 平台图标。
-- `logs/`：运行日志输出目录，运行时自动创建；默认只记录登录、消息、AI 请求和报错等关键事件。
+- `tools/`：前端工具脚本构建产物，不存放运行数据。
+- `data/config/`：TOML、JSON、角色提示词等运行配置数据。
+- `data/scenarios/`：剧本 JSON 数据。
+- `data/rooms/`：房间、房间消息、回档节点和自动存档数据。
+- `data/users/`：用户数据与用户 IP 配置。
+- `data/characters/`：角色卡示例等角色数据资源；浏览器本地创建的角色卡仍保存在当前浏览器 `localStorage`。
+- `data/assets/avatars/` 与 `data/assets/scenario_covers/`：上传头像和剧本封面。
+- `assets/`：AI 平台图标等静态只读资源。
+- `data/logs/`：运行日志输出目录，运行时自动创建；默认只记录登录、消息、AI 请求和报错等关键事件。
 
 ## 配置与安全
 
@@ -156,7 +158,7 @@ http://192.168.192.31:8086
 - 为每个好友创建独立账号，不共享账号。
 - 不把管理账号给普通玩家使用。
 - 仅暴露本程序端口，不暴露项目目录、远程桌面或系统管理端口。
-- 定期备份 `scenarios/`、`rooms/`、`users/`、`assets/avatars/` 和 `assets/scenario_covers/`。
+- 定期备份 `data/`。其中包含运行配置、剧本、房间、用户、上传头像、剧本封面、聊天历史和日志。
 
 联机访问本程序时，页面和 REST API 使用 HTTP；实时聊天同步使用 Socket.IO，底层由 Engine.IO 管理，优先使用 WebSocket，必要时回退到 HTTP long-polling。ZeroTier 只提供虚拟网络通道，本程序本身不实现 ZeroTier 协议。若部署在反向代理和 HTTPS 后面，对外访问会变为 HTTPS，实时通道对应为 WSS。
 

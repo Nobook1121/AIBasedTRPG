@@ -2,14 +2,17 @@ import os
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parents[1]
+DATA_DIR = BASE_DIR / "data"
 
-SCENARIOS_DIR = BASE_DIR / "scenarios"
-SCENARIO_COVERS_DIR = BASE_DIR / "assets" / "scenario_covers"
-AVATARS_DIR = BASE_DIR / "assets" / "avatars"
-ROOMS_DIR = BASE_DIR / "rooms"
-CONFIG_DIR = BASE_DIR / "config"
-USERS_DIR = BASE_DIR / "users"
-LOGS_DIR = BASE_DIR / "logs"
+SCENARIOS_DIR = DATA_DIR / "scenarios"
+CHARACTERS_DIR = DATA_DIR / "characters"
+SCENARIO_COVERS_DIR = DATA_DIR / "assets" / "scenario_covers"
+AVATARS_DIR = DATA_DIR / "assets" / "avatars"
+ROOMS_DIR = DATA_DIR / "rooms"
+CONFIG_DIR = DATA_DIR / "config"
+USERS_DIR = DATA_DIR / "users"
+HISTORY_DIR = DATA_DIR / "history"
+LOGS_DIR = DATA_DIR / "logs"
 
 NETWORK_CONFIG_FILE = CONFIG_DIR / "network.json"
 PENETRATION_CONFIG_FILE = CONFIG_DIR / "penetration.json"

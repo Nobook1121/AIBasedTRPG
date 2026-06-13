@@ -8,7 +8,7 @@ import sqlite3
 from trpg_server.logging_config import configure_logging
 from trpg_server.security import register_session_guard
 from trpg_server.socket_events import register_socket_events
-from trpg_server.settings import SECRET_KEY, USERS_DIR
+from trpg_server.settings import LOGS_DIR, SECRET_KEY, USERS_DIR
 from trpg_server.users.database import UserDatabase
 from trpg_server.users.migrations import migrate_json_users
 from trpg_server.users.service import UserService
@@ -18,7 +18,6 @@ logger = logging.getLogger(__name__)
 
 
 def create_app(config=None):
-    configure_logging()
     app = Flask(__name__, static_folder=None)
     app.secret_key = SECRET_KEY
     app.config.update(
@@ -32,6 +31,7 @@ def create_app(config=None):
     )
     if config:
         app.config.update(config)
+    configure_logging(app.config.get("LOGS_DIR", LOGS_DIR))
     _configure_user_service(app)
     CORS(app)
     socketio.init_app(app)
