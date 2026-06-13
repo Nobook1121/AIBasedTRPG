@@ -72,7 +72,8 @@ try {
     "js\rooms.js",
     "js\scenario.js",
     "js\character-sheet.js",
-    "js\main.js"
+    "js\main.js",
+    "js\react\main.js"
   )
 
   foreach ($file in $jsFiles) {

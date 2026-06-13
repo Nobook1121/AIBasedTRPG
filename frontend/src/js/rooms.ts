@@ -66,7 +66,7 @@ function populateCharacterSelect(selectId: string): void {
     if (!select) return;
     const currentValue = select.value;
     const cards = getCharacterCards();
-    select.innerHTML = '<option value="">请选择角色卡</option>';
+    select.innerHTML = window.TrpgTemplates.render("select-placeholder-option", { label: "请选择角色卡" });
     cards.forEach((card) => {
         const option = document.createElement("option");
         option.value = card.id;
@@ -91,7 +91,7 @@ async function openCreateRoomModal(): Promise<void> {
     populateCharacterSelectors();
     const scenarioSelect = document.getElementById("roomScenarioSelect") as HTMLSelectElement | null;
     if (scenarioSelect) {
-        scenarioSelect.innerHTML = '<option value="">请选择剧本</option>';
+        scenarioSelect.innerHTML = window.TrpgTemplates.render("select-placeholder-option", { label: "请选择剧本" });
         try {
             const data = await TrpgApi.get<ApiResponse<Scenario[]>>("/api/scenarios");
             if (data.success && data.data) {
@@ -197,15 +197,13 @@ function renderRoomsList(rooms: Room[]): void {
     if (!roomListContainer) return;
 
     if (rooms.length === 0) {
-        roomListContainer.innerHTML = '<div class="text-center text-muted py-5">暂无房间，请创建房间或输入房间码加入。</div>';
+        roomListContainer.innerHTML = window.TrpgTemplates.render("room-empty-list");
         return;
     }
 
-    roomListContainer.innerHTML = `
-        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
-            ${rooms.map((room) => renderRoomCard(room)).join("")}
-        </div>
-    `;
+    roomListContainer.innerHTML = window.TrpgTemplates.render("room-card-grid", {
+        cardsHtml: rooms.map((room) => renderRoomCard(room)).join(""),
+    });
 
     roomListContainer.querySelectorAll<HTMLButtonElement>(".view-room-btn").forEach((button) => {
         button.addEventListener("click", async () => {
@@ -219,24 +217,16 @@ function renderRoomsList(rooms: Room[]): void {
 function renderRoomCard(room: Room): string {
     const isActive = currentRoom?.id === room.id;
     const members = (room.members || []).map((member) => member.username).join(", ") || "-";
-    return `
-        <div class="col">
-            <div class="card save-card h-100 ${isActive ? "border-primary border-2 shadow-lg" : ""}" data-room-id="${roomEscapeHtml(room.id)}">
-                ${isActive ? '<div class="card-header bg-primary text-white text-center py-2"><small><i class="fa fa-check-circle"></i> 当前房间</small></div>' : ""}
-                <div class="card-body">
-                    <h5 class="card-title">${roomEscapeHtml(room.name)}</h5>
-                    <p class="card-text mb-2">
-                        <small class="text-muted">房间码：${roomEscapeHtml(room.room_code || room.code || "-")}</small><br>
-                        <small class="text-muted">剧本：${roomEscapeHtml(room.scenario_title || "未知")}</small><br>
-                        <small class="text-muted">成员：${roomEscapeHtml(members)}</small>
-                    </p>
-                </div>
-                <div class="card-footer bg-transparent border-0">
-                    <button class="btn btn-primary w-100 view-room-btn">${isActive ? "管理房间" : "进入房间"}</button>
-                </div>
-            </div>
-        </div>
-    `;
+    return window.TrpgTemplates.render("room-card", {
+        roomId: room.id,
+        activeClass: isActive ? "border-primary border-2 shadow-lg" : "",
+        activeHeaderHtml: isActive ? window.TrpgTemplates.render("room-active-header") : "",
+        name: room.name,
+        roomCode: room.room_code || room.code || "-",
+        scenarioTitle: room.scenario_title || "未知",
+        members,
+        actionLabel: isActive ? "管理房间" : "进入房间",
+    });
 }
 
 async function openRoomDetail(roomId: string): Promise<void> {
@@ -294,7 +284,7 @@ function renderRoomCharacterBindings(room: Room): void {
     if (!container) return;
     const members = room.members || [];
     if (members.length === 0) {
-        container.innerHTML = '<div class="text-muted">暂无参与玩家</div>';
+        container.innerHTML = window.TrpgTemplates.render("room-character-empty");
         return;
     }
 
@@ -303,30 +293,16 @@ function renderRoomCharacterBindings(room: Room): void {
         const state = member.character_state || {};
         const injuryRecords = state.injury_records || [];
         const sanityRecords = state.sanity_records || [];
-        return `
-            <div class="room-character-binding border rounded p-3 mb-3">
-                <div class="d-flex justify-content-between align-items-start gap-3">
-                    <div>
-                        <div class="fw-bold">${roomEscapeHtml(member.username || "-")}</div>
-                        <div class="text-muted">${card ? roomEscapeHtml(card.name || "未命名角色") : "未绑定角色卡"}</div>
-                    </div>
-                    <div class="text-end">
-                        <span class="badge bg-primary">HP ${state.current_hp ?? "-"} / ${state.max_hp ?? "-"}</span>
-                        <span class="badge bg-secondary">San ${state.current_san ?? "-"} / ${state.max_san ?? "-"}</span>
-                    </div>
-                </div>
-                <div class="row mt-3">
-                    <div class="col-md-6">
-                        <h6>生命值/受伤记录</h6>
-                        ${renderCharacterRecordList(injuryRecords)}
-                    </div>
-                    <div class="col-md-6">
-                        <h6>San 值鉴定和损失记录</h6>
-                        ${renderCharacterRecordList(sanityRecords)}
-                    </div>
-                </div>
-            </div>
-        `;
+        return window.TrpgTemplates.render("room-character-binding", {
+            username: member.username || "-",
+            cardName: card ? card.name || "未命名角色" : "未绑定角色卡",
+            currentHp: state.current_hp ?? "-",
+            maxHp: state.max_hp ?? "-",
+            currentSan: state.current_san ?? "-",
+            maxSan: state.max_san ?? "-",
+            injuryRecordsHtml: renderCharacterRecordList(injuryRecords),
+            sanityRecordsHtml: renderCharacterRecordList(sanityRecords),
+        });
     }).join("");
 
     container.querySelectorAll<HTMLButtonElement>("[data-record-id]").forEach((button) => {
@@ -337,16 +313,15 @@ function renderRoomCharacterBindings(room: Room): void {
 }
 
 function renderCharacterRecordList(records: CharacterRuntimeRecord[]): string {
-    if (!records.length) return '<div class="text-muted small">暂无记录</div>';
-    return `<div class="list-group">${records.map((record) => `
-        <div class="list-group-item d-flex justify-content-between gap-2">
-            <div>
-                <div>${record.type === "san" ? "San 损失" : "伤害"} ${record.value}</div>
-                <small class="text-muted">${roomEscapeHtml(record.reason || "未知")} · ${roomEscapeHtml(record.created_at || "-")}</small>
-            </div>
-            ${isElevatedUser() ? `<button type="button" class="btn btn-sm btn-outline-danger" data-record-id="${roomEscapeHtml(record.id)}">删除</button>` : ""}
-        </div>
-    `).join("")}</div>`;
+    if (!records.length) return window.TrpgTemplates.render("room-record-empty");
+    const recordsHtml = records.map((record) => window.TrpgTemplates.render("room-record-item", {
+        typeLabel: record.type === "san" ? "San 损失" : "伤害",
+        value: record.value,
+        reason: record.reason || "未知",
+        createdAt: record.created_at || "-",
+        deleteButtonHtml: isElevatedUser() ? window.TrpgTemplates.render("room-record-delete-button", { recordId: record.id }) : "",
+    })).join("");
+    return window.TrpgTemplates.render("room-record-list", { recordsHtml });
 }
 
 async function submitCharacterRecord(): Promise<void> {
@@ -449,11 +424,13 @@ function renderRoomNodeList(nodes: RoomNode[]): void {
     if (!nodeListContainer) return;
 
     if (nodes.length === 0) {
-        nodeListContainer.innerHTML = '<div class="text-center text-muted py-3">暂无回档节点</div>';
+        nodeListContainer.innerHTML = window.TrpgTemplates.render("room-node-empty");
         return;
     }
 
-    nodeListContainer.innerHTML = `<div class="list-group">${nodes.map(renderRoomNodeItem).join("")}</div>`;
+    nodeListContainer.innerHTML = window.TrpgTemplates.render("room-node-list", {
+        nodesHtml: nodes.map(renderRoomNodeItem).join(""),
+    });
     nodeListContainer.querySelectorAll<HTMLButtonElement>(".preview-node-btn").forEach((button) => {
         button.addEventListener("click", () => void previewRoomNode(button.dataset.nodeFilename || ""));
     });
@@ -466,19 +443,11 @@ function renderRoomNodeList(nodes: RoomNode[]): void {
 }
 
 function renderRoomNodeItem(node: RoomNode): string {
-    return `
-        <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-            <div>
-                <h6 class="mb-1">回档节点</h6>
-                <small class="text-muted">创建时间：${roomEscapeHtml(node.created_at || "-")} | 消息数：${node.message_count || 0}</small>
-            </div>
-            <div>
-                <button class="btn btn-sm btn-secondary preview-node-btn me-2" data-node-filename="${roomEscapeHtml(node.filename)}">预览</button>
-                <button class="btn btn-sm btn-primary load-node-btn me-2" data-node-filename="${roomEscapeHtml(node.filename)}">回档</button>
-                <button class="btn btn-sm btn-danger delete-node-btn" data-node-filename="${roomEscapeHtml(node.filename)}">删除</button>
-            </div>
-        </div>
-    `;
+    return window.TrpgTemplates.render("room-node-item", {
+        filename: node.filename,
+        createdAt: node.created_at || "-",
+        messageCount: node.message_count || 0,
+    });
 }
 
 async function previewRoomNode(nodeFilename: string): Promise<void> {
@@ -502,16 +471,12 @@ function renderPreviewContent(messages: ChatMessage[]): void {
     const previewContent = document.getElementById("saveNodePreviewContent");
     if (!previewContent) return;
 
-    previewContent.innerHTML = `
-        <div class="preview-messages">
-            ${messages.map((message) => `
-                <div class="preview-message mb-3 p-3 border rounded bg-light">
-                    <div class="fw-bold text-primary mb-2">${roomEscapeHtml(message.sender_name || message.sender || "未知")}</div>
-                    <div class="markdown-body">${roomEscapeHtml(message.content)}</div>
-                </div>
-            `).join("")}
-        </div>
-    `;
+    previewContent.innerHTML = window.TrpgTemplates.render("room-preview-list", {
+        messagesHtml: messages.map((message) => window.TrpgTemplates.render("room-preview-message", {
+            sender: message.sender_name || message.sender || "未知",
+            content: message.content,
+        })).join(""),
+    });
 }
 
 async function createRoomNode(): Promise<void> {

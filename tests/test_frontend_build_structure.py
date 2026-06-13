@@ -8,7 +8,15 @@ BUILD_SCRIPT = PROJECT_ROOT / "scripts" / "build-frontend.mjs"
 INDEX_MANIFEST = PROJECT_ROOT / "frontend" / "src" / "index" / "index.parts.json"
 STYLE_MANIFEST = PROJECT_ROOT / "frontend" / "src" / "styles" / "style.parts.json"
 CHAT_TEMPLATE = PROJECT_ROOT / "frontend" / "src" / "templates" / "chat.html"
+SCENARIO_TEMPLATE = PROJECT_ROOT / "frontend" / "src" / "templates" / "scenario.html"
+ROOMS_TEMPLATE = PROJECT_ROOT / "frontend" / "src" / "templates" / "rooms.html"
+COOKIE_TEMPLATE = PROJECT_ROOT / "frontend" / "src" / "templates" / "cookie-consent.html"
 CHAT_TS = PROJECT_ROOT / "frontend" / "src" / "js" / "chat.ts"
+COOKIE_TS = PROJECT_ROOT / "frontend" / "src" / "js" / "cookie-consent.ts"
+SCENARIO_VIEW_TS = PROJECT_ROOT / "frontend" / "src" / "js" / "views" / "ScenarioView.ts"
+ROOMS_TS = PROJECT_ROOT / "frontend" / "src" / "js" / "rooms.ts"
+REACT_ENTRY = PROJECT_ROOT / "frontend" / "src" / "react" / "main.tsx"
+REACT_TSCONFIG = PROJECT_ROOT / "tsconfig.react.json"
 
 
 def _read(path):
@@ -38,8 +46,48 @@ def test_chat_uses_compiled_templates_before_chat_script_loads():
 
     assert 'src="js/generated/templates.js"' in html
     assert html.index('src="js/generated/templates.js"') < html.index('src="js/chat.js"')
+    assert html.index('src="js/generated/templates.js"') < html.index('src="js/cookie-consent.js"')
     assert '<template id="chat-message">' in template_source
     assert '<template id="chat-command-palette-item">' in template_source
     assert "window.TrpgTemplates.render(\"chat-message\"" in source
     assert "window.TrpgTemplates.render(\"chat-command-palette-item\"" in source
     assert "const messageHTML" not in source
+
+
+def test_cookie_banner_uses_compiled_template():
+    assert '<template id="cookie-consent-banner">' in _read(COOKIE_TEMPLATE)
+    assert 'window.TrpgTemplates.render("cookie-consent-banner")' in _read(COOKIE_TS)
+
+
+def test_scenario_and_room_views_use_compiled_templates():
+    scenario_template = _read(SCENARIO_TEMPLATE)
+    rooms_template = _read(ROOMS_TEMPLATE)
+    scenario_source = _read(SCENARIO_VIEW_TS)
+    rooms_source = _read(ROOMS_TS)
+
+    assert '<template id="scenario-card">' in scenario_template
+    assert '<template id="scenario-segment-editor">' in scenario_template
+    assert '<template id="room-card">' in rooms_template
+    assert '<template id="room-character-binding">' in rooms_template
+    assert 'window.TrpgTemplates.render("scenario-card"' in scenario_source
+    assert 'window.TrpgTemplates.render("room-card"' in rooms_source
+    assert 'window.TrpgTemplates.render("room-character-binding"' in rooms_source
+
+
+def test_react_framework_is_bundled_before_application_scripts():
+    html = _read(INDEX_HTML)
+    package_source = _read(PROJECT_ROOT / "package.json")
+    react_source = _read(REACT_ENTRY)
+
+    assert 'id="react-runtime-root"' in html
+    assert 'src="js/react/main.js"' in html
+    assert html.index('src="js/react/main.js"') < html.index('src="js/main.js"')
+    assert '"react"' in package_source
+    assert '"react-dom"' in package_source
+    assert '"esbuild"' in package_source
+    assert '"build:react"' in package_source
+    assert REACT_TSCONFIG.exists()
+    assert 'createRoot' in react_source
+    assert 'data-framework="react"' in react_source
+    assert "alpinejs" not in package_source
+    assert "vendor/alpine.js" not in html

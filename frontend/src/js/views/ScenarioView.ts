@@ -26,19 +26,14 @@ class ScenarioView {
             card.className = "scenario-card";
             const coverPath = safeScenarioCover(scenario.cover);
 
-            card.innerHTML = `
-                <img src="${scenarioEscapeHtml(coverPath)}" alt="${scenarioEscapeHtml(scenario.title)}" onerror="this.src='${DEFAULT_SCENARIO_COVER}'">
-                <div class="scenario-card-body">
-                    <div class="scenario-card-title">${scenarioEscapeHtml(scenario.title)}</div>
-                    <p>作者: ${scenarioEscapeHtml(scenario.author)}</p>
-                    <p>推荐人数: ${scenario.playerCount}</p>
-                    <div class="scenario-card-actions">
-                        <button class="btn btn-sm btn-primary preview-scenario" data-id="${scenario.id}">预览</button>
-                        <button class="btn btn-sm btn-secondary edit-scenario" data-id="${scenario.id}">编辑</button>
-                        <button class="btn btn-sm btn-danger delete-scenario" data-id="${scenario.id}">删除</button>
-                    </div>
-                </div>
-            `;
+            card.innerHTML = window.TrpgTemplates.render("scenario-card", {
+                coverPath,
+                fallbackCover: DEFAULT_SCENARIO_COVER,
+                title: scenario.title,
+                author: scenario.author,
+                playerCount: scenario.playerCount,
+                id: scenario.id,
+            });
             this.scenarioList.appendChild(card);
         });
     }
@@ -62,56 +57,22 @@ class ScenarioView {
     }
 
     previewScenario(scenario: Scenario): void {
-        let previewContent = `
-            <h3>${scenarioEscapeHtml(scenario.title)}</h3>
-            <p><strong>作者:</strong> ${scenarioEscapeHtml(scenario.author)}</p>
-            <p><strong>推荐人数:</strong> ${scenario.playerCount}</p>
-            <p><strong>备注:</strong> ${scenarioEscapeHtml(scenario.notes || "无")}</p>
-            <p><strong>背景/引入:</strong> ${scenarioEscapeHtml(scenario.background || "无")}</p>
-            <p><strong>游戏准备:</strong> ${scenarioEscapeHtml(scenario.preparation || "无")}</p>
-            <h4>场景</h4>
-        `;
-
-        scenario.scenes.forEach((scene) => {
-            previewContent += `
-                <div class="mb-3">
-                    <h5>场景 ${scene.id}</h5>
-                    <p>${scenarioEscapeHtml(scene.content)}</p>
-                    ${scene.marker ? `<p><strong>标记:</strong> ${scenarioEscapeHtml(scene.marker)}</p>` : ""}
-                </div>
-            `;
-        });
-
-        previewContent += "<h4>结局</h4>";
-
-        scenario.endings.forEach((ending) => {
-            previewContent += `
-                <div class="mb-3">
-                    <h5>结局 ${ending.id}</h5>
-                    <p>${scenarioEscapeHtml(ending.content)}</p>
-                    ${ending.marker ? `<p><strong>标记:</strong> ${scenarioEscapeHtml(ending.marker)}</p>` : ""}
-                </div>
-            `;
+        const previewContent = window.TrpgTemplates.render("scenario-preview-content", {
+            title: scenario.title,
+            author: scenario.author,
+            playerCount: scenario.playerCount,
+            notes: scenario.notes || "无",
+            background: scenario.background || "无",
+            preparation: scenario.preparation || "无",
+            scenesHtml: scenario.scenes.map((scene) => renderPreviewSegment("场景", scene)).join(""),
+            endingsHtml: scenario.endings.map((ending) => renderPreviewSegment("结局", ending)).join(""),
         });
 
         const modal = document.createElement("div");
         modal.className = "modal fade";
         modal.id = "previewModal";
         modal.tabIndex = -1;
-        modal.innerHTML = `
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">剧本预览</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">${previewContent}</div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
-                    </div>
-                </div>
-            </div>
-        `;
+        modal.innerHTML = window.TrpgTemplates.render("scenario-preview-modal", { previewContent });
 
         document.body.appendChild(modal);
         new bootstrap.Modal(modal).show();
@@ -142,9 +103,13 @@ class ScenarioView {
     }
 
     showMessage(message: string, isError = false): void {
-        const notification = document.createElement("div");
-        notification.className = `notification ${isError ? "notification-error" : "notification-success"}`;
-        notification.textContent = message;
+        const wrapper = document.createElement("div");
+        wrapper.innerHTML = window.TrpgTemplates.render("notification-message", {
+            variant: isError ? "notification-error" : "notification-success",
+            message,
+        });
+        const notification = wrapper.firstElementChild;
+        if (!(notification instanceof HTMLElement)) return;
 
         const container = document.querySelector(".notification-container");
         if (!container) return;
@@ -269,22 +234,23 @@ function segmentTemplate(type: "scene" | "ending", index: number, segment?: Scen
     const label = type === "scene" ? "场景" : "结局";
     const className = type === "scene" ? "scene-item" : "ending-item";
     const removeClass = type === "scene" ? "remove-scene" : "remove-ending";
-    return `
-        <div class="${className} mb-3 p-3 border rounded">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <h6>${label} ${index}</h6>
-                <button type="button" class="btn btn-sm btn-danger ${removeClass}">删除</button>
-            </div>
-            <div class="form-group">
-                <label>${label}内容</label>
-                <textarea class="form-control" rows="3">${scenarioEscapeHtml(segment?.content || "")}</textarea>
-            </div>
-            <div class="form-group mt-2">
-                <label>${label}标记</label>
-                <textarea class="form-control" rows="2" placeholder="AI总结内容将显示在这里">${scenarioEscapeHtml(segment?.marker || "")}</textarea>
-            </div>
-        </div>
-    `;
+    return window.TrpgTemplates.render("scenario-segment-editor", {
+        className,
+        label,
+        index,
+        removeClass,
+        content: segment?.content || "",
+        marker: segment?.marker || "",
+    });
+}
+
+function renderPreviewSegment(label: "场景" | "结局", segment: ScenarioSegment): string {
+    return window.TrpgTemplates.render("scenario-preview-segment", {
+        label,
+        id: segment.id,
+        content: segment.content,
+        markerHtml: segment.marker ? window.TrpgTemplates.render("scenario-preview-marker", { marker: segment.marker }) : "",
+    });
 }
 
 function collectSegments(selector: ".scene-item" | ".ending-item"): ScenarioSegment[] {

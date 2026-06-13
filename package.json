@@ -5,10 +5,18 @@
   "type": "module",
   "scripts": {
     "prepare:frontend": "node scripts/build-frontend.mjs --assets-only",
-    "typecheck": "npm run prepare:frontend && tsc --noEmit",
-    "build:frontend": "npm run prepare:frontend && tsc --project tsconfig.frontend.json"
+    "typecheck": "npm run prepare:frontend && tsc --noEmit && tsc --project tsconfig.react.json --noEmit",
+    "build:react": "esbuild frontend/src/react/main.tsx --bundle --format=iife --target=es2022 --minify --outfile=js/react/main.js",
+    "build:frontend": "npm run prepare:frontend && tsc --project tsconfig.frontend.json && npm run build:react"
   },
   "devDependencies": {
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "esbuild": "^0.28.1",
     "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   }
 }

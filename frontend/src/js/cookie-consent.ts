@@ -35,15 +35,7 @@
         const banner = document.createElement("div");
         banner.id = "cookieConsentBanner";
         banner.className = "cookie-consent-banner";
-        banner.innerHTML = `
-            <div class="cookie-consent-text">
-                本应用使用必要登录 Cookie 保持会话；可选 Cookie 用于记住上次用户名和房间偏好。
-            </div>
-            <div class="cookie-consent-actions">
-                <button type="button" class="btn btn-sm btn-outline-secondary" id="declineCookieConsent">仅必要 Cookie</button>
-                <button type="button" class="btn btn-sm btn-primary" id="acceptCookieConsent">同意</button>
-            </div>
-        `;
+        banner.innerHTML = window.TrpgTemplates.render("cookie-consent-banner");
         document.body.appendChild(banner);
 
         document.getElementById("acceptCookieConsent")?.addEventListener("click", () => {

@@ -1,0 +1,74 @@
+<template id="scenario-card">
+<img src="{{ coverPath }}" alt="{{ title }}" onerror="this.src='{{ fallbackCover }}'">
+<div class="scenario-card-body">
+    <div class="scenario-card-title">{{ title }}</div>
+    <p>作者: {{ author }}</p>
+    <p>推荐人数: {{ playerCount }}</p>
+    <div class="scenario-card-actions">
+        <button class="btn btn-sm btn-primary preview-scenario" data-id="{{ id }}">预览</button>
+        <button class="btn btn-sm btn-secondary edit-scenario" data-id="{{ id }}">编辑</button>
+        <button class="btn btn-sm btn-danger delete-scenario" data-id="{{ id }}">删除</button>
+    </div>
+</div>
+</template>
+
+<template id="scenario-preview-content">
+<h3>{{ title }}</h3>
+<p><strong>作者:</strong> {{ author }}</p>
+<p><strong>推荐人数:</strong> {{ playerCount }}</p>
+<p><strong>备注:</strong> {{ notes }}</p>
+<p><strong>背景/引入:</strong> {{ background }}</p>
+<p><strong>游戏准备:</strong> {{ preparation }}</p>
+<h4>场景</h4>
+{{{ scenesHtml }}}
+<h4>结局</h4>
+{{{ endingsHtml }}}
+</template>
+
+<template id="scenario-preview-segment">
+<div class="mb-3">
+    <h5>{{ label }} {{ id }}</h5>
+    <p>{{ content }}</p>
+    {{{ markerHtml }}}
+</div>
+</template>
+
+<template id="scenario-preview-marker">
+<p><strong>标记:</strong> {{ marker }}</p>
+</template>
+
+<template id="scenario-preview-modal">
+<div class="modal-dialog modal-lg">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h5 class="modal-title">剧本预览</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">{{{ previewContent }}}</div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+        </div>
+    </div>
+</div>
+</template>
+
+<template id="scenario-segment-editor">
+<div class="{{ className }} mb-3 p-3 border rounded">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6>{{ label }} {{ index }}</h6>
+        <button type="button" class="btn btn-sm btn-danger {{ removeClass }}">删除</button>
+    </div>
+    <div class="form-group">
+        <label>{{ label }}内容</label>
+        <textarea class="form-control" rows="3">{{ content }}</textarea>
+    </div>
+    <div class="form-group mt-2">
+        <label>{{ label }}标记</label>
+        <textarea class="form-control" rows="2" placeholder="AI总结内容将显示在这里">{{ marker }}</textarea>
+    </div>
+</div>
+</template>
+
+<template id="notification-message">
+<div class="notification {{ variant }}">{{ message }}</div>
+</template>
