@@ -43,9 +43,21 @@ try {
     Invoke-Checked npm run build:frontend
   }
 
+  $frontendFiles = @(
+    "frontend\dist\index.html",
+    "js\react\main.css"
+  )
+
+  foreach ($file in $frontendFiles) {
+    if (-not (Test-Path $file)) {
+      Write-Error "Missing frontend build output: $file"
+      exit 1
+    }
+  }
+
   $jsFiles = @(
-    "tools\diceTool.js",
-    "tools\toolManager.js",
+    "data\tools\diceTool.js",
+    "data\tools\toolManager.js",
     "js\config\TestRequestConfig.js",
     "js\config\ConfigManager.js",
     "js\config\AIPlatformManager.js",

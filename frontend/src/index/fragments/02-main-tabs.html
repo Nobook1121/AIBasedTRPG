@@ -1,35 +1,7 @@
 ﻿            <div class="col-10" id="mainContent">
                 <!-- 主页内容 -->
                 <div id="home" class="tab-content active">
-                    <!-- 当前房间状态栏 -->
-                    <div class="save-status-bar" id="saveStatusBar" style="display: none;" aria-live="polite">
-                        <div class="save-status-content">
-                            <span class="save-status-pill">
-                                <i class="fa fa-comments-o" aria-hidden="true"></i>
-                                <span class="save-status-label" data-i18n="room.status.current_room">当前房间</span>
-                                <strong class="save-status-name" id="saveStatusName">未加入</strong>
-                            </span>
-                            <span class="save-status-script">
-                                <i class="fa fa-book" aria-hidden="true"></i>
-                                <span data-i18n="room.status.scenario">剧本</span>
-                                <strong id="saveStatusScenario">-</strong>
-                            </span>
-                        </div>
-                    </div>
-                    <!-- 对话记录区 -->
-                    <div class="chat-history" id="chatHistory">
-                        <div class="welcome-text">欢迎来到AI TRPG系统，请选择一个剧本开始游戏</div>
-                    </div>
-
-                    <!-- 对话输入区 -->
-                    <div class="chat-input p-3 border-top">
-                        <div class="input-group">
-                            <input type="text" class="form-control" id="chatInput" placeholder="加入房间后可发送消息，使用 @KP 呼叫 AI" data-i18n-placeholder="chat.placeholder.room_required">
-                            <button class="btn btn-primary" id="sendButton">
-                                <i class="fa fa-paper-plane"></i> <span data-i18n="chat.action.send">发送</span>
-                            </button>
-                        </div>
-                    </div>
+                    <div id="react-home-root"></div>
                 </div>
 
                 <!-- 剧本管理内容 -->
@@ -77,6 +49,7 @@
                                 </div>
                                 <div class="skill-filter-strip" id="skillLevelFilters" aria-label="技能等级筛选">
                                     <button type="button" class="skill-rank-pill active" data-rank-filter="all">全部</button>
+                                    <button type="button" class="skill-rank-pill" data-rank-filter="mine">我的角色卡</button>
                                     <button type="button" class="skill-rank-pill" data-rank-filter="新手">新手</button>
                                     <button type="button" class="skill-rank-pill" data-rank-filter="学习">学习</button>
                                     <button type="button" class="skill-rank-pill" data-rank-filter="熟修">熟修</button>
@@ -112,9 +85,6 @@
                                 <h2>房间管理</h2>
                                 <div class="room-join-toolbar d-flex gap-2">
                                     <input type="text" class="form-control" id="roomCodeInput" placeholder="输入房间码">
-                                    <select class="form-select" id="joinRoomCharacterSelect" aria-label="绑定角色卡">
-                                        <option value="">请选择角色卡</option>
-                                    </select>
                                     <button class="btn btn-outline-primary" id="joinRoom">加入房间</button>
                                     <button class="btn btn-primary" id="createSave">创建房间</button>
                                 </div>
@@ -153,7 +123,7 @@
                             </div>
                             <div class="card mb-4">
                                 <div class="card-body">
-                                    <h5 class="card-title">玩家角色绑定与记录</h5>
+                                    <h5 class="card-title">角色绑定</h5>
                                     <div id="roomCharacterBindings" class="room-character-bindings" aria-live="polite"></div>
                                 </div>
                             </div>

@@ -111,12 +111,21 @@ type AttributeRollFormulaMap = Record<COC7CoreAttributeKey, string>;
 
 interface CharacterRuleSettings {
     attributeRatioPercent: number;
+    maxCardsPerUser: number;
     attributeRolls: AttributeRollFormulaMap;
 }
 
 interface CharacterRuleSettingsInput {
     attributeRatioPercent?: unknown;
+    maxCardsPerUser?: unknown;
     attributeRolls?: Partial<Record<COC7CoreAttributeKey, string>>;
+}
+
+interface CharacterAssignableUser {
+    id: string | number;
+    username: string;
+    role?: string;
+    status?: string;
 }
 
 interface CharacterStatusFlags {
@@ -229,7 +238,6 @@ interface Window {
     const STORAGE_KEY = "ai-trpg:coc7-character-cards";
     const ACTIVE_STORAGE_KEY = "ai-trpg:coc7-active-character";
     const RULE_SETTINGS_STORAGE_KEY = "ai-trpg:coc7-character-rule-settings";
-    const SAMPLE_CHARACTER_URL = "/data/characters/sample-investigator.json";
     const ATTRIBUTE_KEYS: COC7CoreAttributeKey[] = ["STR", "DEX", "SIZ", "APP", "CON", "INT", "POW", "EDU", "LUC"];
     const PLAYER_UNBOUND_LABEL = "未绑定玩家";
     const ATTRIBUTE_LABELS: Record<COC7CoreAttributeKey, string> = {
@@ -256,6 +264,7 @@ interface Window {
     };
     const DEFAULT_RULE_SETTINGS: CharacterRuleSettings = {
         attributeRatioPercent: 20,
+        maxCardsPerUser: 5,
         attributeRolls: DEFAULT_ATTRIBUTE_ROLLS
     };
     const STATUS_FIELD_IDS: Record<keyof CharacterStatusFlags, string> = {
@@ -437,6 +446,8 @@ interface Window {
 
     let cards: COC7CharacterCard[] = [];
     let activeCardId = "";
+    let activeCharacterFilter = "all";
+    let assignableUsers: CharacterAssignableUser[] = [];
     let modal: BootstrapModalInstance | null = null;
     let nameGeneratorModal: BootstrapModalInstance | null = null;
     let occupationTemplateModal: BootstrapModalInstance | null = null;
@@ -487,6 +498,7 @@ interface Window {
         }, {} as AttributeRollFormulaMap);
         return {
             attributeRatioPercent: clampNumber(input?.attributeRatioPercent, 1, 100, DEFAULT_RULE_SETTINGS.attributeRatioPercent),
+            maxCardsPerUser: clampNumber(input?.maxCardsPerUser, 1, 999, DEFAULT_RULE_SETTINGS.maxCardsPerUser),
             attributeRolls
         };
     }
@@ -507,6 +519,7 @@ interface Window {
         const localSettings = storage ? parseRuleSettingsFromStorage(storage.getItem(RULE_SETTINGS_STORAGE_KEY)) : null;
         return normalizeRuleSettings({
             attributeRatioPercent: localSettings?.attributeRatioPercent ?? configSection?.attribute_ratio_percent ?? DEFAULT_RULE_SETTINGS.attributeRatioPercent,
+            maxCardsPerUser: configSection?.max_cards_per_user ?? localSettings?.maxCardsPerUser ?? DEFAULT_RULE_SETTINGS.maxCardsPerUser,
             attributeRolls: localSettings?.attributeRolls || configRolls
         });
     }
@@ -915,39 +928,119 @@ interface Window {
         return ["ADMIN", "OWNER"].includes(global.currentUser?.role || "");
     }
 
-    async function loadSampleCharacter(): Promise<COC7CharacterCard> {
-        try {
-            const response = await fetch(SAMPLE_CHARACTER_URL);
-            if (response.ok) return createCharacterCard(await response.json() as COC7CharacterCardInput);
-        } catch (error) {
-            console.warn("加载示例角色失败:", error);
+    async function loadAssignableUsers(): Promise<void> {
+        if (!isCurrentUserElevated()) {
+            assignableUsers = [];
+            return;
         }
-        return createCharacterCard();
+        try {
+            const response = await TrpgApi.get<ApiResponse<CharacterAssignableUser[]>>("/api/users");
+            assignableUsers = response.success && Array.isArray(response.data) ? response.data : [];
+            hydratePlayerOptions();
+        } catch (error) {
+            assignableUsers = [];
+            console.warn("加载玩家列表失败:", error);
+        }
+    }
+
+    function hydratePlayerOptions(): void {
+        const list = byId<HTMLDataListElement>("characterPlayerOptions");
+        if (!list) return;
+        list.innerHTML = assignableUsers
+            .filter((user) => user.status !== "banned")
+            .map((user) => {
+                const id = String(user.id);
+                const username = String(user.username || user.id);
+                return `<option value="${escapeHtml(username)}" label="${escapeHtml(id)}"></option>`;
+            })
+            .join("");
+    }
+
+    function playerDisplayName(playerId: string): string {
+        if (!playerId || playerId === PLAYER_UNBOUND_LABEL) return PLAYER_UNBOUND_LABEL;
+        const matchedUser = assignableUsers.find((user) => String(user.id) === playerId || user.username === playerId);
+        if (matchedUser) return matchedUser.username || String(matchedUser.id);
+        const currentUser = global.currentUser;
+        if (currentUser && (String(currentUser.user_id ?? "") === playerId || currentUser.username === playerId)) {
+            return currentUser.username || playerId;
+        }
+        return playerId;
+    }
+
+    function setPlayerBindingInputValue(playerId: string): void {
+        setInputValue("characterBoundPlayer", playerDisplayName(playerId));
+        const input = byId<HTMLInputElement>("characterBoundPlayer");
+        if (input) {
+            input.readOnly = !isCurrentUserElevated();
+            input.placeholder = isCurrentUserElevated() ? "输入玩家 ID，或留空表示未绑定" : "";
+        }
+        updateUnbindButton(playerId);
+    }
+
+    function currentUserCharacterCards(): COC7CharacterCard[] {
+        return cards.filter((card) => Boolean(card.playerId) && isBoundToCurrentPlayer(card.playerId));
+    }
+
+    function canCreateCharacterCard(): boolean {
+        if (isCurrentUserElevated()) return true;
+        const limit = loadRuleSettings().maxCardsPerUser;
+        if (currentUserCharacterCards().length < limit) return true;
+        notify(`普通用户最多只能拥有 ${limit} 张角色卡，请删除旧角色卡或联系管理员调整上限。`, "error");
+        return false;
     }
 
     async function loadCards(): Promise<void> {
+        cards = [];
+        try {
+            const response = await TrpgApi.get<ApiResponse<COC7CharacterCardInput[]>>("/api/characters");
+            if (response.success && Array.isArray(response.data)) {
+                cards = response.data.map((card) => createCharacterCard(card));
+            }
+        } catch (error) {
+            console.warn("???????:", error);
+        }
+
         const storage = safeStorage();
         if (storage) {
             try {
                 const parsed = JSON.parse(storage.getItem(STORAGE_KEY) || "[]") as unknown;
                 if (Array.isArray(parsed) && parsed.length) {
-                    cards = parsed.map((card) => createCharacterCard(card as COC7CharacterCardInput));
-                    activeCardId = storage.getItem(ACTIVE_STORAGE_KEY) || cards[0]?.id || "";
-                    return;
+                    const migratedCards = parsed.map((card) => createCharacterCard(card as COC7CharacterCardInput));
+                    for (const card of migratedCards) {
+                        if (!cards.some((item) => item.id === card.id)) {
+                            cards.push(card);
+                            await saveCardToServer(card);
+                        }
+                    }
+                    storage.removeItem(STORAGE_KEY);
+                    storage.removeItem(ACTIVE_STORAGE_KEY);
                 }
             } catch {
-                cards = [];
+                storage.removeItem(STORAGE_KEY);
             }
         }
-        cards = [await loadSampleCharacter()];
         activeCardId = cards[0]?.id || "";
     }
 
+    async function saveCardToServer(card: COC7CharacterCard): Promise<COC7CharacterCard | null> {
+        try {
+            const response = await TrpgApi.put<ApiResponse<COC7CharacterCard>>(`/api/characters/${encodeURIComponent(card.id)}`, card);
+            if (response.success && response.data) return createCharacterCard(response.data);
+            notify(response.message || response.error || "???????", "error");
+        } catch (error) {
+            notify(`???????: ${characterErrorMessage(error)}`, "error");
+        }
+        return null;
+    }
+
     function persistCards(): void {
-        const storage = safeStorage();
-        if (!storage) return;
-        storage.setItem(STORAGE_KEY, JSON.stringify(cards));
-        storage.setItem(ACTIVE_STORAGE_KEY, activeCardId);
+        const card = cards.find((item) => item.id === activeCardId);
+        if (!card) return;
+        void saveCardToServer(card).then((savedCard) => {
+            if (!savedCard) return;
+            cards = cards.map((item) => item.id === savedCard.id ? savedCard : item);
+            renderList();
+        });
     }
 
     function byId<T extends HTMLElement = HTMLElement>(id: string): T | null {
@@ -968,14 +1061,18 @@ interface Window {
         hydrateOccupationSelect();
         hydrateSkillChecklist();
         bindEvents();
-        void loadCards().then(render);
+        void Promise.all([loadCards(), loadAssignableUsers()]).then(render);
     }
 
     function bindEvents(): void {
-        byId("createCharacter")?.addEventListener("click", () => openEditor());
+        byId("createCharacter")?.addEventListener("click", () => {
+            if (!canCreateCharacterCard()) return;
+            openEditor();
+        });
         byId("saveCharacter")?.addEventListener("click", saveFromEditor);
         byId("exportCharacter")?.addEventListener("click", exportActiveCard);
         byId("backToCharacterList")?.addEventListener("click", showCharacterList);
+        byId("skillLevelFilters")?.addEventListener("click", handleCharacterFilterClick);
         byId("randomizeCharacterName")?.addEventListener("click", openNameGenerator);
         byId("regenerateName")?.addEventListener("click", regenerateNamePreview);
         byId("confirmGeneratedName")?.addEventListener("click", confirmGeneratedName);
@@ -991,7 +1088,9 @@ interface Window {
             setInputValue("characterAge", attributes.AGE);
             refreshEditorRuleSummary();
         });
-        byId("saveCharacterRuleSettings")?.addEventListener("click", saveRuleSettingsFromPanel);
+        byId("saveCharacterRuleSettings")?.addEventListener("click", () => {
+            void saveRuleSettingsFromPanel();
+        });
         byId("autoAllocateOccupationSkills")?.addEventListener("click", autoAllocateEditorOccupationSkills);
         byId("characterOccupation")?.addEventListener("input", () => {
             hydrateSkillChecklist(readChecklistSkills());
@@ -1040,7 +1139,10 @@ interface Window {
         const target = card ? cloneCard(card) : createCharacterCard();
         setInputValue("characterEditingId", card?.id || "");
         setInputValue("characterName", target.name);
-        setInputValue("characterBoundPlayer", target.playerId && target.playerId !== PLAYER_UNBOUND_LABEL ? target.playerId : (currentPlayerLabel() || PLAYER_UNBOUND_LABEL));
+        const boundPlayerId = target.playerId && target.playerId !== PLAYER_UNBOUND_LABEL
+            ? target.playerId
+            : (isCurrentUserElevated() ? "" : currentPlayerId());
+        setPlayerBindingInputValue(boundPlayerId);
         setInputValue("characterEra", target.era);
         setInputValue("characterOccupation", target.occupationName || getOccupation(target).name);
         setInputValue("characterCreditRating", target.creditRating);
@@ -1068,7 +1170,7 @@ interface Window {
         setInputValue("characterInitialSan", target.initialSan);
         setInputValue("characterMaxSan", target.maxSan);
         setEditorStatus(target.status);
-        updateUnbindButton(target.playerId);
+        updateUnbindButton(boundPlayerId);
         updateAvatarPreview(target.avatar);
         hydrateSkillChecklist(target.skills);
         refreshEditorRuleSummary();
@@ -1123,20 +1225,36 @@ interface Window {
     function hydrateRuleSettingsPanel(): void {
         const settings = loadRuleSettings();
         setInputValue("attributeRatioPercent", settings.attributeRatioPercent);
+        setInputValue("maxCardsPerUser", settings.maxCardsPerUser);
         ATTRIBUTE_KEYS.forEach((key) => setInputValue(`attributeRoll${key}`, settings.attributeRolls[key]));
         setText("characterRuleSettingsMessage", "");
     }
 
-    function saveRuleSettingsFromPanel(): void {
+    async function saveRuleSettingsFromPanel(): Promise<void> {
         const nextSettings = normalizeRuleSettings({
             attributeRatioPercent: Number(getInputValue("attributeRatioPercent")),
+            maxCardsPerUser: Number(getInputValue("maxCardsPerUser")),
             attributeRolls: ATTRIBUTE_KEYS.reduce((rolls, key) => {
                 rolls[key] = getInputValue(`attributeRoll${key}`) || DEFAULT_ATTRIBUTE_ROLLS[key];
                 return rolls;
             }, {} as AttributeRollFormulaMap)
         });
         persistRuleSettings(nextSettings);
-        setText("characterRuleSettingsMessage", "角色卡规则已保存到当前浏览器");
+        const generalConfig = global.configManager?.getConfig("general") || {};
+        const characterRules = {
+            ...(getConfigSection("character_rules") || {}),
+            attribute_ratio_percent: nextSettings.attributeRatioPercent,
+            max_cards_per_user: nextSettings.maxCardsPerUser,
+            ...ATTRIBUTE_KEYS.reduce((rolls, key) => {
+                rolls[`attribute_roll_${key.toLowerCase()}`] = nextSettings.attributeRolls[key];
+                return rolls;
+            }, {} as Record<string, string>)
+        };
+        const saved = await global.configManager?.saveConfig("general", {
+            ...generalConfig,
+            character_rules: characterRules
+        });
+        setText("characterRuleSettingsMessage", saved === false ? "?????????" : "????????");
         refreshEditorRuleSummary();
     }
 
@@ -1215,8 +1333,7 @@ interface Window {
             notify("只有管理员可以解绑角色卡玩家。", "error");
             return;
         }
-        setInputValue("characterBoundPlayer", PLAYER_UNBOUND_LABEL);
-        updateUnbindButton("");
+        setPlayerBindingInputValue("");
     }
 
     function syncAttributeDerivedFields(attributes: COC7Attributes = readAttributes()): void {
@@ -1281,9 +1398,16 @@ interface Window {
     }
 
     function resolveEditorPlayerId(existing?: COC7CharacterCard): string {
-        const boundDisplayValue = getInputValue("characterBoundPlayer");
-        if (isCurrentUserElevated() && boundDisplayValue === PLAYER_UNBOUND_LABEL) return "";
-        if (existing?.playerId && existing.playerId !== PLAYER_UNBOUND_LABEL) return existing.playerId;
+        const boundDisplayValue = getInputValue("characterBoundPlayer").trim();
+        if (isCurrentUserElevated()) {
+            if (!boundDisplayValue || boundDisplayValue === PLAYER_UNBOUND_LABEL) return "";
+            const matchedUser = assignableUsers.find((user) => {
+                const userId = String(user.id);
+                return userId === boundDisplayValue || user.username === boundDisplayValue;
+            });
+            return matchedUser ? String(matchedUser.id) : boundDisplayValue;
+        }
+        if (existing?.playerId && !isBoundToCurrentPlayer(existing.playerId)) return existing.playerId;
         return currentPlayerId();
     }
 
@@ -1291,11 +1415,6 @@ interface Window {
         if (!playerId) return true;
         if (!isCurrentUserElevated() && existing?.playerId && !isBoundToCurrentPlayer(existing.playerId)) {
             notify("该角色卡已绑定其他玩家，当前玩家不能使用。", "error");
-            return false;
-        }
-        const occupiedByOther = cards.find((card) => card.id !== cardId && card.playerId === playerId);
-        if (occupiedByOther) {
-            notify("一个玩家同时只能绑定一张角色卡，请先由管理员解绑已有角色卡。", "error");
             return false;
         }
         if (!isCurrentUserElevated() && existing?.playerId && existing.playerId !== playerId) {
@@ -1370,10 +1489,33 @@ interface Window {
         showCharacterList();
     }
 
+    function handleCharacterFilterClick(event: Event): void {
+        const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-rank-filter]");
+        if (!button) return;
+        activeCharacterFilter = button.dataset.rankFilter || "all";
+        document.querySelectorAll<HTMLElement>("#skillLevelFilters [data-rank-filter]").forEach((item) => {
+            item.classList.toggle("active", item === button);
+        });
+        renderList();
+    }
+
+    function filteredCards(): COC7CharacterCard[] {
+        if (activeCharacterFilter === "mine") {
+            return cards.filter((card) => Boolean(card.playerId) && isBoundToCurrentPlayer(card.playerId));
+        }
+        if (activeCharacterFilter === "all") return cards;
+        return cards.filter((card) => card.skills.some((skill) => (skill.rank || rankFromValue(skill.value)) === activeCharacterFilter));
+    }
+
     function renderList(): void {
         const list = byId("characterList");
         if (!list) return;
-        list.innerHTML = cards.map(renderCharacterCardSummary).join("");
+        const visibleCards = filteredCards();
+        if (visibleCards.length === 0) {
+            list.innerHTML = `<div class="character-empty-filter">没有符合筛选条件的角色卡。</div>`;
+            return;
+        }
+        list.innerHTML = visibleCards.map(renderCharacterCardSummary).join("");
         list.querySelectorAll<HTMLElement>(".character-card").forEach((cardElement) => {
             cardElement.addEventListener("click", (event) => {
                 const id = cardElement.dataset.characterId || "";
@@ -1448,7 +1590,7 @@ interface Window {
                     <h3>${escapeHtml(card.name)}</h3>
                     <div class="character-tag-row">
                         <span class="character-tag">${escapeHtml(occupation.name)}</span>
-                        <span class="character-tag">绑定玩家 ${escapeHtml(card.playerId || PLAYER_UNBOUND_LABEL)}</span>
+                        <span class="character-tag">绑定玩家 ${escapeHtml(playerDisplayName(card.playerId))}</span>
                         <span class="character-tag">信用评级 ${occupation.creditRating[0]}-${occupation.creditRating[1]}</span>
                         <span class="character-tag">当前信用 ${card.creditRating}</span>
                         <span class="character-tag">伤害加值 ${escapeHtml(card.damageBonus)}</span>
@@ -1583,7 +1725,7 @@ interface Window {
     function listCharacterCards(): COC7CharacterCard[] {
         const availableCards = isCurrentUserElevated()
             ? cards
-            : cards.filter((card) => !card.playerId || isBoundToCurrentPlayer(card.playerId));
+            : currentUserCharacterCards();
         return availableCards.map(cloneCard);
     }
 
@@ -1595,6 +1737,10 @@ interface Window {
     function notify(message: string, type = "info"): void {
         const notifier = (global as unknown as { showNotification?: (message: string, type?: string) => void }).showNotification;
         if (typeof notifier === "function") notifier(message, type);
+    }
+
+    function characterErrorMessage(error: unknown): string {
+        return error instanceof Error ? error.message : String(error);
     }
 
     function escapeHtml(value: unknown): string {

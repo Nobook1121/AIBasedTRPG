@@ -14,6 +14,11 @@ logger = logging.getLogger(__name__)
 
 USER_ROOM_LIMIT = 3
 ELEVATED_ROLES = {"ADMIN", "OWNER"}
+ROOM_ROLE_OWNER = "owner"
+ROOM_ROLE_ADMIN = "admin"
+ROOM_ROLE_MEMBER = "member"
+ROOM_MEMBER_ACTIVE = "active"
+ROOM_MEMBER_REMOVED = "removed"
 
 
 def _get_rooms_dir():
@@ -95,7 +100,7 @@ def _can_access(info):
     if _is_elevated():
         return True
     user_id = session.get("user_id")
-    return any(member.get("user_id") == user_id for member in info.get("members", []))
+    return _find_member(info, user_id=user_id, active_only=True) is not None
 
 
 def _can_manage(info):
@@ -120,6 +125,9 @@ def _current_member(character_card=None):
         "user_id": user_id,
         "username": session.get("username", "user"),
         "role": session.get("role", "USER"),
+        "room_role": ROOM_ROLE_MEMBER,
+        "status": ROOM_MEMBER_ACTIVE,
+        "is_active": True,
         "avatar": avatar,
         "joined_at": _timestamp(),
     }
@@ -197,13 +205,58 @@ def _bind_character(member, character_card):
     return True
 
 
-def _find_member(info, user_id=None, username=None):
+def _can_bind_character_card(character_card, target_member):
+    if _is_elevated():
+        return True
+    player_id = str((character_card or {}).get("playerId") or "")
+    return player_id in {
+        str(target_member.get("user_id")),
+        str(target_member.get("username")),
+    }
+
+
+def _is_active_member(member):
+    return member.get("is_active", True) is not False and member.get("status", ROOM_MEMBER_ACTIVE) != ROOM_MEMBER_REMOVED
+
+
+def _find_member(info, user_id=None, username=None, active_only=False):
     for member in info.get("members", []):
+        if active_only and not _is_active_member(member):
+            continue
         if user_id is not None and str(member.get("user_id")) == str(user_id):
             return member
         if username and str(member.get("username", "")).lower() == str(username).lower():
             return member
     return None
+
+
+def _normalize_members(info):
+    creator_id = str(info.get("creator_id"))
+    for member in info.setdefault("members", []):
+        member.setdefault("status", ROOM_MEMBER_ACTIVE)
+        member.setdefault("is_active", member.get("status") != ROOM_MEMBER_REMOVED)
+        if str(member.get("user_id")) == creator_id:
+            member["room_role"] = ROOM_ROLE_OWNER
+            member["status"] = ROOM_MEMBER_ACTIVE
+            member["is_active"] = True
+        else:
+            member.setdefault("room_role", ROOM_ROLE_MEMBER)
+    return info["members"]
+
+
+def _room_permission(member, info):
+    if _is_elevated() or session.get("role") in ELEVATED_ROLES:
+        return ROOM_ROLE_ADMIN
+    if not member or not _is_active_member(member):
+        return ""
+    if str(member.get("user_id")) == str(info.get("creator_id")):
+        return ROOM_ROLE_OWNER
+    return member.get("room_role") or ROOM_ROLE_MEMBER
+
+
+def _can_manage_members(info):
+    member = _find_member(info, user_id=session.get("user_id"), active_only=True)
+    return _is_elevated() or _room_permission(member, info) in {ROOM_ROLE_OWNER, ROOM_ROLE_ADMIN}
 
 
 def _recalculate_character_state(state):
@@ -236,7 +289,22 @@ def _new_room_code():
             return code
 
 
+def _room_permission_label(member, info):
+    if member.get("role") in ELEVATED_ROLES:
+        label = "\u7ba1\u7406\u5458"
+    elif member.get("room_role") == ROOM_ROLE_OWNER or str(member.get("user_id")) == str(info.get("creator_id")):
+        label = "\u623f\u4e3b"
+    elif member.get("room_role") == ROOM_ROLE_ADMIN:
+        label = "\u7ba1\u7406\u5458"
+    else:
+        label = "\u6210\u5458"
+    if not _is_active_member(member):
+        return f"{label}\uff08\u5df2\u79fb\u9664\uff09"
+    return label
+
+
 def _room_summary(info):
+    _normalize_members(info)
     return {
         "id": info.get("id"),
         "name": info.get("name"),
@@ -245,7 +313,14 @@ def _room_summary(info):
         "scenario_title": info.get("scenario_title"),
         "creator_id": info.get("creator_id"),
         "creator_name": info.get("creator_name"),
-        "members": info.get("members", []),
+        "members": [
+            {
+                **member,
+                "is_active": _is_active_member(member),
+                "permission_label": _room_permission_label(member, info),
+            }
+            for member in info.get("members", [])
+        ],
         "created_at": info.get("created_at"),
         "updated_at": info.get("updated_at"),
     }
@@ -292,13 +367,10 @@ def create_room():
             403,
             "Room creation limit reached",
         )
-    character_card = data.get("character_card")
-    if not _is_elevated() and not _sanitize_character_card(character_card):
-        return error_response("Character card is required", 400, "Character card is required")
-
     room_id = uuid4().hex
     room_dir = _room_dir(room_id)
-    member = _current_member(character_card if _sanitize_character_card(character_card) else None)
+    member = _current_member()
+    member["room_role"] = ROOM_ROLE_OWNER
     now = _timestamp()
     info = {
         "id": room_id,
@@ -340,17 +412,21 @@ def join_room_by_code():
 
     user_id = session["user_id"]
     member = _find_member(info, user_id=user_id)
-    character_card = data.get("character_card")
-    needs_character = not _is_elevated() and (not member or not member.get("character_card"))
-    if needs_character and not _sanitize_character_card(character_card):
-        return error_response("Character card is required", 400, "Character card is required")
-
     if not member:
-        info.setdefault("members", []).append(_current_member(character_card if _sanitize_character_card(character_card) else None))
+        info.setdefault("members", []).append(_current_member())
         _write_room(room_dir, info)
-    elif character_card and not member.get("character_card"):
-        if not _bind_character(member, character_card):
-            return error_response("Character card is required", 400, "Character card is required")
+    elif not _is_active_member(member):
+        current_member = _current_member()
+        member.update(
+            {
+                "username": current_member["username"],
+                "role": current_member["role"],
+                "avatar": current_member["avatar"],
+                "status": ROOM_MEMBER_ACTIVE,
+                "is_active": True,
+                "rejoined_at": _timestamp(),
+            }
+        )
         _write_room(room_dir, info)
 
     logger.info(
@@ -362,6 +438,86 @@ def join_room_by_code():
         session.get("username"),
     )
     return success_response(_room_summary(info), "Room joined successfully")
+
+
+@bp.route("/api/rooms/<room_id>/members/<user_id>/character", methods=["PUT"])
+def bind_room_member_character(room_id, user_id):
+    login_error = _require_login()
+    if login_error:
+        return login_error
+
+    room_dir, info = _find_room(room_id)
+    if not room_dir:
+        return error_response("Room not found", 404, "Room not found")
+    if not _can_access(info):
+        return error_response("Permission denied", 403, "Permission denied")
+
+    target = _find_member(info, user_id=user_id, active_only=True)
+    if not target:
+        return error_response("Player not found in room", 404, "Player not found in room")
+    if str(target.get("user_id")) != str(session["user_id"]) and not _can_manage_members(info):
+        return error_response("Permission denied", 403, "Permission denied")
+
+    data = request.get_json(silent=True) or {}
+    character_card = data.get("character_card")
+    if not _can_bind_character_card(character_card, target):
+        return error_response("Permission denied", 403, "Permission denied")
+    if not _bind_character(target, character_card):
+        return error_response("Character card is required", 400, "Character card is required")
+    _write_room(room_dir, info)
+    return success_response(_room_summary(info), "Character bound successfully")
+
+
+@bp.route("/api/rooms/<room_id>/members/<user_id>", methods=["DELETE"])
+def delete_room_member(room_id, user_id):
+    login_error = _require_login()
+    if login_error:
+        return login_error
+
+    room_dir, info = _find_room(room_id)
+    if not room_dir:
+        return error_response("Room not found", 404, "Room not found")
+    if not _can_manage_members(info):
+        return error_response("Permission denied", 403, "Permission denied")
+    if str(user_id) == str(info.get("creator_id")):
+        return error_response("Room owner cannot be removed", 400, "Room owner cannot be removed")
+
+    target = _find_member(info, user_id=user_id, active_only=True)
+    if not target:
+        return error_response("Player not found in room", 404, "Player not found in room")
+    target["status"] = ROOM_MEMBER_REMOVED
+    target["is_active"] = False
+    target["removed_at"] = _timestamp()
+    if target.get("room_role") == ROOM_ROLE_ADMIN:
+        target["room_role"] = ROOM_ROLE_MEMBER
+    _write_room(room_dir, info)
+    return success_response(_room_summary(info), "Player removed")
+
+
+@bp.route("/api/rooms/<room_id>/members/<user_id>/role", methods=["PUT"])
+def update_room_member_role(room_id, user_id):
+    login_error = _require_login()
+    if login_error:
+        return login_error
+
+    room_dir, info = _find_room(room_id)
+    if not room_dir:
+        return error_response("Room not found", 404, "Room not found")
+    if not _can_manage_members(info):
+        return error_response("Permission denied", 403, "Permission denied")
+    if str(user_id) == str(info.get("creator_id")):
+        return error_response("Room owner role cannot be changed", 400, "Room owner role cannot be changed")
+
+    target = _find_member(info, user_id=user_id, active_only=True)
+    if not target:
+        return error_response("Player not found in room", 404, "Player not found in room")
+    data = request.get_json(silent=True) or {}
+    role = data.get("room_role")
+    if role not in {ROOM_ROLE_ADMIN, ROOM_ROLE_MEMBER}:
+        return error_response("Invalid room role", 400, "Invalid room role")
+    target["room_role"] = role
+    _write_room(room_dir, info)
+    return success_response(_room_summary(info), "Room role updated")
 
 
 @bp.route("/api/rooms/<room_id>", methods=["GET"])
@@ -432,7 +588,9 @@ def create_room_message(room_id):
     if not content:
         return error_response("Please provide message content", 400, "No message content")
 
-    member = _current_member()
+    member = _find_member(info, user_id=session["user_id"], active_only=True)
+    if not member:
+        return error_response("Permission denied", 403, "Permission denied")
     message = {
         "id": uuid4().hex,
         "type": data.get("type", "player"),
@@ -493,7 +651,7 @@ def _create_character_record_for_room(room_dir, info):
     if record_type not in {"damage", "san"}:
         return error_response("Invalid record type", 400, "Invalid record type")
 
-    target = _find_member(info, user_id=data.get("user_id"), username=data.get("username"))
+    target = _find_member(info, user_id=data.get("user_id"), username=data.get("username"), active_only=True)
     if not target:
         return error_response("Player not found in room", 404, "Player not found in room")
     if not target.get("character_card"):

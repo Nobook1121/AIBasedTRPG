@@ -36,32 +36,46 @@
 </template>
 
 <template id="room-character-empty">
-<div class="text-muted">暂无参与玩家</div>
+<div class="text-muted">&#26242;&#26080;&#29609;&#23478;&#35760;&#24405;</div>
 </template>
 
-<template id="room-character-binding">
-<div class="room-character-binding border rounded p-3 mb-3">
-    <div class="d-flex justify-content-between align-items-start gap-3">
-        <div>
-            <div class="fw-bold">{{ username }}</div>
-            <div class="text-muted">{{ cardName }}</div>
-        </div>
-        <div class="text-end">
-            <span class="badge bg-primary">HP {{ currentHp }} / {{ maxHp }}</span>
-            <span class="badge bg-secondary">San {{ currentSan }} / {{ maxSan }}</span>
-        </div>
-    </div>
-    <div class="row mt-3">
-        <div class="col-md-6">
-            <h6>生命值/受伤记录</h6>
-            {{{ injuryRecordsHtml }}}
-        </div>
-        <div class="col-md-6">
-            <h6>San 值鉴定和损失记录</h6>
-            {{{ sanityRecordsHtml }}}
-        </div>
-    </div>
-</div>
+<template id="room-character-binding-table">
+<table class="table table-sm align-middle room-binding-table">
+    <thead>
+        <tr>
+            <th>&#29609;&#23478;&#21517;</th>
+            <th>&#32465;&#23450;&#35282;&#33394;&#21345;</th>
+            <th>&#25151;&#38388;&#26435;&#38480;</th>
+            <th class="text-end">&#25805;&#20316;</th>
+        </tr>
+    </thead>
+    <tbody>{{{ rowsHtml }}}</tbody>
+</table>
+</template>
+
+<template id="room-character-binding-row">
+<tr class="{{ rowClass }}">
+    <td>{{ username }}</td>
+    <td>{{ cardName }}</td>
+    <td>{{ permission }}</td>
+    <td class="room-binding-actions text-end">
+        {{{ changeButtonHtml }}}
+        {{{ promoteButtonHtml }}}
+        {{{ removeButtonHtml }}}
+    </td>
+</tr>
+</template>
+
+<template id="room-bind-character-button">
+<button type="button" class="btn btn-sm btn-outline-primary" data-bind-user-id="{{ userId }}">&#26356;&#25913;&#35282;&#33394;&#21345;</button>
+</template>
+
+<template id="room-promote-member-button">
+<button type="button" class="btn btn-sm btn-outline-secondary" data-promote-user-id="{{ userId }}">&#25552;&#26435;</button>
+</template>
+
+<template id="room-remove-member-button">
+<button type="button" class="btn btn-sm btn-outline-danger" data-remove-user-id="{{ userId }}">&#21024;&#38500;&#29609;&#23478;</button>
 </template>
 
 <template id="room-record-empty">

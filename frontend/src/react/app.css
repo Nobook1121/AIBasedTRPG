@@ -1,0 +1,5 @@
+@import "../styles/01-foundation-chat.css";
+@import "./shell/sidebar.css";
+@import "../styles/02-scenario-character.css";
+@import "../styles/03-tools-settings-platform.css";
+@import "../styles/04-auth-profile-overrides.css";

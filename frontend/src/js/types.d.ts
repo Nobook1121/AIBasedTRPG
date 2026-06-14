@@ -327,6 +327,10 @@ interface RoomMember {
     user_id?: string | number;
     username?: string;
     role?: string;
+    room_role?: "owner" | "admin" | "member";
+    status?: "active" | "removed";
+    is_active?: boolean;
+    permission_label?: string;
     character_card?: Partial<COC7CharacterCard>;
     character_state?: CharacterRuntimeState;
 }
@@ -356,6 +360,7 @@ interface Room {
     room_code?: string;
     name: string;
     created_at?: string;
+    creator_id?: string | number;
     owner_id?: string | number;
     scenario_id?: number;
     scenario_title?: string;

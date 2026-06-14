@@ -1,5 +1,7 @@
 import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
+import "./app.css";
+import { HomeChat } from "./home/HomeChat";
 import { Sidebar } from "./shell/Sidebar";
 
 function ReactRuntimeBridge() {
@@ -16,5 +18,13 @@ if (sidebarMountNode) {
     const root = createRoot(sidebarMountNode);
     flushSync(() => {
         root.render(<Sidebar />);
+    });
+}
+
+const homeMountNode = document.getElementById("react-home-root");
+if (homeMountNode) {
+    const root = createRoot(homeMountNode);
+    flushSync(() => {
+        root.render(<HomeChat />);
     });
 }

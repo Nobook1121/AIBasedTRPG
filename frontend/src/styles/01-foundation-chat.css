@@ -117,8 +117,20 @@ body, html {
 }
 
 /* 主页样式 */
+#home,
+#react-home-root {
+    min-height: 0;
+}
+
+#react-home-root {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+}
+
 .chat-history {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
     background-color: var(--color-bg);
     border-bottom: 1px solid var(--border-subtle);
@@ -350,11 +362,6 @@ body, html {
 .room-join-toolbar #roomCodeInput {
     flex: 0 0 150px;
     width: 150px;
-}
-
-.room-join-toolbar #joinRoomCharacterSelect {
-    flex: 0 0 180px;
-    width: 180px;
 }
 
 .room-join-toolbar .form-control,
@@ -591,14 +598,14 @@ body.dark-theme .markdown-error {
         justify-content: flex-start;
     }
 
-    .room-join-toolbar #roomCodeInput,
-    .room-join-toolbar #joinRoomCharacterSelect {
+    .room-join-toolbar #roomCodeInput {
         flex: 1 1 160px;
         width: auto;
     }
 }
 
 .chat-input {
+    flex: 0 0 auto;
     background-color: var(--color-panel);
 }
 

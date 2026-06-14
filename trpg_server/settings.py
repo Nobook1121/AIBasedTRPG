@@ -3,11 +3,14 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 DATA_DIR = BASE_DIR / "data"
+FRONTEND_DIST_DIR = BASE_DIR / "frontend" / "dist"
 
 SCENARIOS_DIR = DATA_DIR / "scenarios"
 CHARACTERS_DIR = DATA_DIR / "characters"
 SCENARIO_COVERS_DIR = DATA_DIR / "assets" / "scenario_covers"
 AVATARS_DIR = DATA_DIR / "assets" / "avatars"
+AI_PLATFORM_ASSETS_DIR = DATA_DIR / "assets" / "aiplatform"
+TOOLS_DIR = DATA_DIR / "tools"
 ROOMS_DIR = DATA_DIR / "rooms"
 CONFIG_DIR = DATA_DIR / "config"
 USERS_DIR = DATA_DIR / "users"

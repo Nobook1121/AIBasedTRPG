@@ -91,6 +91,29 @@
         </div>
     </div>
 
+    <div class="modal fade" id="roomCharacterBindModal" tabindex="-1" aria-labelledby="roomCharacterBindModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="roomCharacterBindModalLabel">绑定角色卡</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="roomBindTargetUserId">
+                    <p class="text-muted mb-3" id="roomCharacterBindMessage">请选择要绑定到当前房间的角色卡。</p>
+                    <label class="form-label" for="roomBindCharacterSelect">角色卡</label>
+                    <select class="form-select" id="roomBindCharacterSelect">
+                        <option value="">请选择角色卡</option>
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="confirmRoomCharacterBind">保存绑定</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="modal fade" id="characterModal" tabindex="-1" aria-labelledby="characterModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
@@ -125,7 +148,8 @@
                                         <label class="character-field character-bound-player-field" for="characterBoundPlayer">
                                             <span>绑定玩家</span>
                                             <div class="character-input-shell">
-                                                <input type="text" class="form-control" id="characterBoundPlayer" maxlength="80" readonly>
+                                                <input type="text" class="form-control" id="characterBoundPlayer" maxlength="80" list="characterPlayerOptions">
+                                                <datalist id="characterPlayerOptions"></datalist>
                                                 <button type="button" class="character-input-action" id="unbindCharacterPlayer" title="管理员解绑玩家">
                                                     <i class="fa fa-unlink" aria-hidden="true"></i>
                                                 </button>

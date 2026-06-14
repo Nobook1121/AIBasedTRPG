@@ -1,27 +1,49 @@
 {
-  "id": "sample-investigator",
-  "name": "林雨衡",
+  "id": "investigator-1781411463188-7ziyrg",
+  "name": "周知远",
   "playerId": "9",
   "era": "1920s",
-  "gender": "男性",
-  "age": 42,
+  "gender": "",
+  "age": 25,
   "avatar": "",
   "occupationId": "detective",
-  "creditRating": 20,
-  "residence": "上海",
-  "birthplace": "宁波",
+  "occupationName": "私家侦探",
+  "creditRating": 9,
+  "residence": "",
+  "birthplace": "",
   "attributes": {
     "STR": 50,
-    "DEX": 55,
-    "SIZ": 70,
-    "APP": 45,
-    "CON": 60,
-    "INT": 80,
-    "POW": 65,
-    "EDU": 70,
+    "DEX": 50,
+    "SIZ": 50,
+    "APP": 50,
+    "CON": 50,
+    "INT": 50,
+    "POW": 50,
+    "EDU": 50,
     "LUC": 50,
-    "AGE": 42
+    "AGE": 25
   },
+  "maxHp": 10,
+  "currentHp": 10,
+  "maxSan": 50,
+  "initialSan": 50,
+  "currentSan": 50,
+  "magicPoints": 10,
+  "currentMp": 10,
+  "maxMp": 10,
+  "status": {
+    "majorWound": false,
+    "unconscious": false,
+    "dead": false,
+    "temporaryInsanity": false,
+    "permanentInsanity": false,
+    "indefiniteInsanity": false
+  },
+  "occupationSkillPoints": 200,
+  "personalInterestPoints": 100,
+  "mov": 8,
+  "build": 0,
+  "damageBonus": "0",
   "skills": [
     {
       "id": "accounting",
@@ -104,7 +126,7 @@
       "id": "cthulhuMythos",
       "name": "克苏鲁神话",
       "base": 0,
-      "value": 5,
+      "value": 0,
       "category": "神话",
       "checked": false,
       "occupation": false,
@@ -125,7 +147,7 @@
     {
       "id": "dodge",
       "name": "闪避",
-      "base": 27,
+      "base": 25,
       "value": 25,
       "category": "战斗",
       "checked": false,
@@ -246,7 +268,7 @@
     {
       "id": "languageOwn",
       "name": "母语",
-      "base": 70,
+      "base": 50,
       "value": 70,
       "category": "知识",
       "checked": false,
@@ -258,34 +280,34 @@
       "id": "law",
       "name": "法律",
       "base": 5,
-      "value": 35,
+      "value": 5,
       "category": "知识",
       "checked": true,
       "occupation": true,
       "specialty": "",
-      "rank": "学习"
+      "rank": "新手"
     },
     {
       "id": "libraryUse",
       "name": "图书馆使用",
       "base": 20,
-      "value": 70,
+      "value": 20,
       "category": "知识",
       "checked": true,
       "occupation": true,
       "specialty": "",
-      "rank": "主修"
+      "rank": "新手"
     },
     {
       "id": "listen",
       "name": "聆听",
       "base": 20,
-      "value": 55,
+      "value": 20,
       "category": "探索",
-      "checked": true,
+      "checked": false,
       "occupation": false,
       "specialty": "",
-      "rank": "熟修"
+      "rank": "新手"
     },
     {
       "id": "locksmith",
@@ -412,12 +434,12 @@
       "id": "psychology",
       "name": "心理学",
       "base": 10,
-      "value": 55,
+      "value": 10,
       "category": "社交",
       "checked": true,
       "occupation": true,
       "specialty": "",
-      "rank": "熟修"
+      "rank": "新手"
     },
     {
       "id": "ride",
@@ -500,12 +522,12 @@
       "id": "spotHidden",
       "name": "侦查",
       "base": 25,
-      "value": 65,
+      "value": 25,
       "category": "探索",
       "checked": true,
       "occupation": true,
       "specialty": "",
-      "rank": "熟修"
+      "rank": "学习"
     },
     {
       "id": "stealth",
@@ -563,81 +585,29 @@
       "rank": "新手"
     }
   ],
-  "weapons": [
-    {
-      "name": "左轮手枪",
-      "skill": "射击",
-      "damage": "1D10",
-      "range": "15m",
-      "attacks": 1,
-      "ammo": 6,
-      "malfunction": 100
-    }
-  ],
-  "equipment": [
-    {
-      "name": "急救包",
-      "quantity": 1,
-      "weight": 0.8,
-      "volume": 0,
-      "notes": "医疗用品"
-    },
-    {
-      "name": "旧笔记本",
-      "quantity": 1,
-      "weight": 0.3,
-      "volume": 0,
-      "notes": "案件记录"
-    }
-  ],
+  "weapons": [],
+  "equipment": [],
   "assets": {
-    "cash": 20,
-    "spendingLevel": 10,
-    "assetsText": "一辆旧车，一间租住公寓"
+    "cash": 0,
+    "spendingLevel": 0,
+    "assetsText": ""
   },
   "background": {
-    "appearance": "深色风衣，左手有旧烧伤疤痕。",
-    "ideology": "真相应当被记录，即使无人愿意相信。",
-    "significantPeople": "陈教授，曾经的导师。",
-    "meaningfulLocations": "废弃档案馆。",
-    "treasuredPossessions": "父亲留下的怀表。",
-    "traits": "谨慎、记忆力强；对火焰有明显恐惧。",
-    "injuriesScars": "左手烧伤疤痕。",
-    "phobiasManias": "火焰恐惧。",
-    "arcaneTomes": "残缺的拉丁文笔记。",
-    "encounters": "曾在失踪人口案件中接触到无法解释的符号。",
-    "story": "一名长期追查异常案件的私家侦探。",
-    "education": "地方大学犯罪心理学肄业。",
+    "appearance": "",
+    "ideology": "",
+    "significantPeople": "",
+    "meaningfulLocations": "",
+    "treasuredPossessions": "",
+    "traits": "",
+    "injuriesScars": "",
+    "phobiasManias": "",
+    "arcaneTomes": "",
+    "encounters": "",
+    "story": "",
+    "education": "",
     "raceType": "人类"
   },
-  "relationships": [
-    {
-      "name": "陈教授",
-      "description": "导师，提供学术帮助。"
-    }
-  ],
-  "createdAt": "2026-06-11T00:00:00.000Z",
-  "updatedAt": "2026-06-14T15:56:50.000Z",
-  "occupationName": "私家侦探",
-  "maxHp": 13,
-  "currentHp": 13,
-  "maxSan": 65,
-  "initialSan": 65,
-  "currentSan": 65,
-  "magicPoints": 13,
-  "currentMp": 13,
-  "maxMp": 13,
-  "status": {
-    "majorWound": false,
-    "unconscious": false,
-    "dead": false,
-    "temporaryInsanity": false,
-    "permanentInsanity": false,
-    "indefiniteInsanity": false
-  },
-  "occupationSkillPoints": 250,
-  "personalInterestPoints": 160,
-  "mov": 6,
-  "build": 0,
-  "damageBonus": "0"
+  "relationships": [],
+  "createdAt": "2026-06-14T04:31:03.188Z",
+  "updatedAt": "2026-06-14T12:31:05.000Z"
 }

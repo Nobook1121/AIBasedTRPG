@@ -17,12 +17,6 @@
                                         <option value="">请选择剧本</option>
                                     </select>
                                 </div>
-                                <div class="form-group mt-3">
-                                    <label for="roomCharacterSelect">绑定角色卡 *</label>
-                                    <select class="form-select" id="roomCharacterSelect" required>
-                                        <option value="">请选择角色卡</option>
-                                    </select>
-                                </div>
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
@@ -472,6 +466,11 @@
                                     <label for="attributeRatioPercent">属性第三格比例（%）</label>
                                     <input type="number" class="form-control" id="attributeRatioPercent" min="1" max="100" value="20">
                                     <small class="text-muted">默认为属性值的 20%。保存后会影响角色卡编辑页的第三格显示。</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="maxCardsPerUser">普通用户角色卡数量上限</label>
+                                    <input type="number" class="form-control" id="maxCardsPerUser" min="1" max="999" value="5">
+                                    <small class="text-muted">默认 5 张。管理员和 OWNER 不受该数量限制。</small>
                                 </div>
                             </div>
                             <div class="character-roll-settings-grid" aria-label="属性随机生成公式">

@@ -58,6 +58,7 @@ def register_blueprints(app):
     from trpg_server.routes.assets import bp as assets_bp
     from trpg_server.routes.auth import bp as auth_bp
     from trpg_server.routes.chat import bp as chat_bp
+    from trpg_server.routes.characters import bp as characters_bp
     from trpg_server.routes.config import bp as config_bp
     from trpg_server.routes.network import bp as network_bp
     from trpg_server.routes.pages import bp as pages_bp
@@ -67,6 +68,7 @@ def register_blueprints(app):
 
     app.register_blueprint(assets_bp)
     app.register_blueprint(scenarios_bp)
+    app.register_blueprint(characters_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(users_bp)
     app.register_blueprint(chat_bp)

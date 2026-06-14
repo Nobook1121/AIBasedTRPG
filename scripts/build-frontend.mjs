@@ -18,7 +18,9 @@ async function writeConcatenatedFile({ manifestPath, sourceDir, outputPath }) {
       return source.replace(/^\uFEFF/, "");
     }),
   );
-  await writeFile(path.join(root, outputPath), chunks.join("\n"), "utf8");
+  const destination = path.join(root, outputPath);
+  await mkdir(path.dirname(destination), { recursive: true });
+  await writeFile(destination, chunks.join("\n"), "utf8");
 }
 
 async function listHtmlFiles(directory) {
@@ -101,12 +103,7 @@ async function main() {
   await writeConcatenatedFile({
     manifestPath: "frontend/src/index/index.parts.json",
     sourceDir: "frontend/src/index",
-    outputPath: "index.html",
-  });
-  await writeConcatenatedFile({
-    manifestPath: "frontend/src/styles/style.parts.json",
-    sourceDir: "frontend/src/styles",
-    outputPath: "style.css",
+    outputPath: "frontend/dist/index.html",
   });
   await generateTemplates();
 }

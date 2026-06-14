@@ -51,14 +51,13 @@ python server.py 8090
 - `tests/`：后端单元测试和 API smoke tests。
 - `frontend/src/`：TypeScript 前端源码。
 - `js/`：TypeScript 构建生成的浏览器运行脚本，默认不提交到 Git。
-- `tools/`：前端工具脚本构建产物，不存放运行数据。
+- `data/tools/`：前端小工具脚本构建产物。
 - `data/config/`：TOML、JSON、角色提示词等运行配置数据。
 - `data/scenarios/`：剧本 JSON 数据。
 - `data/rooms/`：房间、房间消息、回档节点和自动存档数据。
 - `data/users/`：用户数据与用户 IP 配置。
 - `data/characters/`：角色卡示例等角色数据资源；浏览器本地创建的角色卡仍保存在当前浏览器 `localStorage`。
-- `data/assets/avatars/` 与 `data/assets/scenario_covers/`：上传头像和剧本封面。
-- `assets/`：AI 平台图标等静态只读资源。
+- `data/assets/avatars/`、`data/assets/scenario_covers/` 与 `data/assets/aiplatform/`：上传头像、剧本封面和 AI 平台图标。
 - `data/logs/`：运行日志输出目录，运行时自动创建；默认只记录登录、消息、AI 请求和报错等关键事件。
 
 ## 配置与安全
@@ -203,7 +202,7 @@ npm run typecheck
 npm run build:frontend
 ```
 
-生成的浏览器文件输出到 `js/`、`tools/` 路径。未构建前端时，`python server.py` 可以启动后端，但浏览器页面会缺少脚本而无法正常使用。
+生成的浏览器文件输出到 `frontend/dist/`、`js/`、`data/tools/` 路径。未构建前端时，`python server.py` 可以启动后端，但浏览器页面会缺少页面或脚本而无法正常使用。
 
 ## 进一步文档
 

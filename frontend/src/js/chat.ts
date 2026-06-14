@@ -27,8 +27,11 @@ interface ChatApiResponse {
 interface IncomingSocketMessage {
     room_id?: string;
     message?: ChatMessage;
-    type?: string;
+    type?: "ai_thinking_start" | "ai_thinking_end" | string;
     content?: string;
+    aiRequestId?: string;
+    roleName?: string;
+    startedAt?: number;
 }
 
 let isAIThinking = false;
@@ -37,6 +40,7 @@ let pendingMessages: PendingAIMessage[] = [];
 let aiName = "KP";
 let aiRoles: ChatRoleConfig[] = [{ id: "kp", name: "KP", wake_words: ["@KP"] }];
 let socket: SocketLike | null = null;
+const thinkingTimers = new Map<string, number>();
 
 const COMMAND_DEFINITIONS: CommandDefinition[] = [
     { name: "/dice", usage: "/dice {dice}", description: "掷骰" },
@@ -165,10 +169,12 @@ async function sendToAI(chatInput: HTMLInputElement, sendButton: HTMLButtonEleme
     isAIThinking = true;
     updateInputState(chatInput, sendButton);
 
-    const thinkingMessageId = Date.now();
+    const aiRequestId = `ai-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const thinkingMessageId = aiRequestId;
     const startTime = Date.now();
     const role = pendingMessages[0]?.role || aiRoles[0] || { id: "kp", name: "KP" };
-    addThinkingMessage(thinkingMessageId);
+    addThinkingMessage(thinkingMessageId, role.name || "KP", startTime);
+    broadcastAIThinkingStart(aiRequestId, role.name || "KP", startTime);
 
     try {
         const { response, data } = await TrpgApi.requestWithResponse<ChatApiResponse>("/api/chat", {
@@ -191,11 +197,13 @@ async function sendToAI(chatInput: HTMLInputElement, sendButton: HTMLButtonEleme
 
         pendingMessages = [];
         replaceThinkingMessage(thinkingMessageId, messageContent, processingTime, tokenCount);
+        broadcastAIThinkingEnd(aiRequestId);
 
         const persisted = await persistRoomMessage("kp", messageContent, {
             processingTime,
             tokenCount,
             roleId: role.id,
+            aiRequestId,
             senderName: role.name || "KP",
         });
         if (persisted) {
@@ -205,6 +213,7 @@ async function sendToAI(chatInput: HTMLInputElement, sendButton: HTMLButtonEleme
     } catch (error) {
         const processingTime = Math.round((Date.now() - startTime) / 1000);
         replaceThinkingMessage(thinkingMessageId, `AI 回复失败: ${chatErrorMessage(error)}`, processingTime, null);
+        broadcastAIThinkingEnd(aiRequestId);
         pendingMessages = [];
     } finally {
         isAIThinking = false;
@@ -484,17 +493,22 @@ function addMessage(
 
 function renderProcessingTime(type: string, processingTime: number | null, tokenCount: number | null): string {
     if (processingTime === null || type !== "kp") return "";
-    let displayText = `已耗时: ${processingTime}秒`;
-    if (tokenCount !== null) displayText += ` 消耗Token：${tokenCount}`;
-    return window.TrpgTemplates.render("chat-processing-time", { text: displayText });
+    return window.TrpgTemplates.render("chat-processing-time", { text: processingTimeText(processingTime, tokenCount) });
 }
 
-function addThinkingMessage(messageId: string | number): void {
-    addMessage("kp", "KP", "AI 正在思考中...", messageId, true);
+function addThinkingMessage(messageId: string | number, roleName = "KP", startedAt = Date.now()): void {
+    addMessage("kp", roleName, "AI 正在思考中...", messageId, true, 0);
+    const messageElement = document.querySelector<HTMLElement>(`.message[data-id="${String(messageId)}"]`);
+    if (messageElement) {
+        messageElement.setAttribute("data-ai-request-id", String(messageId));
+        messageElement.setAttribute("data-started-at", String(startedAt));
+    }
+    startThinkingElapsedTimer(String(messageId), startedAt);
 }
 
 function replaceThinkingMessage(messageId: string | number, newContent: string, processingTime: number, tokenCount: number | null): void {
-    const targetMessage = document.querySelector<HTMLElement>(".message.thinking.kp-message")
+    stopThinkingElapsedTimer(String(messageId));
+    const targetMessage = document.querySelector<HTMLElement>(`.message.thinking.kp-message[data-ai-request-id="${String(messageId)}"]`)
         || document.querySelector<HTMLElement>(`.message[data-id="${messageId}"]`);
 
     if (!targetMessage) {
@@ -516,12 +530,52 @@ function replaceThinkingMessage(messageId: string | number, newContent: string, 
         targetMessage.querySelector(".message-content-container")?.appendChild(processingTimeDiv);
     }
 
-    let displayText = `已耗时: ${processingTime}秒`;
-    if (tokenCount !== null) displayText += ` 消耗Token：${tokenCount}`;
-    processingTimeDiv.textContent = displayText;
+    processingTimeDiv.textContent = processingTimeText(processingTime, tokenCount);
 
     const chatHistory = document.getElementById("chatHistory");
     if (chatHistory) chatHistory.scrollTop = chatHistory.scrollHeight;
+}
+
+function processingTimeText(processingTime: number, tokenCount: number | null = null): string {
+    let displayText = `已耗时: ${processingTime}秒`;
+    if (tokenCount !== null) displayText += ` 消耗Token：${tokenCount}`;
+    return displayText;
+}
+
+function startThinkingElapsedTimer(aiRequestId: string, startedAt: number): void {
+    stopThinkingElapsedTimer(aiRequestId);
+    updateThinkingElapsed(aiRequestId, startedAt);
+    const timerId = window.setInterval(() => updateThinkingElapsed(aiRequestId, startedAt), 1000);
+    thinkingTimers.set(aiRequestId, timerId);
+}
+
+function stopThinkingElapsedTimer(aiRequestId: string): void {
+    const timerId = thinkingTimers.get(aiRequestId);
+    if (timerId !== undefined) window.clearInterval(timerId);
+    thinkingTimers.delete(aiRequestId);
+}
+
+function updateThinkingElapsed(aiRequestId: string, startedAt: number): void {
+    const messageElement = document.querySelector<HTMLElement>(`.message.thinking.kp-message[data-ai-request-id="${aiRequestId}"]`);
+    if (!messageElement) {
+        stopThinkingElapsedTimer(aiRequestId);
+        return;
+    }
+    const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+    let processingTimeDiv = messageElement.querySelector<HTMLElement>(".processing-time");
+    if (!processingTimeDiv) {
+        const wrapper = document.createElement("div");
+        wrapper.innerHTML = renderProcessingTime("kp", elapsedSeconds, null);
+        processingTimeDiv = wrapper.firstElementChild as HTMLElement | null;
+        if (processingTimeDiv) messageElement.querySelector(".message-content-container")?.appendChild(processingTimeDiv);
+    } else {
+        processingTimeDiv.textContent = processingTimeText(elapsedSeconds);
+    }
+}
+
+function clearThinkingMessage(aiRequestId: string): void {
+    stopThinkingElapsedTimer(aiRequestId);
+    document.querySelector<HTMLElement>(`.message.thinking.kp-message[data-ai-request-id="${aiRequestId}"]`)?.remove();
 }
 
 function getCurrentChatMessages(): ChatMessage[] {
@@ -560,6 +614,8 @@ function renderChatMessages(messages: ChatMessage[]): void {
 
 function renderRoomMessage(message: ChatMessage | null): void {
     if (!message) return;
+    const aiRequestId = typeof message.metadata?.aiRequestId === "string" ? message.metadata.aiRequestId : null;
+    if (aiRequestId) clearThinkingMessage(aiRequestId);
     const isOwnPlayerMessage = message.type === "player" && message.sender_id === getCurrentUserId();
     const type = message.type === "player" && !isOwnPlayerMessage ? "other" : message.type || "other";
     const metadata = message.metadata || {};
@@ -637,16 +693,52 @@ function broadcastMessage(message: ChatMessage | null): void {
     });
 }
 
+function broadcastAIThinkingStart(aiRequestId: string, roleName: string, startedAt: number): void {
+    if (!socket?.connected) return;
+    socket.emit("send_message", {
+        room_id: getCurrentRoom()?.id || null,
+        type: "ai_thinking_start",
+        aiRequestId,
+        roleName,
+        startedAt,
+    });
+}
+
+function broadcastAIThinkingEnd(aiRequestId: string): void {
+    if (!socket?.connected) return;
+    socket.emit("send_message", {
+        room_id: getCurrentRoom()?.id || null,
+        type: "ai_thinking_end",
+        aiRequestId,
+    });
+}
+
 function handleIncomingMessage(data: unknown): void {
     const incoming = normalizeIncomingMessage(data);
     if (!incoming) return;
     const room = getCurrentRoom();
     if (incoming.room_id && room?.id !== incoming.room_id) return;
+    if (incoming.type === "ai_thinking_start" || incoming.type === "ai_thinking_end") {
+        handleAIThinkingEvent(incoming);
+        return;
+    }
     if (incoming.message) {
+        const aiRequestId = typeof incoming.message.metadata?.aiRequestId === "string" ? incoming.message.metadata.aiRequestId : null;
+        if (aiRequestId) clearThinkingMessage(aiRequestId);
         renderRoomMessage(incoming.message);
         return;
     }
     if (incoming.type && incoming.content) renderRoomMessage(incoming as ChatMessage);
+}
+
+function handleAIThinkingEvent(incoming: IncomingSocketMessage): void {
+    const aiRequestId = incoming.aiRequestId;
+    if (!aiRequestId) return;
+    if (incoming.type === "ai_thinking_end") {
+        clearThinkingMessage(aiRequestId);
+        return;
+    }
+    addThinkingMessage(aiRequestId, incoming.roleName || "KP", incoming.startedAt || Date.now());
 }
 
 function normalizeIncomingMessage(data: unknown): IncomingSocketMessage | null {

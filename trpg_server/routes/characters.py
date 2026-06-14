@@ -1,0 +1,164 @@
+import time
+import tomllib
+
+from flask import Blueprint, current_app, request, session
+
+from trpg_server.json_store import read_json, write_json_atomic
+from trpg_server.responses import error_response, success_response
+from trpg_server.security import normalize_filename, safe_join
+from trpg_server.settings import CHARACTERS_DIR, CONFIG_DIR
+
+bp = Blueprint("characters", __name__)
+
+ELEVATED_ROLES = {"ADMIN", "OWNER"}
+DEFAULT_MAX_CARDS_PER_USER = 5
+
+
+def _get_characters_dir():
+    return current_app.config.get("CHARACTERS_DIR", CHARACTERS_DIR)
+
+
+def _get_config_dir():
+    return current_app.config.get("CONFIG_DIR", CONFIG_DIR)
+
+
+def _require_login():
+    if "user_id" not in session:
+        return error_response("Please login first", 401, "Not logged in")
+    return None
+
+
+def _is_elevated():
+    return session.get("role") in ELEVATED_ROLES
+
+
+def _current_player_ids():
+    return {str(session.get("user_id", "")), str(session.get("username", ""))}
+
+
+def _iter_character_files():
+    characters_dir = _get_characters_dir()
+    if not characters_dir.exists():
+        return []
+    return sorted(characters_dir.glob("*.json"))
+
+
+def _max_cards_per_user():
+    config_path = _get_config_dir() / "general.toml"
+    try:
+        config = tomllib.loads(config_path.read_text(encoding="utf-8")) if config_path.exists() else {}
+    except (OSError, tomllib.TOMLDecodeError):
+        return DEFAULT_MAX_CARDS_PER_USER
+    value = (config.get("character_rules") or {}).get("max_cards_per_user", DEFAULT_MAX_CARDS_PER_USER)
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return DEFAULT_MAX_CARDS_PER_USER
+    return max(1, min(parsed, 999))
+
+
+def _owned_character_count(excluded_character_id=None):
+    current_ids = _current_player_ids()
+    count = 0
+    for path in _iter_character_files():
+        character = read_json(path, default=None)
+        if not isinstance(character, dict):
+            continue
+        if excluded_character_id and str(character.get("id")) == str(excluded_character_id):
+            continue
+        if str(character.get("playerId") or "") in current_ids:
+            count += 1
+    return count
+
+
+def _character_filename(character_id):
+    return normalize_filename(f"{character_id or f'investigator-{int(time.time() * 1000)}'}.json")
+
+
+def _character_path(character_id):
+    return safe_join(_get_characters_dir(), _character_filename(character_id))
+
+
+def _can_access_character(character):
+    if _is_elevated():
+        return True
+    player_id = str(character.get("playerId") or "")
+    return not player_id or player_id in _current_player_ids()
+
+
+def _normalize_character_payload(payload, existing=None):
+    if not isinstance(payload, dict):
+        return None
+
+    character = dict(existing or {})
+    character.update(payload)
+    character_id = str(character.get("id") or "").strip()
+    name = str(character.get("name") or "").strip()
+    if not character_id or not name:
+        return None
+
+    player_id = str(character.get("playerId") or "").strip()
+    if not _is_elevated():
+        player_id = str(session.get("user_id"))
+
+    character["id"] = character_id[:80]
+    character["name"] = name[:80]
+    character["playerId"] = player_id
+    character["updatedAt"] = time.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    character.setdefault("createdAt", character["updatedAt"])
+    return character
+
+
+@bp.route("/api/characters", methods=["GET"])
+def list_characters():
+    login_error = _require_login()
+    if login_error:
+        return login_error
+
+    characters = []
+    for path in _iter_character_files():
+        character = read_json(path, default=None)
+        if isinstance(character, dict) and _can_access_character(character):
+            characters.append(character)
+    characters.sort(key=lambda item: item.get("updatedAt") or item.get("createdAt") or "", reverse=True)
+    return success_response(characters, "Characters loaded successfully")
+
+
+@bp.route("/api/characters/<character_id>", methods=["PUT"])
+def save_character(character_id):
+    login_error = _require_login()
+    if login_error:
+        return login_error
+
+    path = _character_path(character_id)
+    existing = read_json(path, default={}) if path.exists() else {}
+    if existing and not _can_access_character(existing):
+        return error_response("Permission denied", 403, "Permission denied")
+
+    if not _is_elevated() and not existing and _owned_character_count() >= _max_cards_per_user():
+        return error_response("Character card limit reached", 403, "Character card limit reached")
+
+    payload = request.get_json(silent=True) or {}
+    payload["id"] = character_id
+    character = _normalize_character_payload(payload, existing)
+    if character is None:
+        return error_response("Invalid character card", 400, "Invalid character card")
+
+    write_json_atomic(path, character)
+    return success_response(character, "Character saved successfully")
+
+
+@bp.route("/api/characters/<character_id>", methods=["DELETE"])
+def delete_character(character_id):
+    login_error = _require_login()
+    if login_error:
+        return login_error
+
+    path = _character_path(character_id)
+    if not path.exists():
+        return success_response(message="Character already deleted")
+    character = read_json(path, default={})
+    if character and not _can_access_character(character):
+        return error_response("Permission denied", 403, "Permission denied")
+    path.unlink()
+    return success_response(message="Character deleted successfully")

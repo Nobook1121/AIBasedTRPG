@@ -50,6 +50,59 @@
     font-size: 1.2em;
 }
 
+#save > .p-4 {
+    min-height: 0;
+    overflow-y: auto;
+}
+
+#save-detail-view {
+    min-height: 0;
+    padding-bottom: 24px;
+}
+
+.room-character-bindings {
+    overflow-x: auto;
+}
+
+.room-binding-table {
+    min-width: 720px;
+    table-layout: fixed;
+}
+
+.room-binding-table th:nth-child(1),
+.room-binding-table td:nth-child(1) {
+    width: 24%;
+}
+
+.room-binding-table th:nth-child(2),
+.room-binding-table td:nth-child(2) {
+    width: 34%;
+}
+
+.room-binding-table th:nth-child(3),
+.room-binding-table td:nth-child(3) {
+    width: 16%;
+}
+
+.room-binding-actions {
+    width: 26%;
+    min-height: 32px;
+    white-space: nowrap;
+}
+
+.room-binding-actions .btn {
+    margin-left: 6px;
+}
+
+.room-member-removed {
+    color: var(--color-text-muted);
+    opacity: 0.68;
+}
+
+.room-member-removed td {
+    background: var(--color-panel-muted);
+}
+
 /* 设置子标签样式 - 与小工具标签样式保持一致 */
 .settings-tabs {
     display: flex;

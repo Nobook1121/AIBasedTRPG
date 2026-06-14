@@ -6,10 +6,11 @@ __pycache__/
 /.worktrees/
 /node_modules/
 /js/
-/tools/*.js
+/data/tools/*.js
 tests/**/__pycache__/
 /data/history/
 /data/rooms/
 /data/logs/
 /data/users/*.sqlite3
 /data/users/ip_configs/
+/docs
