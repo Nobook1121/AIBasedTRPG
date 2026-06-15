@@ -1,0 +1,51 @@
+{
+  "id": "writer",
+  "nameKey": "occupations.writer",
+  "creditRating": {
+    "min": 9,
+    "max": 30
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "occupationSkills": [
+    {
+      "skillKey": "artCraft",
+      "specialtyKey": "writing"
+    },
+    {
+      "skillKey": "history"
+    },
+    {
+      "skillKey": "libraryUse"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "naturalWorld"
+        },
+        {
+          "skillKey": "occult"
+        }
+      ]
+    },
+    {
+      "skillKey": "languageOther"
+    },
+    {
+      "skillKey": "languageOwn"
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "freeChoice": "personalOrEraSpecialty"
+    }
+  ]
+}

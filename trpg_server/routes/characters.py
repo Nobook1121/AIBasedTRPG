@@ -1,14 +1,17 @@
+import logging
 import time
 import tomllib
 
 from flask import Blueprint, current_app, request, session
 
 from trpg_server.json_store import read_json, write_json_atomic
+from trpg_server.logging_config import log_user_action, user_action_text
 from trpg_server.responses import error_response, success_response
 from trpg_server.security import normalize_filename, safe_join
-from trpg_server.settings import CHARACTERS_DIR, CONFIG_DIR
+from trpg_server.settings import CHARACTERS_DIR, CONFIG_DIR, OCCUPATIONS_DIR
 
 bp = Blueprint("characters", __name__)
+logger = logging.getLogger(__name__)
 
 ELEVATED_ROLES = {"ADMIN", "OWNER"}
 DEFAULT_MAX_CARDS_PER_USER = 5
@@ -20,6 +23,10 @@ def _get_characters_dir():
 
 def _get_config_dir():
     return current_app.config.get("CONFIG_DIR", CONFIG_DIR)
+
+
+def _get_occupations_dir():
+    return current_app.config.get("OCCUPATIONS_DIR", OCCUPATIONS_DIR)
 
 
 def _require_login():
@@ -41,6 +48,13 @@ def _iter_character_files():
     if not characters_dir.exists():
         return []
     return sorted(characters_dir.glob("*.json"))
+
+
+def _iter_builtin_occupation_files():
+    occupations_dir = _get_occupations_dir() / "builtin"
+    if not occupations_dir.exists():
+        return []
+    return sorted(occupations_dir.glob("*.json"))
 
 
 def _max_cards_per_user():
@@ -109,6 +123,21 @@ def _normalize_character_payload(payload, existing=None):
     return character
 
 
+@bp.route("/api/character-catalogs/occupations", methods=["GET"])
+def list_builtin_occupations():
+    login_error = _require_login()
+    if login_error:
+        return login_error
+
+    occupations = []
+    for path in _iter_builtin_occupation_files():
+        occupation = read_json(path, default=None)
+        if isinstance(occupation, dict):
+            occupations.append(occupation)
+    occupations.sort(key=lambda item: str(item.get("id") or item.get("nameKey") or ""))
+    return success_response(occupations, "Occupation catalogs loaded successfully")
+
+
 @bp.route("/api/characters", methods=["GET"])
 def list_characters():
     login_error = _require_login()
@@ -131,6 +160,7 @@ def save_character(character_id):
         return login_error
 
     path = _character_path(character_id)
+    is_new_character = not path.exists()
     existing = read_json(path, default={}) if path.exists() else {}
     if existing and not _can_access_character(existing):
         return error_response("Permission denied", 403, "Permission denied")
@@ -145,6 +175,14 @@ def save_character(character_id):
         return error_response("Invalid character card", 400, "Invalid character card")
 
     write_json_atomic(path, character)
+    log_user_action(
+        logger,
+        user_action_text(session.get("username"), "保存了角色卡"),
+        用户ID=session.get("user_id"),
+        操作="创建" if is_new_character else "更新",
+        角色卡ID=character["id"],
+        角色名=character["name"],
+    )
     return success_response(character, "Character saved successfully")
 
 
@@ -161,4 +199,11 @@ def delete_character(character_id):
     if character and not _can_access_character(character):
         return error_response("Permission denied", 403, "Permission denied")
     path.unlink()
+    log_user_action(
+        logger,
+        user_action_text(session.get("username"), "删除了角色卡"),
+        用户ID=session.get("user_id"),
+        角色卡ID=character_id,
+        角色名=character.get("name"),
+    )
     return success_response(message="Character deleted successfully")

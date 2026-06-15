@@ -3,9 +3,10 @@ import logging
 import re
 
 import requests
-from flask import Blueprint, current_app, request
+from flask import Blueprint, current_app, request, session
 
 from trpg_server.json_store import read_json, write_json_atomic
+from trpg_server.logging_config import log_user_action, user_action_text
 from trpg_server.responses import error_response, success_response
 from trpg_server.role_config import enabled_provider_options, load_roles, save_role
 from trpg_server.security import require_permission, safe_join
@@ -14,6 +15,9 @@ from trpg_server.settings import CONFIG_DIR
 bp = Blueprint("config", __name__)
 logger = logging.getLogger(__name__)
 _BARE_TOML_KEY_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+CONFIG_LABELS = {
+    "general": "通用设置",
+}
 
 
 def _get_config_dir():
@@ -78,7 +82,12 @@ def save_config(config_name):
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(convert_to_toml(config_data), encoding="utf-8")
 
-        logger.debug("Config saved file=%s", config_path.name)
+        log_user_action(
+            logger,
+            user_action_text(session.get("username"), f"更改了{CONFIG_LABELS.get(config_name, config_name + '设置')}"),
+            用户ID=session.get("user_id"),
+            文件=config_path.name,
+        )
         return success_response(message="Config saved successfully")
     except Exception as exc:
         logger.exception("Failed to save config: %s", config_name)
@@ -95,7 +104,12 @@ def save_ai_platform_config(platform):
         config_path = safe_join(_get_ai_platform_dir(), f"{platform}.json")
         write_json_atomic(config_path, config_data)
 
-        logger.debug("AI platform config saved platform=%s", platform)
+        log_user_action(
+            logger,
+            user_action_text(session.get("username"), "更改了 AI 平台设置"),
+            用户ID=session.get("user_id"),
+            平台=platform,
+        )
         return success_response(message="Config saved successfully")
     except Exception as exc:
         logger.exception("Failed to save AI platform config: %s", platform)
@@ -130,7 +144,13 @@ def test_ai_platform_api(platform):
             extra_body = test_payload.pop("extra_body")
             test_payload.update(extra_body)
 
-        logger.debug("Testing AI platform API platform=%s base_url=%s", platform, base_url)
+        log_user_action(
+            logger,
+            user_action_text(session.get("username"), "测试了 AI 平台连接"),
+            用户ID=session.get("user_id"),
+            平台=platform,
+            BaseURL=base_url,
+        )
         response = requests.post(base_url, headers=headers, json=test_payload, timeout=30)
         response_data = response.json()
         if response.status_code != 200:
@@ -174,7 +194,13 @@ def save_model_request_config():
         if legacy_js_path.exists():
             legacy_js_path.unlink()
 
-        logger.debug("AI model request config saved platform=%s model_id=%s", platform, model_id)
+        log_user_action(
+            logger,
+            user_action_text(session.get("username"), "更改了 AI 模型请求设置"),
+            用户ID=session.get("user_id"),
+            平台=platform,
+            模型=model_id,
+        )
         return success_response(message="Config saved successfully")
     except Exception as exc:
         logger.exception("Failed to save model request config")
@@ -210,7 +236,13 @@ def save_system_prompt():
         prompt_path.parent.mkdir(parents=True, exist_ok=True)
         prompt_path.write_text(content, encoding="utf-8")
 
-        logger.info("System prompt saved file=%s", prompt_path.name)
+        log_user_action(
+            logger,
+            user_action_text(session.get("username"), "更改了系统提示词"),
+            用户ID=session.get("user_id"),
+            文件=prompt_path.name,
+            内容长度=len(content),
+        )
         return success_response(message="System prompt saved successfully")
     except Exception as exc:
         logger.exception("Failed to save system prompt")
@@ -244,7 +276,13 @@ def save_role_config(role_id):
             role_id,
             role_data,
         )
-        logger.info("Role config saved role_id=%s provider=%s", role_id, role_data.get("provider"))
+        log_user_action(
+            logger,
+            user_action_text(session.get("username"), "更改了角色配置"),
+            用户ID=session.get("user_id"),
+            角色=role_id,
+            平台=role_data.get("provider"),
+        )
         return success_response(message="Role config saved successfully", data={"roles": roles})
     except ValueError as exc:
         return error_response(str(exc), 400)
@@ -273,9 +311,21 @@ def delete_model_request_config():
                 removed = True
 
         if removed:
-            logger.debug("AI model request config deleted platform=%s model_id=%s", platform, model_id)
+            log_user_action(
+                logger,
+                user_action_text(session.get("username"), "删除了 AI 模型请求设置"),
+                用户ID=session.get("user_id"),
+                平台=platform,
+                模型=model_id,
+            )
         else:
-            logger.debug("AI model request config already absent platform=%s model_id=%s", platform, model_id)
+            log_user_action(
+                logger,
+                user_action_text(session.get("username"), "确认 AI 模型请求设置已不存在"),
+                用户ID=session.get("user_id"),
+                平台=platform,
+                模型=model_id,
+            )
 
         return success_response(message="Config deleted successfully")
     except Exception as exc:

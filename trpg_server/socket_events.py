@@ -3,6 +3,7 @@ import logging
 from flask import current_app, request, session
 from flask_socketio import disconnect, emit, join_room, leave_room
 
+from trpg_server.logging_config import log_user_action, user_action_text
 from trpg_server.security import ACTIVE_SESSION_REGISTRY_KEY, SESSION_TOKEN_KEY
 
 logger = logging.getLogger(__name__)
@@ -75,11 +76,13 @@ def register_socket_events(socketio):
         payload = data or {}
         message = payload.get("message") or payload
         room_id = payload.get("room_id")
-        logger.info(
-            "WebSocket message received room_id=%s sender=%s type=%s",
-            room_id,
-            message.get("sender_name") or message.get("sender"),
-            message.get("type"),
+        log_user_action(
+            logger,
+            user_action_text(session.get("username") or message.get("sender_name") or message.get("sender"), "发送了实时对话"),
+            用户ID=session.get("user_id"),
+            房间ID=room_id,
+            消息类型=message.get("type"),
+            内容长度=len(str(message.get("content") or "")),
         )
         if room_id:
             emit("new_message", payload, room=room_id, include_self=False)

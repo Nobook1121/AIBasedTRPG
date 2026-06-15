@@ -2,6 +2,7 @@ import logging
 
 from flask import Blueprint, current_app, request, session
 
+from trpg_server.logging_config import log_user_action, user_action_text
 from trpg_server.responses import error_response, success_response
 from trpg_server.security import get_user_manager, require_permission
 from trpg_server.users.smtp import (
@@ -93,7 +94,13 @@ def update_user_role(user_id):
         if not success:
             return error_response(message, 404, message)
 
-        logger.debug("User role updated user_id=%s role=%s", user_id, role)
+        log_user_action(
+            logger,
+            user_action_text(session.get("username"), "更改了用户角色"),
+            操作者ID=session.get("user_id"),
+            目标用户ID=user_id,
+            角色=role,
+        )
         return success_response(message=message)
     except Exception as exc:
         logger.exception("Failed to update user role: %s", user_id)
@@ -163,6 +170,13 @@ def update_current_user_profile():
             updated_user = user
 
         session["username"] = username
+        log_user_action(
+            logger,
+            user_action_text(username, "更改了个人资料"),
+            用户ID=session.get("user_id"),
+            昵称=nickname,
+            邮箱=email,
+        )
         return success_response(_profile_payload(updated_user), "Profile updated")
     except Exception as exc:
         logger.exception("Failed to update user profile")
@@ -205,6 +219,12 @@ def update_current_user_presence():
                 return error_response("Failed to save user data", 500, "Failed to save data")
             updated_user = user
 
+        log_user_action(
+            logger,
+            user_action_text(session.get("username"), "更改了在线状态"),
+            用户ID=session.get("user_id"),
+            状态=presence,
+        )
         return success_response(_profile_payload(updated_user), "Presence updated")
     except Exception as exc:
         logger.exception("Failed to update user presence")
@@ -231,7 +251,13 @@ def update_user_status(user_id):
         if not success:
             return error_response(message, 404, message)
 
-        logger.debug("User status updated user_id=%s status=%s", user_id, status)
+        log_user_action(
+            logger,
+            user_action_text(session.get("username"), "更改了用户状态"),
+            操作者ID=session.get("user_id"),
+            目标用户ID=user_id,
+            状态=status,
+        )
         return success_response(message=message)
     except Exception as exc:
         logger.exception("Failed to update user status: %s", user_id)
@@ -262,7 +288,11 @@ def update_admin_auth_settings():
             _auth_settings_db(),
             _auth_settings_fallback(),
         )
-        logger.info("Admin auth settings updated user_id=%s", session.get("user_id"))
+        log_user_action(
+            logger,
+            user_action_text(session.get("username"), "更改了认证设置"),
+            用户ID=session.get("user_id"),
+        )
         return success_response(admin_auth_settings(settings), "Auth settings updated")
     except ValueError as exc:
         return error_response(str(exc), 400, str(exc))
@@ -300,6 +330,12 @@ def update_ip_config():
             return error_response("IP config update failed", 500, "Update failed")
 
         updated_config = manager.get_ip_config(ip_address)
+        log_user_action(
+            logger,
+            user_action_text(session.get("username"), "更改了 IP 配置"),
+            用户ID=session.get("user_id"),
+            IP=ip_address,
+        )
         return success_response(updated_config, "IP config updated successfully")
     except Exception as exc:
         logger.exception("Failed to update IP config")

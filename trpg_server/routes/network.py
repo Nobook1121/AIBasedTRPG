@@ -2,8 +2,9 @@ import logging
 import socket
 import time
 
-from flask import Blueprint, current_app, request
+from flask import Blueprint, current_app, request, session
 
+from trpg_server.logging_config import log_user_action, user_action_text
 from trpg_server.network_discovery import (
     DEFAULT_PORT,
     get_local_ip,
@@ -52,7 +53,13 @@ def update_network_config_api():
             return validation_error
 
         saved_config = save_network_config(config_data, _network_config_file())
-        logger.debug("Network config updated port=%s", saved_config.get("port"))
+        log_user_action(
+            logger,
+            user_action_text(session.get("username"), "更改了网络设置"),
+            用户ID=session.get("user_id"),
+            端口=saved_config.get("port"),
+            局域网发现=saved_config.get("discovery_enabled"),
+        )
         return success_response(config_data, "Network config updated successfully")
     except Exception as exc:
         logger.exception("Failed to update network config")
@@ -132,7 +139,13 @@ def update_penetration_config_api():
             return error_response("Please provide penetration config data", 400, "No data")
 
         save_penetration_config(config_data, _penetration_config_file())
-        logger.debug("Penetration config updated type=%s", config_data.get("type"))
+        log_user_action(
+            logger,
+            user_action_text(session.get("username"), "更改了穿透设置"),
+            用户ID=session.get("user_id"),
+            类型=config_data.get("type"),
+            启用=config_data.get("enabled"),
+        )
         return success_response(config_data, "Penetration config updated successfully")
     except Exception as exc:
         logger.exception("Failed to update penetration config")

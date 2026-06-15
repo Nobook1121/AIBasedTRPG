@@ -34,6 +34,25 @@ interface COC7Skill {
     rank?: SkillRank;
 }
 
+interface OccupationPointFormulaTerm {
+    attribute: COC7AttributeKey;
+    multiplier: number;
+}
+
+interface SkillSuccessLimits {
+    occupation: number;
+    other: number;
+}
+
+type OccupationPointFormula = Array<COC7AttributeKey | OccupationPointFormulaTerm>;
+
+type OccupationSkillEntry = {
+    skillKey?: string;
+    specialtyKey?: string;
+    chooseOne?: OccupationSkillEntry[];
+    freeChoice?: string;
+};
+
 interface COC7EquipmentItem {
     name: string;
     quantity: number;
@@ -82,12 +101,26 @@ interface COC7Background {
 interface COC7Occupation {
     id: string;
     name: string;
+    nameKey?: string;
     creditRating: [number, number];
     occupationSkills: string[];
-    pointsFormula: Array<COC7AttributeKey>;
+    pointsFormula: OccupationPointFormula;
+    occupationSkillEntries?: OccupationSkillEntry[];
+    occupationSkillLabels?: string[];
     skillBonuses: Record<string, number>;
     specialties: string[];
     passiveEffects: string[];
+}
+
+interface OccupationCatalogPayload {
+    id: string;
+    nameKey?: string;
+    creditRating?: { min?: number; max?: number };
+    occupationSkillPoints?: {
+        formula?: string;
+        terms?: OccupationPointFormulaTerm[];
+    };
+    occupationSkills?: OccupationSkillEntry[];
 }
 
 interface COC7HalfAndFifth {
@@ -170,6 +203,7 @@ interface COC7CharacterCard {
     status: CharacterStatusFlags;
     occupationSkillPoints: number;
     personalInterestPoints: number;
+    skillSuccessLimits: SkillSuccessLimits;
     mov: number;
     build: number;
     damageBonus: string;
@@ -289,7 +323,7 @@ interface Window {
         italy: { family: ["Rossi", "Bianchi", "Romano", "Ricci", "Marino"], male: ["Marco", "Luca", "Giovanni", "Matteo"], female: ["Giulia", "Sofia", "Elena", "Bianca"], neutral: ["Andrea", "Noa", "Vale"], westernOrder: true }
     };
 
-    const PRESET_OCCUPATIONS: COC7Occupation[] = [
+    let PRESET_OCCUPATIONS: COC7Occupation[] = [
         {
             id: "detective",
             name: "私家侦探",
@@ -392,6 +426,39 @@ interface Window {
         }
     ];
 
+    const OCCUPATION_LABELS: Record<string, string> = {
+        "occupations.writer": "作家"
+    };
+
+    const SKILL_SPECIALTY_LABELS: Record<string, string> = {
+        "artCraft.writing": "写作"
+    };
+
+    const WRITER_OCCUPATION: COC7Occupation = {
+        id: "writer",
+        name: "作家",
+        nameKey: "occupations.writer",
+        creditRating: [9, 30],
+        occupationSkills: ["artCraft", "history", "libraryUse", "naturalWorld", "occult", "languageOther", "languageOwn", "psychology"],
+        pointsFormula: [{ attribute: "EDU", multiplier: 4 }],
+        occupationSkillEntries: [
+            { skillKey: "artCraft", specialtyKey: "writing" },
+            { skillKey: "history" },
+            { skillKey: "libraryUse" },
+            { chooseOne: [{ skillKey: "naturalWorld" }, { skillKey: "occult" }] },
+            { skillKey: "languageOther" },
+            { skillKey: "languageOwn" },
+            { skillKey: "psychology" },
+            { freeChoice: "personalOrEraSpecialty" }
+        ],
+        occupationSkillLabels: ["技艺(写作)", "历史", "图书馆使用", "博物学或神秘学", "外语", "母语", "心理学", "任意一项其他个人或时代特长"],
+        skillBonuses: {},
+        specialties: [],
+        passiveEffects: []
+    };
+
+    PRESET_OCCUPATIONS = [WRITER_OCCUPATION];
+
     const BASE_SKILLS: COC7Skill[] = [
         { id: "accounting", name: "会计", base: 5, value: 5, category: "知识", checked: false },
         { id: "anthropology", name: "人类学", base: 1, value: 1, category: "知识", checked: false },
@@ -452,6 +519,9 @@ interface Window {
     let nameGeneratorModal: BootstrapModalInstance | null = null;
     let occupationTemplateModal: BootstrapModalInstance | null = null;
     let pendingGeneratedName = "";
+    let editorSkills: COC7Skill[] = [];
+    let occupationSkillPointsManuallyEdited = false;
+    let personalInterestPointsManuallyEdited = false;
 
     function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
         const parsed = Number(value);
@@ -589,7 +659,10 @@ interface Window {
 
     function calculateOccupationSkillPoints(attributes: COC7Attributes, occupationId: string): number {
         const occupation = getOccupationById(occupationId);
-        return occupation.pointsFormula.reduce((total, key) => total + attributes[key], 0);
+        return occupation.pointsFormula.reduce((total, term) => {
+            if (typeof term === "string") return total + attributes[term];
+            return total + attributes[term.attribute] * term.multiplier;
+        }, 0);
     }
 
     function calculatePersonalInterestPoints(attributes: COC7Attributes): number {
@@ -658,7 +731,7 @@ interface Window {
 
     function resolveOccupationFromInput(value: string): COC7Occupation {
         const normalized = value.trim();
-        return PRESET_OCCUPATIONS.find((occupation) => occupation.id === normalized || occupation.name === normalized) || getOccupationById("detective");
+        return PRESET_OCCUPATIONS.find((occupation) => occupation.id === normalized || occupation.name === normalized) || getOccupationById("writer");
     }
 
     function resolveOccupationIdFromInput(value: string): string {
@@ -786,8 +859,9 @@ interface Window {
             currentMp: clampNumber(input.currentMp ?? input.magicPoints, 0, maxMp, maxMp),
             maxMp,
             status: normalizeStatus(input.status),
-            occupationSkillPoints: calculateOccupationSkillPoints(attributes, occupationId),
-            personalInterestPoints: calculatePersonalInterestPoints(attributes),
+            occupationSkillPoints: clampNumber(input.occupationSkillPoints, 0, 999, calculateOccupationSkillPoints(attributes, occupationId)),
+            personalInterestPoints: clampNumber(input.personalInterestPoints, 0, 999, calculatePersonalInterestPoints(attributes)),
+            skillSuccessLimits: normalizeSkillSuccessLimits(input.skillSuccessLimits),
             mov: calculateMov(attributes),
             build: damage.build,
             damageBonus: damage.damageBonus,
@@ -885,6 +959,13 @@ interface Window {
             temporaryInsanity: Boolean(status?.temporaryInsanity),
             permanentInsanity: Boolean(status?.permanentInsanity),
             indefiniteInsanity: Boolean(status?.indefiniteInsanity)
+        };
+    }
+
+    function normalizeSkillSuccessLimits(limits?: Partial<SkillSuccessLimits>): SkillSuccessLimits {
+        return {
+            occupation: clampNumber(limits?.occupation, 0, 99, 75),
+            other: clampNumber(limits?.other, 0, 99, 50)
         };
     }
 
@@ -989,6 +1070,66 @@ interface Window {
         return false;
     }
 
+    async function loadOccupationCatalogs(): Promise<void> {
+        try {
+            const response = await TrpgApi.get<ApiResponse<OccupationCatalogPayload[]>>("/api/character-catalogs/occupations");
+            if (response.success && Array.isArray(response.data) && response.data.length) {
+                PRESET_OCCUPATIONS = response.data.map(normalizeOccupationCatalog);
+                hydrateOccupationSelect();
+            }
+        } catch (error) {
+            console.warn("加载职业目录失败:", error);
+        }
+    }
+
+    function normalizeOccupationCatalog(payload: OccupationCatalogPayload): COC7Occupation {
+        const entries = payload.occupationSkills || [];
+        const skillKeys = Array.from(new Set(entries.flatMap(occupationSkillKeys)));
+        const minCredit = clampNumber(payload.creditRating?.min, 0, 99, 9);
+        const maxCredit = clampNumber(payload.creditRating?.max, minCredit, 99, 30);
+        return {
+            id: payload.id || "writer",
+            name: localizeOccupationName(payload.nameKey, payload.id),
+            nameKey: payload.nameKey || "",
+            creditRating: [minCredit, maxCredit],
+            occupationSkills: skillKeys,
+            pointsFormula: normalizeOccupationFormula(payload.occupationSkillPoints?.terms),
+            occupationSkillEntries: entries,
+            occupationSkillLabels: entries.map(occupationSkillEntryLabel),
+            skillBonuses: {},
+            specialties: [],
+            passiveEffects: []
+        };
+    }
+
+    function normalizeOccupationFormula(terms?: OccupationPointFormulaTerm[]): OccupationPointFormula {
+        const validTerms = (terms || []).filter((term) => ATTRIBUTE_KEYS.includes(term.attribute as COC7CoreAttributeKey) || term.attribute === "AGE");
+        return validTerms.length ? validTerms : [{ attribute: "EDU", multiplier: 4 }];
+    }
+
+    function occupationSkillKeys(entry: OccupationSkillEntry): string[] {
+        if (entry.skillKey) return [entry.skillKey];
+        if (entry.chooseOne) return entry.chooseOne.flatMap(occupationSkillKeys);
+        return [];
+    }
+
+    function occupationSkillEntryLabel(entry: OccupationSkillEntry): string {
+        if (entry.skillKey) return formatSkillLabel(entry.skillKey, entry.specialtyKey);
+        if (entry.chooseOne) return entry.chooseOne.map(occupationSkillEntryLabel).join("或");
+        if (entry.freeChoice === "personalOrEraSpecialty") return "任意一项其他个人或时代特长";
+        return "自定义本职技能";
+    }
+
+    function formatSkillLabel(skillKey: string, specialtyKey?: string): string {
+        const skillName = skillNameById(skillKey);
+        if (!specialtyKey) return skillName;
+        return `${skillName}(${SKILL_SPECIALTY_LABELS[`${skillKey}.${specialtyKey}`] || specialtyKey})`;
+    }
+
+    function localizeOccupationName(nameKey?: string, fallback?: string): string {
+        return nameKey ? OCCUPATION_LABELS[nameKey] || fallback || nameKey : fallback || "未命名职业";
+    }
+
     async function loadCards(): Promise<void> {
         cards = [];
         try {
@@ -1059,9 +1200,11 @@ interface Window {
         const occupationModalElement = byId("occupationTemplateModal");
         occupationTemplateModal = occupationModalElement && typeof bootstrap !== "undefined" ? new bootstrap.Modal(occupationModalElement) : null;
         hydrateOccupationSelect();
-        hydrateSkillChecklist();
         bindEvents();
-        void Promise.all([loadCards(), loadAssignableUsers()]).then(render);
+        void loadOccupationCatalogs().then(() => {
+            void loadCards().then(render);
+        });
+        void loadAssignableUsers().then(render);
     }
 
     function bindEvents(): void {
@@ -1091,12 +1234,29 @@ interface Window {
         byId("saveCharacterRuleSettings")?.addEventListener("click", () => {
             void saveRuleSettingsFromPanel();
         });
-        byId("autoAllocateOccupationSkills")?.addEventListener("click", autoAllocateEditorOccupationSkills);
         byId("characterOccupation")?.addEventListener("input", () => {
-            hydrateSkillChecklist(readChecklistSkills());
+            occupationSkillPointsManuallyEdited = false;
             refreshEditorRuleSummary();
         });
         byId("characterCreditRating")?.addEventListener("input", refreshEditorRuleSummary);
+        byId("characterOccupationSkillPoints")?.addEventListener("input", () => {
+            occupationSkillPointsManuallyEdited = true;
+            refreshSkillPointSummary();
+        });
+        byId("characterPersonalInterestPoints")?.addEventListener("input", () => {
+            personalInterestPointsManuallyEdited = true;
+            refreshSkillPointSummary();
+        });
+        byId("generateOccupationSkillPoints")?.addEventListener("click", () => {
+            occupationSkillPointsManuallyEdited = false;
+            setGeneratedOccupationSkillPoints();
+            refreshSkillPointSummary();
+        });
+        byId("generatePersonalInterestPoints")?.addEventListener("click", () => {
+            personalInterestPointsManuallyEdited = false;
+            setGeneratedPersonalInterestPoints();
+            refreshSkillPointSummary();
+        });
         document.querySelectorAll<HTMLInputElement>(".character-attribute-input").forEach((input) => {
             input.addEventListener("input", () => {
                 refreshEditorRuleSummary();
@@ -1158,7 +1318,6 @@ interface Window {
         setInputValue("traits", target.background.traits);
         setInputValue("characterRelationships", target.relationships.map((item) => `${item.name}:${item.description}`).join("；"));
         setInputValue("characterMythos", target.background.encounters);
-        setInputValue("characterSkills", formatSkills(target.skills));
         setInputValue("characterWeapons", formatWeapons(target.weapons));
         setInputValue("characterEquipment", formatEquipment(target.equipment));
         setInputValue("characterAssets", formatAssets(target.assets));
@@ -1169,10 +1328,16 @@ interface Window {
         setInputValue("characterCurrentSan", target.currentSan);
         setInputValue("characterInitialSan", target.initialSan);
         setInputValue("characterMaxSan", target.maxSan);
+        setInputValue("characterOccupationSkillPoints", target.occupationSkillPoints);
+        setInputValue("characterPersonalInterestPoints", target.personalInterestPoints);
+        setInputValue("characterOccupationSkillLimit", target.skillSuccessLimits.occupation);
+        setInputValue("characterOtherSkillLimit", target.skillSuccessLimits.other);
+        editorSkills = target.skills;
+        occupationSkillPointsManuallyEdited = target.occupationSkillPoints !== calculateOccupationSkillPoints(target.attributes, target.occupationId);
+        personalInterestPointsManuallyEdited = target.personalInterestPoints !== calculatePersonalInterestPoints(target.attributes);
         setEditorStatus(target.status);
         updateUnbindButton(boundPlayerId);
         updateAvatarPreview(target.avatar);
-        hydrateSkillChecklist(target.skills);
         refreshEditorRuleSummary();
         modal?.show();
     }
@@ -1203,12 +1368,12 @@ interface Window {
             <button type="button" class="occupation-template-card" data-occupation-id="${escapeHtml(occupation.id)}">
                 <strong>${escapeHtml(occupation.name)}</strong>
                 <span>信用评级 ${occupation.creditRating[0]}-${occupation.creditRating[1]}</span>
-                <small>职业点：${occupation.pointsFormula.join(" + ")}</small>
-                <small>本职技能：${occupation.occupationSkills.map(skillNameById).join("、")}</small>
+                <small>职业点：${formatOccupationPointFormula(occupation.pointsFormula)}</small>
+                <small>本职技能：${(occupation.occupationSkillLabels || occupation.occupationSkills.map(skillNameById)).join("、")}</small>
             </button>
         `).join("");
         container.querySelectorAll<HTMLButtonElement>("[data-occupation-id]").forEach((button) => {
-            button.addEventListener("click", () => applyOccupationTemplate(button.dataset.occupationId || "detective"));
+            button.addEventListener("click", () => applyOccupationTemplate(button.dataset.occupationId || "writer"));
         });
         occupationTemplateModal?.show();
     }
@@ -1217,7 +1382,7 @@ interface Window {
         const occupation = getOccupationById(occupationId);
         setInputValue("characterOccupation", occupation.name);
         setInputValue("characterCreditRating", occupation.creditRating[0]);
-        hydrateSkillChecklist(readChecklistSkills());
+        occupationSkillPointsManuallyEdited = false;
         refreshEditorRuleSummary();
         occupationTemplateModal?.hide();
     }
@@ -1260,6 +1425,10 @@ interface Window {
 
     function skillNameById(skillId: string): string {
         return BASE_SKILLS.find((skill) => skill.id === skillId)?.name || skillId;
+    }
+
+    function formatOccupationPointFormula(formula: OccupationPointFormula): string {
+        return formula.map((term) => typeof term === "string" ? term : `${term.attribute} * ${term.multiplier}`).join(" + ");
     }
 
     function handleAvatarUpload(event: Event): void {
@@ -1368,7 +1537,7 @@ interface Window {
 
     function readChecklistSkills(): COC7Skill[] {
         const container = byId("characterSkillChecklist");
-        if (!container) return parseSkills(getInputValue("characterSkills"));
+        if (!container) return editorSkills.length ? editorSkills : normalizeSkills(undefined, readAttributes(), resolveOccupationFromInput(getInputValue("characterOccupation")));
         const occupation = resolveOccupationFromInput(getInputValue("characterOccupation"));
         return BASE_SKILLS.map((base) => {
             const checked = container.querySelector<HTMLInputElement>(`[data-skill-id="${CSS.escape(base.id)}"]`)?.checked || false;
@@ -1382,7 +1551,45 @@ interface Window {
         const attributes = readAttributes();
         syncAttributeDerivedFields(attributes);
         syncEditorResourceLimits(attributes);
+        syncGeneratedSkillPointInputs(false);
+        refreshSkillPointSummary();
         updateAttributeRollHints();
+    }
+
+    function syncGeneratedSkillPointInputs(force: boolean): void {
+        if (force || !occupationSkillPointsManuallyEdited) {
+            setGeneratedOccupationSkillPoints();
+        }
+        if (force || !personalInterestPointsManuallyEdited) {
+            setGeneratedPersonalInterestPoints();
+        }
+        refreshSkillPointSummary();
+    }
+
+    function setGeneratedOccupationSkillPoints(): void {
+        setInputValue("characterOccupationSkillPoints", calculateOccupationSkillPoints(readAttributes(), resolveOccupationIdFromInput(getInputValue("characterOccupation"))));
+    }
+
+    function setGeneratedPersonalInterestPoints(): void {
+        setInputValue("characterPersonalInterestPoints", calculatePersonalInterestPoints(readAttributes()));
+    }
+
+    function refreshSkillPointSummary(): void {
+        const occupation = resolveOccupationFromInput(getInputValue("characterOccupation"));
+        const spent = calculateEditorSkillPointSpending(occupation);
+        const occupationTotal = clampNumber(getInputValue("characterOccupationSkillPoints"), 0, 999, 0);
+        const personalTotal = clampNumber(getInputValue("characterPersonalInterestPoints"), 0, 999, 0);
+        setText("characterOccupationSkillPointsRemaining", `剩余 ${Math.max(0, occupationTotal - spent.occupation)}`);
+        setText("characterPersonalInterestPointsRemaining", `剩余 ${Math.max(0, personalTotal - spent.personal)}`);
+    }
+
+    function calculateEditorSkillPointSpending(occupation: COC7Occupation): { occupation: number; personal: number } {
+        return readChecklistSkills().reduce((summary, skill) => {
+            const spent = Math.max(0, skill.value - skill.base);
+            if (occupation.occupationSkills.includes(skill.id) || skill.occupation) summary.occupation += spent;
+            else summary.personal += spent;
+            return summary;
+        }, { occupation: 0, personal: 0 });
     }
 
     function autoAllocateEditorOccupationSkills(): void {
@@ -1459,7 +1666,13 @@ interface Window {
             initialSan: clampNumber(getInputValue("characterInitialSan"), 0, maxSan, maxSan),
             currentSan: clampNumber(getInputValue("characterCurrentSan"), 0, maxSan, maxSan),
             status: readEditorStatus(),
-            skills: mergeManualSkills(readChecklistSkills(), parseSkills(getInputValue("characterSkills"))),
+            occupationSkillPoints: clampNumber(getInputValue("characterOccupationSkillPoints"), 0, 999, calculateOccupationSkillPoints(attributes, resolveOccupationIdFromInput(occupationName))),
+            personalInterestPoints: clampNumber(getInputValue("characterPersonalInterestPoints"), 0, 999, calculatePersonalInterestPoints(attributes)),
+            skillSuccessLimits: {
+                occupation: clampNumber(getInputValue("characterOccupationSkillLimit"), 0, 99, 75),
+                other: clampNumber(getInputValue("characterOtherSkillLimit"), 0, 99, 50)
+            },
+            skills: readChecklistSkills(),
             weapons: parseWeapons(getInputValue("characterWeapons")),
             equipment: parseEquipment(getInputValue("characterEquipment")),
             assets: parseAssets(getInputValue("characterAssets")),

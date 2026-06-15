@@ -719,6 +719,45 @@
     margin-top: 16px;
 }
 
+.character-skill-editor-panel {
+    margin-top: 0;
+}
+
+.character-skill-editor-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.45fr) minmax(260px, 0.75fr);
+    gap: 12px;
+}
+
+.character-skill-points-card,
+.character-skill-limit-card {
+    padding: 12px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--color-panel-muted);
+}
+
+.character-skill-points-grid,
+.character-skill-limit-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.character-skill-limit-title {
+    display: block;
+    margin-bottom: 10px;
+    color: var(--color-text);
+    font-size: 0.82rem;
+    font-weight: 800;
+}
+
+.character-point-hint {
+    color: var(--color-muted);
+    font-size: 0.72rem;
+    line-height: 1.35;
+}
+
 .character-resource-card,
 .character-status-panel {
     padding: 12px;
@@ -954,6 +993,7 @@
     .character-attribute-grid,
     .background-grid,
     .attribute-editor-grid,
+    .character-skill-editor-row,
     .character-resource-grid,
     .character-status-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -966,6 +1006,8 @@
 }
 
 @media (max-width: 560px) {
+    .character-skill-editor-row,
+    .character-skill-points-grid,
     .character-resource-grid,
     .character-status-grid,
     .character-resource-values-three {

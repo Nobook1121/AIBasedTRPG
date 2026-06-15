@@ -935,6 +935,43 @@
                             </section>
                         </section>
 
+                        <section class="character-form-section character-skill-editor-panel">
+                            <h6 class="character-section-title"><i class="fa fa-graduation-cap" aria-hidden="true"></i> <span>技能</span><small>Skills</small></h6>
+                            <div class="character-skill-editor-row">
+                                <section class="character-skill-points-card">
+                                    <div class="character-skill-points-grid">
+                                        <label class="character-mini-field" for="characterOccupationSkillPoints">
+                                            <span>职业点数</span>
+                                            <div class="character-input-shell">
+                                                <input type="number" class="form-control" id="characterOccupationSkillPoints" min="0">
+                                                <button type="button" class="character-input-action" id="generateOccupationSkillPoints" title="按职业与属性生成职业点数" aria-label="按职业与属性生成职业点数">
+                                                    <i class="fa fa-refresh" aria-hidden="true"></i>
+                                                </button>
+                                            </div>
+                                            <small class="character-point-hint" id="characterOccupationSkillPointsRemaining">剩余 0</small>
+                                        </label>
+                                        <label class="character-mini-field" for="characterPersonalInterestPoints">
+                                            <span>兴趣点数</span>
+                                            <div class="character-input-shell">
+                                                <input type="number" class="form-control" id="characterPersonalInterestPoints" min="0">
+                                                <button type="button" class="character-input-action" id="generatePersonalInterestPoints" title="按智力生成兴趣点数" aria-label="按智力生成兴趣点数">
+                                                    <i class="fa fa-refresh" aria-hidden="true"></i>
+                                                </button>
+                                            </div>
+                                            <small class="character-point-hint" id="characterPersonalInterestPointsRemaining">剩余 0</small>
+                                        </label>
+                                    </div>
+                                </section>
+                                <section class="character-skill-limit-card">
+                                    <span class="character-skill-limit-title">技能成功率上限</span>
+                                    <div class="character-skill-limit-grid">
+                                        <label class="character-mini-field" for="characterOccupationSkillLimit"><span>本职</span><input type="number" class="form-control" id="characterOccupationSkillLimit" min="0" max="99"></label>
+                                        <label class="character-mini-field" for="characterOtherSkillLimit"><span>其他</span><input type="number" class="form-control" id="characterOtherSkillLimit" min="0" max="99"></label>
+                                    </div>
+                                </section>
+                            </div>
+                        </section>
+
                         <section class="character-form-section">
                             <h6><i class="fa fa-graduation-cap" aria-hidden="true"></i> 背景信息</h6>
                             <div class="row g-3">
@@ -972,11 +1009,6 @@
                                 <input type="number" class="form-control" id="characterCreditRating" min="0" max="99">
                                 <small class="text-muted">请根据所选职业模板允许的信用评级范围填写。</small>
                             </div>
-                            <button type="button" class="btn btn-sm btn-outline-secondary mb-3" id="autoAllocateOccupationSkills">自动分配职业技能</button>
-                            <label class="form-label" for="characterSkillChecklist">技能复选</label>
-                            <div class="skill-check-grid" id="characterSkillChecklist"></div>
-                            <label class="form-label" for="characterSkills">技能列表</label>
-                            <textarea class="form-control" id="characterSkills" rows="4" placeholder="侦查:65:熟修:物理；图书馆使用:70:主修:学术"></textarea>
                             <label class="form-label mt-3" for="characterWeapons">武器</label>
                             <textarea class="form-control" id="characterWeapons" rows="3" placeholder="左轮手枪:射击:1D10:15m:1:6:100"></textarea>
                             <label class="form-label mt-3" for="characterEquipment">装备列表</label>

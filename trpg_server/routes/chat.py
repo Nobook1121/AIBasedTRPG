@@ -3,9 +3,10 @@ import logging
 import time
 
 import requests
-from flask import Blueprint, current_app, request
+from flask import Blueprint, current_app, request, session
 
 from trpg_server.json_store import read_json, write_json_atomic
+from trpg_server.logging_config import log_user_action, user_action_text
 from trpg_server.responses import error_response, success_response
 from trpg_server.role_config import load_roles, select_role_for_content
 from trpg_server.settings import CONFIG_DIR, HISTORY_DIR
@@ -180,14 +181,14 @@ def chat():
             "Authorization": f"Bearer {api_key}",
         }
 
-        logger.info(
-            "Sending chat request role=%s platform=%s base_url=%s model=%s user_id=%s request_content=%s",
-            role_config.get("id"),
-            selected_platform,
-            base_url,
-            request_data["model"],
-            user_id,
-            content,
+        log_user_action(
+            logger,
+            user_action_text(session.get("username") or user_id, "发起了 AI 对话"),
+            用户ID=session.get("user_id") or user_id,
+            角色=role_config.get("id"),
+            平台=selected_platform,
+            模型=request_data["model"],
+            内容长度=len(content),
         )
         response = requests.post(base_url, headers=headers, json=request_data, timeout=300)
         if not response.ok:
@@ -205,12 +206,14 @@ def chat():
                 400,
                 "No response",
             )
-        logger.info(
-            "AI response received platform=%s model=%s user_id=%s ai_response=%s",
-            selected_platform,
-            request_data["model"],
-            user_id,
-            ai_response,
+        log_user_action(
+            logger,
+            user_action_text(session.get("username") or user_id, "收到了 AI 对话回复"),
+            用户ID=session.get("user_id") or user_id,
+            平台=selected_platform,
+            模型=request_data["model"],
+            回复长度=len(ai_response),
+            Token数=token_count,
         )
 
         history.extend(
@@ -254,7 +257,12 @@ def send_home_message():
                 "No message content",
             )
 
-        logger.info("Home message user_id=%s", user_id)
+        log_user_action(
+            logger,
+            user_action_text(session.get("username") or user_id, "发送了主页对话"),
+            用户ID=session.get("user_id") or user_id,
+            内容长度=len(message_content),
+        )
         return _message_response(user_id, message_content, "Message sent successfully")
     except Exception as exc:
         logger.exception("Failed to send home message")
@@ -277,7 +285,13 @@ def send_message(script_id):
                 "No message content",
             )
 
-        logger.info("Scenario message script_id=%s user_id=%s", script_id, user_id)
+        log_user_action(
+            logger,
+            user_action_text(session.get("username") or user_id, "发送了剧本对话"),
+            用户ID=session.get("user_id") or user_id,
+            剧本ID=script_id,
+            内容长度=len(message_content),
+        )
         return _message_response(
             user_id,
             message_content,

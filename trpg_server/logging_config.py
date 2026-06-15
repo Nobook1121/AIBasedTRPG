@@ -1,10 +1,12 @@
 import logging
+import json
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any
 
 SENSITIVE_KEYS = {"api_key", "auth_token", "token", "password", "secret", "secret_key"}
+MAX_LOG_VALUE_LENGTH = 200
 LEVEL_LABELS = {
     logging.WARNING: "WARN",
     logging.CRITICAL: "FATAL",
@@ -30,6 +32,39 @@ def redact_sensitive(value: Any) -> Any:
     if isinstance(value, list):
         return [redact_sensitive(item) for item in value]
     return value
+
+
+def user_action_text(username: Any = None, action: str = "进行了操作") -> str:
+    display_name = str(username or "未知用户").strip() or "未知用户"
+    return f"用户 {display_name} {action}"
+
+
+def log_user_action(logger: logging.Logger, message: str, **details: Any) -> None:
+    safe_details = redact_sensitive(details)
+    detail_text = _format_details(safe_details)
+    if detail_text:
+        logger.info("%s；%s", message, detail_text)
+        return
+    logger.info("%s", message)
+
+
+def _format_details(details: dict[str, Any]) -> str:
+    parts = []
+    for key, value in details.items():
+        if value is None or value == "":
+            continue
+        parts.append(f"{key}={_format_log_value(value)}")
+    return "，".join(parts)
+
+
+def _format_log_value(value: Any) -> str:
+    if isinstance(value, (dict, list)):
+        text = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    else:
+        text = str(value)
+    if len(text) > MAX_LOG_VALUE_LENGTH:
+        return f"{text[:MAX_LOG_VALUE_LENGTH]}..."
+    return text
 
 
 def configure_logging(log_dir: str | Path = "logs") -> None:

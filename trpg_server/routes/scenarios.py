@@ -7,6 +7,7 @@ from urllib.parse import unquote
 from flask import Blueprint, request, session
 
 from trpg_server.json_store import read_json, write_json_atomic
+from trpg_server.logging_config import log_user_action, user_action_text
 from trpg_server.responses import error_response, success_response
 from trpg_server.security import (
     build_public_asset_url,
@@ -174,11 +175,12 @@ def create_scenario():
         write_json_atomic(file_path, scenario_data)
         clear_scenarios_cache()
 
-        logger.debug(
-            "Scenario created user_id=%s scenario_id=%s title=%s",
-            scenario_data.get("user_id", "unknown"),
-            scenario_id,
-            title,
+        log_user_action(
+            logger,
+            user_action_text(session.get("username"), "创建了剧本"),
+            用户ID=session.get("user_id"),
+            剧本ID=scenario_id,
+            标题=title,
         )
         return success_response(
             scenario_data,
@@ -224,11 +226,12 @@ def update_scenario(scenario_id):
         write_json_atomic(target_file, scenario_data)
         clear_scenarios_cache()
 
-        logger.debug(
-            "Scenario updated user_id=%s scenario_id=%s title=%s",
-            scenario_data.get("user_id", "unknown"),
-            scenario_id,
-            scenario_data.get("title", "unknown"),
+        log_user_action(
+            logger,
+            user_action_text(session.get("username"), "更新了剧本"),
+            用户ID=session.get("user_id"),
+            剧本ID=scenario_id,
+            标题=scenario_data.get("title", "unknown"),
         )
         return success_response(scenario_data, "Scenario updated successfully")
     except Exception as exc:
@@ -265,11 +268,12 @@ def delete_scenario(scenario_id):
             cover_path.unlink()
 
         clear_scenarios_cache()
-        logger.debug(
-            "Scenario deleted user_id=%s scenario_id=%s title=%s",
-            user_id,
-            scenario_id,
-            scenario_data.get("title", "unknown"),
+        log_user_action(
+            logger,
+            user_action_text(session.get("username"), "删除了剧本"),
+            用户ID=session.get("user_id") or user_id,
+            剧本ID=scenario_id,
+            标题=scenario_data.get("title", "unknown"),
         )
         return success_response(message="Scenario deleted successfully")
     except Exception as exc:
@@ -317,7 +321,13 @@ def upload_scenario_cover():
         cover.save(file_path)
         cover_url = build_public_asset_url("/assets/scenario_covers", filename)
 
-        logger.debug("Scenario cover uploaded user_id=%s file=%s", user_id, filename)
+        log_user_action(
+            logger,
+            user_action_text(session.get("username"), "上传了剧本封面"),
+            用户ID=user_id,
+            文件=filename,
+            剧本标题=scenario_title,
+        )
         return success_response(
             {"cover_url": cover_url},
             "Cover uploaded successfully",
@@ -352,7 +362,12 @@ def delete_scenario_cover():
             return error_response("Cover file does not exist", 404, "File not found")
 
         file_path.unlink()
-        logger.debug("Scenario cover deleted user_id=%s file=%s", user_id, filename)
+        log_user_action(
+            logger,
+            user_action_text(session.get("username"), "删除了剧本封面"),
+            用户ID=user_id,
+            文件=filename,
+        )
         return success_response(message="Cover deleted successfully")
     except Exception as exc:
         logger.exception("Failed to delete scenario cover")
@@ -393,11 +408,12 @@ def rename_scenario_cover():
             new_file_path.unlink()
         old_file_path.rename(new_file_path)
 
-        logger.debug(
-            "Scenario cover renamed user_id=%s old_file=%s new_file=%s",
-            user_id,
-            old_filename,
-            new_filename,
+        log_user_action(
+            logger,
+            user_action_text(session.get("username"), "重命名了剧本封面"),
+            用户ID=user_id,
+            原文件=old_filename,
+            新文件=new_filename,
         )
         return success_response(message="Cover renamed successfully")
     except Exception as exc:

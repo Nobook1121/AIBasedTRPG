@@ -5,6 +5,7 @@ from uuid import uuid4
 from flask import Blueprint, current_app, request, session
 
 from trpg_server.json_store import read_json, write_json_atomic
+from trpg_server.logging_config import log_user_action, user_action_text
 from trpg_server.responses import error_response, success_response
 from trpg_server.security import safe_join
 from trpg_server.settings import ROOMS_DIR
@@ -388,13 +389,14 @@ def create_room():
     _write_messages(room_dir, [])
     write_json_atomic(room_dir / "autosave.json", {"updated_at": now, "messages": []})
 
-    logger.info(
-        "Room created room_id=%s room_code=%s room_name=%s creator_id=%s creator_name=%s",
-        room_id,
-        info["room_code"],
-        name,
-        session["user_id"],
-        session.get("username"),
+    log_user_action(
+        logger,
+        user_action_text(session.get("username"), "创建了房间"),
+        用户ID=session.get("user_id"),
+        房间ID=room_id,
+        房间码=info["room_code"],
+        房间名=name,
+        剧本=scenario_title,
     )
     return success_response(_room_summary(info), "Room created successfully", 201)
 
@@ -429,13 +431,13 @@ def join_room_by_code():
         )
         _write_room(room_dir, info)
 
-    logger.info(
-        "Room joined room_id=%s room_code=%s room_name=%s user_id=%s username=%s",
-        info["id"],
-        info.get("room_code"),
-        info.get("name"),
-        user_id,
-        session.get("username"),
+    log_user_action(
+        logger,
+        user_action_text(session.get("username"), "加入了房间"),
+        用户ID=user_id,
+        房间ID=info["id"],
+        房间码=info.get("room_code"),
+        房间名=info.get("name"),
     )
     return success_response(_room_summary(info), "Room joined successfully")
 
@@ -465,6 +467,15 @@ def bind_room_member_character(room_id, user_id):
     if not _bind_character(target, character_card):
         return error_response("Character card is required", 400, "Character card is required")
     _write_room(room_dir, info)
+    log_user_action(
+        logger,
+        user_action_text(session.get("username"), "绑定了房间角色卡"),
+        用户ID=session.get("user_id"),
+        房间ID=room_id,
+        目标用户=user_id,
+        角色卡ID=target.get("character_card", {}).get("id"),
+        角色名=target.get("character_card", {}).get("name"),
+    )
     return success_response(_room_summary(info), "Character bound successfully")
 
 
@@ -491,6 +502,14 @@ def delete_room_member(room_id, user_id):
     if target.get("room_role") == ROOM_ROLE_ADMIN:
         target["room_role"] = ROOM_ROLE_MEMBER
     _write_room(room_dir, info)
+    log_user_action(
+        logger,
+        user_action_text(session.get("username"), "移除了房间成员"),
+        用户ID=session.get("user_id"),
+        房间ID=room_id,
+        目标用户=user_id,
+        房间名=info.get("name"),
+    )
     return success_response(_room_summary(info), "Player removed")
 
 
@@ -517,6 +536,14 @@ def update_room_member_role(room_id, user_id):
         return error_response("Invalid room role", 400, "Invalid room role")
     target["room_role"] = role
     _write_room(room_dir, info)
+    log_user_action(
+        logger,
+        user_action_text(session.get("username"), "更改了房间成员权限"),
+        用户ID=session.get("user_id"),
+        房间ID=room_id,
+        目标用户=user_id,
+        权限=role,
+    )
     return success_response(_room_summary(info), "Room role updated")
 
 
@@ -552,7 +579,13 @@ def delete_room(room_id):
     import shutil
 
     shutil.rmtree(room_dir)
-    logger.info("Room deleted room_id=%s user_id=%s", room_id, session["user_id"])
+    log_user_action(
+        logger,
+        user_action_text(session.get("username"), "删除了房间"),
+        用户ID=session.get("user_id"),
+        房间ID=room_id,
+        房间名=info.get("name"),
+    )
     return success_response(message="Room deleted successfully")
 
 
@@ -620,12 +653,13 @@ def create_room_message(room_id):
     _write_messages(room_dir, messages)
     _write_room(room_dir, info)
 
-    logger.info(
-        "Room message room_id=%s sender_id=%s type=%s content=%s",
-        room_id,
-        session["user_id"],
-        message["type"],
-        content,
+    log_user_action(
+        logger,
+        user_action_text(session.get("username"), "发送了房间对话"),
+        用户ID=session.get("user_id"),
+        房间ID=room_id,
+        消息类型=message["type"],
+        内容长度=len(content),
     )
     return success_response(message, "Room message saved successfully", 201)
 
@@ -680,14 +714,15 @@ def _create_character_record_for_room(room_dir, info):
         state["sanity_records"].insert(0, record)
 
     _write_room(room_dir, info)
-    logger.info(
-        "Room character record room_id=%s type=%s target_user=%s value=%s reason=%s created_by=%s",
-        info.get("id"),
-        record_type,
-        target.get("username"),
-        value,
-        reason,
-        session.get("username"),
+    log_user_action(
+        logger,
+        user_action_text(session.get("username"), "记录了角色状态变化"),
+        用户ID=session.get("user_id"),
+        房间ID=info.get("id"),
+        类型=record_type,
+        目标玩家=target.get("username"),
+        数值=value,
+        原因=reason,
     )
     return success_response({"member": target, "record": record}, "Character record created", 201)
 
@@ -727,11 +762,12 @@ def delete_character_record(room_id, record_id):
                 state[collection_name] = next_records
                 _recalculate_character_state(state)
                 _write_room(room_dir, info)
-                logger.info(
-                    "Room character record deleted room_id=%s record_id=%s admin=%s",
-                    room_id,
-                    record_id,
-                    session.get("username"),
+                log_user_action(
+                    logger,
+                    user_action_text(session.get("username"), "删除了角色状态记录"),
+                    用户ID=session.get("user_id"),
+                    房间ID=room_id,
+                    记录ID=record_id,
                 )
                 return success_response({"member": member}, "Character record deleted")
 
@@ -784,7 +820,13 @@ def create_room_node(room_id):
         "messages": _read_messages(room_dir),
     }
     write_json_atomic(room_dir / "nodes" / node["filename"], node)
-    logger.info("Room node created room_id=%s user_id=%s", room_id, session["user_id"])
+    log_user_action(
+        logger,
+        user_action_text(session.get("username"), "创建了房间回档节点"),
+        用户ID=session.get("user_id"),
+        房间ID=room_id,
+        文件=node["filename"],
+    )
     return success_response(node, "Room node created successfully", 201)
 
 
@@ -825,7 +867,13 @@ def restore_room_node(room_id, node_filename):
     node = read_json(node_file, default={"messages": []})
     _write_messages(room_dir, node.get("messages", []))
     _write_room(room_dir, info)
-    logger.info("Room node restored room_id=%s file=%s", room_id, node_filename)
+    log_user_action(
+        logger,
+        user_action_text(session.get("username"), "恢复了房间回档节点"),
+        用户ID=session.get("user_id"),
+        房间ID=room_id,
+        文件=node_filename,
+    )
     return success_response(node, "Room node restored successfully")
 
 
@@ -844,7 +892,13 @@ def delete_room_node(room_id, node_filename):
     node_file = safe_join(room_dir / "nodes", node_filename)
     if node_file.exists():
         node_file.unlink()
-    logger.info("Room node deleted room_id=%s file=%s", room_id, node_filename)
+    log_user_action(
+        logger,
+        user_action_text(session.get("username"), "删除了房间回档节点"),
+        用户ID=session.get("user_id"),
+        房间ID=room_id,
+        文件=node_filename,
+    )
     return success_response(message="Room node deleted successfully")
 
 
@@ -862,6 +916,13 @@ def save_room_autosave(room_id):
 
     autosave = {"updated_at": _timestamp(), "messages": _read_messages(room_dir)}
     write_json_atomic(room_dir / "autosave.json", autosave)
+    log_user_action(
+        logger,
+        user_action_text(session.get("username"), "保存了房间自动存档"),
+        用户ID=session.get("user_id"),
+        房间ID=room_id,
+        消息数=len(autosave["messages"]),
+    )
     return success_response(autosave, "Room autosave saved successfully")
 
 

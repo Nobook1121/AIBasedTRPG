@@ -6,6 +6,7 @@ from datetime import timedelta
 
 from flask import Blueprint, current_app, request, session
 
+from trpg_server.logging_config import log_user_action, user_action_text
 from trpg_server.responses import error_response, success_response
 from trpg_server.security import (
     SESSION_TOKEN_KEY,
@@ -118,7 +119,12 @@ def register():
             logger.debug("User registration failed username=%s reason=%s", username, message)
             return error_response(message, 400, message)
 
-        logger.debug("User registered username=%s email=%s ip=%s", username, email, ip_address)
+        log_user_action(
+            logger,
+            user_action_text(username, "注册了账号"),
+            邮箱=email,
+            IP=ip_address,
+        )
         return success_response(message=message, status=201)
     except Exception as exc:
         logger.exception("Failed to register user")
@@ -147,7 +153,12 @@ def login():
         success, message, user = result[0], result[1], result[2]
         manager_session_token = result[3] if len(result) > 3 else None
         if not success:
-            logger.info("User login failed username=%s ip=%s reason=%s", identifier, ip_address, message)
+            log_user_action(
+                logger,
+                user_action_text(identifier, "登录失败"),
+                IP=ip_address,
+                原因=message,
+            )
             return error_response(message, 401, message)
 
         manager = _get_user_manager()
@@ -166,7 +177,12 @@ def login():
         session.permanent = True
         current_app.permanent_session_lifetime = timedelta(days=7)
 
-        logger.info("User logged in username=%s user_id=%s ip=%s", identifier, user["id"], ip_address)
+        log_user_action(
+            logger,
+            user_action_text(user.get("username") or identifier, "登录成功"),
+            用户ID=user["id"],
+            IP=ip_address,
+        )
         return success_response(_user_payload(user), message)
     except Exception as exc:
         logger.exception("Failed to login user")
@@ -198,7 +214,11 @@ def logout():
         if revoke_error:
             return error_response("Logout failed", 500, str(revoke_error))
 
-        logger.debug("User logged out username=%s", username)
+        log_user_action(
+            logger,
+            user_action_text(username, "退出登录"),
+            用户ID=user_id,
+        )
         return success_response(message="Logged out successfully")
     except Exception as exc:
         logger.exception("Failed to logout user")
@@ -292,7 +312,14 @@ def update_user():
             avatar_persisted = True
 
         session["username"] = username
-        logger.debug("User profile updated user_id=%s username=%s", user_id, username)
+        log_user_action(
+            logger,
+            user_action_text(username, "更改了个人资料"),
+            用户ID=user_id,
+            昵称=nickname,
+            邮箱=email,
+            更换头像="是" if saved_avatar_file else "否",
+        )
         return success_response(
             {
                 "user_id": user_id,
@@ -343,6 +370,11 @@ def change_password():
             )
             if not success:
                 return error_response(message, 400, message)
+            log_user_action(
+                logger,
+                user_action_text(session.get("username"), "更改了登录密码"),
+                用户ID=user_id,
+            )
             return success_response(message=message)
 
         user = manager.get_user_by_id(user_id)
@@ -371,6 +403,11 @@ def change_password():
             user.clear()
             user.update(original_user)
             return error_response("Failed to save user data", 500, "Failed to save data")
+        log_user_action(
+            logger,
+            user_action_text(session.get("username"), "更改了登录密码"),
+            用户ID=user_id,
+        )
         return success_response(message="Password changed")
     except Exception as exc:
         logger.exception("Failed to change password")
