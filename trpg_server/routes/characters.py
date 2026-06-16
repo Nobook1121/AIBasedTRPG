@@ -57,6 +57,10 @@ def _iter_builtin_occupation_files():
     return sorted(occupations_dir.glob("*.json"))
 
 
+def _skill_catalog_path():
+    return _get_config_dir() / "character_skills.json"
+
+
 def _max_cards_per_user():
     config_path = _get_config_dir() / "general.toml"
     try:
@@ -136,6 +140,26 @@ def list_builtin_occupations():
             occupations.append(occupation)
     occupations.sort(key=lambda item: str(item.get("id") or item.get("nameKey") or ""))
     return success_response(occupations, "Occupation catalogs loaded successfully")
+
+
+@bp.route("/api/character-catalogs/skills", methods=["GET"])
+def list_character_skills():
+    login_error = _require_login()
+    if login_error:
+        return login_error
+
+    catalog = read_json(_skill_catalog_path(), default={})
+    if not isinstance(catalog, dict):
+        catalog = {}
+    skills = catalog.get("skills")
+    if not isinstance(skills, list):
+        catalog["skills"] = []
+    locales = catalog.get("locales")
+    if not isinstance(locales, dict):
+        catalog["locales"] = {}
+    catalog.setdefault("version", 1)
+    catalog.setdefault("defaultLocale", "zh-CN")
+    return success_response(catalog, "Skill catalog loaded successfully")
 
 
 @bp.route("/api/characters", methods=["GET"])

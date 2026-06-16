@@ -1,7 +1,7 @@
 type COC7CoreAttributeKey = "STR" | "DEX" | "SIZ" | "APP" | "CON" | "INT" | "POW" | "EDU" | "LUC";
 type COC7AttributeKey = COC7CoreAttributeKey | "AGE";
 type SkillRank = "新手" | "学习" | "熟修" | "主修";
-type SkillCategory = "探索" | "社交" | "知识" | "战斗" | "行动" | "神话";
+type SkillCategory = "特殊" | "探索" | "社交" | "战斗" | "医疗" | "运动" | "知识" | "技术" | "操纵" | "其他";
 type InvestigatorGender = "male" | "female" | "unknown";
 type NameRegion = "china" | "japan" | "korea" | "western" | "russia" | "india" | "france" | "germany" | "spain" | "italy";
 
@@ -24,6 +24,7 @@ interface LegacyAttributesInput extends Partial<COC7Attributes> {
 
 interface COC7Skill {
     id: string;
+    skillKey?: string;
     name: string;
     value: number;
     base: number;
@@ -31,7 +32,30 @@ interface COC7Skill {
     checked: boolean;
     occupation?: boolean;
     specialty?: string;
+    specialtyKey?: string;
+    occupationPoints?: number;
+    interestPoints?: number;
+    growthPoints?: number;
     rank?: SkillRank;
+}
+
+interface COC7SkillWithSource extends COC7Skill {
+    skillKey?: string;
+}
+
+interface SkillSpecialtyCatalogEntry {
+    key: string;
+    labelKey: string;
+}
+
+interface SkillCatalogEntry {
+    key: string;
+    labelKey: string;
+    category: SkillCategory;
+    base: number;
+    repeatable: number;
+    specialties: SkillSpecialtyCatalogEntry[];
+    eraLimited?: boolean;
 }
 
 interface OccupationPointFormulaTerm {
@@ -108,6 +132,7 @@ interface COC7Occupation {
     occupationSkillEntries?: OccupationSkillEntry[];
     occupationSkillLabels?: string[];
     skillBonuses: Record<string, number>;
+    skillBases: Record<string, number>;
     specialties: string[];
     passiveEffects: string[];
 }
@@ -121,6 +146,14 @@ interface OccupationCatalogPayload {
         terms?: OccupationPointFormulaTerm[];
     };
     occupationSkills?: OccupationSkillEntry[];
+    skillBases?: Record<string, number>;
+}
+
+interface SkillCatalogPayload {
+    version?: number;
+    defaultLocale?: string;
+    skills?: SkillCatalogEntry[];
+    locales?: Record<string, Record<string, string>>;
 }
 
 interface COC7HalfAndFifth {
@@ -311,7 +344,12 @@ interface Window {
     };
     const SKILL_RANKS: SkillRank[] = ["新手", "学习", "熟修", "主修"];
     const REGIONAL_NAMES: Record<NameRegion, { family: string[]; male: string[]; female: string[]; neutral: string[]; westernOrder?: boolean }> = {
-        china: { family: ["林", "陈", "顾", "沈", "周", "陆", "许", "梁"], male: ["雨衡", "明远", "怀瑾", "景行", "子昂", "修文"], female: ["若宁", "清荷", "知遥", "南枝", "书瑶", "映雪"], neutral: ["安和", "知远", "星河"] },
+        china: {
+            family: ["林", "陈", "顾", "沈", "周", "陆", "许", "梁", "赵", "钱", "孙", "李", "王", "吴", "郑", "冯", "蒋", "韩", "杨", "朱", "秦", "何", "吕", "罗", "宋", "谢", "唐", "杜", "程", "苏", "魏", "叶"],
+            male: ["雨衡", "明远", "怀瑾", "景行", "子昂", "修文", "亦舟", "远航", "启明", "望舒", "云起", "砚清", "书珩", "临川", "君泽", "予安", "星野", "知白", "立言", "鹤鸣", "清越", "元恺", "文昊", "慕辰", "南烛", "纪行", "守拙", "斯年"],
+            female: ["若宁", "清荷", "知遥", "南枝", "书瑶", "映雪", "芷晴", "以沫", "予棠", "云舒", "念真", "采薇", "夕颜", "月白", "景澜", "安歌", "诗涵", "沐晴", "婉仪", "明玥", "洛笙", "令仪", "素问", "清欢", "青黛", "语桐", "初夏", "晚照"],
+            neutral: ["安和", "知远", "星河", "沐川", "云深", "青岚", "长风", "一白", "宁川", "砚秋", "归鸿", "明岑", "溪亭", "望川", "逐光", "南星"]
+        },
         japan: { family: ["藤原", "佐藤", "高桥", "田中", "渡边", "伊藤"], male: ["悠真", "莲", "翔太", "拓海"], female: ["香里", "美咲", "结衣", "葵"], neutral: ["遥", "光", "律"] },
         korea: { family: ["金", "李", "朴", "崔", "郑", "韩"], male: ["俊浩", "民载", "道允", "志勋"], female: ["素贤", "智雅", "恩彩", "瑞妍"], neutral: ["贤宇", "智安", "夏仁"] },
         western: { family: ["Carter", "Miller", "Bennett", "Morgan", "Reed", "Howard"], male: ["Arthur", "Edward", "Henry", "Victor"], female: ["Eleanor", "Clara", "Grace", "Helen"], neutral: ["Alex", "Robin", "Taylor"], westernOrder: true },
@@ -331,6 +369,7 @@ interface Window {
             occupationSkills: ["artCraft", "disguise", "law", "libraryUse", "psychology", "spotHidden", "stealth", "fastTalk"],
             pointsFormula: ["EDU", "EDU", "DEX", "DEX"],
             skillBonuses: { spotHidden: 20, listen: 15, psychology: 15, libraryUse: 10 },
+            skillBases: {},
             specialties: ["调查", "跟踪", "线索整合"],
             passiveEffects: ["调查场景中第一次侦查或聆听检定可获得 +10 情境加值。"]
         },
@@ -341,6 +380,7 @@ interface Window {
             occupationSkills: ["firstAid", "medicine", "psychology", "science", "scienceBiology", "sciencePharmacy", "languageOther", "persuade"],
             pointsFormula: ["EDU", "EDU", "EDU", "EDU"],
             skillBonuses: { medicine: 25, firstAid: 20, psychology: 10, science: 10 },
+            skillBases: {},
             specialties: ["治疗", "诊断", "解剖"],
             passiveEffects: ["处理伤势时，急救成功后可额外恢复 1 点生命值。"]
         },
@@ -351,6 +391,7 @@ interface Window {
             occupationSkills: ["libraryUse", "languageOwn", "history", "archaeology", "science", "psychology", "languageOther", "persuade"],
             pointsFormula: ["EDU", "EDU", "EDU", "EDU"],
             skillBonuses: { libraryUse: 25, languageOwn: 20, history: 15, archaeology: 15 },
+            skillBases: {},
             specialties: ["学术研究", "文献检索", "古物辨识"],
             passiveEffects: ["学术分组技能检定成功后，可额外获得一条背景线索。"]
         },
@@ -361,6 +402,7 @@ interface Window {
             occupationSkills: ["artCraft", "history", "libraryUse", "languageOwn", "psychology", "fastTalk", "photography", "persuade"],
             pointsFormula: ["EDU", "EDU", "APP", "APP"],
             skillBonuses: { libraryUse: 20, fastTalk: 15, psychology: 10, photography: 10 },
+            skillBases: {},
             specialties: ["采访", "摄影", "舆论调查"],
             passiveEffects: ["公开场合收集传闻时，话术或说服检定可获得 +10 情境加值。"]
         },
@@ -371,6 +413,7 @@ interface Window {
             occupationSkills: ["fightingBrawl", "firearmsHandgun", "firstAid", "law", "listen", "psychology", "spotHidden", "driveAuto"],
             pointsFormula: ["EDU", "EDU", "STR", "DEX"],
             skillBonuses: { law: 15, spotHidden: 15, firearmsHandgun: 10, psychology: 10 },
+            skillBases: {},
             specialties: ["执法", "审讯", "现场控制"],
             passiveEffects: ["面对普通市民或地方机构时，可获得一次身份便利。"]
         },
@@ -381,6 +424,7 @@ interface Window {
             occupationSkills: ["anthropology", "history", "libraryUse", "occult", "languageOther", "psychology", "spotHidden", "cthulhuMythos"],
             pointsFormula: ["EDU", "EDU", "INT", "INT"],
             skillBonuses: { occult: 25, libraryUse: 15, history: 10, languageOther: 10 },
+            skillBases: {},
             specialties: ["仪式", "民俗", "禁书"],
             passiveEffects: ["辨识神秘符号、仪式或民俗时可获得 +10 情境加值。"]
         },
@@ -391,6 +435,7 @@ interface Window {
             occupationSkills: ["appraise", "artCraft", "history", "libraryUse", "languageOther", "occult", "persuade", "spotHidden"],
             pointsFormula: ["EDU", "EDU", "APP", "APP"],
             skillBonuses: { appraise: 25, history: 15, persuade: 10, spotHidden: 10 },
+            skillBases: {},
             specialties: ["估价", "古物", "交易"],
             passiveEffects: ["鉴定古物、赝品或收藏来源时可获得 +10 情境加值。"]
         },
@@ -401,6 +446,7 @@ interface Window {
             occupationSkills: ["climb", "dodge", "fightingBrawl", "firearmsRifle", "firstAid", "stealth", "survival", "throw"],
             pointsFormula: ["EDU", "EDU", "STR", "DEX"],
             skillBonuses: { firearmsRifle: 20, fightingBrawl: 15, firstAid: 10, survival: 10 },
+            skillBases: {},
             specialties: ["战斗", "野外", "纪律"],
             passiveEffects: ["战斗轮开始前第一次运动类行动可获得 +10 情境加值。"]
         },
@@ -411,6 +457,7 @@ interface Window {
             occupationSkills: ["appraise", "disguise", "fightingBrawl", "firearmsHandgun", "locksmith", "sleightOfHand", "stealth", "fastTalk"],
             pointsFormula: ["EDU", "EDU", "DEX", "DEX"],
             skillBonuses: { stealth: 20, locksmith: 15, sleightOfHand: 15, fastTalk: 10 },
+            skillBases: {},
             specialties: ["潜入", "黑市", "伪装"],
             passiveEffects: ["处理非法交易、潜入或销赃线索时可获得 +10 情境加值。"]
         },
@@ -421,6 +468,7 @@ interface Window {
             occupationSkills: ["electricalRepair", "mechanicalRepair", "operateHeavyMachinery", "science", "scienceEngineering", "libraryUse", "mathematics", "spotHidden"],
             pointsFormula: ["EDU", "EDU", "EDU", "EDU"],
             skillBonuses: { mechanicalRepair: 25, electricalRepair: 20, scienceEngineering: 15, operateHeavyMachinery: 10 },
+            skillBases: {},
             specialties: ["机械", "电气", "结构"],
             passiveEffects: ["修复机械、电气设备或分析工程结构时可获得 +10 情境加值。"]
         }
@@ -453,62 +501,35 @@ interface Window {
         ],
         occupationSkillLabels: ["技艺(写作)", "历史", "图书馆使用", "博物学或神秘学", "外语", "母语", "心理学", "任意一项其他个人或时代特长"],
         skillBonuses: {},
+        skillBases: {
+            artCraft: 5,
+            history: 5,
+            libraryUse: 20,
+            naturalWorld: 10,
+            occult: 5,
+            languageOther: 1,
+            languageOwn: 0,
+            psychology: 10
+        },
         specialties: [],
         passiveEffects: []
     };
 
     PRESET_OCCUPATIONS = [WRITER_OCCUPATION];
 
-    const BASE_SKILLS: COC7Skill[] = [
-        { id: "accounting", name: "会计", base: 5, value: 5, category: "知识", checked: false },
-        { id: "anthropology", name: "人类学", base: 1, value: 1, category: "知识", checked: false },
-        { id: "appraise", name: "估价", base: 5, value: 5, category: "知识", checked: false },
-        { id: "archaeology", name: "考古学", base: 1, value: 1, category: "知识", checked: false },
-        { id: "artCraft", name: "艺术/手艺", base: 5, value: 5, category: "知识", checked: false },
-        { id: "charm", name: "魅惑", base: 15, value: 15, category: "社交", checked: false },
-        { id: "climb", name: "攀爬", base: 20, value: 20, category: "行动", checked: false },
-        { id: "cthulhuMythos", name: "克苏鲁神话", base: 0, value: 0, category: "神话", checked: false },
-        { id: "disguise", name: "乔装", base: 5, value: 5, category: "社交", checked: false },
-        { id: "dodge", name: "闪避", base: 25, value: 25, category: "战斗", checked: false },
-        { id: "driveAuto", name: "汽车驾驶", base: 20, value: 20, category: "行动", checked: false },
-        { id: "electricalRepair", name: "电气维修", base: 10, value: 10, category: "行动", checked: false },
-        { id: "fastTalk", name: "话术", base: 5, value: 5, category: "社交", checked: false },
-        { id: "fightingBrawl", name: "格斗", base: 25, value: 25, category: "战斗", checked: false },
-        { id: "firearmsHandgun", name: "射击/手枪", base: 20, value: 20, category: "战斗", checked: false },
-        { id: "firearmsRifle", name: "射击/步枪霰弹枪", base: 25, value: 25, category: "战斗", checked: false },
-        { id: "firstAid", name: "急救", base: 30, value: 30, category: "探索", checked: false },
-        { id: "history", name: "历史", base: 5, value: 5, category: "知识", checked: false },
-        { id: "intimidate", name: "恐吓", base: 15, value: 15, category: "社交", checked: false },
-        { id: "jump", name: "跳跃", base: 20, value: 20, category: "行动", checked: false },
-        { id: "languageOwn", name: "母语", base: 70, value: 70, category: "知识", checked: false },
-        { id: "law", name: "法律", base: 5, value: 5, category: "知识", checked: false },
-        { id: "libraryUse", name: "图书馆使用", base: 20, value: 20, category: "知识", checked: false },
-        { id: "listen", name: "聆听", base: 20, value: 20, category: "探索", checked: false },
-        { id: "locksmith", name: "锁匠", base: 1, value: 1, category: "探索", checked: false },
-        { id: "mechanicalRepair", name: "机械维修", base: 10, value: 10, category: "行动", checked: false },
-        { id: "medicine", name: "医学", base: 1, value: 1, category: "知识", checked: false },
-        { id: "naturalWorld", name: "博物学", base: 10, value: 10, category: "知识", checked: false },
-        { id: "navigate", name: "导航", base: 10, value: 10, category: "行动", checked: false },
-        { id: "occult", name: "神秘学", base: 5, value: 5, category: "神话", checked: false },
-        { id: "operateHeavyMachinery", name: "操作重型机械", base: 1, value: 1, category: "行动", checked: false },
-        { id: "persuade", name: "说服", base: 10, value: 10, category: "社交", checked: false },
-        { id: "photography", name: "摄影", base: 5, value: 5, category: "知识", checked: false },
-        { id: "pilot", name: "驾驶/飞行器", base: 1, value: 1, category: "行动", checked: false },
-        { id: "psychoanalysis", name: "精神分析", base: 1, value: 1, category: "探索", checked: false },
-        { id: "psychology", name: "心理学", base: 10, value: 10, category: "社交", checked: false },
-        { id: "ride", name: "骑术", base: 5, value: 5, category: "行动", checked: false },
-        { id: "science", name: "科学", base: 1, value: 1, category: "知识", checked: false },
-        { id: "scienceBiology", name: "科学/生物学", base: 1, value: 1, category: "知识", checked: false },
-        { id: "scienceEngineering", name: "科学/工程学", base: 1, value: 1, category: "知识", checked: false },
-        { id: "sciencePharmacy", name: "科学/药学", base: 1, value: 1, category: "知识", checked: false },
-        { id: "mathematics", name: "数学", base: 10, value: 10, category: "知识", checked: false },
-        { id: "sleightOfHand", name: "妙手", base: 10, value: 10, category: "行动", checked: false },
-        { id: "spotHidden", name: "侦查", base: 25, value: 25, category: "探索", checked: false },
-        { id: "stealth", name: "潜行", base: 20, value: 20, category: "行动", checked: false },
-        { id: "survival", name: "生存", base: 10, value: 10, category: "行动", checked: false },
-        { id: "swim", name: "游泳", base: 20, value: 20, category: "行动", checked: false },
-        { id: "throw", name: "投掷", base: 20, value: 20, category: "行动", checked: false },
-        { id: "track", name: "追踪", base: 10, value: 10, category: "探索", checked: false }
+    let SKILL_CATALOG: SkillCatalogEntry[] = [];
+    let SKILL_LOCALE_MAP: Record<string, string> = {};
+    let BASE_SKILLS: COC7Skill[] = [
+        { id: "artCraft", skillKey: "artCraft", name: "技艺", base: 5, value: 5, category: "技术", checked: false, specialty: "写作", specialtyKey: "writing" },
+        { id: "history", skillKey: "history", name: "历史", base: 5, value: 5, category: "知识", checked: false },
+        { id: "libraryUse", skillKey: "libraryUse", name: "图书馆使用", base: 20, value: 20, category: "探索", checked: false },
+        { id: "naturalWorld", skillKey: "naturalWorld", name: "博物学", base: 10, value: 10, category: "知识", checked: false },
+        { id: "occult", skillKey: "occult", name: "神秘学", base: 5, value: 5, category: "知识", checked: false },
+        { id: "languageOwn", skillKey: "languageOwn", name: "母语", base: 0, value: 0, category: "社交", checked: false, specialty: "汉语", specialtyKey: "chinese" },
+        { id: "languageOther", skillKey: "languageOther", name: "外语", base: 1, value: 1, category: "社交", checked: false, specialty: "英语", specialtyKey: "english" },
+        { id: "psychology", skillKey: "psychology", name: "心理学", base: 10, value: 10, category: "社交", checked: false },
+        { id: "creditRating", skillKey: "creditRating", name: "信用评级", base: 0, value: 0, category: "特殊", checked: false },
+        { id: "cthulhuMythos", skillKey: "cthulhuMythos", name: "克苏鲁神话", base: 0, value: 0, category: "特殊", checked: false }
     ];
 
     let cards: COC7CharacterCard[] = [];
@@ -518,7 +539,10 @@ interface Window {
     let modal: BootstrapModalInstance | null = null;
     let nameGeneratorModal: BootstrapModalInstance | null = null;
     let occupationTemplateModal: BootstrapModalInstance | null = null;
+    let skillSpecialtyModal: BootstrapModalInstance | null = null;
     let pendingGeneratedName = "";
+    let pendingSkillSpecialtyTarget = "";
+    let activeSkillCategoryFilter = "全部技能";
     let editorSkills: COC7Skill[] = [];
     let occupationSkillPointsManuallyEdited = false;
     let personalInterestPointsManuallyEdited = false;
@@ -798,7 +822,7 @@ interface Window {
 
     function generateRegionalName(region: NameRegion = "china", gender: InvestigatorGender = "unknown", random: () => number = Math.random): string {
         const source = REGIONAL_NAMES[region] || REGIONAL_NAMES.china;
-        const givenPool = gender === "male" ? source.male : gender === "female" ? source.female : source.neutral;
+        const givenPool = gender === "male" ? source.male : gender === "female" ? source.female : [...source.male, ...source.female, ...source.neutral];
         const family = pickRandom(source.family, random);
         const given = pickRandom(givenPool.length ? givenPool : source.neutral, random);
         return source.westernOrder ? `${given} ${family}` : `${family}${given}`;
@@ -883,20 +907,29 @@ interface Window {
     function normalizeSkills(skills?: COC7Skill[], attributes?: COC7Attributes, occupation?: COC7Occupation): COC7Skill[] {
         const source = skills && skills.length ? mergeSkillCatalog(skills) : BASE_SKILLS;
         return source.map((skill) => {
-            const base = calculateSkillBase(skill, attributes);
-            const value = clampNumber(skill.value, 0, 99, Math.max(skill.base, base));
-            const occupationSkill = occupation?.occupationSkills.includes(skill.id) || Boolean(skill.occupation);
+            const skillKey = skill.skillKey || skill.id.split("__")[0];
+            const base = calculateSkillBase(skill, attributes, occupation);
+            const occupationPoints = clampNumber(skill.occupationPoints, 0, 99, 0);
+            const interestPoints = clampNumber(skill.interestPoints, 0, 99, 0);
+            const growthPoints = clampNumber(skill.growthPoints, 0, 99, 0);
+            const value = clampNumber(skill.value, 0, 99, base + occupationPoints + interestPoints + growthPoints);
+            const occupationSkill = occupation?.occupationSkills.includes(skillKey) || Boolean(skill.occupation);
             return {
-            id: skill.id || slugify(skill.name),
-            name: String(skill.name || "未命名技能").slice(0, 40),
-            base,
-            value,
-            category: skill.category || "知识",
-            checked: Boolean(skill.checked || occupationSkill),
-            occupation: occupationSkill,
-            specialty: skill.specialty || "",
-            rank: skill.rank || rankFromValue(value)
-        };
+                id: skill.id || slugify(skill.name),
+                skillKey,
+                name: String(skill.name || "未命名技能").slice(0, 40),
+                base,
+                value,
+                category: skill.category || "知识",
+                checked: Boolean(skill.checked || occupationSkill),
+                occupation: occupationSkill,
+                specialty: skill.specialty || "",
+                specialtyKey: skill.specialtyKey || "",
+                occupationPoints,
+                interestPoints,
+                growthPoints,
+                rank: skill.rank || rankFromValue(value)
+            };
         });
     }
 
@@ -905,9 +938,12 @@ interface Window {
         return BASE_SKILLS.map((base) => ({ ...base, ...(byId.get(base.id) || {}) }));
     }
 
-    function calculateSkillBase(skill: COC7Skill, attributes?: COC7Attributes): number {
+    function calculateSkillBase(skill: COC7Skill, attributes?: COC7Attributes, occupation?: COC7Occupation): number {
+        const skillKey = skill.skillKey || skill.id.split("__")[0];
+        if (occupation?.skillBases && Object.prototype.hasOwnProperty.call(occupation.skillBases, skillKey)) {
+            return clampNumber(occupation.skillBases[skillKey], 0, 99, clampNumber(skill.base, 0, 99, 0));
+        }
         if (skill.id === "dodge" && attributes) return Math.floor(attributes.DEX / 2);
-        if (skill.id === "languageOwn" && attributes) return attributes.EDU;
         return clampNumber(skill.base, 0, 99, 0);
     }
 
@@ -1097,9 +1133,76 @@ interface Window {
             occupationSkillEntries: entries,
             occupationSkillLabels: entries.map(occupationSkillEntryLabel),
             skillBonuses: {},
+            skillBases: normalizeSkillBases(payload.skillBases),
             specialties: [],
             passiveEffects: []
         };
+    }
+
+    function normalizeSkillBases(skillBases?: Record<string, number>): Record<string, number> {
+        return Object.entries(skillBases || {}).reduce((bases, [skillKey, value]) => {
+            const parsed = Number(value);
+            if (Number.isFinite(parsed)) bases[skillKey] = clampNumber(parsed, 0, 99, 0);
+            return bases;
+        }, {} as Record<string, number>);
+    }
+
+    async function loadSkillCatalog(): Promise<void> {
+        try {
+            const response = await TrpgApi.get<ApiResponse<SkillCatalogPayload>>("/api/character-catalogs/skills");
+            if (!response.success || !response.data) return;
+            const payload = response.data;
+            SKILL_CATALOG = normalizeSkillCatalog(payload.skills || []);
+            SKILL_LOCALE_MAP = payload.locales?.[payload.defaultLocale || "zh-CN"] || payload.locales?.["zh-CN"] || {};
+            BASE_SKILLS = flattenSkillCatalog(SKILL_CATALOG, SKILL_LOCALE_MAP);
+        } catch (error) {
+            console.warn("加载技能目录失败:", error);
+        }
+    }
+
+    function normalizeSkillCatalog(entries: SkillCatalogEntry[]): SkillCatalogEntry[] {
+        return entries.map((entry) => ({
+            key: String(entry.key || "").trim(),
+            labelKey: String(entry.labelKey || "").trim(),
+            category: normalizeSkillCategory(entry.category),
+            base: clampNumber(entry.base, 0, 99, 0),
+            repeatable: clampNumber(entry.repeatable, 1, 9, 1),
+            specialties: Array.isArray(entry.specialties)
+                ? entry.specialties.map((specialty) => ({
+                    key: String(specialty.key || "").trim(),
+                    labelKey: String(specialty.labelKey || "").trim()
+                })).filter((specialty) => Boolean(specialty.key))
+                : [],
+            eraLimited: Boolean(entry.eraLimited)
+        })).filter((entry) => Boolean(entry.key));
+    }
+
+    function normalizeSkillCategory(value: SkillCategory | string): SkillCategory {
+        const allowed: SkillCategory[] = ["特殊", "探索", "社交", "战斗", "医疗", "运动", "知识", "技术", "操纵", "其他"];
+        return allowed.includes(value as SkillCategory) ? value as SkillCategory : "其他";
+    }
+
+    function flattenSkillCatalog(entries: SkillCatalogEntry[], locales: Record<string, string>): COC7Skill[] {
+        const flattened: COC7Skill[] = [];
+        entries.forEach((entry) => {
+            const label = locales[entry.labelKey] || entry.labelKey.split(".").pop() || entry.key;
+            const repeatCount = Math.max(1, entry.repeatable || 1);
+            for (let index = 0; index < repeatCount; index += 1) {
+                const suffix = repeatCount > 1 ? index + 1 : 0;
+                flattened.push({
+                    id: repeatCount > 1 ? `${entry.key}__${suffix}` : entry.key,
+                    skillKey: entry.key,
+                    name: label,
+                    base: entry.base,
+                    value: entry.base,
+                    category: entry.category,
+                    checked: false,
+                    specialty: "",
+                    specialtyKey: ""
+                });
+            }
+        });
+        return flattened.length ? flattened : BASE_SKILLS;
     }
 
     function normalizeOccupationFormula(terms?: OccupationPointFormulaTerm[]): OccupationPointFormula {
@@ -1279,16 +1382,58 @@ interface Window {
     }
 
     function hydrateSkillChecklist(skills: COC7Skill[] = BASE_SKILLS): void {
-        const container = byId("characterSkillChecklist");
-        if (!container) return;
+        renderSkillTable(skills);
+    }
+
+    function renderSkillTable(skills: COC7Skill[] = BASE_SKILLS): void {
+        const body = byId("characterSkillTableBody");
+        if (!body) return;
         const occupation = resolveOccupationFromInput(getInputValue("characterOccupation"));
-        container.innerHTML = normalizeSkills(skills, readAttributes(), occupation).map((skill) => `
-            <label class="skill-check-item">
-                <input type="checkbox" data-skill-id="${escapeHtml(skill.id)}" ${skill.checked ? "checked" : ""}>
-                <span>${escapeHtml(skill.name)}${skill.occupation ? " · 职业" : ""}</span>
-                <input type="number" min="0" max="99" value="${skill.value}" data-skill-value="${escapeHtml(skill.id)}">
-            </label>
-        `).join("");
+        const normalized = normalizeSkills(skills, readAttributes(), occupation);
+        const availableCategories = new Set(["全部技能", "特殊", "探索", "社交", "战斗", "医疗", "运动", "知识", "操纵", "其他"]);
+        body.innerHTML = normalized.map((skill) => {
+            const skillKey = skill.skillKey || skill.id.split("__")[0];
+            const specialtyLabel = skill.specialty ? skill.specialty : "";
+            const rowId = escapeHtml(skill.id);
+            const category = escapeHtml(skill.category || "其他");
+            const allowed = availableCategories.has(skill.category || "其他");
+            const successLimit = skill.occupation ? getSkillLimit("occupation") : getSkillLimit("other");
+            const success = clampNumber(skill.base + skill.occupationPoints + skill.interestPoints + skill.growthPoints, 0, successLimit, skill.base);
+            const occupationDisabled = skill.occupation ? "" : "disabled";
+            const typeButton = buildSkillSpecialtyButton(skill);
+            return `
+                <tr data-skill-row-id="${rowId}" data-skill-key="${escapeHtml(skillKey)}" data-skill-category="${category}" data-skill-occupation="${skill.occupation ? "1" : "0"}" ${allowed ? "" : 'hidden="hidden"'}>
+                    <td><input type="checkbox" class="form-check-input" data-skill-occupation-checkbox="${rowId}" ${skill.occupation ? "checked" : ""}></td>
+                    <td>
+                        <div class="character-skill-name-cell">
+                            <span>${escapeHtml(skill.name)}</span>
+                            ${typeButton}
+                        </div>
+                    </td>
+                    <td><input type="number" class="form-control form-control-sm character-skill-value-cell" value="${skill.base}" readonly data-skill-base="${rowId}"></td>
+                    <td><input type="number" class="form-control form-control-sm character-skill-points-input" min="0" max="${getSkillLimit("occupation")}" value="${skill.occupationPoints || 0}" data-skill-occupation-points="${rowId}" ${occupationDisabled}></td>
+                    <td><input type="number" class="form-control form-control-sm character-skill-points-input" min="0" max="${getSkillLimit("other")}" value="${skill.interestPoints || 0}" data-skill-interest-points="${rowId}"></td>
+                    <td><input type="number" class="form-control form-control-sm character-skill-points-input" min="0" max="${getSkillLimit("other")}" value="${skill.growthPoints || 0}" data-skill-growth-points="${rowId}"></td>
+                    <td><input type="number" class="form-control form-control-sm character-skill-value-cell" value="${success}" readonly data-skill-success="${rowId}"></td>
+                    <td><input type="number" class="form-control form-control-sm character-skill-value-cell" value="${Math.floor(success / 2)}" readonly data-skill-hard="${rowId}"></td>
+                    <td><input type="number" class="form-control form-control-sm character-skill-value-cell" value="${Math.floor(success / 5)}" readonly data-skill-extreme="${rowId}"></td>
+                </tr>
+            `;
+        }).join("");
+        refreshSkillTableVisibility();
+        refreshSkillPointSummary();
+    }
+
+    function buildSkillSpecialtyButton(skill: COC7Skill): string {
+        const skillKey = skill.skillKey || skill.id.split("__")[0];
+        const catalog = SKILL_CATALOG.find((entry) => entry.key === skillKey);
+        if (!catalog?.specialties?.length) return "";
+        const label = skill.specialty || "选择类型";
+        return `<button type="button" class="character-skill-type-button" data-skill-specialty-trigger="${escapeHtml(skill.id)}">${escapeHtml(label)}</button>`;
+    }
+
+    function getSkillLimit(type: "occupation" | "other"): number {
+        return clampNumber(getInputValue(type === "occupation" ? "characterOccupationSkillLimit" : "characterOtherSkillLimit"), 0, 99, type === "occupation" ? 75 : 50);
     }
 
     function openEditor(card?: COC7CharacterCard): void {
@@ -1536,14 +1681,114 @@ interface Window {
     }
 
     function readChecklistSkills(): COC7Skill[] {
-        const container = byId("characterSkillChecklist");
-        if (!container) return editorSkills.length ? editorSkills : normalizeSkills(undefined, readAttributes(), resolveOccupationFromInput(getInputValue("characterOccupation")));
-        const occupation = resolveOccupationFromInput(getInputValue("characterOccupation"));
-        return BASE_SKILLS.map((base) => {
-            const checked = container.querySelector<HTMLInputElement>(`[data-skill-id="${CSS.escape(base.id)}"]`)?.checked || false;
-            const value = Number(container.querySelector<HTMLInputElement>(`[data-skill-value="${CSS.escape(base.id)}"]`)?.value || base.value);
-            const occupationSkill = occupation.occupationSkills.includes(base.id);
-            return { ...base, checked, occupation: occupationSkill, value: clampNumber(value, 0, 99, base.base), rank: rankFromValue(value) };
+        const body = byId("characterSkillTableBody");
+        if (!body) return editorSkills.length ? editorSkills : normalizeSkills(undefined, readAttributes(), resolveOccupationFromInput(getInputValue("characterOccupation")));
+        const rows = Array.from(body.querySelectorAll<HTMLTableRowElement>("tr[data-skill-row-id]"));
+        if (!rows.length) return normalizeSkills(editorSkills.length ? editorSkills : undefined, readAttributes(), resolveOccupationFromInput(getInputValue("characterOccupation")));
+        return rows.map((row) => {
+            const rowId = row.dataset.skillRowId || "";
+            const skillKey = row.dataset.skillKey || rowId.split("__")[0];
+            const baseSkill = BASE_SKILLS.find((skill) => skill.id === rowId) || BASE_SKILLS.find((skill) => (skill.skillKey || skill.id) === skillKey);
+            const occupation = row.querySelector<HTMLInputElement>("[data-skill-occupation-checkbox]")?.checked || false;
+            const base = readSkillRowNumber(row, "base", 0);
+            const occupationPoints = readSkillRowNumber(row, "occupationPoints", 0);
+            const interestPoints = readSkillRowNumber(row, "interestPoints", 0);
+            const growthPoints = readSkillRowNumber(row, "growthPoints", 0);
+            const value = clampNumber(base + occupationPoints + interestPoints + growthPoints, 0, 99, base);
+            return {
+                ...(baseSkill || {}),
+                id: rowId,
+                skillKey,
+                name: baseSkill?.name || skillNameById(skillKey),
+                base,
+                value,
+                category: row.dataset.skillCategory || baseSkill?.category || "其他",
+                checked: occupation,
+                occupation,
+                specialty: row.dataset.specialtyLabel || "",
+                specialtyKey: row.dataset.specialtyKey || "",
+                occupationPoints,
+                interestPoints,
+                growthPoints,
+                rank: rankFromValue(value)
+            };
+        });
+    }
+
+    function readSkillRowNumber(row: HTMLTableRowElement, kind: "base" | "occupationPoints" | "interestPoints" | "growthPoints", fallback: number): number {
+        const selectors = {
+            base: "[data-skill-base]",
+            occupationPoints: "[data-skill-occupation-points]",
+            interestPoints: "[data-skill-interest-points]",
+            growthPoints: "[data-skill-growth-points]"
+        };
+        return clampNumber(row.querySelector<HTMLInputElement>(selectors[kind])?.value, 0, 99, fallback);
+    }
+
+    function refreshSkillTableVisibility(): void {
+        const body = byId("characterSkillTableBody");
+        if (!body) return;
+        body.querySelectorAll<HTMLTableRowElement>("tr[data-skill-row-id]").forEach((row) => {
+            const category = row.dataset.skillCategory || "其他";
+            row.hidden = activeSkillCategoryFilter !== "全部技能" && category !== activeSkillCategoryFilter;
+        });
+    }
+
+    function refreshSkillTableCalculations(): void {
+        const body = byId("characterSkillTableBody");
+        if (!body) return;
+        body.querySelectorAll<HTMLTableRowElement>("tr[data-skill-row-id]").forEach(refreshSkillRowCalculations);
+        refreshSkillPointSummary();
+    }
+
+    function refreshSkillRowCalculations(row: HTMLTableRowElement): void {
+        const occupationCheckbox = row.querySelector<HTMLInputElement>("[data-skill-occupation-checkbox]");
+        const occupationInput = row.querySelector<HTMLInputElement>("[data-skill-occupation-points]");
+        const interestInput = row.querySelector<HTMLInputElement>("[data-skill-interest-points]");
+        const growthInput = row.querySelector<HTMLInputElement>("[data-skill-growth-points]");
+        const successInput = row.querySelector<HTMLInputElement>("[data-skill-success]");
+        const hardInput = row.querySelector<HTMLInputElement>("[data-skill-hard]");
+        const extremeInput = row.querySelector<HTMLInputElement>("[data-skill-extreme]");
+        const base = readSkillRowNumber(row, "base", 0);
+        const isOccupation = Boolean(occupationCheckbox?.checked);
+        row.dataset.skillOccupation = isOccupation ? "1" : "0";
+        if (occupationInput) {
+            occupationInput.disabled = !isOccupation;
+            if (!isOccupation && Number(occupationInput.value || 0) > 0) {
+                occupationInput.value = "0";
+                notify("只有本职技能才能添加点数", "error");
+            }
+            occupationInput.value = String(clampNumber(occupationInput.value, 0, getSkillLimit("occupation"), 0));
+        }
+        if (interestInput) interestInput.value = String(clampNumber(interestInput.value, 0, getSkillLimit("other"), 0));
+        if (growthInput) growthInput.value = String(clampNumber(growthInput.value, 0, getSkillLimit("other"), 0));
+        enforceSkillPointBudgets();
+        const occupationPoints = readSkillRowNumber(row, "occupationPoints", 0);
+        const interestPoints = readSkillRowNumber(row, "interestPoints", 0);
+        const growthPoints = readSkillRowNumber(row, "growthPoints", 0);
+        const success = clampNumber(base + occupationPoints + interestPoints + growthPoints, 0, getSkillLimit("occupation"), base);
+        if (successInput) successInput.value = String(success);
+        if (hardInput) hardInput.value = String(Math.floor(success / 2));
+        if (extremeInput) extremeInput.value = String(Math.floor(success / 5));
+    }
+
+    function enforceSkillPointBudgets(): void {
+        const body = byId("characterSkillTableBody");
+        if (!body) return;
+        const occupationTotal = clampNumber(getInputValue("characterOccupationSkillPoints"), 0, 999, 0);
+        const interestTotal = clampNumber(getInputValue("characterPersonalInterestPoints"), 0, 999, 0);
+        clampColumnToBudget(Array.from(body.querySelectorAll<HTMLInputElement>("[data-skill-occupation-points]")), occupationTotal);
+        clampColumnToBudget(Array.from(body.querySelectorAll<HTMLInputElement>("[data-skill-interest-points]")), interestTotal);
+    }
+
+    function clampColumnToBudget(inputs: HTMLInputElement[], budget: number): void {
+        let total = 0;
+        inputs.forEach((input) => {
+            const value = clampNumber(input.value, 0, 99, 0);
+            const allowed = Math.max(0, budget - total);
+            const nextValue = Math.min(value, allowed);
+            if (nextValue !== value) input.value = String(nextValue);
+            total += nextValue;
         });
     }
 
@@ -1584,10 +1829,14 @@ interface Window {
     }
 
     function calculateEditorSkillPointSpending(occupation: COC7Occupation): { occupation: number; personal: number } {
-        return readChecklistSkills().reduce((summary, skill) => {
-            const spent = Math.max(0, skill.value - skill.base);
-            if (occupation.occupationSkills.includes(skill.id) || skill.occupation) summary.occupation += spent;
-            else summary.personal += spent;
+        const body = byId("characterSkillTableBody");
+        if (!body) return { occupation: 0, personal: 0 };
+        const rows = Array.from(body.querySelectorAll<HTMLTableRowElement>("tr[data-skill-row-id]"));
+        return rows.reduce((summary, row) => {
+            const occupationInput = row.querySelector<HTMLInputElement>("[data-skill-occupation-points]");
+            const interestInput = row.querySelector<HTMLInputElement>("[data-skill-interest-points]");
+            summary.occupation += clampNumber(occupationInput?.value, 0, 99, 0);
+            summary.personal += clampNumber(interestInput?.value, 0, 99, 0);
             return summary;
         }, { occupation: 0, personal: 0 });
     }

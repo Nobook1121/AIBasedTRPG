@@ -1,12 +1,12 @@
 {
   "id": "investigator-1781411388293-2i1xr9",
-  "name": "许星河",
+  "name": "李元",
   "playerId": "9",
   "era": "1920s",
   "gender": "",
   "age": 25,
   "avatar": "",
-  "occupationId": "detective",
+  "occupationId": "writer",
   "occupationName": "私家侦探",
   "creditRating": 9,
   "residence": "",
@@ -238,8 +238,8 @@
       "base": 5,
       "value": 5,
       "category": "知识",
-      "checked": false,
-      "occupation": false,
+      "checked": true,
+      "occupation": true,
       "specialty": "",
       "rank": "新手"
     },
@@ -271,8 +271,8 @@
       "base": 80,
       "value": 70,
       "category": "知识",
-      "checked": false,
-      "occupation": false,
+      "checked": true,
+      "occupation": true,
       "specialty": "",
       "rank": "主修"
     },
@@ -348,8 +348,8 @@
       "base": 10,
       "value": 10,
       "category": "知识",
-      "checked": false,
-      "occupation": false,
+      "checked": true,
+      "occupation": true,
       "specialty": "",
       "rank": "新手"
     },
@@ -370,8 +370,8 @@
       "base": 5,
       "value": 5,
       "category": "神话",
-      "checked": false,
-      "occupation": false,
+      "checked": true,
+      "occupation": true,
       "specialty": "",
       "rank": "新手"
     },
@@ -609,5 +609,9 @@
   },
   "relationships": [],
   "createdAt": "2026-06-14T04:29:48.294Z",
-  "updatedAt": "2026-06-15T13:54:11.000Z"
+  "updatedAt": "2026-06-15T23:15:32.000Z",
+  "skillSuccessLimits": {
+    "occupation": 75,
+    "other": 50
+  }
 }

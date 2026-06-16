@@ -14,6 +14,16 @@
       }
     ]
   },
+  "skillBases": {
+    "artCraft": 5,
+    "history": 5,
+    "libraryUse": 20,
+    "naturalWorld": 10,
+    "occult": 5,
+    "languageOther": 1,
+    "languageOwn": 0,
+    "psychology": 10
+  },
   "occupationSkills": [
     {
       "skillKey": "artCraft",

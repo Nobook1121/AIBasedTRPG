@@ -2,341 +2,946 @@
   "version": 1,
   "defaultLocale": "zh-CN",
   "skills": [
-    { "key": "creditRating", "labelKey": "skills.creditRating", "repeatable": 1, "specialties": [] },
-    { "key": "cthulhuMythos", "labelKey": "skills.cthulhuMythos", "repeatable": 1, "specialties": [] },
-    { "key": "spotHidden", "labelKey": "skills.spotHidden", "repeatable": 1, "specialties": [] },
-    { "key": "listen", "labelKey": "skills.listen", "repeatable": 1, "specialties": [] },
-    { "key": "stealth", "labelKey": "skills.stealth", "repeatable": 1, "specialties": [] },
-    { "key": "track", "labelKey": "skills.track", "repeatable": 1, "specialties": [] },
-    { "key": "lipRead", "labelKey": "skills.lipRead", "repeatable": 1, "specialties": [] },
-    { "key": "libraryUse", "labelKey": "skills.libraryUse", "repeatable": 1, "specialties": [] },
-    { "key": "navigate", "labelKey": "skills.navigate", "repeatable": 1, "specialties": [] },
-    { "key": "computerUse", "labelKey": "skills.computerUse", "repeatable": 1, "eraLimited": true, "specialties": [] },
-    { "key": "charm", "labelKey": "skills.charm", "repeatable": 1, "specialties": [] },
-    { "key": "fastTalk", "labelKey": "skills.fastTalk", "repeatable": 1, "specialties": [] },
-    { "key": "intimidate", "labelKey": "skills.intimidate", "repeatable": 1, "specialties": [] },
-    { "key": "persuade", "labelKey": "skills.persuade", "repeatable": 1, "specialties": [] },
-    { "key": "psychology", "labelKey": "skills.psychology", "repeatable": 1, "specialties": [] },
+    {
+      "key": "creditRating",
+      "labelKey": "skills.creditRating",
+      "repeatable": 1,
+      "category": "??",
+      "base": 0,
+      "specialties": []
+    },
+    {
+      "key": "cthulhuMythos",
+      "labelKey": "skills.cthulhuMythos",
+      "repeatable": 1,
+      "category": "??",
+      "base": 0,
+      "specialties": []
+    },
+    {
+      "key": "spotHidden",
+      "labelKey": "skills.spotHidden",
+      "repeatable": 1,
+      "category": "??",
+      "base": 25,
+      "specialties": []
+    },
+    {
+      "key": "listen",
+      "labelKey": "skills.listen",
+      "repeatable": 1,
+      "category": "??",
+      "base": 20,
+      "specialties": []
+    },
+    {
+      "key": "stealth",
+      "labelKey": "skills.stealth",
+      "repeatable": 1,
+      "category": "??",
+      "base": 20,
+      "specialties": []
+    },
+    {
+      "key": "track",
+      "labelKey": "skills.track",
+      "repeatable": 1,
+      "category": "??",
+      "base": 10,
+      "specialties": []
+    },
+    {
+      "key": "lipRead",
+      "labelKey": "skills.lipRead",
+      "repeatable": 1,
+      "category": "??",
+      "base": 0,
+      "specialties": []
+    },
+    {
+      "key": "libraryUse",
+      "labelKey": "skills.libraryUse",
+      "repeatable": 1,
+      "category": "??",
+      "base": 20,
+      "specialties": []
+    },
+    {
+      "key": "navigate",
+      "labelKey": "skills.navigate",
+      "repeatable": 1,
+      "category": "??",
+      "base": 10,
+      "specialties": []
+    },
+    {
+      "key": "computerUse",
+      "labelKey": "skills.computerUse",
+      "repeatable": 1,
+      "category": "??",
+      "base": 0,
+      "specialties": [],
+      "eraLimited": true
+    },
+    {
+      "key": "charm",
+      "labelKey": "skills.charm",
+      "repeatable": 1,
+      "category": "??",
+      "base": 15,
+      "specialties": []
+    },
+    {
+      "key": "fastTalk",
+      "labelKey": "skills.fastTalk",
+      "repeatable": 1,
+      "category": "??",
+      "base": 5,
+      "specialties": []
+    },
+    {
+      "key": "intimidate",
+      "labelKey": "skills.intimidate",
+      "repeatable": 1,
+      "category": "??",
+      "base": 15,
+      "specialties": []
+    },
+    {
+      "key": "persuade",
+      "labelKey": "skills.persuade",
+      "repeatable": 1,
+      "category": "??",
+      "base": 10,
+      "specialties": []
+    },
+    {
+      "key": "psychology",
+      "labelKey": "skills.psychology",
+      "repeatable": 1,
+      "category": "??",
+      "base": 10,
+      "specialties": []
+    },
     {
       "key": "languageOwn",
       "labelKey": "skills.languageOwn",
       "repeatable": 1,
+      "category": "??",
+      "base": 0,
       "specialties": [
-        { "key": "chinese", "labelKey": "skillSpecialties.languageOwn.chinese" },
-        { "key": "english", "labelKey": "skillSpecialties.languageOwn.english" },
-        { "key": "japanese", "labelKey": "skillSpecialties.languageOwn.japanese" },
-        { "key": "french", "labelKey": "skillSpecialties.languageOwn.french" },
-        { "key": "russian", "labelKey": "skillSpecialties.languageOwn.russian" },
-        { "key": "german", "labelKey": "skillSpecialties.languageOwn.german" },
-        { "key": "korean", "labelKey": "skillSpecialties.languageOwn.korean" },
-        { "key": "cantonese", "labelKey": "skillSpecialties.languageOwn.cantonese" },
-        { "key": "latin", "labelKey": "skillSpecialties.languageOwn.latin" },
-        { "key": "dutch", "labelKey": "skillSpecialties.languageOwn.dutch" },
-        { "key": "norwegian", "labelKey": "skillSpecialties.languageOwn.norwegian" },
-        { "key": "danish", "labelKey": "skillSpecialties.languageOwn.danish" },
-        { "key": "hindi", "labelKey": "skillSpecialties.languageOwn.hindi" },
-        { "key": "spanish", "labelKey": "skillSpecialties.languageOwn.spanish" },
-        { "key": "portuguese", "labelKey": "skillSpecialties.languageOwn.portuguese" },
-        { "key": "arabic", "labelKey": "skillSpecialties.languageOwn.arabic" }
+        {
+          "key": "chinese",
+          "labelKey": "skillSpecialties.languageOwn.chinese"
+        },
+        {
+          "key": "english",
+          "labelKey": "skillSpecialties.languageOwn.english"
+        },
+        {
+          "key": "japanese",
+          "labelKey": "skillSpecialties.languageOwn.japanese"
+        },
+        {
+          "key": "french",
+          "labelKey": "skillSpecialties.languageOwn.french"
+        },
+        {
+          "key": "russian",
+          "labelKey": "skillSpecialties.languageOwn.russian"
+        },
+        {
+          "key": "german",
+          "labelKey": "skillSpecialties.languageOwn.german"
+        },
+        {
+          "key": "korean",
+          "labelKey": "skillSpecialties.languageOwn.korean"
+        },
+        {
+          "key": "cantonese",
+          "labelKey": "skillSpecialties.languageOwn.cantonese"
+        },
+        {
+          "key": "latin",
+          "labelKey": "skillSpecialties.languageOwn.latin"
+        },
+        {
+          "key": "dutch",
+          "labelKey": "skillSpecialties.languageOwn.dutch"
+        },
+        {
+          "key": "norwegian",
+          "labelKey": "skillSpecialties.languageOwn.norwegian"
+        },
+        {
+          "key": "danish",
+          "labelKey": "skillSpecialties.languageOwn.danish"
+        },
+        {
+          "key": "hindi",
+          "labelKey": "skillSpecialties.languageOwn.hindi"
+        },
+        {
+          "key": "spanish",
+          "labelKey": "skillSpecialties.languageOwn.spanish"
+        },
+        {
+          "key": "portuguese",
+          "labelKey": "skillSpecialties.languageOwn.portuguese"
+        },
+        {
+          "key": "arabic",
+          "labelKey": "skillSpecialties.languageOwn.arabic"
+        }
       ]
     },
     {
       "key": "languageOther",
       "labelKey": "skills.languageOther",
       "repeatable": 2,
+      "category": "??",
+      "base": 1,
       "specialties": [
-        { "key": "chinese", "labelKey": "skillSpecialties.languageOther.chinese" },
-        { "key": "english", "labelKey": "skillSpecialties.languageOther.english" },
-        { "key": "japanese", "labelKey": "skillSpecialties.languageOther.japanese" },
-        { "key": "french", "labelKey": "skillSpecialties.languageOther.french" },
-        { "key": "russian", "labelKey": "skillSpecialties.languageOther.russian" },
-        { "key": "german", "labelKey": "skillSpecialties.languageOther.german" },
-        { "key": "korean", "labelKey": "skillSpecialties.languageOther.korean" },
-        { "key": "cantonese", "labelKey": "skillSpecialties.languageOther.cantonese" },
-        { "key": "latin", "labelKey": "skillSpecialties.languageOther.latin" },
-        { "key": "dutch", "labelKey": "skillSpecialties.languageOther.dutch" },
-        { "key": "norwegian", "labelKey": "skillSpecialties.languageOther.norwegian" },
-        { "key": "danish", "labelKey": "skillSpecialties.languageOther.danish" },
-        { "key": "hindi", "labelKey": "skillSpecialties.languageOther.hindi" },
-        { "key": "spanish", "labelKey": "skillSpecialties.languageOther.spanish" },
-        { "key": "portuguese", "labelKey": "skillSpecialties.languageOther.portuguese" },
-        { "key": "arabic", "labelKey": "skillSpecialties.languageOther.arabic" }
+        {
+          "key": "chinese",
+          "labelKey": "skillSpecialties.languageOther.chinese"
+        },
+        {
+          "key": "english",
+          "labelKey": "skillSpecialties.languageOther.english"
+        },
+        {
+          "key": "japanese",
+          "labelKey": "skillSpecialties.languageOther.japanese"
+        },
+        {
+          "key": "french",
+          "labelKey": "skillSpecialties.languageOther.french"
+        },
+        {
+          "key": "russian",
+          "labelKey": "skillSpecialties.languageOther.russian"
+        },
+        {
+          "key": "german",
+          "labelKey": "skillSpecialties.languageOther.german"
+        },
+        {
+          "key": "korean",
+          "labelKey": "skillSpecialties.languageOther.korean"
+        },
+        {
+          "key": "cantonese",
+          "labelKey": "skillSpecialties.languageOther.cantonese"
+        },
+        {
+          "key": "latin",
+          "labelKey": "skillSpecialties.languageOther.latin"
+        },
+        {
+          "key": "dutch",
+          "labelKey": "skillSpecialties.languageOther.dutch"
+        },
+        {
+          "key": "norwegian",
+          "labelKey": "skillSpecialties.languageOther.norwegian"
+        },
+        {
+          "key": "danish",
+          "labelKey": "skillSpecialties.languageOther.danish"
+        },
+        {
+          "key": "hindi",
+          "labelKey": "skillSpecialties.languageOther.hindi"
+        },
+        {
+          "key": "spanish",
+          "labelKey": "skillSpecialties.languageOther.spanish"
+        },
+        {
+          "key": "portuguese",
+          "labelKey": "skillSpecialties.languageOther.portuguese"
+        },
+        {
+          "key": "arabic",
+          "labelKey": "skillSpecialties.languageOther.arabic"
+        }
       ]
     },
     {
       "key": "fighting",
       "labelKey": "skills.fighting",
       "repeatable": 3,
+      "category": "??",
+      "base": 25,
       "specialties": [
-        { "key": "brawl", "labelKey": "skillSpecialties.fighting.brawl" },
-        { "key": "sword", "labelKey": "skillSpecialties.fighting.sword" },
-        { "key": "spear", "labelKey": "skillSpecialties.fighting.spear" },
-        { "key": "axe", "labelKey": "skillSpecialties.fighting.axe" },
-        { "key": "garrote", "labelKey": "skillSpecialties.fighting.garrote" },
-        { "key": "chainsaw", "labelKey": "skillSpecialties.fighting.chainsaw" },
-        { "key": "flail", "labelKey": "skillSpecialties.fighting.flail" },
-        { "key": "whip", "labelKey": "skillSpecialties.fighting.whip" }
+        {
+          "key": "brawl",
+          "labelKey": "skillSpecialties.fighting.brawl"
+        },
+        {
+          "key": "sword",
+          "labelKey": "skillSpecialties.fighting.sword"
+        },
+        {
+          "key": "spear",
+          "labelKey": "skillSpecialties.fighting.spear"
+        },
+        {
+          "key": "axe",
+          "labelKey": "skillSpecialties.fighting.axe"
+        },
+        {
+          "key": "garrote",
+          "labelKey": "skillSpecialties.fighting.garrote"
+        },
+        {
+          "key": "chainsaw",
+          "labelKey": "skillSpecialties.fighting.chainsaw"
+        },
+        {
+          "key": "flail",
+          "labelKey": "skillSpecialties.fighting.flail"
+        },
+        {
+          "key": "whip",
+          "labelKey": "skillSpecialties.fighting.whip"
+        }
       ]
     },
     {
       "key": "firearms",
       "labelKey": "skills.firearms",
       "repeatable": 3,
+      "category": "??",
+      "base": 20,
       "specialties": [
-        { "key": "handgun", "labelKey": "skillSpecialties.firearms.handgun" },
-        { "key": "rifleShotgun", "labelKey": "skillSpecialties.firearms.rifleShotgun" },
-        { "key": "submachineGun", "labelKey": "skillSpecialties.firearms.submachineGun" },
-        { "key": "sniperRifle", "labelKey": "skillSpecialties.firearms.sniperRifle" },
-        { "key": "bow", "labelKey": "skillSpecialties.firearms.bow" },
-        { "key": "machineGun", "labelKey": "skillSpecialties.firearms.machineGun" },
-        { "key": "heavyWeapon", "labelKey": "skillSpecialties.firearms.heavyWeapon" }
+        {
+          "key": "handgun",
+          "labelKey": "skillSpecialties.firearms.handgun"
+        },
+        {
+          "key": "rifleShotgun",
+          "labelKey": "skillSpecialties.firearms.rifleShotgun"
+        },
+        {
+          "key": "submachineGun",
+          "labelKey": "skillSpecialties.firearms.submachineGun"
+        },
+        {
+          "key": "sniperRifle",
+          "labelKey": "skillSpecialties.firearms.sniperRifle"
+        },
+        {
+          "key": "bow",
+          "labelKey": "skillSpecialties.firearms.bow"
+        },
+        {
+          "key": "machineGun",
+          "labelKey": "skillSpecialties.firearms.machineGun"
+        },
+        {
+          "key": "heavyWeapon",
+          "labelKey": "skillSpecialties.firearms.heavyWeapon"
+        }
       ]
     },
-    { "key": "dodge", "labelKey": "skills.dodge", "repeatable": 1, "specialties": [] },
-    { "key": "throw", "labelKey": "skills.throw", "repeatable": 1, "specialties": [] },
-    { "key": "demolitions", "labelKey": "skills.demolitions", "repeatable": 1, "specialties": [] },
-    { "key": "artillery", "labelKey": "skills.artillery", "repeatable": 1, "specialties": [] },
-    { "key": "firstAid", "labelKey": "skills.firstAid", "repeatable": 1, "specialties": [] },
-    { "key": "medicine", "labelKey": "skills.medicine", "repeatable": 1, "specialties": [] },
-    { "key": "psychoanalysis", "labelKey": "skills.psychoanalysis", "repeatable": 1, "specialties": [] },
-    { "key": "hypnosis", "labelKey": "skills.hypnosis", "repeatable": 1, "specialties": [] },
-    { "key": "climb", "labelKey": "skills.climb", "repeatable": 1, "specialties": [] },
-    { "key": "jump", "labelKey": "skills.jump", "repeatable": 1, "specialties": [] },
-    { "key": "swim", "labelKey": "skills.swim", "repeatable": 1, "specialties": [] },
-    { "key": "diving", "labelKey": "skills.diving", "repeatable": 1, "specialties": [] },
-    { "key": "appraise", "labelKey": "skills.appraise", "repeatable": 1, "specialties": [] },
-    { "key": "anthropology", "labelKey": "skills.anthropology", "repeatable": 1, "specialties": [] },
-    { "key": "accounting", "labelKey": "skills.accounting", "repeatable": 1, "specialties": [] },
-    { "key": "law", "labelKey": "skills.law", "repeatable": 1, "specialties": [] },
-    { "key": "history", "labelKey": "skills.history", "repeatable": 1, "specialties": [] },
-    { "key": "archaeology", "labelKey": "skills.archaeology", "repeatable": 1, "specialties": [] },
-    { "key": "naturalWorld", "labelKey": "skills.naturalWorld", "repeatable": 1, "specialties": [] },
-    { "key": "occult", "labelKey": "skills.occult", "repeatable": 1, "specialties": [] },
-    { "key": "electronics", "labelKey": "skills.electronics", "repeatable": 1, "eraLimited": true, "specialties": [] },
+    {
+      "key": "dodge",
+      "labelKey": "skills.dodge",
+      "repeatable": 1,
+      "category": "??",
+      "base": 25,
+      "specialties": []
+    },
+    {
+      "key": "throw",
+      "labelKey": "skills.throw",
+      "repeatable": 1,
+      "category": "??",
+      "base": 20,
+      "specialties": []
+    },
+    {
+      "key": "demolitions",
+      "labelKey": "skills.demolitions",
+      "repeatable": 1,
+      "category": "??",
+      "base": 0,
+      "specialties": []
+    },
+    {
+      "key": "artillery",
+      "labelKey": "skills.artillery",
+      "repeatable": 1,
+      "category": "??",
+      "base": 0,
+      "specialties": []
+    },
+    {
+      "key": "firstAid",
+      "labelKey": "skills.firstAid",
+      "repeatable": 1,
+      "category": "??",
+      "base": 30,
+      "specialties": []
+    },
+    {
+      "key": "medicine",
+      "labelKey": "skills.medicine",
+      "repeatable": 1,
+      "category": "??",
+      "base": 1,
+      "specialties": []
+    },
+    {
+      "key": "psychoanalysis",
+      "labelKey": "skills.psychoanalysis",
+      "repeatable": 1,
+      "category": "??",
+      "base": 1,
+      "specialties": []
+    },
+    {
+      "key": "hypnosis",
+      "labelKey": "skills.hypnosis",
+      "repeatable": 1,
+      "category": "??",
+      "base": 1,
+      "specialties": []
+    },
+    {
+      "key": "climb",
+      "labelKey": "skills.climb",
+      "repeatable": 1,
+      "category": "??",
+      "base": 20,
+      "specialties": []
+    },
+    {
+      "key": "jump",
+      "labelKey": "skills.jump",
+      "repeatable": 1,
+      "category": "??",
+      "base": 20,
+      "specialties": []
+    },
+    {
+      "key": "swim",
+      "labelKey": "skills.swim",
+      "repeatable": 1,
+      "category": "??",
+      "base": 20,
+      "specialties": []
+    },
+    {
+      "key": "diving",
+      "labelKey": "skills.diving",
+      "repeatable": 1,
+      "category": "??",
+      "base": 0,
+      "specialties": []
+    },
+    {
+      "key": "appraise",
+      "labelKey": "skills.appraise",
+      "repeatable": 1,
+      "category": "??",
+      "base": 5,
+      "specialties": []
+    },
+    {
+      "key": "anthropology",
+      "labelKey": "skills.anthropology",
+      "repeatable": 1,
+      "category": "??",
+      "base": 1,
+      "specialties": []
+    },
+    {
+      "key": "accounting",
+      "labelKey": "skills.accounting",
+      "repeatable": 1,
+      "category": "??",
+      "base": 5,
+      "specialties": []
+    },
+    {
+      "key": "law",
+      "labelKey": "skills.law",
+      "repeatable": 1,
+      "category": "??",
+      "base": 5,
+      "specialties": []
+    },
+    {
+      "key": "history",
+      "labelKey": "skills.history",
+      "repeatable": 1,
+      "category": "??",
+      "base": 5,
+      "specialties": []
+    },
+    {
+      "key": "archaeology",
+      "labelKey": "skills.archaeology",
+      "repeatable": 1,
+      "category": "??",
+      "base": 1,
+      "specialties": []
+    },
+    {
+      "key": "naturalWorld",
+      "labelKey": "skills.naturalWorld",
+      "repeatable": 1,
+      "category": "??",
+      "base": 10,
+      "specialties": []
+    },
+    {
+      "key": "occult",
+      "labelKey": "skills.occult",
+      "repeatable": 1,
+      "category": "??",
+      "base": 5,
+      "specialties": []
+    },
+    {
+      "key": "electronics",
+      "labelKey": "skills.electronics",
+      "repeatable": 1,
+      "category": "??",
+      "base": 0,
+      "specialties": [],
+      "eraLimited": true
+    },
     {
       "key": "science",
       "labelKey": "skills.science",
       "repeatable": 3,
+      "category": "??",
+      "base": 1,
       "specialties": [
-        { "key": "mathematics", "labelKey": "skillSpecialties.science.mathematics" },
-        { "key": "physics", "labelKey": "skillSpecialties.science.physics" },
-        { "key": "chemistry", "labelKey": "skillSpecialties.science.chemistry" },
-        { "key": "pharmacy", "labelKey": "skillSpecialties.science.pharmacy" },
-        { "key": "geology", "labelKey": "skillSpecialties.science.geology" },
-        { "key": "biology", "labelKey": "skillSpecialties.science.biology" },
-        { "key": "zoology", "labelKey": "skillSpecialties.science.zoology" },
-        { "key": "botany", "labelKey": "skillSpecialties.science.botany" },
-        { "key": "astronomy", "labelKey": "skillSpecialties.science.astronomy" },
-        { "key": "cryptography", "labelKey": "skillSpecialties.science.cryptography" },
-        { "key": "meteorology", "labelKey": "skillSpecialties.science.meteorology" },
-        { "key": "engineering", "labelKey": "skillSpecialties.science.engineering" },
-        { "key": "forensics", "labelKey": "skillSpecialties.science.forensics" },
-        { "key": "pharmaceuticals", "labelKey": "skillSpecialties.science.pharmaceuticals" }
+        {
+          "key": "mathematics",
+          "labelKey": "skillSpecialties.science.mathematics"
+        },
+        {
+          "key": "physics",
+          "labelKey": "skillSpecialties.science.physics"
+        },
+        {
+          "key": "chemistry",
+          "labelKey": "skillSpecialties.science.chemistry"
+        },
+        {
+          "key": "pharmacy",
+          "labelKey": "skillSpecialties.science.pharmacy"
+        },
+        {
+          "key": "geology",
+          "labelKey": "skillSpecialties.science.geology"
+        },
+        {
+          "key": "biology",
+          "labelKey": "skillSpecialties.science.biology"
+        },
+        {
+          "key": "zoology",
+          "labelKey": "skillSpecialties.science.zoology"
+        },
+        {
+          "key": "botany",
+          "labelKey": "skillSpecialties.science.botany"
+        },
+        {
+          "key": "astronomy",
+          "labelKey": "skillSpecialties.science.astronomy"
+        },
+        {
+          "key": "cryptography",
+          "labelKey": "skillSpecialties.science.cryptography"
+        },
+        {
+          "key": "meteorology",
+          "labelKey": "skillSpecialties.science.meteorology"
+        },
+        {
+          "key": "engineering",
+          "labelKey": "skillSpecialties.science.engineering"
+        },
+        {
+          "key": "forensics",
+          "labelKey": "skillSpecialties.science.forensics"
+        },
+        {
+          "key": "pharmaceuticals",
+          "labelKey": "skillSpecialties.science.pharmaceuticals"
+        }
       ]
     },
-    { "key": "disguise", "labelKey": "skills.disguise", "repeatable": 1, "specialties": [] },
+    {
+      "key": "disguise",
+      "labelKey": "skills.disguise",
+      "repeatable": 1,
+      "category": "??",
+      "base": 5,
+      "specialties": []
+    },
     {
       "key": "survival",
       "labelKey": "skills.survival",
       "repeatable": 3,
+      "category": "??",
+      "base": 10,
       "specialties": [
-        { "key": "desert", "labelKey": "skillSpecialties.survival.desert" },
-        { "key": "forest", "labelKey": "skillSpecialties.survival.forest" },
-        { "key": "island", "labelKey": "skillSpecialties.survival.island" },
-        { "key": "mountain", "labelKey": "skillSpecialties.survival.mountain" },
-        { "key": "sea", "labelKey": "skillSpecialties.survival.sea" }
+        {
+          "key": "desert",
+          "labelKey": "skillSpecialties.survival.desert"
+        },
+        {
+          "key": "forest",
+          "labelKey": "skillSpecialties.survival.forest"
+        },
+        {
+          "key": "island",
+          "labelKey": "skillSpecialties.survival.island"
+        },
+        {
+          "key": "mountain",
+          "labelKey": "skillSpecialties.survival.mountain"
+        },
+        {
+          "key": "sea",
+          "labelKey": "skillSpecialties.survival.sea"
+        }
       ]
     },
     {
       "key": "artCraft",
       "labelKey": "skills.artCraft",
       "repeatable": 3,
+      "category": "??",
+      "base": 5,
       "specialties": [
-        { "key": "acting", "labelKey": "skillSpecialties.artCraft.acting" },
-        { "key": "music", "labelKey": "skillSpecialties.artCraft.music" },
-        { "key": "painting", "labelKey": "skillSpecialties.artCraft.painting" },
-        { "key": "art", "labelKey": "skillSpecialties.artCraft.art" },
-        { "key": "photography", "labelKey": "skillSpecialties.artCraft.photography" },
-        { "key": "writing", "labelKey": "skillSpecialties.artCraft.writing" },
-        { "key": "calligraphy", "labelKey": "skillSpecialties.artCraft.calligraphy" },
-        { "key": "typing", "labelKey": "skillSpecialties.artCraft.typing" },
-        { "key": "shorthand", "labelKey": "skillSpecialties.artCraft.shorthand" },
-        { "key": "forgery", "labelKey": "skillSpecialties.artCraft.forgery" },
-        { "key": "cooking", "labelKey": "skillSpecialties.artCraft.cooking" },
-        { "key": "tailoring", "labelKey": "skillSpecialties.artCraft.tailoring" },
-        { "key": "barber", "labelKey": "skillSpecialties.artCraft.barber" },
-        { "key": "drafting", "labelKey": "skillSpecialties.artCraft.drafting" },
-        { "key": "farming", "labelKey": "skillSpecialties.artCraft.farming" },
-        { "key": "carpentry", "labelKey": "skillSpecialties.artCraft.carpentry" },
-        { "key": "blacksmithing", "labelKey": "skillSpecialties.artCraft.blacksmithing" },
-        { "key": "welding", "labelKey": "skillSpecialties.artCraft.welding" },
-        { "key": "plumbing", "labelKey": "skillSpecialties.artCraft.plumbing" }
+        {
+          "key": "acting",
+          "labelKey": "skillSpecialties.artCraft.acting"
+        },
+        {
+          "key": "music",
+          "labelKey": "skillSpecialties.artCraft.music"
+        },
+        {
+          "key": "painting",
+          "labelKey": "skillSpecialties.artCraft.painting"
+        },
+        {
+          "key": "art",
+          "labelKey": "skillSpecialties.artCraft.art"
+        },
+        {
+          "key": "photography",
+          "labelKey": "skillSpecialties.artCraft.photography"
+        },
+        {
+          "key": "writing",
+          "labelKey": "skillSpecialties.artCraft.writing"
+        },
+        {
+          "key": "calligraphy",
+          "labelKey": "skillSpecialties.artCraft.calligraphy"
+        },
+        {
+          "key": "typing",
+          "labelKey": "skillSpecialties.artCraft.typing"
+        },
+        {
+          "key": "shorthand",
+          "labelKey": "skillSpecialties.artCraft.shorthand"
+        },
+        {
+          "key": "forgery",
+          "labelKey": "skillSpecialties.artCraft.forgery"
+        },
+        {
+          "key": "cooking",
+          "labelKey": "skillSpecialties.artCraft.cooking"
+        },
+        {
+          "key": "tailoring",
+          "labelKey": "skillSpecialties.artCraft.tailoring"
+        },
+        {
+          "key": "barber",
+          "labelKey": "skillSpecialties.artCraft.barber"
+        },
+        {
+          "key": "drafting",
+          "labelKey": "skillSpecialties.artCraft.drafting"
+        },
+        {
+          "key": "farming",
+          "labelKey": "skillSpecialties.artCraft.farming"
+        },
+        {
+          "key": "carpentry",
+          "labelKey": "skillSpecialties.artCraft.carpentry"
+        },
+        {
+          "key": "blacksmithing",
+          "labelKey": "skillSpecialties.artCraft.blacksmithing"
+        },
+        {
+          "key": "welding",
+          "labelKey": "skillSpecialties.artCraft.welding"
+        },
+        {
+          "key": "plumbing",
+          "labelKey": "skillSpecialties.artCraft.plumbing"
+        }
       ]
     },
-    { "key": "sleightOfHand", "labelKey": "skills.sleightOfHand", "repeatable": 1, "specialties": [] },
-    { "key": "locksmith", "labelKey": "skills.locksmith", "repeatable": 1, "specialties": [] },
-    { "key": "electricalRepair", "labelKey": "skills.electricalRepair", "repeatable": 1, "specialties": [] },
-    { "key": "mechanicalRepair", "labelKey": "skills.mechanicalRepair", "repeatable": 1, "specialties": [] },
-    { "key": "animalHandling", "labelKey": "skills.animalHandling", "repeatable": 1, "specialties": [] },
-    { "key": "ride", "labelKey": "skills.ride", "repeatable": 1, "specialties": [] },
-    { "key": "operateHeavyMachinery", "labelKey": "skills.operateHeavyMachinery", "repeatable": 1, "specialties": [] },
-    { "key": "driveAuto", "labelKey": "skills.driveAuto", "repeatable": 1, "specialties": [] },
+    {
+      "key": "sleightOfHand",
+      "labelKey": "skills.sleightOfHand",
+      "repeatable": 1,
+      "category": "??",
+      "base": 10,
+      "specialties": []
+    },
+    {
+      "key": "locksmith",
+      "labelKey": "skills.locksmith",
+      "repeatable": 1,
+      "category": "??",
+      "base": 1,
+      "specialties": []
+    },
+    {
+      "key": "electricalRepair",
+      "labelKey": "skills.electricalRepair",
+      "repeatable": 1,
+      "category": "??",
+      "base": 10,
+      "specialties": []
+    },
+    {
+      "key": "mechanicalRepair",
+      "labelKey": "skills.mechanicalRepair",
+      "repeatable": 1,
+      "category": "??",
+      "base": 10,
+      "specialties": []
+    },
+    {
+      "key": "animalHandling",
+      "labelKey": "skills.animalHandling",
+      "repeatable": 1,
+      "category": "??",
+      "base": 5,
+      "specialties": []
+    },
+    {
+      "key": "ride",
+      "labelKey": "skills.ride",
+      "repeatable": 1,
+      "category": "??",
+      "base": 5,
+      "specialties": []
+    },
+    {
+      "key": "operateHeavyMachinery",
+      "labelKey": "skills.operateHeavyMachinery",
+      "repeatable": 1,
+      "category": "??",
+      "base": 1,
+      "specialties": []
+    },
+    {
+      "key": "driveAuto",
+      "labelKey": "skills.driveAuto",
+      "repeatable": 1,
+      "category": "??",
+      "base": 20,
+      "specialties": []
+    },
     {
       "key": "pilot",
       "labelKey": "skills.pilot",
       "repeatable": 1,
+      "category": "??",
+      "base": 1,
       "specialties": [
-        { "key": "boat", "labelKey": "skillSpecialties.pilot.boat" },
-        { "key": "carriage", "labelKey": "skillSpecialties.pilot.carriage" },
-        { "key": "aircraft", "labelKey": "skillSpecialties.pilot.aircraft" }
+        {
+          "key": "boat",
+          "labelKey": "skillSpecialties.pilot.boat"
+        },
+        {
+          "key": "carriage",
+          "labelKey": "skillSpecialties.pilot.carriage"
+        },
+        {
+          "key": "aircraft",
+          "labelKey": "skillSpecialties.pilot.aircraft"
+        }
       ]
     },
-    { "key": "custom", "labelKey": "skills.custom", "repeatable": 3, "specialties": [] }
+    {
+      "key": "custom",
+      "labelKey": "skills.custom",
+      "repeatable": 3,
+      "category": "??",
+      "base": 0,
+      "specialties": []
+    }
   ],
   "locales": {
     "zh-CN": {
-      "skills.creditRating": "信用评级",
-      "skills.cthulhuMythos": "克苏鲁神话",
-      "skills.spotHidden": "侦察",
-      "skills.listen": "聆听",
-      "skills.stealth": "潜行",
-      "skills.track": "追踪",
-      "skills.lipRead": "读唇",
-      "skills.libraryUse": "图书馆使用",
-      "skills.navigate": "导航",
-      "skills.computerUse": "计算机使用Ω",
-      "skills.charm": "取悦",
-      "skills.fastTalk": "话术",
-      "skills.intimidate": "恐吓",
-      "skills.persuade": "说服",
-      "skills.psychology": "心理学",
-      "skills.languageOwn": "母语",
-      "skills.languageOther": "外语",
-      "skills.fighting": "格斗",
-      "skills.firearms": "射击",
-      "skills.dodge": "闪避",
-      "skills.throw": "投掷",
-      "skills.demolitions": "爆破",
-      "skills.artillery": "炮术",
-      "skills.firstAid": "急救",
-      "skills.medicine": "医学",
-      "skills.psychoanalysis": "精神分析",
-      "skills.hypnosis": "催眠",
-      "skills.climb": "攀爬",
-      "skills.jump": "跳跃",
-      "skills.swim": "游泳",
-      "skills.diving": "潜水",
-      "skills.appraise": "估价",
-      "skills.anthropology": "人类学",
-      "skills.accounting": "会计",
-      "skills.law": "法律",
-      "skills.history": "历史",
-      "skills.archaeology": "考古学",
-      "skills.naturalWorld": "博物学",
-      "skills.occult": "神秘学",
-      "skills.electronics": "电子学Ω",
-      "skills.science": "科学",
-      "skills.disguise": "乔装",
-      "skills.survival": "生存",
-      "skills.artCraft": "技艺",
-      "skills.sleightOfHand": "妙手",
-      "skills.locksmith": "锁匠",
-      "skills.electricalRepair": "电气维修",
-      "skills.mechanicalRepair": "机械维修",
-      "skills.animalHandling": "驯兽",
-      "skills.ride": "骑术",
-      "skills.operateHeavyMachinery": "操作重型机械",
-      "skills.driveAuto": "汽车驾驶",
-      "skills.pilot": "驾驶",
-      "skills.custom": "自定义",
-      "skillSpecialties.languageOwn.chinese": "汉语",
-      "skillSpecialties.languageOwn.english": "英语",
-      "skillSpecialties.languageOwn.japanese": "日语",
-      "skillSpecialties.languageOwn.french": "法语",
-      "skillSpecialties.languageOwn.russian": "俄语",
-      "skillSpecialties.languageOwn.german": "德语",
-      "skillSpecialties.languageOwn.korean": "韩语",
-      "skillSpecialties.languageOwn.cantonese": "粤语",
-      "skillSpecialties.languageOwn.latin": "拉丁语",
-      "skillSpecialties.languageOwn.dutch": "荷兰语",
-      "skillSpecialties.languageOwn.norwegian": "挪威语",
-      "skillSpecialties.languageOwn.danish": "丹麦语",
-      "skillSpecialties.languageOwn.hindi": "印度语",
-      "skillSpecialties.languageOwn.spanish": "西班牙语",
-      "skillSpecialties.languageOwn.portuguese": "葡萄牙语",
-      "skillSpecialties.languageOwn.arabic": "阿拉伯语",
-      "skillSpecialties.languageOther.chinese": "汉语",
-      "skillSpecialties.languageOther.english": "英语",
-      "skillSpecialties.languageOther.japanese": "日语",
-      "skillSpecialties.languageOther.french": "法语",
-      "skillSpecialties.languageOther.russian": "俄语",
-      "skillSpecialties.languageOther.german": "德语",
-      "skillSpecialties.languageOther.korean": "韩语",
-      "skillSpecialties.languageOther.cantonese": "粤语",
-      "skillSpecialties.languageOther.latin": "拉丁语",
-      "skillSpecialties.languageOther.dutch": "荷兰语",
-      "skillSpecialties.languageOther.norwegian": "挪威语",
-      "skillSpecialties.languageOther.danish": "丹麦语",
-      "skillSpecialties.languageOther.hindi": "印度语",
-      "skillSpecialties.languageOther.spanish": "西班牙语",
-      "skillSpecialties.languageOther.portuguese": "葡萄牙语",
-      "skillSpecialties.languageOther.arabic": "阿拉伯语",
-      "skillSpecialties.fighting.brawl": "斗殴",
-      "skillSpecialties.fighting.sword": "刀剑",
-      "skillSpecialties.fighting.spear": "矛",
-      "skillSpecialties.fighting.axe": "斧",
-      "skillSpecialties.fighting.garrote": "绞索",
-      "skillSpecialties.fighting.chainsaw": "链锯",
-      "skillSpecialties.fighting.flail": "链枷",
-      "skillSpecialties.fighting.whip": "鞭",
-      "skillSpecialties.firearms.handgun": "手枪",
-      "skillSpecialties.firearms.rifleShotgun": "步/霰",
-      "skillSpecialties.firearms.submachineGun": "冲锋枪",
-      "skillSpecialties.firearms.sniperRifle": "狙击枪",
-      "skillSpecialties.firearms.bow": "弓弩",
-      "skillSpecialties.firearms.machineGun": "机枪",
-      "skillSpecialties.firearms.heavyWeapon": "重武器",
-      "skillSpecialties.science.mathematics": "数学",
-      "skillSpecialties.science.physics": "物理",
-      "skillSpecialties.science.chemistry": "化学",
-      "skillSpecialties.science.pharmacy": "药学",
-      "skillSpecialties.science.geology": "地质学",
-      "skillSpecialties.science.biology": "生物学",
-      "skillSpecialties.science.zoology": "动物学",
-      "skillSpecialties.science.botany": "植物学",
-      "skillSpecialties.science.astronomy": "天文学",
-      "skillSpecialties.science.cryptography": "密码学",
-      "skillSpecialties.science.meteorology": "气象学",
-      "skillSpecialties.science.engineering": "工程学",
-      "skillSpecialties.science.forensics": "鉴证",
-      "skillSpecialties.science.pharmaceuticals": "制药",
-      "skillSpecialties.survival.desert": "沙漠",
-      "skillSpecialties.survival.forest": "森林",
-      "skillSpecialties.survival.island": "荒岛",
-      "skillSpecialties.survival.mountain": "高山",
-      "skillSpecialties.survival.sea": "海上",
-      "skillSpecialties.artCraft.acting": "表演",
-      "skillSpecialties.artCraft.music": "音乐",
-      "skillSpecialties.artCraft.painting": "绘画",
-      "skillSpecialties.artCraft.art": "艺术",
-      "skillSpecialties.artCraft.photography": "摄影",
-      "skillSpecialties.artCraft.writing": "写作",
-      "skillSpecialties.artCraft.calligraphy": "书法",
-      "skillSpecialties.artCraft.typing": "打字",
-      "skillSpecialties.artCraft.shorthand": "速记",
-      "skillSpecialties.artCraft.forgery": "伪造",
-      "skillSpecialties.artCraft.cooking": "烹饪",
-      "skillSpecialties.artCraft.tailoring": "裁缝",
-      "skillSpecialties.artCraft.barber": "理发",
-      "skillSpecialties.artCraft.drafting": "工程制图",
-      "skillSpecialties.artCraft.farming": "耕作",
-      "skillSpecialties.artCraft.carpentry": "木工",
-      "skillSpecialties.artCraft.blacksmithing": "铁匠",
-      "skillSpecialties.artCraft.welding": "焊接",
-      "skillSpecialties.artCraft.plumbing": "管道工",
-      "skillSpecialties.pilot.boat": "船",
-      "skillSpecialties.pilot.carriage": "马车",
-      "skillSpecialties.pilot.aircraft": "飞行器"
+      "skills.creditRating": "????",
+      "skills.cthulhuMythos": "?????",
+      "skills.spotHidden": "??",
+      "skills.listen": "??",
+      "skills.stealth": "??",
+      "skills.track": "??",
+      "skills.lipRead": "??",
+      "skills.libraryUse": "?????",
+      "skills.navigate": "??",
+      "skills.computerUse": "?????",
+      "skills.charm": "??",
+      "skills.fastTalk": "??",
+      "skills.intimidate": "??",
+      "skills.persuade": "??",
+      "skills.psychology": "???",
+      "skills.languageOwn": "??",
+      "skills.languageOther": "??",
+      "skills.fighting": "??",
+      "skills.firearms": "??",
+      "skills.dodge": "??",
+      "skills.throw": "??",
+      "skills.demolitions": "??",
+      "skills.artillery": "??",
+      "skills.firstAid": "??",
+      "skills.medicine": "??",
+      "skills.psychoanalysis": "????",
+      "skills.hypnosis": "??",
+      "skills.climb": "??",
+      "skills.jump": "??",
+      "skills.swim": "??",
+      "skills.diving": "??",
+      "skills.appraise": "??",
+      "skills.anthropology": "???",
+      "skills.accounting": "??",
+      "skills.law": "??",
+      "skills.history": "??",
+      "skills.archaeology": "???",
+      "skills.naturalWorld": "???",
+      "skills.occult": "???",
+      "skills.electronics": "???",
+      "skills.science": "??",
+      "skills.disguise": "??",
+      "skills.survival": "??",
+      "skills.artCraft": "??",
+      "skills.sleightOfHand": "??",
+      "skills.locksmith": "??",
+      "skills.electricalRepair": "????",
+      "skills.mechanicalRepair": "????",
+      "skills.animalHandling": "??",
+      "skills.ride": "??",
+      "skills.operateHeavyMachinery": "??????",
+      "skills.driveAuto": "????",
+      "skills.pilot": "??",
+      "skills.custom": "???",
+      "skillSpecialties.languageOwn.chinese": "??",
+      "skillSpecialties.languageOwn.english": "??",
+      "skillSpecialties.languageOwn.japanese": "??",
+      "skillSpecialties.languageOwn.french": "??",
+      "skillSpecialties.languageOwn.russian": "??",
+      "skillSpecialties.languageOwn.german": "??",
+      "skillSpecialties.languageOwn.korean": "??",
+      "skillSpecialties.languageOwn.cantonese": "??",
+      "skillSpecialties.languageOwn.latin": "???",
+      "skillSpecialties.languageOwn.dutch": "???",
+      "skillSpecialties.languageOwn.norwegian": "???",
+      "skillSpecialties.languageOwn.danish": "???",
+      "skillSpecialties.languageOwn.hindi": "???",
+      "skillSpecialties.languageOwn.spanish": "????",
+      "skillSpecialties.languageOwn.portuguese": "????",
+      "skillSpecialties.languageOwn.arabic": "????",
+      "skillSpecialties.languageOther.chinese": "??",
+      "skillSpecialties.languageOther.english": "??",
+      "skillSpecialties.languageOther.japanese": "??",
+      "skillSpecialties.languageOther.french": "??",
+      "skillSpecialties.languageOther.russian": "??",
+      "skillSpecialties.languageOther.german": "??",
+      "skillSpecialties.languageOther.korean": "??",
+      "skillSpecialties.languageOther.cantonese": "??",
+      "skillSpecialties.languageOther.latin": "???",
+      "skillSpecialties.languageOther.dutch": "???",
+      "skillSpecialties.languageOther.norwegian": "???",
+      "skillSpecialties.languageOther.danish": "???",
+      "skillSpecialties.languageOther.hindi": "???",
+      "skillSpecialties.languageOther.spanish": "????",
+      "skillSpecialties.languageOther.portuguese": "????",
+      "skillSpecialties.languageOther.arabic": "????",
+      "skillSpecialties.fighting.brawl": "??",
+      "skillSpecialties.fighting.sword": "??",
+      "skillSpecialties.fighting.spear": "?",
+      "skillSpecialties.fighting.axe": "?",
+      "skillSpecialties.fighting.garrote": "??",
+      "skillSpecialties.fighting.chainsaw": "??",
+      "skillSpecialties.fighting.flail": "??",
+      "skillSpecialties.fighting.whip": "?",
+      "skillSpecialties.firearms.handgun": "??",
+      "skillSpecialties.firearms.rifleShotgun": "?/?",
+      "skillSpecialties.firearms.submachineGun": "???",
+      "skillSpecialties.firearms.sniperRifle": "???",
+      "skillSpecialties.firearms.bow": "??",
+      "skillSpecialties.firearms.machineGun": "??",
+      "skillSpecialties.firearms.heavyWeapon": "???",
+      "skillSpecialties.science.mathematics": "??",
+      "skillSpecialties.science.physics": "??",
+      "skillSpecialties.science.chemistry": "??",
+      "skillSpecialties.science.pharmacy": "??",
+      "skillSpecialties.science.geology": "???",
+      "skillSpecialties.science.biology": "???",
+      "skillSpecialties.science.zoology": "???",
+      "skillSpecialties.science.botany": "???",
+      "skillSpecialties.science.astronomy": "???",
+      "skillSpecialties.science.cryptography": "???",
+      "skillSpecialties.science.meteorology": "???",
+      "skillSpecialties.science.engineering": "???",
+      "skillSpecialties.science.forensics": "??",
+      "skillSpecialties.science.pharmaceuticals": "??",
+      "skillSpecialties.survival.desert": "??",
+      "skillSpecialties.survival.forest": "??",
+      "skillSpecialties.survival.island": "??",
+      "skillSpecialties.survival.mountain": "??",
+      "skillSpecialties.survival.sea": "??",
+      "skillSpecialties.artCraft.acting": "??",
+      "skillSpecialties.artCraft.music": "??",
+      "skillSpecialties.artCraft.painting": "??",
+      "skillSpecialties.artCraft.art": "??",
+      "skillSpecialties.artCraft.photography": "??",
+      "skillSpecialties.artCraft.writing": "??",
+      "skillSpecialties.artCraft.calligraphy": "??",
+      "skillSpecialties.artCraft.typing": "??",
+      "skillSpecialties.artCraft.shorthand": "??",
+      "skillSpecialties.artCraft.forgery": "??",
+      "skillSpecialties.artCraft.cooking": "??",
+      "skillSpecialties.artCraft.tailoring": "??",
+      "skillSpecialties.artCraft.hairdressing": "??",
+      "skillSpecialties.artCraft.drafting": "????",
+      "skillSpecialties.artCraft.farming": "??",
+      "skillSpecialties.artCraft.carpentry": "??",
+      "skillSpecialties.artCraft.blacksmithing": "??",
+      "skillSpecialties.artCraft.welding": "??",
+      "skillSpecialties.artCraft.plumbing": "???",
+      "skillSpecialties.pilot.boat": "?",
+      "skillSpecialties.pilot.carriage": "??",
+      "skillSpecialties.pilot.aircraft": "???",
+      "skillSpecialties.artCraft.barber": "barber"
     }
   }
 }

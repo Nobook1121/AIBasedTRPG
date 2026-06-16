@@ -288,6 +288,36 @@
                                     </div>
                                 </section>
                             </div>
+                            <div class="character-skill-filter-strip" id="characterSkillCategoryFilters" aria-label="技能分类筛选">
+                                <button type="button" class="character-skill-filter is-active" data-skill-category="全部技能">全部技能</button>
+                                <button type="button" class="character-skill-filter" data-skill-category="特殊">特殊</button>
+                                <button type="button" class="character-skill-filter" data-skill-category="探索">探索</button>
+                                <button type="button" class="character-skill-filter" data-skill-category="社交">社交</button>
+                                <button type="button" class="character-skill-filter" data-skill-category="战斗">战斗</button>
+                                <button type="button" class="character-skill-filter" data-skill-category="医疗">医疗</button>
+                                <button type="button" class="character-skill-filter" data-skill-category="运动">运动</button>
+                                <button type="button" class="character-skill-filter" data-skill-category="知识">知识</button>
+                                <button type="button" class="character-skill-filter" data-skill-category="操纵">操纵</button>
+                                <button type="button" class="character-skill-filter" data-skill-category="其他">其他</button>
+                            </div>
+                            <div class="character-skill-table-shell">
+                                <table class="character-skill-table">
+                                    <thead>
+                                        <tr>
+                                            <th>专职</th>
+                                            <th>技能名称</th>
+                                            <th>基础%</th>
+                                            <th>职业%</th>
+                                            <th>兴趣%</th>
+                                            <th>成长%</th>
+                                            <th>成功率%</th>
+                                            <th>困难50%</th>
+                                            <th>噩梦20%</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="characterSkillTableBody"></tbody>
+                                </table>
+                            </div>
                         </section>
 
                         <section class="character-form-section">
@@ -397,6 +427,21 @@
                 </div>
                 <div class="modal-body">
                     <div class="occupation-template-list" id="occupationTemplateList" aria-live="polite"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="skillSpecialtyModal" tabindex="-1" aria-labelledby="skillSpecialtyModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="skillSpecialtyModalLabel">选择技能类型</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="skillSpecialtyTargetRow">
+                    <div class="character-specialty-options" id="skillSpecialtyOptions"></div>
                 </div>
             </div>
         </div>
