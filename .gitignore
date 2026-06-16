@@ -15,3 +15,10 @@ tests/**/__pycache__/
 /data/users/ip_configs/
 /docs
 /tests/*
+/data/characters/*
+/data/history/*
+/data/logs/*
+/data/rooms/*
+/data/scenarios/*
+/data/users/*
+
