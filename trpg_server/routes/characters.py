@@ -8,7 +8,7 @@ from trpg_server.json_store import read_json, write_json_atomic
 from trpg_server.logging_config import log_user_action, user_action_text
 from trpg_server.responses import error_response, success_response
 from trpg_server.security import normalize_filename, safe_join
-from trpg_server.settings import CHARACTERS_DIR, CONFIG_DIR, OCCUPATIONS_DIR
+from trpg_server.settings import CHARACTERS_DIR, CONFIG_DIR, OCCUPATIONS_DIR, WEAPONS_DIR
 
 bp = Blueprint("characters", __name__)
 logger = logging.getLogger(__name__)
@@ -27,6 +27,10 @@ def _get_config_dir():
 
 def _get_occupations_dir():
     return current_app.config.get("OCCUPATIONS_DIR", OCCUPATIONS_DIR)
+
+
+def _get_weapons_dir():
+    return current_app.config.get("WEAPONS_DIR", WEAPONS_DIR)
 
 
 def _require_login():
@@ -55,6 +59,13 @@ def _iter_builtin_occupation_files():
     if not occupations_dir.exists():
         return []
     return sorted(occupations_dir.glob("*.json"))
+
+
+def _iter_builtin_weapon_files():
+    weapons_dir = _get_weapons_dir() / "builtin"
+    if not weapons_dir.exists():
+        return []
+    return sorted(weapons_dir.glob("*.json"))
 
 
 def _skill_catalog_path():
@@ -160,6 +171,21 @@ def list_character_skills():
     catalog.setdefault("version", 1)
     catalog.setdefault("defaultLocale", "zh-CN")
     return success_response(catalog, "Skill catalog loaded successfully")
+
+
+@bp.route("/api/character-catalogs/weapons", methods=["GET"])
+def list_builtin_weapons():
+    login_error = _require_login()
+    if login_error:
+        return login_error
+
+    weapons = []
+    for path in _iter_builtin_weapon_files():
+        weapon = read_json(path, default=None)
+        if isinstance(weapon, dict):
+            weapons.append(weapon)
+    weapons.sort(key=lambda item: str(item.get("id") or item.get("name") or ""))
+    return success_response(weapons, "Weapon catalogs loaded successfully")
 
 
 @bp.route("/api/characters", methods=["GET"])

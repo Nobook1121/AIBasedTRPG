@@ -20,6 +20,7 @@ max_history_messages = 1000
 [character_rules]
 attribute_ratio_percent = 20
 max_cards_per_user = 5
+weapon_slot_count = 5
 attribute_roll_str = "3d6x5"
 attribute_roll_dex = "3d6x5"
 attribute_roll_siz = "(2d6+6)x5"

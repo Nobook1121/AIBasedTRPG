@@ -758,6 +758,277 @@
     line-height: 1.35;
 }
 
+.character-skill-filter-strip {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    padding-bottom: 4px;
+    overflow-x: auto;
+}
+
+.character-skill-filter {
+    flex: 0 0 auto;
+    min-height: 32px;
+    padding: 5px 10px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--color-muted);
+    background: var(--color-panel);
+    font-size: 0.78rem;
+    font-weight: 800;
+    white-space: nowrap;
+    transition: color 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
+}
+
+.character-skill-filter:hover,
+.character-skill-filter.is-active {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+    background: var(--color-panel-muted);
+}
+
+.character-skill-table-shell {
+    margin-top: 10px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    overflow: auto;
+    background: var(--color-panel);
+}
+
+.character-skill-table {
+    width: 100%;
+    min-width: 920px;
+    border-collapse: collapse;
+}
+
+.character-skill-table th,
+.character-skill-table td {
+    padding: 8px;
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--color-text);
+    font-size: 0.78rem;
+    vertical-align: middle;
+}
+
+.character-skill-table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--color-panel-muted);
+    font-weight: 900;
+    white-space: nowrap;
+}
+
+.character-skill-table td:first-child,
+.character-skill-table th:first-child {
+    width: 52px;
+    text-align: center;
+}
+
+.character-skill-name-cell {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    min-width: 180px;
+}
+
+.character-skill-name-cell span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.character-skill-type-button {
+    flex: 0 0 auto;
+    min-height: 28px;
+    padding: 3px 8px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--color-muted);
+    background: var(--color-panel-muted);
+    font-size: 0.72rem;
+    font-weight: 800;
+}
+
+.character-skill-type-button:hover {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+.character-custom-skill-name-input {
+    width: min(150px, 45%);
+    min-width: 110px;
+}
+
+.character-skill-points-input {
+    width: 72px;
+    min-height: 30px;
+    padding: 4px 6px;
+    text-align: center;
+}
+
+.character-skill-value-cell {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 52px;
+    min-height: 30px;
+    padding: 4px 6px;
+    border: 1px solid transparent;
+    color: var(--color-text);
+    font-weight: 800;
+    text-align: center;
+}
+
+.character-skill-points-input:disabled {
+    color: var(--color-muted);
+    background: var(--color-panel-muted);
+    cursor: not-allowed;
+}
+
+.character-weapon-table-shell {
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    overflow: auto;
+    background: var(--color-panel);
+}
+
+.character-weapon-table {
+    width: 100%;
+    min-width: 920px;
+    border-collapse: collapse;
+}
+
+.character-weapon-table th,
+.character-weapon-table td {
+    padding: 8px;
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--color-text);
+    font-size: 0.78rem;
+    vertical-align: middle;
+}
+
+.character-weapon-table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--color-panel-muted);
+    font-weight: 900;
+    white-space: nowrap;
+}
+
+.character-weapon-name-button {
+    width: 100%;
+    min-height: 30px;
+    padding: 4px 8px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--color-text);
+    background: var(--color-panel-muted);
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-align: left;
+}
+
+.character-weapon-name-button:hover {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+.character-weapon-skill-select {
+    min-width: 130px;
+}
+
+.character-weapon-impale-select {
+    width: 72px;
+}
+
+.character-weapon-input {
+    min-width: 92px;
+    min-height: 30px;
+    padding: 4px 6px;
+}
+
+.character-weapon-input-narrow {
+    min-width: 68px;
+}
+
+.character-combat-field-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.character-modal-action-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.character-weapon-catalog-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px;
+}
+
+.character-weapon-catalog-card {
+    position: relative;
+    display: grid;
+    gap: 6px;
+    min-height: 150px;
+    padding: 12px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--color-panel);
+}
+
+.character-weapon-catalog-card strong {
+    display: block;
+    color: var(--color-text);
+    font-size: 0.95rem;
+}
+
+.character-weapon-catalog-card span,
+.character-weapon-catalog-card small {
+    color: var(--color-muted);
+    font-size: 0.76rem;
+}
+
+.character-weapon-catalog-card .btn {
+    justify-self: end;
+    align-self: end;
+}
+
+.character-specialty-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 8px;
+}
+
+.character-specialty-option {
+    min-height: 36px;
+    padding: 6px 10px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--color-text);
+    background: var(--color-panel);
+    font-weight: 800;
+    text-align: center;
+}
+
+.character-specialty-option:hover:not(:disabled) {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.character-specialty-option:disabled {
+    color: var(--color-muted);
+    background: var(--color-panel-muted);
+    cursor: not-allowed;
+    opacity: 0.58;
+}
+
 .character-resource-card,
 .character-status-panel {
     padding: 12px;
@@ -1007,6 +1278,7 @@
 
 @media (max-width: 560px) {
     .character-skill-editor-row,
+    .character-combat-field-grid,
     .character-skill-points-grid,
     .character-resource-grid,
     .character-status-grid,

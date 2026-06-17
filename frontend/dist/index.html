@@ -638,6 +638,11 @@
                                     <input type="number" class="form-control" id="maxCardsPerUser" min="1" max="999" value="5">
                                     <small class="text-muted">默认 5 张。管理员和 OWNER 不受该数量限制。</small>
                                 </div>
+                                <div class="form-group">
+                                    <label for="weaponSlotCount">默认武器栏位数量</label>
+                                    <input type="number" class="form-control" id="weaponSlotCount" min="1" max="20" value="5">
+                                    <small class="text-muted">默认 5 个。新建或打开角色卡时会补足武器表格行数。</small>
+                                </div>
                             </div>
                             <div class="character-roll-settings-grid" aria-label="属性随机生成公式">
                                 <label>力量 STR<input type="text" class="form-control" id="attributeRollSTR" placeholder="3d6x5"></label>
@@ -970,6 +975,68 @@
                                     </div>
                                 </section>
                             </div>
+                            <div class="character-skill-filter-strip" id="characterSkillCategoryFilters" aria-label="技能分类筛选">
+                                <button type="button" class="character-skill-filter is-active" data-skill-category="全部技能">全部技能</button>
+                                <button type="button" class="character-skill-filter" data-skill-category="特殊">特殊</button>
+                                <button type="button" class="character-skill-filter" data-skill-category="探索">探索</button>
+                                <button type="button" class="character-skill-filter" data-skill-category="社交">社交</button>
+                                <button type="button" class="character-skill-filter" data-skill-category="战斗">战斗</button>
+                                <button type="button" class="character-skill-filter" data-skill-category="医疗">医疗</button>
+                                <button type="button" class="character-skill-filter" data-skill-category="运动">运动</button>
+                                <button type="button" class="character-skill-filter" data-skill-category="知识">知识</button>
+                                <button type="button" class="character-skill-filter" data-skill-category="操纵">操纵</button>
+                                <button type="button" class="character-skill-filter" data-skill-category="其他">其他</button>
+                            </div>
+                            <div class="character-skill-table-shell">
+                                <table class="character-skill-table">
+                                    <thead>
+                                        <tr>
+                                            <th>专职</th>
+                                            <th>技能名称</th>
+                                            <th>基础%</th>
+                                            <th>职业%</th>
+                                            <th>兴趣%</th>
+                                            <th>成长%</th>
+                                            <th>成功率%</th>
+                                            <th>困难50%</th>
+                                            <th>噩梦20%</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="characterSkillTableBody"></tbody>
+                                </table>
+                            </div>
+                        </section>
+
+                        <section class="character-form-section character-weapon-editor-panel">
+                            <h6 class="character-section-title"><i class="fa fa-crosshairs" aria-hidden="true"></i> <span>武器</span><small>Weapons</small></h6>
+                            <div class="character-weapon-table-shell">
+                                <table class="character-weapon-table">
+                                    <thead>
+                                        <tr>
+                                            <th>武器名称</th>
+                                            <th>使用技能</th>
+                                            <th>成功率</th>
+                                            <th>伤害</th>
+                                            <th>射程</th>
+                                            <th>贯穿</th>
+                                            <th>次数</th>
+                                            <th>装弹量</th>
+                                            <th>故障率</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="characterWeaponTableBody"></tbody>
+                                </table>
+                            </div>
+                        </section>
+
+                        <section class="character-form-section character-combat-editor-panel">
+                            <h6 class="character-section-title"><i class="fa fa-shield" aria-hidden="true"></i> <span>战斗</span><small>Combat</small></h6>
+                            <div class="character-combat-field-grid">
+                                <label class="character-mini-field" for="characterDamageBonus"><span>伤害加值 DB</span><input type="text" class="form-control" id="characterDamageBonus"></label>
+                                <label class="character-mini-field" for="characterBuild"><span>体格</span><input type="number" class="form-control" id="characterBuild"></label>
+                                <label class="character-mini-field" for="characterArmor"><span>护甲</span><input type="number" class="form-control" id="characterArmor" min="0"></label>
+                                <label class="character-mini-field" for="characterMov"><span>移动力</span><input type="number" class="form-control" id="characterMov" min="0"></label>
+                            </div>
                         </section>
 
                         <section class="character-form-section">
@@ -1009,8 +1076,6 @@
                                 <input type="number" class="form-control" id="characterCreditRating" min="0" max="99">
                                 <small class="text-muted">请根据所选职业模板允许的信用评级范围填写。</small>
                             </div>
-                            <label class="form-label mt-3" for="characterWeapons">武器</label>
-                            <textarea class="form-control" id="characterWeapons" rows="3" placeholder="左轮手枪:射击:1D10:15m:1:6:100"></textarea>
                             <label class="form-label mt-3" for="characterEquipment">装备列表</label>
                             <textarea class="form-control" id="characterEquipment" rows="3" placeholder="左轮手枪:1.2:2；急救包:0.8:3"></textarea>
                             <label class="form-label mt-3" for="characterAssets">资产</label>
@@ -1079,6 +1144,40 @@
                 </div>
                 <div class="modal-body">
                     <div class="occupation-template-list" id="occupationTemplateList" aria-live="polite"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="skillSpecialtyModal" tabindex="-1" aria-labelledby="skillSpecialtyModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="skillSpecialtyModalLabel">选择技能类型</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="skillSpecialtyTargetRow">
+                    <div class="character-specialty-options" id="skillSpecialtyOptions"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="characterWeaponPickerModal" tabindex="-1" aria-labelledby="characterWeaponPickerModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="characterWeaponPickerModalLabel">选择武器</h5>
+                    <div class="character-modal-action-row">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="createCustomWeapon">自定义</button>
+                        <button type="button" class="btn btn-sm btn-outline-danger" id="removeCurrentWeapon">移除当前武器</button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="weaponPickerTargetRow">
+                    <div class="character-weapon-catalog-list" id="characterWeaponCatalogList" aria-live="polite"></div>
                 </div>
             </div>
         </div>

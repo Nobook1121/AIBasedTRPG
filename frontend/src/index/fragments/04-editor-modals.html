@@ -320,6 +320,55 @@
                             </div>
                         </section>
 
+                        <section class="character-form-section character-weapon-editor-panel">
+                            <h6 class="character-section-title"><i class="fa fa-crosshairs" aria-hidden="true"></i> <span>武器</span><small>Weapons</small></h6>
+                            <div class="character-weapon-table-shell">
+                                <table class="character-weapon-table">
+                                    <thead>
+                                        <tr>
+                                            <th>武器名称</th>
+                                            <th>使用技能</th>
+                                            <th>成功率</th>
+                                            <th>伤害</th>
+                                            <th>射程</th>
+                                            <th>贯穿</th>
+                                            <th>次数</th>
+                                            <th>装弹量</th>
+                                            <th>故障率</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="characterWeaponTableBody"></tbody>
+                                </table>
+                            </div>
+                        </section>
+
+                        <section class="character-form-section character-combat-editor-panel">
+                            <h6 class="character-section-title"><i class="fa fa-shield" aria-hidden="true"></i> <span>战斗</span><small>Combat</small></h6>
+                            <div class="character-combat-field-grid">
+                                <label class="character-mini-field" for="characterDamageBonus"><span>伤害加值 DB</span><input type="text" class="form-control" id="characterDamageBonus"></label>
+                                <label class="character-mini-field" for="characterBuild"><span>体格</span><input type="number" class="form-control" id="characterBuild"></label>
+                                <label class="character-mini-field" for="characterArmor"><span>护甲</span><input type="number" class="form-control" id="characterArmor" min="0"></label>
+                                <label class="character-mini-field" for="characterMov"><span>移动力</span><input type="number" class="form-control" id="characterMov" min="0"></label>
+                            </div>
+                        </section>
+
+                        <section class="character-form-section character-possessions-editor-panel">
+                            <h6 class="character-section-title"><i class="fa fa-suitcase" aria-hidden="true"></i> <span>物品与装备</span><small>Possessions</small></h6>
+                            <label class="form-label" for="characterEquipment">物品与装备</label>
+                            <textarea class="form-control character-large-textarea" id="characterEquipment" rows="5" placeholder="左轮手枪:1:1.2；急救包:3:0.8"></textarea>
+                        </section>
+
+                        <section class="character-form-section character-assets-editor-panel">
+                            <h6 class="character-section-title"><i class="fa fa-bank" aria-hidden="true"></i> <span>资产</span><small>Cash & Assets</small></h6>
+                            <div class="character-assets-field-grid">
+                                <label class="character-mini-field" for="characterCreditRating"><span>信用评级</span><input type="number" class="form-control" id="characterCreditRating" min="0" max="99" readonly></label>
+                                <label class="character-mini-field" for="characterCash"><span>现金</span><input type="number" class="form-control" id="characterCash" min="0"></label>
+                                <label class="character-mini-field" for="characterSpendingLevel"><span>消费水平</span><input type="number" class="form-control" id="characterSpendingLevel" min="0"></label>
+                            </div>
+                            <label class="form-label mt-3" for="characterAssets">资产</label>
+                            <textarea class="form-control character-large-textarea" id="characterAssets" rows="5" placeholder="房产、车辆、投资、债务或其他长期资产"></textarea>
+                        </section>
+
                         <section class="character-form-section">
                             <h6><i class="fa fa-graduation-cap" aria-hidden="true"></i> 背景信息</h6>
                             <div class="row g-3">
@@ -348,21 +397,6 @@
                                     <textarea class="form-control" id="characterMythos" rows="3"></textarea>
                                 </div>
                             </div>
-                        </section>
-
-                        <section class="character-form-section">
-                            <h6><i class="fa fa-cubes" aria-hidden="true"></i> 快速录入</h6>
-                            <div class="character-occupation-settings">
-                                <label class="form-label" for="characterCreditRating">信用评级</label>
-                                <input type="number" class="form-control" id="characterCreditRating" min="0" max="99">
-                                <small class="text-muted">请根据所选职业模板允许的信用评级范围填写。</small>
-                            </div>
-                            <label class="form-label mt-3" for="characterWeapons">武器</label>
-                            <textarea class="form-control" id="characterWeapons" rows="3" placeholder="左轮手枪:射击:1D10:15m:1:6:100"></textarea>
-                            <label class="form-label mt-3" for="characterEquipment">装备列表</label>
-                            <textarea class="form-control" id="characterEquipment" rows="3" placeholder="左轮手枪:1.2:2；急救包:0.8:3"></textarea>
-                            <label class="form-label mt-3" for="characterAssets">资产</label>
-                            <textarea class="form-control" id="characterAssets" rows="2" placeholder="现金:20；消费水平:10；资产:旧车"></textarea>
                         </section>
                     </div>
                 </div>
@@ -442,6 +476,25 @@
                 <div class="modal-body">
                     <input type="hidden" id="skillSpecialtyTargetRow">
                     <div class="character-specialty-options" id="skillSpecialtyOptions"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="characterWeaponPickerModal" tabindex="-1" aria-labelledby="characterWeaponPickerModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="characterWeaponPickerModalLabel">选择武器</h5>
+                    <div class="character-modal-action-row">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="createCustomWeapon">自定义</button>
+                        <button type="button" class="btn btn-sm btn-outline-danger" id="removeCurrentWeapon">移除当前武器</button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="weaponPickerTargetRow">
+                    <div class="character-weapon-catalog-list" id="characterWeaponCatalogList" aria-live="polite"></div>
                 </div>
             </div>
         </div>
