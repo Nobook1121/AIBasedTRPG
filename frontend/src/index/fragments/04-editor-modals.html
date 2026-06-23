@@ -297,6 +297,7 @@
                                 <button type="button" class="character-skill-filter" data-skill-category="医疗">医疗</button>
                                 <button type="button" class="character-skill-filter" data-skill-category="运动">运动</button>
                                 <button type="button" class="character-skill-filter" data-skill-category="知识">知识</button>
+                                <button type="button" class="character-skill-filter" data-skill-category="技术">技术</button>
                                 <button type="button" class="character-skill-filter" data-skill-category="操纵">操纵</button>
                                 <button type="button" class="character-skill-filter" data-skill-category="其他">其他</button>
                             </div>
@@ -354,8 +355,7 @@
 
                         <section class="character-form-section character-possessions-editor-panel">
                             <h6 class="character-section-title"><i class="fa fa-suitcase" aria-hidden="true"></i> <span>物品与装备</span><small>Possessions</small></h6>
-                            <label class="form-label" for="characterEquipment">物品与装备</label>
-                            <textarea class="form-control character-large-textarea" id="characterEquipment" rows="5" placeholder="左轮手枪:1:1.2；急救包:3:0.8"></textarea>
+                            <textarea class="form-control character-large-textarea" id="characterEquipment" rows="5" placeholder="在此输入物品与装备信息..."></textarea>
                         </section>
 
                         <section class="character-form-section character-assets-editor-panel">
@@ -369,32 +369,64 @@
                             <textarea class="form-control character-large-textarea" id="characterAssets" rows="5" placeholder="房产、车辆、投资、债务或其他长期资产"></textarea>
                         </section>
 
-                        <section class="character-form-section">
-                            <h6><i class="fa fa-graduation-cap" aria-hidden="true"></i> 背景信息</h6>
-                            <div class="row g-3">
-                                <div class="col-md-6">
-                                    <label class="form-label" for="appearance">外貌特征</label>
-                                    <textarea class="form-control" id="appearance" rows="2"></textarea>
+                        <section class="character-form-section character-mythos-editor-panel">
+                            <h6 class="character-section-title"><i class="fa fa-book" aria-hidden="true"></i> <span>克苏鲁神话</span><small>Cthulu Mythos</small></h6>
+                            <div class="character-textarea-grid character-textarea-grid-three">
+                                <textarea class="form-control character-medium-textarea" id="characterArcaneTomes" rows="3" placeholder="魔法物品与典籍"></textarea>
+                                <textarea class="form-control character-medium-textarea" id="characterSpells" rows="3" placeholder="法术"></textarea>
+                                <textarea class="form-control character-medium-textarea" id="characterEncounters" rows="3" placeholder="第三类接触"></textarea>
+                            </div>
+                        </section>
+
+                        <section class="character-form-section character-story-editor-panel">
+                            <h6 class="character-section-title"><i class="fa fa-pencil-square-o" aria-hidden="true"></i> <span>背景故事</span><small>Story</small></h6>
+                            <div class="character-textarea-grid character-textarea-grid-three">
+                                <textarea class="form-control character-medium-textarea" id="characterBio" rows="3" placeholder="个人介绍"></textarea>
+                                <textarea class="form-control character-medium-textarea" id="appearance" rows="3" placeholder="形象描述"></textarea>
+                                <textarea class="form-control character-medium-textarea" id="characterIdeology" rows="3" placeholder="思想与信念"></textarea>
+                                <textarea class="form-control character-medium-textarea" id="characterSignificantPeople" rows="3" placeholder="重要之人"></textarea>
+                                <textarea class="form-control character-medium-textarea" id="characterMeaningfulLocations" rows="3" placeholder="意义非凡之地"></textarea>
+                                <textarea class="form-control character-medium-textarea" id="characterTreasuredPossessions" rows="3" placeholder="宝贵之物"></textarea>
+                                <textarea class="form-control character-medium-textarea" id="traits" rows="3" placeholder="特质"></textarea>
+                                <textarea class="form-control character-medium-textarea" id="characterInjuriesScars" rows="3" placeholder="伤口与疤痕"></textarea>
+                                <textarea class="form-control character-medium-textarea" id="characterPhobiasManias" rows="3" placeholder="精神症状"></textarea>
+                                <textarea class="form-control character-medium-textarea" id="education" rows="3" placeholder="教育背景" hidden></textarea>
+                            </div>
+                        </section>
+
+                        <section class="character-form-section character-companions-editor-panel">
+                            <div class="character-section-heading">
+                                <h6 class="character-section-title"><i class="fa fa-users" aria-hidden="true"></i> <span>人际关系</span><small>Companions</small></h6>
+                                <button type="button" class="character-icon-button" id="addCharacterCompanion" title="增加人际关系" aria-label="增加人际关系">
+                                    <i class="fa fa-plus" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                            <div class="character-repeatable-list" id="characterCompanionList">
+                                <div class="character-repeatable-row" data-companion-row>
+                                    <input type="text" class="form-control" id="characterCompanionRole" data-companion-role placeholder="角色">
+                                    <input type="text" class="form-control" id="characterCompanionRelationship" data-companion-relationship placeholder="关系">
+                                    <input type="text" class="form-control" id="characterCompanionPlayer" data-companion-player placeholder="玩家">
+                                    <button type="button" class="character-icon-button" data-remove-companion title="删除人际关系" aria-label="删除人际关系">
+                                        <i class="fa fa-trash" aria-hidden="true"></i>
+                                    </button>
                                 </div>
-                                <div class="col-md-6">
-                                    <label class="form-label" for="education">教育背景</label>
-                                    <textarea class="form-control" id="education" rows="2"></textarea>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label" for="characterBio">故事经历</label>
-                                    <textarea class="form-control" id="characterBio" rows="3"></textarea>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label" for="traits">弱点优势</label>
-                                    <textarea class="form-control" id="traits" rows="3"></textarea>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label" for="characterRelationships">人际关系</label>
-                                    <textarea class="form-control" id="characterRelationships" rows="3"></textarea>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label" for="characterMythos">克苏鲁神话经历</label>
-                                    <textarea class="form-control" id="characterMythos" rows="3"></textarea>
+                            </div>
+                        </section>
+
+                        <section class="character-form-section character-scenarios-editor-panel">
+                            <div class="character-section-heading">
+                                <h6 class="character-section-title"><i class="fa fa-map-o" aria-hidden="true"></i> <span>经历过的模组</span><small>Experienced Scenarios</small></h6>
+                                <button type="button" class="character-icon-button" id="addCharacterScenario" title="增加经历过的模组" aria-label="增加经历过的模组">
+                                    <i class="fa fa-plus" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                            <div class="character-repeatable-list" id="characterScenarioList">
+                                <div class="character-repeatable-row character-scenario-row" data-scenario-row>
+                                    <input type="text" class="form-control" id="characterScenarioName" data-scenario-name placeholder="模组">
+                                    <textarea class="form-control character-medium-textarea" id="characterScenarioExperience" data-scenario-experience rows="2" placeholder="经历"></textarea>
+                                    <button type="button" class="character-icon-button" data-remove-scenario title="删除经历过的模组" aria-label="删除经历过的模组">
+                                        <i class="fa fa-trash" aria-hidden="true"></i>
+                                    </button>
                                 </div>
                             </div>
                         </section>

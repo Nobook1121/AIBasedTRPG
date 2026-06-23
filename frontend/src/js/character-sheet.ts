@@ -125,6 +125,12 @@ interface COC7Assets {
 interface COC7Relationship {
     name: string;
     description: string;
+    player: string;
+}
+
+interface COC7ExperiencedScenario {
+    name: string;
+    experience: string;
 }
 
 interface COC7Background {
@@ -137,6 +143,7 @@ interface COC7Background {
     injuriesScars: string;
     phobiasManias: string;
     arcaneTomes: string;
+    spells: string;
     encounters: string;
     story: string;
     education: string;
@@ -270,6 +277,7 @@ interface COC7CharacterCard {
     assets: COC7Assets;
     background: COC7Background;
     relationships: COC7Relationship[];
+    experiencedScenarios: COC7ExperiencedScenario[];
     createdAt: string;
     updatedAt: string;
 }
@@ -278,6 +286,43 @@ type COC7CharacterCardInput = Partial<Omit<COC7CharacterCard, "attributes" | "ge
     attributes?: LegacyAttributesInput;
     gender?: string;
 };
+
+interface TestCharacterJson {
+    [key: string]: unknown;
+    id?: string;
+    name?: string;
+    playerId?: string;
+    playerName?: string;
+    time?: string;
+    job?: string;
+    age?: string | number;
+    gender?: string;
+    location?: string;
+    hometown?: string;
+    attributes?: Record<string, unknown>;
+    deriveAttributes?: {
+        sanity?: Record<string, unknown>;
+        hp?: Record<string, unknown>;
+        mp?: Record<string, unknown>;
+    };
+    battleAttributes?: Record<string, unknown>;
+    characterStatus?: {
+        bodyStates?: Record<string, unknown>;
+        mentalStates?: Record<string, unknown>;
+    };
+    pointValues?: unknown;
+    proSkills?: unknown;
+    skillPoints?: unknown;
+    weapons?: Array<Record<string, unknown>>;
+    stories?: Record<string, unknown>;
+    assets?: Record<string, unknown>;
+    experiencedModules?: string | Array<Record<string, unknown>>;
+    friends?: string | Array<Record<string, unknown>>;
+    skillGroups?: Record<string, Array<Record<string, unknown>>>;
+    isEditable?: boolean;
+    createdAt?: string;
+    updatedAt?: string;
+}
 
 interface AttributeCheckResult {
     roll: number;
@@ -367,7 +412,34 @@ interface Window {
         permanentInsanity: "characterStatusPermanentInsanity",
         indefiniteInsanity: "characterStatusIndefiniteInsanity"
     };
+    const TEST_CHARACTER_SKILL_GROUPS: Record<string, SkillCategory> = {
+        special: "特殊",
+        explore: "探索",
+        social: "社交",
+        combat: "战斗",
+        medical: "医疗",
+        move: "运动",
+        knowledge: "知识",
+        tech: "技术",
+        drive: "操纵",
+        other: "其他"
+    };
+    const TEST_CHARACTER_CATEGORY_GROUPS = Object.entries(TEST_CHARACTER_SKILL_GROUPS).reduce((index, [group, category]) => {
+        index[category] = group;
+        return index;
+    }, {} as Record<string, string>);
+    const TEST_CHARACTER_BODY_STATUS: Record<keyof Pick<CharacterStatusFlags, "majorWound" | "unconscious" | "dead">, string> = {
+        majorWound: "重伤",
+        unconscious: "昏迷",
+        dead: "死亡"
+    };
+    const TEST_CHARACTER_MENTAL_STATUS: Record<keyof Pick<CharacterStatusFlags, "indefiniteInsanity" | "permanentInsanity" | "temporaryInsanity">, string> = {
+        indefiniteInsanity: "不定期疯狂",
+        permanentInsanity: "永久疯狂",
+        temporaryInsanity: "临时疯狂"
+    };
     const SKILL_RANKS: SkillRank[] = ["新手", "学习", "熟修", "主修"];
+    const SKILL_FILTER_CATEGORIES: Array<SkillCategory | "全部技能"> = ["全部技能", "特殊", "探索", "社交", "战斗", "医疗", "运动", "知识", "技术", "操纵", "其他"];
     const REGIONAL_NAMES: Record<NameRegion, { family: string[]; male: string[]; female: string[]; neutral: string[]; westernOrder?: boolean }> = {
         china: {
             family: ["林", "陈", "顾", "沈", "周", "陆", "许", "梁", "赵", "钱", "孙", "李", "王", "吴", "郑", "冯", "蒋", "韩", "杨", "朱", "秦", "何", "吕", "罗", "宋", "谢", "唐", "杜", "程", "苏", "魏", "叶"],
@@ -901,7 +973,7 @@ interface Window {
             avatar: input.avatar || "",
             occupationId,
             occupationName: input.occupationName || occupation.name,
-            creditRating: clampNumber(input.creditRating, occupation.creditRating[0], occupation.creditRating[1], occupation.creditRating[0]),
+            creditRating: clampNumber(input.creditRating, 0, 99, 0),
             residence: input.residence || "",
             birthplace: input.birthplace || "",
             attributes,
@@ -931,6 +1003,7 @@ interface Window {
             },
             background: normalizeBackground(input.background),
             relationships: normalizeRelationships(input.relationships),
+            experiencedScenarios: normalizeExperiencedScenarios(input.experiencedScenarios),
             createdAt: input.createdAt || now,
             updatedAt: now
         };
@@ -1039,6 +1112,7 @@ interface Window {
             injuriesScars: background?.injuriesScars || "",
             phobiasManias: background?.phobiasManias || "",
             arcaneTomes: background?.arcaneTomes || "",
+            spells: background?.spells || "",
             encounters: background?.encounters || "",
             story: background?.story || "",
             education: background?.education || "",
@@ -1067,7 +1141,15 @@ interface Window {
     function normalizeRelationships(relationships?: COC7Relationship[]): COC7Relationship[] {
         return (relationships || []).map((item) => ({
             name: item.name || "未命名关系",
-            description: item.description || ""
+            description: item.description || "",
+            player: item.player || ""
+        }));
+    }
+
+    function normalizeExperiencedScenarios(scenarios?: COC7ExperiencedScenario[]): COC7ExperiencedScenario[] {
+        return (scenarios || []).map((item) => ({
+            name: item.name || "",
+            experience: item.experience || ""
         }));
     }
 
@@ -1416,6 +1498,8 @@ interface Window {
             openEditor();
         });
         byId("saveCharacter")?.addEventListener("click", saveFromEditor);
+        byId("importCharacter")?.addEventListener("click", () => byId<HTMLInputElement>("importCharacterFile")?.click());
+        byId<HTMLInputElement>("importCharacterFile")?.addEventListener("change", importCharacterFiles);
         byId("exportCharacter")?.addEventListener("click", exportActiveCard);
         byId("backToCharacterList")?.addEventListener("click", showCharacterList);
         byId("skillLevelFilters")?.addEventListener("click", handleCharacterFilterClick);
@@ -1443,7 +1527,7 @@ interface Window {
             hydrateSkillChecklist(editorSkills);
             refreshEditorRuleSummary();
         });
-        byId("characterCreditRating")?.addEventListener("input", refreshEditorRuleSummary);
+        byId("characterCreditRating")?.addEventListener("input", syncEditorCreditRating);
         byId("characterOccupationSkillPoints")?.addEventListener("input", () => {
             occupationSkillPointsManuallyEdited = true;
             refreshSkillTableCalculations();
@@ -1481,6 +1565,10 @@ interface Window {
         byId("characterWeaponCatalogList")?.addEventListener("click", handleWeaponCatalogClick);
         byId("createCustomWeapon")?.addEventListener("click", createCustomWeaponRow);
         byId("removeCurrentWeapon")?.addEventListener("click", removeCurrentWeaponRow);
+        byId("addCharacterCompanion")?.addEventListener("click", () => addRelationshipRow());
+        byId("characterCompanionList")?.addEventListener("click", handleRelationshipRowClick);
+        byId("addCharacterScenario")?.addEventListener("click", () => addExperiencedScenarioRow());
+        byId("characterScenarioList")?.addEventListener("click", handleExperiencedScenarioRowClick);
         document.querySelectorAll<HTMLInputElement>(".character-attribute-input").forEach((input) => {
             input.addEventListener("input", () => {
                 refreshEditorRuleSummary();
@@ -1504,6 +1592,7 @@ interface Window {
 
     function hydrateSkillChecklist(skills: COC7Skill[] = BASE_SKILLS): void {
         renderSkillTable(skills);
+        syncEditorCreditRating();
     }
 
     function renderSkillTable(skills: COC7Skill[] = BASE_SKILLS): void {
@@ -1511,7 +1600,7 @@ interface Window {
         if (!body) return;
         const occupation = resolveOccupationFromInput(getInputValue("characterOccupation"));
         const normalized = normalizeSkills(skills, readAttributes(), occupation);
-        const availableCategories = new Set(["全部技能", "特殊", "探索", "社交", "战斗", "医疗", "运动", "知识", "操纵", "其他"]);
+        const availableCategories = new Set<string>(SKILL_FILTER_CATEGORIES);
         body.innerHTML = normalized.map((skill) => {
             const skillKey = resolveSkillKey(skill);
             const rowId = escapeHtml(skill.id);
@@ -1548,6 +1637,7 @@ interface Window {
         }).join("");
         refreshSkillTableVisibility();
         refreshSkillPointSummary();
+        syncEditorCreditRating();
     }
 
     function buildCustomSkillNameInput(skill: COC7Skill, rowId: string): string {
@@ -1592,6 +1682,7 @@ interface Window {
             syncCustomSkillDisplayName(row);
         }
         refreshSkillTableCalculations();
+        syncEditorCreditRating();
     }
 
     function handleSkillTableClick(event: Event): void {
@@ -1687,7 +1778,7 @@ interface Window {
             <tr data-weapon-row-id="${rowId}">
                 <td>
                     <button type="button" class="character-weapon-name-button" data-weapon-picker-trigger="${rowId}">
-                        ${escapeHtml(weapon.name || "选择武器")}
+                        ${formatWeaponNameForDisplay(weapon.name || "选择武器")}
                     </button>
                     <input type="hidden" data-weapon-name="${rowId}" value="${escapeHtml(weapon.name)}">
                 </td>
@@ -1726,6 +1817,10 @@ interface Window {
             ammo: "N/A",
             malfunction: "N/A"
         };
+    }
+
+    function formatWeaponNameForDisplay(name: string): string {
+        return escapeHtml(name).replace(/\s+/g, "<wbr>");
     }
 
     function weaponSkillOptions(selectedWeapon: COC7Weapon): string {
@@ -1978,7 +2073,7 @@ interface Window {
         setPlayerBindingInputValue(boundPlayerId);
         setInputValue("characterEra", target.era);
         setInputValue("characterOccupation", target.occupationName || getOccupation(target).name);
-        setInputValue("characterCreditRating", target.creditRating);
+        setInputValue("characterCreditRating", target.creditRating || 0);
         setInputValue("characterAge", target.age);
         setInputValue("characterGender", target.gender);
         setInputValue("raceType", target.background.raceType);
@@ -1989,10 +2084,21 @@ interface Window {
         setInputValue("education", target.background.education);
         setInputValue("characterBio", target.background.story);
         setInputValue("traits", target.background.traits);
-        setInputValue("characterRelationships", target.relationships.map((item) => `${item.name}:${item.description}`).join("；"));
-        setInputValue("characterMythos", target.background.encounters);
+        setInputValue("characterArcaneTomes", target.background.arcaneTomes);
+        setInputValue("characterSpells", target.background.spells);
+        setInputValue("characterEncounters", target.background.encounters);
+        setInputValue("characterIdeology", target.background.ideology);
+        setInputValue("characterSignificantPeople", target.background.significantPeople);
+        setInputValue("characterMeaningfulLocations", target.background.meaningfulLocations);
+        setInputValue("characterTreasuredPossessions", target.background.treasuredPossessions);
+        setInputValue("characterInjuriesScars", target.background.injuriesScars);
+        setInputValue("characterPhobiasManias", target.background.phobiasManias);
+        hydrateRelationshipRows(target.relationships);
+        hydrateExperiencedScenarioRows(target.experiencedScenarios);
         setInputValue("characterEquipment", formatEquipment(target.equipment));
-        setInputValue("characterAssets", formatAssets(target.assets));
+        setInputValue("characterCash", target.assets.cash);
+        setInputValue("characterSpendingLevel", target.assets.spendingLevel);
+        setInputValue("characterAssets", target.assets.assetsText);
         setInputValue("characterCurrentHp", target.currentHp);
         setInputValue("characterMaxHp", target.maxHp);
         setInputValue("characterCurrentMp", target.currentMp);
@@ -2018,6 +2124,7 @@ interface Window {
         hydrateSkillChecklist(editorSkills);
         hydrateWeaponTable(target.weapons);
         refreshEditorRuleSummary();
+        syncEditorCreditRating();
         modal?.show();
     }
 
@@ -2060,11 +2167,11 @@ interface Window {
     function applyOccupationTemplate(occupationId: string): void {
         const occupation = getOccupationById(occupationId);
         setInputValue("characterOccupation", occupation.name);
-        setInputValue("characterCreditRating", occupation.creditRating[0]);
         occupationSkillPointsManuallyEdited = false;
         editorSkills = readChecklistSkills();
         hydrateSkillChecklist(editorSkills);
         refreshEditorRuleSummary();
+        syncEditorCreditRating();
         occupationTemplateModal?.hide();
     }
 
@@ -2305,6 +2412,7 @@ interface Window {
         body.querySelectorAll<HTMLTableRowElement>("tr[data-skill-row-id]").forEach(refreshSkillRowCalculations);
         refreshSkillPointSummary();
         refreshWeaponSuccessRates();
+        syncEditorCreditRating();
     }
 
     function refreshSkillRowCalculations(row: HTMLTableRowElement): void {
@@ -2337,6 +2445,7 @@ interface Window {
         if (hardOutput) hardOutput.textContent = String(Math.floor(success / 2));
         if (extremeOutput) extremeOutput.textContent = String(Math.floor(success / 5));
         refreshSkillPointSummary();
+        syncEditorCreditRating();
     }
 
     function enforceSkillPointBudgets(): void {
@@ -2368,6 +2477,7 @@ interface Window {
         refreshSkillTableCalculations();
         refreshSkillPointSummary();
         updateAttributeRollHints();
+        syncEditorCreditRating();
     }
 
     function syncGeneratedSkillPointInputs(force: boolean): void {
@@ -2414,7 +2524,7 @@ interface Window {
         const card = createCharacterCard({
             occupationId: resolveOccupationIdFromInput(getInputValue("characterOccupation")),
             occupationName: resolveOccupationNameFromInput(getInputValue("characterOccupation")),
-            creditRating: Number(getInputValue("characterCreditRating") || "0"),
+            creditRating: readEditorCreditRating(),
             attributes: readAttributes(),
             skills: readChecklistSkills()
         });
@@ -2472,7 +2582,7 @@ interface Window {
             gender: getInputValue("characterGender"),
             occupationId: resolveOccupationIdFromInput(occupationName),
             occupationName,
-            creditRating: Number(getInputValue("characterCreditRating") || "0"),
+            creditRating: readEditorCreditRating(),
             avatar: avatarInput?.dataset.avatar || existing?.avatar || "",
             residence: getInputValue("characterResidence"),
             birthplace: getInputValue("characterBirthplace"),
@@ -2497,17 +2607,26 @@ interface Window {
             armor: clampNumber(getInputValue("characterArmor"), 0, 99, 0),
             mov: clampNumber(getInputValue("characterMov"), 0, 99, calculateMov(attributes)),
             equipment: parseEquipment(getInputValue("characterEquipment")),
-            assets: parseAssets(getInputValue("characterAssets")),
+            assets: readEditorAssets(),
             background: {
                 ...normalizeBackground(existing?.background),
                 appearance: getInputValue("appearance"),
                 education: getInputValue("education"),
                 story: getInputValue("characterBio"),
                 traits: getInputValue("traits"),
-                encounters: getInputValue("characterMythos"),
+                arcaneTomes: getInputValue("characterArcaneTomes"),
+                spells: getInputValue("characterSpells"),
+                encounters: getInputValue("characterEncounters"),
+                ideology: getInputValue("characterIdeology"),
+                significantPeople: getInputValue("characterSignificantPeople"),
+                meaningfulLocations: getInputValue("characterMeaningfulLocations"),
+                treasuredPossessions: getInputValue("characterTreasuredPossessions"),
+                injuriesScars: getInputValue("characterInjuriesScars"),
+                phobiasManias: getInputValue("characterPhobiasManias"),
                 raceType: getInputValue("raceType") || "人类"
             },
-            relationships: parseRelationships(getInputValue("characterRelationships"))
+            relationships: readRelationshipRows(),
+            experiencedScenarios: readExperiencedScenarioRows()
         };
         const card = createCharacterCard(cardInput);
         if (!validatePlayerBinding(card.id, card.playerId, existing)) return;
@@ -2576,9 +2695,9 @@ interface Window {
                     <span>MOV ${card.mov}</span>
                 </div>
                 <div class="character-card-actions">
-                    <button type="button" data-action="detail"><i class="fa fa-eye"></i> 详情</button>
-                    <button type="button" data-action="edit"><i class="fa fa-pencil"></i> 编辑</button>
-                    <button type="button" data-action="delete"><i class="fa fa-trash"></i> 删除</button>
+                    <button type="button" data-action="detail">详情</button>
+                    <button type="button" data-action="edit">编辑</button>
+                    <button type="button" data-action="delete">删除</button>
                 </div>
             </article>
         `;
@@ -2615,44 +2734,215 @@ interface Window {
     }
 
     function renderCharacterDetail(card: COC7CharacterCard): string {
-        const occupation = getOccupation(card);
-        const load = calculateEquipmentLoad(card.equipment);
-        const groups = groupSkillsByCategory(card.skills);
-        const allocation = validateOccupationSkillSelection(card);
         return `
             <header class="character-inspector-header">
                 <div>
                     <h3>${escapeHtml(card.name)}</h3>
-                    <div class="character-tag-row">
-                        <span class="character-tag">${escapeHtml(occupation.name)}</span>
-                        <span class="character-tag">绑定玩家 ${escapeHtml(playerDisplayName(card.playerId))}</span>
-                        <span class="character-tag">信用评级 ${occupation.creditRating[0]}-${occupation.creditRating[1]}</span>
-                        <span class="character-tag">当前信用 ${card.creditRating}</span>
-                        <span class="character-tag">伤害加值 ${escapeHtml(card.damageBonus)}</span>
-                        <span class="character-tag">体格 ${card.build}</span>
-                    </div>
                 </div>
-                <div class="character-inline-actions"><button type="button" data-character-edit-active><i class="fa fa-pencil"></i> 编辑角色卡</button></div>
+                <div class="character-inline-actions"><button type="button" data-character-edit-active>编辑角色卡</button></div>
             </header>
-            <section class="character-section"><h4>属性</h4><div class="character-attribute-grid">${ATTRIBUTE_KEYS.map((key) => renderAttributeChip(key, card.attributes[key])).join("")}</div></section>
-            <section class="character-section"><h4>状态</h4><div class="character-vital-grid">${statCard("生命 HP", `${card.currentHp} / ${card.maxHp}`)}${statCard("魔法 MP", `${card.currentMp} / ${card.maxMp}`)}${statCard("理智 SAN", `${card.currentSan} / ${card.initialSan} / ${card.maxSan}`)}${statCard("人物状态", statusSummary(card.status))}${statCard("幸运", card.attributes.LUC)}${statCard("移动速度", card.mov)}${statCard("职业技能点", card.occupationSkillPoints)}${statCard("兴趣点", card.personalInterestPoints)}${statCard("职业技能", `${allocation.selectedOccupationSkills}/${allocation.requiredOccupationSkills}`)}</div></section>
-            <section class="character-section"><h4>技能等级</h4><div class="character-card-metrics">${Object.entries(groups).map(([group, total]) => `<span>${escapeHtml(group)} ${total}</span>`).join("")}</div><div class="character-skill-grid">${card.skills.map(renderSkillCard).join("")}</div></section>
-            <section class="character-section"><h4>武器</h4>${card.weapons.map(renderWeaponDetailRow).join("") || `<div class="background-note">暂无武器</div>`}</section>
-            <section class="character-section"><h4>战斗物品与装备资产</h4>${statCard("总重量", `${load.totalWeight} kg`)}${statCard("现金", card.assets.cash)}${statCard("消费水平", card.assets.spendingLevel)}<div class="background-note">${escapeHtml(card.assets.assetsText || "暂无资产")}</div>${card.equipment.map(renderEquipmentRow).join("")}</section>
-            <section class="character-section"><h4>背景故事与人际关系</h4><div class="background-grid">${backgroundNote("外貌特征", card.background.appearance)}${backgroundNote("思想信念", card.background.ideology)}${backgroundNote("重要之人", card.background.significantPeople)}${backgroundNote("克苏鲁神话", card.background.encounters)}${backgroundNote("故事经历", card.background.story)}${backgroundNote("人际关系", card.relationships.map((item) => `${item.name}: ${item.description}`).join("；"))}</div></section>
+            <div class="character-detail-dashboard">
+                ${renderCharacterBasicInfo(card)}
+                <section class="character-detail-band">
+                    <h4>属性</h4>
+                    <div class="character-attribute-grid">${ATTRIBUTE_KEYS.map((key) => renderAttributeChip(key, card.attributes[key])).join("")}</div>
+                </section>
+                ${renderCharacterVitals(card)}
+                ${renderCharacterStatusSection(card)}
+                ${renderCharacterSkillSection(card)}
+                ${renderCharacterWeaponsSection(card)}
+                ${renderCharacterCombatSection(card)}
+                ${renderCharacterPossessionsSection(card)}
+                ${renderCharacterAssetsSection(card)}
+                ${renderCharacterBackgroundSections(card)}
+            </div>
         `;
-    }
-
-    function deleteCard(id: string): void {
-        if (cards.length <= 1) return;
-        cards = cards.filter((card) => card.id !== id);
-        activeCardId = cards[0]?.id || "";
-        persistCards();
-        render();
     }
 
     function statCard(label: string, value: unknown): string {
         return `<div class="character-stat-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
+    }
+
+    function renderCharacterBasicInfo(card: COC7CharacterCard): string {
+        const occupation = getOccupation(card);
+        const fields: Array<[string, unknown]> = [
+            ["姓名", card.name],
+            ["绑定玩家", playerDisplayName(card.playerId)],
+            ["时代", card.era],
+            ["种族类型", card.background.raceType],
+            ["职业", card.occupationName || occupation.name],
+            ["年龄", card.age],
+            ["性别", card.gender],
+            ["现居地", card.residence],
+            ["出生地", card.birthplace]
+        ];
+        return `
+            <section class="character-detail-band">
+                <h4>基础信息</h4>
+                <div class="character-detail-info-grid">${fields.map(([label, value]) => statCard(label, value || "未填写")).join("")}</div>
+            </section>
+        `;
+    }
+
+    function renderCharacterVitals(card: COC7CharacterCard): string {
+        const fields: Array<[string, unknown]> = [
+            ["生命值", `${card.currentHp} / ${card.maxHp}`],
+            ["理智值", `${card.currentSan} / ${card.initialSan} / ${card.maxSan}`],
+            ["魔法值", `${card.currentMp} / ${card.maxMp}`],
+            ["幸运", card.attributes.LUC],
+            ["移动速度", card.mov]
+        ];
+        return `
+            <section class="character-detail-band character-detail-band-vitals">
+                <h4>生命（HP）</h4>
+                <div class="character-vital-grid">${fields.map(([label, value]) => statCard(label, value)).join("")}</div>
+            </section>
+        `;
+    }
+
+    function renderCharacterStatusSection(card: COC7CharacterCard): string {
+        return `
+            <section class="character-detail-band">
+                <h4>人物状态</h4>
+                <div class="character-vital-grid">${statCard("当前状态", statusSummary(card.status))}</div>
+            </section>
+        `;
+    }
+
+    function renderCharacterSkillSection(card: COC7CharacterCard): string {
+        const rows = card.skills.map((skill) => {
+            const occupationPoints = skill.occupationPoints || 0;
+            const interestPoints = skill.interestPoints || 0;
+            const growthPoints = skill.growthPoints || 0;
+            const success = clampNumber(skill.value, 0, 99, skill.base);
+            return `
+                <tr>
+                    <td>${skill.occupation ? "是" : "否"}</td>
+                    <td>${escapeHtml(skill.name)}</td>
+                    <td>${skill.base}</td>
+                    <td>${occupationPoints}</td>
+                    <td>${interestPoints}</td>
+                    <td>${growthPoints}</td>
+                    <td>${success}</td>
+                    <td>${Math.floor(success / 2)}</td>
+                    <td>${Math.floor(success / 5)}</td>
+                </tr>
+            `;
+        }).join("");
+        return `
+            <section class="character-detail-band character-detail-band-wide">
+                <h4>技能</h4>
+                <div class="character-detail-table-shell">
+                    <table class="character-detail-table">
+                        <thead>
+                            <tr>
+                                <th>专职</th>
+                                <th>技能名称</th>
+                                <th>基础%</th>
+                                <th>职业%</th>
+                                <th>兴趣%</th>
+                                <th>成长%</th>
+                                <th>成功率%</th>
+                                <th>困难50%</th>
+                                <th>噩梦20%</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows || `<tr><td colspan="9">暂无技能</td></tr>`}</tbody>
+                    </table>
+                </div>
+            </section>
+        `;
+    }
+
+    function renderCharacterWeaponsSection(card: COC7CharacterCard): string {
+        const rows = card.weapons.map((weapon) => {
+            const success = findSkillSuccessByWeaponSkill(weapon);
+            const impale = weapon.impale === null ? "-" : weapon.impale ? "是" : "否";
+            return `
+                <tr>
+                    <td>${escapeHtml(weapon.name)}</td>
+                    <td>${escapeHtml(weapon.skill)}</td>
+                    <td>${success}</td>
+                    <td>${escapeHtml(weapon.damage)}</td>
+                    <td>${escapeHtml(weapon.range)}</td>
+                    <td>${impale}</td>
+                    <td>${escapeHtml(weapon.attacks)}</td>
+                    <td>${escapeHtml(weapon.ammo)}</td>
+                    <td>${escapeHtml(weapon.malfunction)}</td>
+                </tr>
+            `;
+        }).join("");
+        return `
+            <section class="character-detail-band character-detail-band-wide">
+                <h4>武器</h4>
+                <div class="character-detail-table-shell">
+                    <table class="character-detail-table">
+                        <thead>
+                            <tr>
+                                <th>武器名称</th>
+                                <th>使用技能</th>
+                                <th>成功率</th>
+                                <th>伤害</th>
+                                <th>射程</th>
+                                <th>贯穿</th>
+                                <th>次数</th>
+                                <th>装弹量</th>
+                                <th>故障率</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows || `<tr><td colspan="9">暂无武器</td></tr>`}</tbody>
+                    </table>
+                </div>
+            </section>
+        `;
+    }
+
+    function renderCharacterCombatSection(card: COC7CharacterCard): string {
+        const fields: Array<[string, unknown]> = [
+            ["伤害加值 DB", card.damageBonus],
+            ["体格", card.build],
+            ["护甲", card.armor],
+            ["移动力", card.mov]
+        ];
+        return `
+            <section class="character-detail-band">
+                <h4>战斗</h4>
+                <div class="character-vital-grid">${fields.map(([label, value]) => statCard(label, value)).join("")}</div>
+            </section>
+        `;
+    }
+
+    function renderCharacterPossessionsSection(card: COC7CharacterCard): string {
+        return `
+            <section class="character-detail-band">
+                <h4>物品与装备</h4>
+                <div class="background-grid">${card.equipment.map(renderEquipmentDetail).join("") || `<div class="background-note">未填写</div>`}</div>
+            </section>
+        `;
+    }
+
+    function renderCharacterAssetsSection(card: COC7CharacterCard): string {
+        const fields: Array<[string, unknown]> = [
+            ["信用评级", card.creditRating],
+            ["现金", card.assets.cash],
+            ["消费水平", card.assets.spendingLevel]
+        ];
+        return `
+            <section class="character-detail-band">
+                <h4>资产</h4>
+                <div class="character-vital-grid">${fields.map(([label, value]) => statCard(label, value)).join("")}</div>
+                <div class="background-grid background-grid-single">${backgroundNote("资产", card.assets.assetsText)}</div>
+            </section>
+        `;
+    }
+
+    function renderCharacterBackgroundSections(card: COC7CharacterCard): string {
+        return `
+            <section class="character-detail-band"><h4>克苏鲁神话</h4><div class="background-grid">${backgroundNote("魔法物品与典籍", card.background.arcaneTomes)}${backgroundNote("法术", card.background.spells)}${backgroundNote("第三类接触", card.background.encounters)}</div></section>
+            <section class="character-detail-band"><h4>背景故事</h4><div class="background-grid">${backgroundNote("个人介绍", card.background.story)}${backgroundNote("形象描述", card.background.appearance)}${backgroundNote("思想与信念", card.background.ideology)}${backgroundNote("重要之人", card.background.significantPeople)}${backgroundNote("意义非凡之地", card.background.meaningfulLocations)}${backgroundNote("宝贵之物", card.background.treasuredPossessions)}${backgroundNote("特质", card.background.traits)}${backgroundNote("伤口与疤痕", card.background.injuriesScars)}${backgroundNote("精神症状", card.background.phobiasManias)}</div></section>
+            <section class="character-detail-band"><h4>人际关系</h4><div class="background-grid">${card.relationships.map(renderRelationshipDetail).join("") || `<div class="background-note">暂无人际关系</div>`}</div></section>
+            <section class="character-detail-band"><h4>经历过的模组</h4><div class="background-grid">${card.experiencedScenarios.map(renderExperiencedScenarioDetail).join("") || `<div class="background-note">暂无经历过的模组</div>`}</div></section>
+        `;
     }
 
     function statusSummary(status: CharacterStatusFlags): string {
@@ -2673,21 +2963,30 @@ interface Window {
         return `<div class="attribute-chip"><span>${ATTRIBUTE_LABELS[key]} (${key})</span><strong>${value}</strong><small>半 ${derived.half} / 比 ${derived.ratio}</small></div>`;
     }
 
-    function renderSkillCard(skill: COC7Skill): string {
-        return `<div class="skill-card"><div class="skill-card-header"><strong>${escapeHtml(skill.name)}</strong><span>${escapeHtml(skill.rank || rankFromValue(skill.value))} · ${escapeHtml(skill.category)}</span></div><div class="skill-card-meter"><span style="width:${skill.value}%"></span></div><small>${skill.value}</small></div>`;
-    }
-
-    function renderEquipmentRow(item: COC7EquipmentItem): string {
-        return `<div class="equipment-row"><strong>${escapeHtml(item.name)}</strong> x ${item.quantity}<br><small>${item.weight} kg ${escapeHtml(item.notes || "")}</small></div>`;
-    }
-
-    function renderWeaponDetailRow(weapon: COC7Weapon): string {
-        const impale = weapon.impale ? "贯穿" : "非贯穿";
-        return `<div class="equipment-row"><strong>${escapeHtml(weapon.name)}</strong><br><small>${escapeHtml(weapon.skill)} · ${escapeHtml(weapon.damage)} · ${escapeHtml(weapon.range)} · ${impale} · 次数 ${escapeHtml(weapon.attacks)} · 装弹 ${escapeHtml(weapon.ammo)} · 故障 ${escapeHtml(weapon.malfunction)}</small></div>`;
+    function renderEquipmentDetail(item: COC7EquipmentItem): string {
+        const details = [`数量 ${item.quantity}`, `重量 ${item.weight} kg`, item.notes || ""].filter(Boolean).join("；");
+        return backgroundNote(item.name || "未命名物品", details);
     }
 
     function backgroundNote(label: string, value: string): string {
         return `<div class="background-note"><strong>${escapeHtml(label)}</strong><p>${escapeHtml(value || "未填写")}</p></div>`;
+    }
+
+    function renderRelationshipDetail(item: COC7Relationship): string {
+        const parts = [item.description, item.player ? `玩家：${item.player}` : ""].filter(Boolean).join("；");
+        return backgroundNote(item.name || "未命名关系", parts);
+    }
+
+    function renderExperiencedScenarioDetail(item: COC7ExperiencedScenario): string {
+        return backgroundNote(item.name || "未命名模组", item.experience);
+    }
+
+    function deleteCard(id: string): void {
+        if (cards.length <= 1) return;
+        cards = cards.filter((card) => card.id !== id);
+        activeCardId = cards[0]?.id || "";
+        persistCards();
+        render();
     }
 
     function formatSkills(skills: COC7Skill[]): string {
@@ -2717,32 +3016,501 @@ interface Window {
         });
     }
 
-    function formatAssets(assets: COC7Assets): string {
-        return `现金:${assets.cash}；消费水平:${assets.spendingLevel}；资产:${assets.assetsText}`;
+    function readEditorCreditRating(): number {
+        return clampNumber(readSkillCreditRating(), 0, 99, 0);
     }
 
-    function parseAssets(raw: string): COC7Assets {
-        const assets: COC7Assets = { cash: 0, spendingLevel: 0, assetsText: "" };
-        raw.split(/[;\n；]+/).forEach((line) => {
-            const [key, value] = line.split(/[:：]/).map((part) => part.trim());
-            if (key === "现金") assets.cash = clampNumber(value, 0, 999999, 0);
-            else if (key === "消费水平") assets.spendingLevel = clampNumber(value, 0, 999999, 0);
-            else if (key === "资产") assets.assetsText = value || "";
-        });
-        return assets;
+    function readSkillCreditRating(): number {
+        const body = byId("characterSkillTableBody");
+        if (!body) return 0;
+        const row = body.querySelector<HTMLTableRowElement>('tr[data-skill-key="creditRating"]');
+        if (!row) return 0;
+        return clampNumber(row.querySelector<HTMLElement>("[data-skill-success]")?.textContent, 0, 99, 0);
+    }
+
+    function syncEditorCreditRating(): void {
+        setInputValue("characterCreditRating", readEditorCreditRating());
+    }
+
+    function readEditorAssets(): COC7Assets {
+        return {
+            cash: clampNumber(getInputValue("characterCash"), 0, 999999, 0),
+            spendingLevel: clampNumber(getInputValue("characterSpendingLevel"), 0, 999999, 0),
+            assetsText: getInputValue("characterAssets")
+        };
+    }
+
+    function createRelationshipRow(item: Partial<COC7Relationship> = {}, index = 0): string {
+        const suffix = index === 0 ? "" : `-${index}`;
+        return `
+            <div class="character-repeatable-row" data-companion-row>
+                <input type="text" class="form-control" id="characterCompanionRole${suffix}" data-companion-role placeholder="角色" value="${escapeHtml(item.name || "")}">
+                <input type="text" class="form-control" id="characterCompanionRelationship${suffix}" data-companion-relationship placeholder="关系" value="${escapeHtml(item.description || "")}">
+                <input type="text" class="form-control" id="characterCompanionPlayer${suffix}" data-companion-player placeholder="玩家" value="${escapeHtml(item.player || "")}">
+                <button type="button" class="character-icon-button" data-remove-companion title="删除人际关系" aria-label="删除人际关系">
+                    <i class="fa fa-trash" aria-hidden="true"></i>
+                </button>
+            </div>
+        `;
+    }
+
+    function hydrateRelationshipRows(relationships: COC7Relationship[] = []): void {
+        const list = byId("characterCompanionList");
+        if (!list) return;
+        const rows = relationships.length ? relationships : [{}];
+        list.innerHTML = rows.map((item, index) => createRelationshipRow(item, index)).join("");
+    }
+
+    function addRelationshipRow(item: Partial<COC7Relationship> = {}): void {
+        const list = byId("characterCompanionList");
+        if (!list) return;
+        list.insertAdjacentHTML("beforeend", createRelationshipRow(item, list.querySelectorAll("[data-companion-row]").length));
+    }
+
+    function handleRelationshipRowClick(event: Event): void {
+        const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-remove-companion]");
+        if (!button) return;
+        const list = byId("characterCompanionList");
+        const row = button.closest<HTMLElement>("[data-companion-row]");
+        if (!list || !row) return;
+        if (list.querySelectorAll("[data-companion-row]").length <= 1) {
+            row.querySelectorAll<HTMLInputElement>("input").forEach((input) => { input.value = ""; });
+            return;
+        }
+        row.remove();
+    }
+
+    function readRelationshipRows(): COC7Relationship[] {
+        const list = byId("characterCompanionList");
+        if (!list) return [];
+        return Array.from(list.querySelectorAll<HTMLElement>("[data-companion-row]")).map((row) => {
+            const name = row.querySelector<HTMLInputElement>("[data-companion-role]")?.value.trim() || "";
+            const description = row.querySelector<HTMLInputElement>("[data-companion-relationship]")?.value.trim() || "";
+            const player = row.querySelector<HTMLInputElement>("[data-companion-player]")?.value.trim() || "";
+            return { name, description, player };
+        }).filter((item) => item.name || item.description || item.player);
+    }
+
+    function createExperiencedScenarioRow(item: Partial<COC7ExperiencedScenario> = {}, index = 0): string {
+        const suffix = index === 0 ? "" : `-${index}`;
+        return `
+            <div class="character-repeatable-row character-scenario-row" data-scenario-row>
+                <input type="text" class="form-control" id="characterScenarioName${suffix}" data-scenario-name placeholder="模组" value="${escapeHtml(item.name || "")}">
+                <textarea class="form-control character-medium-textarea" id="characterScenarioExperience${suffix}" data-scenario-experience rows="2" placeholder="经历">${escapeHtml(item.experience || "")}</textarea>
+                <button type="button" class="character-icon-button" data-remove-scenario title="删除经历过的模组" aria-label="删除经历过的模组">
+                    <i class="fa fa-trash" aria-hidden="true"></i>
+                </button>
+            </div>
+        `;
+    }
+
+    function hydrateExperiencedScenarioRows(scenarios: COC7ExperiencedScenario[] = []): void {
+        const list = byId("characterScenarioList");
+        if (!list) return;
+        const rows = scenarios.length ? scenarios : [{}];
+        list.innerHTML = rows.map((item, index) => createExperiencedScenarioRow(item, index)).join("");
+    }
+
+    function addExperiencedScenarioRow(item: Partial<COC7ExperiencedScenario> = {}): void {
+        const list = byId("characterScenarioList");
+        if (!list) return;
+        list.insertAdjacentHTML("beforeend", createExperiencedScenarioRow(item, list.querySelectorAll("[data-scenario-row]").length));
+    }
+
+    function handleExperiencedScenarioRowClick(event: Event): void {
+        const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-remove-scenario]");
+        if (!button) return;
+        const list = byId("characterScenarioList");
+        const row = button.closest<HTMLElement>("[data-scenario-row]");
+        if (!list || !row) return;
+        if (list.querySelectorAll("[data-scenario-row]").length <= 1) {
+            row.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>("input, textarea").forEach((input) => { input.value = ""; });
+            return;
+        }
+        row.remove();
+    }
+
+    function readExperiencedScenarioRows(): COC7ExperiencedScenario[] {
+        const list = byId("characterScenarioList");
+        if (!list) return [];
+        return Array.from(list.querySelectorAll<HTMLElement>("[data-scenario-row]")).map((row) => {
+            const name = row.querySelector<HTMLInputElement>("[data-scenario-name]")?.value.trim() || "";
+            const experience = row.querySelector<HTMLTextAreaElement>("[data-scenario-experience]")?.value.trim() || "";
+            return { name, experience };
+        }).filter((item) => item.name || item.experience);
     }
 
     function parseRelationships(raw: string): COC7Relationship[] {
         return raw.split(/[;\n；]+/).map((line) => line.trim()).filter(Boolean).map((line) => {
             const [name, description] = line.split(/[:：]/).map((part) => part.trim());
-            return { name: name || "未命名关系", description: description || "" };
+            return { name: name || "未命名关系", description: description || "", player: "" };
+        });
+    }
+
+    function isRecord(value: unknown): value is Record<string, unknown> {
+        return Boolean(value && typeof value === "object" && !Array.isArray(value));
+    }
+
+    function stringField(value: unknown, fallback = ""): string {
+        return value === undefined || value === null ? fallback : String(value);
+    }
+
+    function recordField(value: unknown): Record<string, unknown> {
+        return isRecord(value) ? value : {};
+    }
+
+    function jsonArrayField(value: unknown): Array<Record<string, unknown>> {
+        if (Array.isArray(value)) return value.filter(isRecord);
+        if (typeof value !== "string" || !value.trim()) return [];
+        try {
+            const parsed = JSON.parse(value) as unknown;
+            return Array.isArray(parsed) ? parsed.filter(isRecord) : [];
+        } catch {
+            return [];
+        }
+    }
+
+    function jsonArrayText(items: Array<Record<string, unknown>>): string {
+        return JSON.stringify(items);
+    }
+
+    function testAttribute(attributes: Record<string, unknown>, upperKey: COC7CoreAttributeKey, lowerKey: string, fallback = 50): number {
+        return clampNumber(attributes[upperKey] ?? attributes[lowerKey], 1, 99, fallback);
+    }
+
+    function equipmentToItemsText(equipment: COC7EquipmentItem[]): string {
+        return equipment.map((item) => {
+            const base = `${item.name} x${Math.max(1, item.quantity)}`;
+            return item.notes ? `${base}：${item.notes}` : base;
+        }).join("\n");
+    }
+
+    function skillGroupKey(skill: COC7Skill): string {
+        return TEST_CHARACTER_CATEGORY_GROUPS[String(skill.category || "")] || "other";
+    }
+
+    function convertCardToTestCharacterJson(card: COC7CharacterCard): TestCharacterJson {
+        const skillGroups = Object.keys(TEST_CHARACTER_SKILL_GROUPS).reduce((groups, group) => {
+            groups[group] = [];
+            return groups;
+        }, {} as Record<string, Array<Record<string, unknown>>>);
+        card.skills.forEach((skill) => {
+            const group = skillGroups[skillGroupKey(skill)] ?? skillGroups.other!;
+            group.push({
+                id: skill.id,
+                skillKey: skill.skillKey,
+                name: skill.name,
+                base: skill.base,
+                job: skill.occupationPoints || 0,
+                interest: skill.interestPoints || 0,
+                growth: skill.growthPoints || 0,
+                isProfessional: Boolean(skill.occupation || skill.checked),
+                value: skill.value,
+                category: skill.category,
+                checked: skill.checked,
+                specialty: skill.specialty,
+                specialtyKey: skill.specialtyKey,
+                rank: skill.rank
+            });
+        });
+        return {
+            id: card.id,
+            name: card.name,
+            playerName: playerDisplayName(card.playerId),
+            playerId: card.playerId,
+            time: card.era,
+            job: card.occupationName,
+            age: String(card.age),
+            gender: card.gender,
+            location: card.residence,
+            hometown: card.birthplace,
+            attributes: {
+                str: card.attributes.STR,
+                dex: card.attributes.DEX,
+                con: card.attributes.CON,
+                app: card.attributes.APP,
+                pow: card.attributes.POW,
+                siz: card.attributes.SIZ,
+                edu: card.attributes.EDU,
+                int: card.attributes.INT,
+                luc: card.attributes.LUC
+            },
+            deriveAttributes: {
+                sanity: { current: String(card.currentSan), start: String(card.initialSan), max: String(card.maxSan) },
+                hp: { current: String(card.currentHp), max: String(card.maxHp) },
+                mp: { current: String(card.currentMp), max: String(card.maxMp) }
+            },
+            battleAttributes: {
+                db: card.damageBonus,
+                build: String(card.build),
+                mov: String(card.mov),
+                movNote: "",
+                armor: String(card.armor)
+            },
+            characterStatus: {
+                bodyStates: {
+                    [TEST_CHARACTER_BODY_STATUS.majorWound]: card.status.majorWound,
+                    [TEST_CHARACTER_BODY_STATUS.unconscious]: card.status.unconscious,
+                    [TEST_CHARACTER_BODY_STATUS.dead]: card.status.dead
+                },
+                mentalStates: {
+                    [TEST_CHARACTER_MENTAL_STATUS.indefiniteInsanity]: card.status.indefiniteInsanity,
+                    [TEST_CHARACTER_MENTAL_STATUS.permanentInsanity]: card.status.permanentInsanity,
+                    [TEST_CHARACTER_MENTAL_STATUS.temporaryInsanity]: card.status.temporaryInsanity
+                }
+            },
+            pointValues: {},
+            proSkills: [],
+            skillPoints: [],
+            weapons: card.weapons.map((weapon) => ({
+                name: weapon.name,
+                skill: weapon.skill,
+                skillKey: weapon.skillKey,
+                specialtyKey: weapon.specialtyKey,
+                damage: weapon.damage,
+                range: weapon.range,
+                round: weapon.attacks,
+                tho: "",
+                num: weapon.ammo,
+                err: weapon.malfunction,
+                weight: "",
+                note: "",
+                impale: weapon.impale,
+                attacks: weapon.attacks,
+                ammo: weapon.ammo,
+                malfunction: weapon.malfunction
+            })),
+            stories: {
+                app: card.background.appearance,
+                belief: card.background.ideology,
+                IPerson: card.background.significantPeople,
+                IPlace: card.background.meaningfulLocations,
+                IItem: card.background.treasuredPossessions,
+                trait: card.background.traits,
+                scar: card.background.injuriesScars,
+                mad: card.background.phobiasManias,
+                desc: card.background.story
+            },
+            assets: {
+                cash: String(card.assets.cash),
+                consumption: String(card.assets.spendingLevel),
+                assets: card.assets.assetsText,
+                items: equipmentToItemsText(card.equipment),
+                magicItems: card.background.arcaneTomes,
+                magics: card.background.spells,
+                touches: card.background.encounters
+            },
+            experiencedModules: jsonArrayText(card.experiencedScenarios.map((item) => ({ name: item.name, experience: item.experience }))),
+            friends: jsonArrayText(card.relationships.map((item) => ({ character: item.name, relationship: item.description, player: item.player }))),
+            skillGroups,
+            isEditable: true,
+            createdAt: card.createdAt,
+            updatedAt: card.updatedAt
+        };
+    }
+
+    function convertTestCharacterJsonToCardInput(payload: TestCharacterJson): COC7CharacterCardInput {
+        const attributes = recordField(payload.attributes);
+        const derived = recordField(payload.deriveAttributes);
+        const sanity = recordField(derived.sanity);
+        const hp = recordField(derived.hp);
+        const mp = recordField(derived.mp);
+        const battle = recordField(payload.battleAttributes);
+        const characterStatus = recordField(payload.characterStatus);
+        const bodyStates = recordField(characterStatus.bodyStates);
+        const mentalStates = recordField(characterStatus.mentalStates);
+        const stories = recordField(payload.stories);
+        const assets = recordField(payload.assets);
+        const age = clampNumber(payload.age, 15, 99, 25);
+        const skills: COC7Skill[] = Object.entries(recordField(payload.skillGroups)).flatMap(([group, items]) => {
+            if (!Array.isArray(items)) return [];
+            return items.filter(isRecord).map((item, index) => {
+                const base = clampNumber(item.base, 0, 99, 0);
+                const occupationPoints = clampNumber(item.job, 0, 99, 0);
+                const interestPoints = clampNumber(item.interest, 0, 99, 0);
+                const growthPoints = clampNumber(item.growth, 0, 99, 0);
+                const value = clampNumber(item.value, 0, 99, base + occupationPoints + interestPoints + growthPoints);
+                const name = stringField(item.name, "未命名技能");
+                const skill: COC7Skill = {
+                    id: stringField(item.id || item.skillKey || `${slugify(name)}-${index}`),
+                    skillKey: stringField(item.skillKey || item.id),
+                    name,
+                    base,
+                    value,
+                    category: stringField(item.category || TEST_CHARACTER_SKILL_GROUPS[group] || "其他"),
+                    checked: Boolean(item.checked ?? item.isProfessional),
+                    occupation: Boolean(item.isProfessional),
+                    specialty: stringField(item.specialty),
+                    specialtyKey: stringField(item.specialtyKey),
+                    occupationPoints,
+                    interestPoints,
+                    growthPoints
+                };
+                if (SKILL_RANKS.includes(item.rank as SkillRank)) {
+                    skill.rank = item.rank as SkillRank;
+                }
+                return skill;
+            });
+        });
+        return {
+            name: stringField(payload.name, "导入角色卡"),
+            playerId: stringField(payload.playerId || payload.playerName),
+            era: stringField(payload.time, "1920s"),
+            gender: stringField(payload.gender),
+            age,
+            occupationName: stringField(payload.job),
+            residence: stringField(payload.location),
+            birthplace: stringField(payload.hometown),
+            attributes: {
+                STR: testAttribute(attributes, "STR", "str"),
+                DEX: testAttribute(attributes, "DEX", "dex"),
+                CON: testAttribute(attributes, "CON", "con"),
+                APP: testAttribute(attributes, "APP", "app"),
+                POW: testAttribute(attributes, "POW", "pow"),
+                SIZ: testAttribute(attributes, "SIZ", "siz"),
+                EDU: testAttribute(attributes, "EDU", "edu"),
+                INT: testAttribute(attributes, "INT", "int"),
+                LUC: testAttribute(attributes, "LUC", "luc"),
+                AGE: age
+            },
+            maxHp: clampNumber(hp.max, 0, 999, 0),
+            currentHp: clampNumber(hp.current, 0, 999, 0),
+            maxSan: clampNumber(sanity.max, 0, 999, 99),
+            initialSan: clampNumber(sanity.start, 0, 999, 0),
+            currentSan: clampNumber(sanity.current, 0, 999, 0),
+            maxMp: clampNumber(mp.max, 0, 999, 0),
+            currentMp: clampNumber(mp.current, 0, 999, 0),
+            magicPoints: clampNumber(mp.current, 0, 999, 0),
+            damageBonus: stringField(battle.db),
+            build: clampNumber(battle.build, -2, 99, 0),
+            mov: clampNumber(battle.mov, 0, 99, 0),
+            armor: clampNumber(battle.armor, 0, 99, 0),
+            status: {
+                majorWound: Boolean(bodyStates[TEST_CHARACTER_BODY_STATUS.majorWound]),
+                unconscious: Boolean(bodyStates[TEST_CHARACTER_BODY_STATUS.unconscious]),
+                dead: Boolean(bodyStates[TEST_CHARACTER_BODY_STATUS.dead]),
+                indefiniteInsanity: Boolean(mentalStates[TEST_CHARACTER_MENTAL_STATUS.indefiniteInsanity]),
+                permanentInsanity: Boolean(mentalStates[TEST_CHARACTER_MENTAL_STATUS.permanentInsanity]),
+                temporaryInsanity: Boolean(mentalStates[TEST_CHARACTER_MENTAL_STATUS.temporaryInsanity])
+            },
+            skills,
+            weapons: (payload.weapons || []).filter(isRecord).map((weapon) => ({
+                name: stringField(weapon.name, "未命名武器"),
+                skill: stringField(weapon.skill, "格斗(斗殴)"),
+                skillKey: stringField(weapon.skillKey),
+                specialtyKey: stringField(weapon.specialtyKey),
+                damage: stringField(weapon.damage, "1D3"),
+                range: stringField(weapon.range, "接触"),
+                impale: typeof weapon.impale === "boolean" ? weapon.impale : null,
+                attacks: stringField(weapon.attacks || weapon.round, "1"),
+                ammo: stringField(weapon.ammo || weapon.num, "N/A"),
+                malfunction: stringField(weapon.malfunction || weapon.err, "N/A")
+            })),
+            equipment: parseEquipment(stringField(assets.items)),
+            assets: {
+                cash: clampNumber(assets.cash, 0, 999999, 0),
+                spendingLevel: clampNumber(assets.consumption, 0, 999999, 0),
+                assetsText: stringField(assets.assets)
+            },
+            background: {
+                appearance: stringField(stories.app),
+                ideology: stringField(stories.belief),
+                significantPeople: stringField(stories.IPerson),
+                meaningfulLocations: stringField(stories.IPlace),
+                treasuredPossessions: stringField(stories.IItem),
+                traits: stringField(stories.trait),
+                injuriesScars: stringField(stories.scar),
+                phobiasManias: stringField(stories.mad),
+                story: stringField(stories.desc),
+                arcaneTomes: stringField(assets.magicItems),
+                spells: stringField(assets.magics),
+                encounters: stringField(assets.touches),
+                education: "",
+                raceType: "人类"
+            },
+            relationships: jsonArrayField(payload.friends).map((item) => ({
+                name: stringField(item.character),
+                description: stringField(item.relationship),
+                player: stringField(item.player)
+            })),
+            experiencedScenarios: jsonArrayField(payload.experiencedModules).map((item) => ({
+                name: stringField(item.name),
+                experience: stringField(item.experience)
+            })),
+            ...(payload.createdAt ? { createdAt: payload.createdAt } : {}),
+            ...(payload.updatedAt ? { updatedAt: payload.updatedAt } : {})
+        };
+    }
+
+    function isTestCharacterJsonPayload(value: unknown): value is TestCharacterJson {
+        return isRecord(value) && ["deriveAttributes", "battleAttributes", "characterStatus", "skillGroups", "stories", "friends", "experiencedModules"].some((key) => key in value);
+    }
+
+    function readCharacterImportFile(file: File): Promise<unknown> {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                try {
+                    resolve(JSON.parse(String(reader.result || "")) as unknown);
+                } catch (error) {
+                    reject(error);
+                }
+            };
+            reader.onerror = () => reject(reader.error || new Error("Failed to read character file"));
+            reader.readAsText(file);
+        });
+    }
+
+    async function importCharacterData(data: unknown): Promise<number> {
+        const payloads = Array.isArray(data) ? data : [data];
+        let imported = 0;
+        for (const payload of payloads) {
+            if (!isRecord(payload)) continue;
+            if (!canCreateCharacterCard()) break;
+            const input = isTestCharacterJsonPayload(payload)
+                ? convertTestCharacterJsonToCardInput(payload)
+                : payload as COC7CharacterCardInput;
+            const { id: _importedId, ...importInput } = input;
+            const card = createCharacterCard({
+                ...importInput,
+                playerId: isCurrentUserElevated() ? stringField(input.playerId) : currentPlayerId()
+            });
+            const savedCard = await saveCardToServer(card);
+            if (!savedCard) continue;
+            cards = [savedCard, ...cards.filter((item) => item.id !== savedCard.id)];
+            activeCardId = savedCard.id;
+            imported += 1;
+        }
+        return imported;
+    }
+
+    async function saveImportedCharacterFile(file: File): Promise<void> {
+        try {
+            const imported = await importCharacterData(await readCharacterImportFile(file));
+            if (imported > 0) {
+                renderList();
+                openCharacterDetail(activeCardId);
+                notify(`已导入 ${imported} 张角色卡`, "success");
+            } else {
+                notify(`未能从 ${file.name} 导入角色卡`, "error");
+            }
+        } catch (error) {
+            notify(`导入角色卡失败：${characterErrorMessage(error)}`, "error");
+        }
+    }
+
+    function importCharacterFiles(event: Event): void {
+        const input = event.target as HTMLInputElement | null;
+        const files = Array.from(input?.files || []);
+        void files.reduce((chain, file) => chain.then(() => saveImportedCharacterFile(file)), Promise.resolve()).finally(() => {
+            if (input) input.value = "";
         });
     }
 
     function exportActiveCard(): void {
         const card = cards.find((item) => item.id === activeCardId);
         if (!card) return;
-        const payload = JSON.stringify(card, null, 2);
+        const payload = JSON.stringify(convertCardToTestCharacterJson(card), null, 2);
         if (navigator.clipboard?.writeText) {
             void navigator.clipboard.writeText(payload).then(() => notify("角色卡 JSON 已复制到剪贴板。", "success"));
         } else {

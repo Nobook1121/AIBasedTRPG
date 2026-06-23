@@ -207,6 +207,7 @@
 
 .character-card-metrics,
 .character-vital-grid,
+.character-detail-info-grid,
 .character-attribute-grid,
 .character-skill-grid,
 .equipment-summary-grid,
@@ -344,6 +345,45 @@
     margin-top: 16px;
 }
 
+.character-detail-dashboard {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 14px;
+}
+
+.character-detail-band {
+    grid-column: 1 / -1;
+    padding: 14px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--color-panel);
+}
+
+.character-detail-band-wide {
+    grid-column: 1 / -1;
+}
+
+.character-detail-band h4 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 10px;
+    color: var(--color-text);
+    font-size: 1rem;
+}
+
+.character-detail-band-vitals .character-vital-grid {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
+.character-detail-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 10px;
+    margin-top: 10px;
+}
+
 .character-section h4 {
     display: flex;
     align-items: center;
@@ -355,6 +395,10 @@
 
 .character-vital-grid {
     grid-template-columns: repeat(4, minmax(120px, 1fr));
+}
+
+.character-detail-info-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
 .character-stat-card {
@@ -375,7 +419,7 @@
 }
 
 .character-attribute-grid {
-    grid-template-columns: repeat(7, minmax(78px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
 }
 
 .attribute-chip {
@@ -405,6 +449,42 @@
 
 .character-skill-grid {
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.character-detail-table-shell {
+    overflow-x: auto;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background: var(--color-panel-muted);
+}
+
+.character-detail-table {
+    width: 100%;
+    min-width: 820px;
+    border-collapse: collapse;
+    font-size: 0.86rem;
+}
+
+.character-detail-table th,
+.character-detail-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border-subtle);
+    text-align: left;
+    white-space: nowrap;
+}
+
+.character-detail-table th {
+    color: var(--color-primary);
+    background: #eef4ff;
+    font-weight: 800;
+}
+
+.character-detail-table td {
+    color: var(--color-text);
+}
+
+.character-detail-table tbody tr:last-child td {
+    border-bottom: 0;
 }
 
 .skill-card {
@@ -462,6 +542,11 @@
 
 .background-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.background-grid-single {
+    margin-top: 10px;
+    grid-template-columns: 1fr;
 }
 
 .character-form-grid {
@@ -929,6 +1014,9 @@
     font-size: 0.78rem;
     font-weight: 800;
     text-align: left;
+    white-space: normal;
+    word-break: keep-all;
+    overflow-wrap: normal;
 }
 
 .character-weapon-name-button:hover {
@@ -958,6 +1046,47 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
+}
+
+.character-assets-field-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.character-large-textarea {
+    min-height: 132px;
+    resize: vertical;
+}
+
+.character-medium-textarea {
+    min-height: 84px;
+    resize: vertical;
+}
+
+.character-textarea-grid {
+    display: grid;
+    gap: 10px;
+}
+
+.character-textarea-grid-three {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.character-repeatable-list {
+    display: grid;
+    gap: 10px;
+}
+
+.character-repeatable-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) 34px;
+    gap: 8px;
+    align-items: start;
+}
+
+.character-scenario-row {
+    grid-template-columns: minmax(160px, 0.8fr) minmax(0, 1.6fr) 34px;
 }
 
 .character-modal-action-row {
@@ -1264,6 +1393,8 @@
     .character-attribute-grid,
     .background-grid,
     .attribute-editor-grid,
+    .character-textarea-grid-three,
+    .character-repeatable-row,
     .character-skill-editor-row,
     .character-resource-grid,
     .character-status-grid {
@@ -1282,6 +1413,8 @@
     .character-skill-points-grid,
     .character-resource-grid,
     .character-status-grid,
+    .character-textarea-grid-three,
+    .character-repeatable-row,
     .character-resource-values-three {
         grid-template-columns: 1fr;
     }
