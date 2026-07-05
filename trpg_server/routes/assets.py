@@ -7,6 +7,7 @@ from trpg_server.settings import (
     CONFIG_DIR,
     SCENARIO_COVERS_DIR,
     TOOLS_DIR,
+    VENDOR_ASSETS_DIR,
 )
 
 bp = Blueprint("assets", __name__)
@@ -32,6 +33,11 @@ def serve_scenario_cover(filename):
 @bp.route("/assets/aiplatform/<path:filename>")
 def serve_aiplatform_icon(filename):
     return _with_no_cache(send_from_directory(AI_PLATFORM_ASSETS_DIR, filename))
+
+
+@bp.route("/assets/vendor/<path:filename>")
+def serve_vendor_asset(filename):
+    return send_from_directory(VENDOR_ASSETS_DIR, filename)
 
 
 @bp.route("/config/<path:filename>")

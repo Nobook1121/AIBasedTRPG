@@ -57,7 +57,7 @@ python server.py 8090
 - `data/rooms/`：房间、房间消息、回档节点和自动存档数据。
 - `data/users/`：用户数据与用户 IP 配置。
 - `data/characters/`：角色卡示例等角色数据资源；浏览器本地创建的角色卡仍保存在当前浏览器 `localStorage`。
-- `data/assets/avatars/`、`data/assets/scenario_covers/` 与 `data/assets/aiplatform/`：上传头像、剧本封面和 AI 平台图标。
+- `data/assets/avatars/`、`data/assets/scenario_covers/`、`data/assets/aiplatform/` 与 `data/assets/vendor/`：上传头像、剧本封面、AI 平台图标和本地第三方静态资源。
 - `data/logs/`：运行日志输出目录，运行时自动创建；默认只记录登录、消息、AI 请求和报错等关键事件。
 
 ## 配置与安全
