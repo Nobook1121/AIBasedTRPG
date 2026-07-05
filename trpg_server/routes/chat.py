@@ -5,11 +5,16 @@ import time
 import requests
 from flask import Blueprint, current_app, request, session
 
+from trpg_server.agents.config import load_ai_runtime_config
+from trpg_server.agents.context import build_agent_context
+from trpg_server.agents.profiles import resolve_agent_profile
+from trpg_server.agents.runtime import run_agent_completion
+from trpg_server.agents.tools import default_tool_registry
 from trpg_server.json_store import read_json, write_json_atomic
 from trpg_server.logging_config import log_user_action, user_action_text
 from trpg_server.responses import error_response, success_response
 from trpg_server.role_config import load_roles, select_role_for_content
-from trpg_server.settings import CONFIG_DIR, HISTORY_DIR
+from trpg_server.settings import CONFIG_DIR, HISTORY_DIR, ROOMS_DIR, SCENARIOS_DIR
 
 bp = Blueprint("chat", __name__)
 logger = logging.getLogger(__name__)
@@ -33,6 +38,10 @@ def _message_response(user_id, content, message, script_id=None):
 
 def _get_ai_platform_dir():
     return current_app.config.get("AI_PLATFORM_DIR", CONFIG_DIR / "aiplatform")
+
+
+def _get_config_dir():
+    return current_app.config.get("CONFIG_DIR", CONFIG_DIR)
 
 
 def _get_history_dir():
@@ -71,6 +80,16 @@ def _load_enabled_platform(provider_id=None):
 def _load_role_for_content(content):
     roles = load_roles(_get_role_config_file(), _get_kp_prompt_file(), _get_ai_platform_dir())
     return select_role_for_content(roles, content)
+
+
+def _post_ai_request(base_url, headers):
+    def requester(payload):
+        response = requests.post(base_url, headers=headers, json=payload, timeout=300)
+        if not response.ok:
+            raise RuntimeError(f"API request failed: {response.status_code}")
+        return response.json()
+
+    return requester
 
 
 def _load_kp_prompt():
@@ -142,7 +161,8 @@ def chat():
         user_id = message_data.get("user_id", "unknown")
         content = message_data.get("content", "")
         role_config = _load_role_for_content(content)
-        selected_platform, platform_config = _load_enabled_platform(role_config.get("provider"))
+        agent_profile = resolve_agent_profile(role_config, _get_kp_prompt_file())
+        selected_platform, platform_config = _load_enabled_platform(agent_profile.provider)
         if not platform_config:
             return error_response(
                 "No enabled AI platform",
@@ -169,13 +189,16 @@ def chat():
             )
 
         history_file, history = _load_history(user_id)
+        runtime_config = load_ai_runtime_config(_get_config_dir())
         request_data = {
-            "messages": _build_messages(role_config.get("prompt") or _load_kp_prompt(), history, content),
+            "messages": _build_messages(agent_profile.prompt or _load_kp_prompt(), history, content),
             "model": _select_model(platform_config),
             "max_tokens": 4096,
             "temperature": 0.7,
             "top_p": 0.9,
         }
+        if runtime_config.stream_output:
+            request_data["stream"] = False
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
@@ -190,16 +213,25 @@ def chat():
             模型=request_data["model"],
             内容长度=len(content),
         )
-        response = requests.post(base_url, headers=headers, json=request_data, timeout=300)
-        if not response.ok:
-            return error_response(
-                "AI platform request failed",
-                response.status_code,
-                f"API request failed: {response.status_code}",
-            )
+        agent_context = build_agent_context(
+            room_id=message_data.get("room_id"),
+            rooms_dir=current_app.config.get("ROOMS_DIR", ROOMS_DIR),
+            scenarios_dir=current_app.config.get("SCENARIOS_DIR", SCENARIOS_DIR),
+            user_id=user_id,
+            agent_id=agent_profile.id,
+        )
+        result = run_agent_completion(
+            requester=_post_ai_request(base_url, headers),
+            base_payload=request_data,
+            profile=agent_profile,
+            registry=default_tool_registry(),
+            context=agent_context,
+        )
+        if result.error:
+            return error_response("AI agent request failed", 500, result.error)
 
-        response_data = response.json()
-        ai_response, token_count = _extract_ai_response(response_data)
+        ai_response = result.content
+        token_count = result.token_count
         if not ai_response:
             return error_response(
                 "AI platform did not return a response",

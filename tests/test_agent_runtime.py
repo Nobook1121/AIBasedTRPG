@@ -67,3 +67,26 @@ def test_runtime_rejects_unauthorized_tool():
     )
 
     assert result.error == "Tool test.echo is not enabled for agent kp"
+
+
+def test_build_agent_context_resolves_room_dir_and_scenarios_dir(tmp_path):
+    from trpg_server.agents.context import build_agent_context
+
+    rooms_dir = tmp_path / "rooms"
+    scenarios_dir = tmp_path / "scenarios"
+    room_dir = rooms_dir / "room-1"
+    room_dir.mkdir(parents=True)
+    scenarios_dir.mkdir()
+
+    context = build_agent_context(
+        room_id="room-1",
+        rooms_dir=rooms_dir,
+        scenarios_dir=scenarios_dir,
+        user_id=7,
+        agent_id="kp",
+    )
+
+    assert context.room_id == "room-1"
+    assert context.room_dir == room_dir
+    assert context.scenarios_dir == scenarios_dir
+    assert context.user_id == 7
