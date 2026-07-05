@@ -20,6 +20,7 @@ def test_kp_profile_gets_default_tools_when_role_has_none(tmp_path):
     assert profile.provider == "openrouter"
     assert profile.prompt == "你是KP。"
     assert profile.tool_names == DEFAULT_KP_TOOLS
+    assert "room.get_room_snapshot" in profile.tool_names
     assert profile.wake_words == ["@KP"]
 
 

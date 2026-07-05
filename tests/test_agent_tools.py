@@ -4,7 +4,11 @@ import json
 
 from trpg_server.agents.context import AgentRequestContext
 from trpg_server.agents.memory import read_room_memory, remember_room_fact
-from trpg_server.agents.tools.room import get_room_character_cards, get_room_scenario_context
+from trpg_server.agents.tools.room import (
+    get_room_character_cards,
+    get_room_scenario_context,
+    get_room_snapshot,
+)
 
 
 def test_coc_check_regular_success_with_fixed_rng():
@@ -131,3 +135,59 @@ def test_room_memory_write_and_read(tmp_path):
 
     assert remembered["stored"] is True
     assert memory["items"][0]["content"] == "图书管理员开始怀疑调查员。"
+
+
+def test_room_snapshot_returns_bound_scenario_and_character_cards(tmp_path):
+    scenarios_dir = tmp_path / "scenarios"
+    scenarios_dir.mkdir()
+    room_dir = tmp_path / "rooms" / "room-1"
+    room_dir.mkdir(parents=True)
+    (room_dir / "info.json").write_text(
+        json.dumps(
+            {
+                "id": "room-1",
+                "name": "测试房间",
+                "scenario_id": 1776085966397,
+                "scenario_title": "长生俑",
+                "members": [
+                    {
+                        "user_id": 9,
+                        "username": "ADMIN",
+                        "status": "active",
+                        "is_active": True,
+                        "character_card": {
+                            "id": "investigator-1",
+                            "name": "吴明山",
+                            "background": {"story": "失踪记者。"},
+                            "skills": [{"skillKey": "locksmith", "name": "锁匠", "value": 45}],
+                        },
+                        "character_state": {"current_hp": 15, "current_san": 50},
+                    }
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    (scenarios_dir / "长生俑.json").write_text(
+        json.dumps(
+            {
+                "id": 1776085966397,
+                "title": "长生俑",
+                "background": "秦俑与长生药的现代调查。",
+                "scenes": [{"id": 1, "content": "西安高铁站。冯教授迎接调查员。"}],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    context = AgentRequestContext(room_id="room-1", room_dir=room_dir, scenarios_dir=scenarios_dir)
+
+    result = get_room_snapshot({}, context)
+
+    assert result["room"]["id"] == "room-1"
+    assert result["scenario"]["id"] == 1776085966397
+    assert result["scenario"]["title"] == "长生俑"
+    assert result["scenario"]["scenes"][0]["content"] == "西安高铁站。冯教授迎接调查员。"
+    assert result["members"][0]["character_card"]["name"] == "吴明山"
+    assert result["members"][0]["character_state"]["current_san"] == 50

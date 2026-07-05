@@ -69,6 +69,60 @@ def get_room_character_cards(arguments: dict[str, Any], context: Any) -> dict[st
     return {"members": members}
 
 
+def _summarize_scenario(scenario: dict[str, Any] | None, room_info: dict[str, Any]) -> dict[str, Any] | None:
+    if not scenario:
+        scenario_id = room_info.get("scenario_id")
+        if scenario_id is None:
+            return None
+        return {
+            "id": scenario_id,
+            "title": room_info.get("scenario_title"),
+            "found": False,
+            "scenes": [],
+        }
+
+    summary = {
+        "id": scenario.get("id"),
+        "title": scenario.get("title"),
+        "description": scenario.get("description"),
+        "background": scenario.get("background"),
+        "preparation": scenario.get("preparation"),
+        "found": True,
+    }
+    for key in ("scenes", "locations", "npcs", "clues", "endings"):
+        values = scenario.get(key)
+        if isinstance(values, list):
+            summary[key] = values
+    return summary
+
+
+def get_room_snapshot(arguments: dict[str, Any], context: Any) -> dict[str, Any]:
+    info = context.room_info()
+    scenario = _find_scenario(context.scenarios_dir, info.get("scenario_id"))
+    characters = get_room_character_cards(
+        {"include_inactive": bool(arguments.get("include_inactive", False))},
+        context,
+    )
+    return {
+        "room": {
+            "id": info.get("id") or context.room_id,
+            "name": info.get("name"),
+            "scenario_id": info.get("scenario_id"),
+            "scenario_title": info.get("scenario_title"),
+        },
+        "scenario": _summarize_scenario(scenario, info),
+        "members": characters["members"],
+    }
+
+
+GET_ROOM_SNAPSHOT_TOOL = AgentTool(
+    name="room.get_room_snapshot",
+    description="Load the current room, its bound scenario, and active members' character cards in one call.",
+    parameters={"type": "object", "properties": {"include_inactive": {"type": "boolean"}}},
+    handler=get_room_snapshot,
+)
+
+
 GET_SCENARIO_CONTEXT_TOOL = AgentTool(
     name="room.get_scenario_context",
     description="Load scenario scenes, NPCs, clues, and locations for the current room.",

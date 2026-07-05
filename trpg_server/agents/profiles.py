@@ -4,6 +4,7 @@ from typing import Any
 
 
 DEFAULT_KP_TOOLS = [
+    "room.get_room_snapshot",
     "room.get_scenario_context",
     "room.get_character_cards",
     "room.get_memory",
