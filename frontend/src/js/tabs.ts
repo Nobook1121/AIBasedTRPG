@@ -189,6 +189,20 @@ function initSettingsTabs(): void {
             configManager.applyTheme();
         });
     }
+
+    bindGeneralCheckboxSetting("streamOutput", "ai", "stream_output");
+}
+
+function bindGeneralCheckboxSetting(elementId: string, sectionName: string, key: string): void {
+    const input = document.getElementById(elementId) as HTMLInputElement | null;
+    if (!input) return;
+    input.addEventListener("change", async () => {
+        const generalConfig = configManager.getConfig("general");
+        const section = isConfigObject(generalConfig[sectionName]) ? generalConfig[sectionName] : {};
+        section[key] = input.checked;
+        generalConfig[sectionName] = section;
+        await configManager.saveConfig("general", generalConfig);
+    });
 }
 
 function isConfigObject(value: unknown): value is TomlConfig {

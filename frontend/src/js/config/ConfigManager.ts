@@ -110,6 +110,7 @@ class ConfigManager {
         configSetCheckboxValue("enableAutosave", this.get("general", "autosave", "enabled", true));
         configSetInputValue("autosaveInterval", this.get("general", "autosave", "interval", 300));
         configSetCheckboxValue("showTimestamp", this.get("general", "chat", "show_timestamp", true));
+        configSetCheckboxValue("streamOutput", this.get("general", "ai", "stream_output", false));
         configSetInputValue("messageFontSize", this.get("general", "chat", "message_font_size", 14));
 
         console.log("常规设置已应用到 UI");

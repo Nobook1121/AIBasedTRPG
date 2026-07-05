@@ -17,6 +17,9 @@ show_timestamp = true
 message_font_size = 14
 max_history_messages = 1000
 
+[ai]
+stream_output = false
+
 [character_rules]
 attribute_ratio_percent = 20
 max_cards_per_user = 5
