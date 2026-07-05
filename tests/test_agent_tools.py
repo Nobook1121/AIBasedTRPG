@@ -181,6 +181,13 @@ def test_room_snapshot_returns_bound_scenario_and_character_cards(tmp_path):
         ),
         encoding="utf-8",
     )
+    (room_dir / "agent_memory.json").write_text(
+        json.dumps(
+            [{"id": "memory-1", "kind": "fact", "content": "ADMIN 已经找到门厅暗格。", "importance": 4}],
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
     context = AgentRequestContext(room_id="room-1", room_dir=room_dir, scenarios_dir=scenarios_dir)
 
     result = get_room_snapshot({}, context)
@@ -191,3 +198,4 @@ def test_room_snapshot_returns_bound_scenario_and_character_cards(tmp_path):
     assert result["scenario"]["scenes"][0]["content"] == "西安高铁站。冯教授迎接调查员。"
     assert result["members"][0]["character_card"]["name"] == "吴明山"
     assert result["members"][0]["character_state"]["current_san"] == 50
+    assert result["memory"]["items"][0]["content"] == "ADMIN 已经找到门厅暗格。"

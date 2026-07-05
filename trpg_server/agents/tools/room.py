@@ -112,13 +112,20 @@ def get_room_snapshot(arguments: dict[str, Any], context: Any) -> dict[str, Any]
         },
         "scenario": _summarize_scenario(scenario, info),
         "members": characters["members"],
+        "memory": read_room_memory({"limit": int(arguments.get("memory_limit") or 20)}, context),
     }
 
 
 GET_ROOM_SNAPSHOT_TOOL = AgentTool(
     name="room.get_room_snapshot",
     description="Load the current room, its bound scenario, and active members' character cards in one call.",
-    parameters={"type": "object", "properties": {"include_inactive": {"type": "boolean"}}},
+    parameters={
+        "type": "object",
+        "properties": {
+            "include_inactive": {"type": "boolean"},
+            "memory_limit": {"type": "integer", "minimum": 1, "maximum": 50},
+        },
+    },
     handler=get_room_snapshot,
 )
 

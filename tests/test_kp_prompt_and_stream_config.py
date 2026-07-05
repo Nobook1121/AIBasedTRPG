@@ -12,6 +12,10 @@ def test_kp_prompt_is_valid_chinese_and_requires_tools_for_dice():
     assert "dice.roll_coc_check" in prompt
     assert "不无故让调查员死亡" in prompt
     assert "失败归因" in prompt
+    assert "不要在回复结尾主动提供选项" in prompt
+    assert "所有参与玩家的角色卡已经创建完毕" in prompt
+    assert "玩家的名字就是其用户名" in prompt
+    assert "当前房间绑定的剧本" in prompt
 
 
 def test_general_config_contains_ai_stream_output_flag():

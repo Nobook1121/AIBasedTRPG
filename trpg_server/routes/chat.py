@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import time
 
 import requests
@@ -10,6 +11,7 @@ from trpg_server.agents.context import build_agent_context
 from trpg_server.agents.profiles import resolve_agent_profile
 from trpg_server.agents.runtime import run_agent_completion
 from trpg_server.agents.tools import default_tool_registry
+from trpg_server.agents.tools.room import get_room_snapshot
 from trpg_server.json_store import read_json, write_json_atomic
 from trpg_server.logging_config import log_user_action, user_action_text
 from trpg_server.responses import error_response, success_response
@@ -18,6 +20,7 @@ from trpg_server.settings import CONFIG_DIR, HISTORY_DIR, ROOMS_DIR, SCENARIOS_D
 
 bp = Blueprint("chat", __name__)
 logger = logging.getLogger(__name__)
+_HISTORY_SAFE_RE = re.compile(r"[^A-Za-z0-9_.-]+")
 
 
 def _timestamp():
@@ -82,12 +85,19 @@ def _load_role_for_content(content):
     return select_role_for_content(roles, content)
 
 
+def _json_for_log(value):
+    return json.dumps(value, ensure_ascii=False, default=str)
+
+
 def _post_ai_request(base_url, headers):
     def requester(payload):
+        logger.info("AI API request payload: %s", _json_for_log(payload))
         response = requests.post(base_url, headers=headers, json=payload, timeout=300)
         if not response.ok:
             raise RuntimeError(f"API request failed: {response.status_code}")
-        return response.json()
+        response_data = response.json()
+        logger.info("AI API response payload: %s", _json_for_log(response_data))
+        return response_data
 
     return requester
 
@@ -108,8 +118,20 @@ def _load_kp_prompt():
     return "你是KP（守密人），负责主持TRPG游戏，引导玩家进行游戏。"
 
 
-def _load_history(user_id):
-    history_file = _get_history_dir() / f"{user_id}.json"
+def _safe_history_part(value):
+    text = str(value or "unknown").strip() or "unknown"
+    return _HISTORY_SAFE_RE.sub("_", text)[:120]
+
+
+def _history_filename(user_id, room_id=None, agent_id="kp"):
+    safe_agent = _safe_history_part(agent_id)
+    if room_id:
+        return f"room-{_safe_history_part(room_id)}-{safe_agent}.json"
+    return f"user-{_safe_history_part(user_id)}-{safe_agent}.json"
+
+
+def _load_history(user_id, room_id=None, agent_id="kp"):
+    history_file = _get_history_dir() / _history_filename(user_id, room_id, agent_id)
     return history_file, read_json(history_file, default=[])
 
 
@@ -122,8 +144,19 @@ def _select_model(platform_config):
     return model.get("id", "local-model")
 
 
-def _build_messages(system_prompt, history, content):
+def _room_snapshot_system_message(snapshot):
+    return (
+        "当前房间资料由 function `room.get_room_snapshot` 读取。"
+        "这是本次回复必须优先采用的当前房间、绑定剧本和玩家角色卡上下文；"
+        "不得沿用其他房间的剧本、角色或记忆。\n"
+        f"{_json_for_log(snapshot)}"
+    )
+
+
+def _build_messages(system_prompt, history, content, room_snapshot_message=None):
     messages = [{"role": "system", "content": system_prompt}]
+    if room_snapshot_message:
+        messages.append({"role": "system", "content": room_snapshot_message})
     for item in history:
         messages.append({"role": item["role"], "content": item["content"]})
     messages.append({"role": "user", "content": content})
@@ -188,10 +221,27 @@ def chat():
                 "Incomplete platform config",
             )
 
-        history_file, history = _load_history(user_id)
+        room_id = message_data.get("room_id")
+        agent_context = build_agent_context(
+            room_id=room_id,
+            rooms_dir=current_app.config.get("ROOMS_DIR", ROOMS_DIR),
+            scenarios_dir=current_app.config.get("SCENARIOS_DIR", SCENARIOS_DIR),
+            user_id=user_id,
+            agent_id=agent_profile.id,
+        )
+        room_snapshot_message = None
+        if room_id:
+            room_snapshot_message = _room_snapshot_system_message(get_room_snapshot({}, agent_context))
+
+        history_file, history = _load_history(user_id, room_id=room_id, agent_id=agent_profile.id)
         runtime_config = load_ai_runtime_config(_get_config_dir())
         request_data = {
-            "messages": _build_messages(agent_profile.prompt or _load_kp_prompt(), history, content),
+            "messages": _build_messages(
+                agent_profile.prompt or _load_kp_prompt(),
+                history,
+                content,
+                room_snapshot_message=room_snapshot_message,
+            ),
             "model": _select_model(platform_config),
             "max_tokens": 4096,
             "temperature": 0.7,
@@ -212,13 +262,6 @@ def chat():
             平台=selected_platform,
             模型=request_data["model"],
             内容长度=len(content),
-        )
-        agent_context = build_agent_context(
-            room_id=message_data.get("room_id"),
-            rooms_dir=current_app.config.get("ROOMS_DIR", ROOMS_DIR),
-            scenarios_dir=current_app.config.get("SCENARIOS_DIR", SCENARIOS_DIR),
-            user_id=user_id,
-            agent_id=agent_profile.id,
         )
         result = run_agent_completion(
             requester=_post_ai_request(base_url, headers),
