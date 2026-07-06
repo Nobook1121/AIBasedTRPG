@@ -183,6 +183,7 @@ interface ToolManagerConstructor {
 
 interface ToolManager {
     handleCommand(command: string): string | null;
+    handleCheckCommand(command: string): string;
     recordCharacterChange(payload: Record<string, unknown>): Promise<unknown>;
 }
 

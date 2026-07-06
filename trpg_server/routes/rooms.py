@@ -655,11 +655,7 @@ def create_room_message(room_id):
 
     log_user_action(
         logger,
-        user_action_text(session.get("username"), "发送了房间对话"),
-        用户ID=session.get("user_id"),
-        房间ID=room_id,
-        消息类型=message["type"],
-        内容长度=len(content),
+        f"{message['sender_name']}:{content}",
     )
     return success_response(message, "Room message saved successfully", 201)
 

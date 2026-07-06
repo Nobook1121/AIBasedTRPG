@@ -10,6 +10,7 @@ DEFAULT_KP_TOOLS = [
     "room.get_memory",
     "room.remember_fact",
     "dice.roll_coc_check",
+    "check.roll_room_check",
 ]
 
 

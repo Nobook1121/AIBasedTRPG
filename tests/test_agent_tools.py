@@ -1,4 +1,6 @@
-from trpg_server.agents.tools.dice import roll_coc_check
+from trpg_server.agents.profiles import DEFAULT_KP_TOOLS
+from trpg_server.agents.tools import default_tool_registry
+from trpg_server.agents.tools.dice import roll_coc_check, roll_room_check
 
 import json
 
@@ -56,6 +58,122 @@ def test_coc_check_rejects_invalid_target():
     result = roll_coc_check({"skill": "锁匠", "target": 0}, rng=lambda sides: 1)
 
     assert result["error"] == "target must be between 1 and 100"
+
+
+def _context_with_check_member(tmp_path, member):
+    room_dir = tmp_path / "rooms" / "room-1"
+    room_dir.mkdir(parents=True)
+    (room_dir / "info.json").write_text(
+        json.dumps({"id": "room-1", "members": [member]}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    return AgentRequestContext(room_id="room-1", room_dir=room_dir, agent_id="kp")
+
+
+def test_room_check_reads_skill_from_bound_character_by_username(tmp_path):
+    skill_name = "\u4fa6\u5bdf"
+    context = _context_with_check_member(
+        tmp_path,
+        {
+            "username": "testplayer",
+            "status": "active",
+            "character_card": {
+                "name": "\u8c03\u67e5\u5458",
+                "skills": [{"name": skill_name, "value": 60}],
+            },
+        },
+    )
+
+    result = roll_room_check({"player_name": "testplayer", "name": skill_name}, context, rng=lambda sides: 30)
+
+    assert result["roll"] == 30
+    assert result["target"] == 60
+    assert result["threshold"] == 60
+    assert result["success"] is True
+    assert result["summary"] == "\u4fa6\u5bdf d%: [30] = 30 / 60 \u6210\u529f"
+
+
+def test_room_check_applies_difficulty_and_adjustment(tmp_path):
+    skill_name = "\u4fa6\u5bdf"
+    context = _context_with_check_member(
+        tmp_path,
+        {
+            "username": "testplayer",
+            "status": "active",
+            "character_card": {
+                "name": "\u8c03\u67e5\u5458",
+                "skills": [{"name": skill_name, "value": 60}],
+            },
+        },
+    )
+
+    result = roll_room_check(
+        {"player_name": "testplayer", "name": skill_name, "difficulty": "\u56f0\u96be", "adjustment": "+10"},
+        context,
+        rng=lambda sides: 40,
+    )
+
+    assert result["base_target"] == 60
+    assert result["threshold"] == 40
+    assert result["success"] is True
+    assert result["summary"] == "\u56f0\u96be\u4fa6\u5bdf d%: [40] = 40 / 40 \u6210\u529f"
+
+
+def test_room_check_reads_attribute_alias_from_bound_character(tmp_path):
+    context = _context_with_check_member(
+        tmp_path,
+        {
+            "username": "testplayer",
+            "status": "active",
+            "character_card": {
+                "name": "\u8c03\u67e5\u5458",
+                "attributes": {"DEX": 55},
+                "skills": [],
+            },
+        },
+    )
+
+    result = roll_room_check(
+        {"player_name": "testplayer", "name": "\u654f\u6377", "difficulty": "\u6781\u96be"},
+        context,
+        rng=lambda sides: 12,
+    )
+
+    assert result["base_target"] == 55
+    assert result["threshold"] == 11
+    assert result["success"] is False
+    assert result["summary"] == "\u6781\u96be\u654f\u6377 d%: [12] = 12 / 11 \u5931\u8d25"
+
+
+def test_room_check_returns_error_for_missing_bound_character(tmp_path):
+    context = _context_with_check_member(tmp_path, {"username": "testplayer", "status": "active"})
+
+    result = roll_room_check({"player_name": "testplayer", "name": "\u4fa6\u5bdf"}, context, rng=lambda sides: 1)
+
+    assert result["error"] == "player testplayer has no bound character card"
+
+
+def test_kp_default_tools_include_room_check_function():
+    registry = default_tool_registry()
+
+    assert "check.roll_room_check" in DEFAULT_KP_TOOLS
+    assert registry.get("check.roll_room_check") is not None
+
+
+def test_frontend_registers_check_command():
+    manager_source = open("frontend/src/tools/toolManager.ts", encoding="utf-8").read()
+    chat_source = open("frontend/src/js/chat.ts", encoding="utf-8").read()
+
+    assert '"/check"' in manager_source
+    assert "handleCheckCommand" in manager_source
+    assert "/check {*\u73a9\u5bb6\u540d} {*\u6280\u80fd/\u5c5e\u6027\u540d}" in chat_source
+
+
+def test_kp_prompt_requires_room_check_function():
+    prompt = open("data/config/roles/kp.md", encoding="utf-8").read()
+
+    assert "check.roll_room_check" in prompt
+    assert "/check {*\u73a9\u5bb6\u540d} {*\u6280\u80fd/\u5c5e\u6027\u540d}" in prompt
 
 
 def test_room_scenario_context_loads_current_room_scenario(tmp_path):

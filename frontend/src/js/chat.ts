@@ -44,6 +44,7 @@ const thinkingTimers = new Map<string, number>();
 
 const COMMAND_DEFINITIONS: CommandDefinition[] = [
     { name: "/dice", usage: "/dice {dice}", description: "掷骰" },
+    { name: "/check", usage: "/check {*玩家名} {*技能/属性名} {困难/极难} {调整值}", description: "属性或技能鉴定" },
     { name: "/record", usage: "/record {damage/san} {username} {int} {reason?}", description: "管理员记录房间角色伤害或 San 损失" },
 ];
 
@@ -122,7 +123,8 @@ function initChat(): void {
 
         if (commandResult) {
             await sendVisibleMessage("player", message);
-            const commandType = message.toLowerCase().startsWith("/dice") ? "dice" : "system";
+            const lowerMessage = message.toLowerCase();
+            const commandType = lowerMessage.startsWith("/dice") || lowerMessage.startsWith("/check") ? "dice" : "system";
             window.setTimeout(() => {
                 void sendVisibleMessage(commandType, commandResult);
             }, 300);
