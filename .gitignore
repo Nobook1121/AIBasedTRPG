@@ -14,7 +14,6 @@ tests/**/__pycache__/
 /data/users/*.sqlite3
 /data/users/ip_configs/
 /docs
-/tests/*
 /data/characters/*
 /data/history/*
 /data/logs/*
