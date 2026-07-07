@@ -160,8 +160,22 @@ def test_kp_default_tools_include_room_check_function():
     assert registry.get("check.roll_room_check") is not None
 
 
+def test_room_context_tool_descriptions_do_not_invite_numeric_character_lookup():
+    registry = default_tool_registry()
+    snapshot_description = registry.get("room.get_room_snapshot").description
+    character_description = registry.get("room.get_character_cards").description
+
+    combined = f"{snapshot_description}\n{character_description}"
+    assert "HP" not in combined
+    assert "SAN" not in combined
+    assert "attribute" not in combined.casefold()
+    assert "skill" not in combined.casefold()
+    assert "character cards" not in combined.casefold()
+    assert "summary" in character_description.casefold()
+
+
 def test_frontend_registers_check_command():
-    manager_source = open("frontend/src/tools/toolManager.ts", encoding="utf-8").read()
+    manager_source = open("data/tools/toolManager.ts", encoding="utf-8").read()
     chat_source = open("frontend/src/js/chat.ts", encoding="utf-8").read()
 
     assert '"/check"' in manager_source
@@ -236,8 +250,13 @@ def test_room_character_cards_returns_active_bound_cards(tmp_path):
     result = get_room_character_cards({}, context)
 
     assert result["members"][0]["username"] == "alice"
-    assert result["members"][0]["character_card"]["name"] == "林见山"
-    assert result["members"][0]["character_state"]["current_san"] == 55
+    assert "character_card" not in result["members"][0]
+    assert "character_state" not in result["members"][0]
+    assert result["members"][0]["character"]["name"] == "林见山"
+    serialized = json.dumps(result, ensure_ascii=False)
+    assert '"skills"' not in serialized
+    assert '"attributes"' not in serialized
+    assert "current_san" not in serialized
 
 
 def test_room_memory_write_and_read(tmp_path):
@@ -311,9 +330,42 @@ def test_room_snapshot_returns_bound_scenario_and_character_cards(tmp_path):
     result = get_room_snapshot({}, context)
 
     assert result["room"]["id"] == "room-1"
-    assert result["scenario"]["id"] == 1776085966397
     assert result["scenario"]["title"] == "长生俑"
-    assert result["scenario"]["scenes"][0]["content"] == "西安高铁站。冯教授迎接调查员。"
-    assert result["members"][0]["character_card"]["name"] == "吴明山"
-    assert result["members"][0]["character_state"]["current_san"] == 50
+    assert isinstance(result["scenario"]["summary"], str)
+    assert "西安高铁站" in result["scenario"]["summary"]
+    assert result["members"][0]["character"]["name"] == "吴明山"
     assert result["memory"]["items"][0]["content"] == "ADMIN 已经找到门厅暗格。"
+    serialized = json.dumps(result, ensure_ascii=False)
+    assert '"scenes"' not in serialized
+    assert '"skills"' not in serialized
+    assert "current_san" not in serialized
+
+
+def test_room_check_still_reads_full_card_after_character_summary_is_compact(tmp_path):
+    context = _context_with_check_member(
+        tmp_path,
+        {
+            "username": "testplayer",
+            "status": "active",
+            "character_card": {
+                "name": "Investigator",
+                "attributes": {"INT": 65},
+                "skills": [{"name": "Spot Hidden", "value": 70}],
+            },
+            "character_state": {"current_hp": 8, "current_san": 44},
+        },
+    )
+
+    cards = get_room_character_cards({}, context)
+    assert "character_card" not in cards["members"][0]
+    assert "skills" not in json.dumps(cards, ensure_ascii=False)
+
+    result = roll_room_check(
+        {"player_name": "testplayer", "name": "Spot Hidden", "difficulty": "hard"},
+        context,
+        rng=lambda sides: 35,
+    )
+
+    assert result["base_target"] == 70
+    assert result["threshold"] == 35
+    assert result["success"] is True

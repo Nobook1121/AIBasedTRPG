@@ -8,6 +8,11 @@ from flask import Blueprint, current_app, request, session
 from trpg_server.json_store import read_json, write_json_atomic
 from trpg_server.logging_config import log_user_action, user_action_text
 from trpg_server.responses import error_response, success_response
+from trpg_server.routes.chat import (
+    _build_provider_request,
+    _provider_headers,
+    _resolve_provider_endpoint,
+)
 from trpg_server.role_config import enabled_provider_options, load_roles, save_role
 from trpg_server.security import require_permission, safe_join
 from trpg_server.settings import CONFIG_DIR
@@ -18,6 +23,23 @@ _BARE_TOML_KEY_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 CONFIG_LABELS = {
     "general": "通用设置",
 }
+
+
+def _ai_api_error_message(response_data, status_code):
+    if isinstance(response_data, str):
+        return response_data
+    if isinstance(response_data, dict):
+        error = response_data.get("error")
+        if isinstance(error, dict):
+            message = error.get("message")
+            if message:
+                return str(message)
+        if error:
+            return str(error)
+        for key in ("message", "detail"):
+            if response_data.get(key):
+                return str(response_data[key])
+    return f"API request failed: {status_code}"
 
 
 def _get_config_dir():
@@ -116,6 +138,31 @@ def save_ai_platform_config(platform):
         return error_response(f"Save failed: {exc}", 500)
 
 
+@bp.route("/api/config/aiplatforms", methods=["GET"])
+def list_ai_platform_configs():
+    try:
+        platform_dir = _get_ai_platform_dir()
+        if not platform_dir.exists():
+            return success_response(data=[])
+
+        platforms = []
+        for path in sorted(platform_dir.glob("*.json")):
+            if path.name == "default-request.json":
+                continue
+            try:
+                config = read_json(path, default={})
+            except (json.JSONDecodeError, OSError):
+                logger.exception("Failed to read AI platform config: %s", path.name)
+                continue
+            if isinstance(config, dict):
+                platforms.append(config)
+
+        return success_response(data=platforms)
+    except Exception as exc:
+        logger.exception("Failed to list AI platform configs")
+        return error_response(f"Load failed: {exc}", 500)
+
+
 @bp.route("/api/config/aiplatform/<platform>/test", methods=["POST"])
 def test_ai_platform_api(platform):
     try:
@@ -128,21 +175,14 @@ def test_ai_platform_api(platform):
             return error_response("Platform config file does not exist", 404)
 
         config = read_json(config_path, default={})
-        api_key = config.get("config", {}).get("api_key")
-        base_url = config.get("config", {}).get("base_url")
+        runtime_config = config.get("config", {})
+        if isinstance(runtime_config, dict) and not runtime_config.get("api_key") and platform == "lmstudio":
+            runtime_config["api_key"] = "lm-studio"
+        base_url = _resolve_provider_endpoint(config, test_data)
         if not base_url:
             return error_response("Base URL is not set", 400)
-        if not api_key and platform == "lmstudio":
-            api_key = "lm-studio"
-
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
-        }
-        test_payload = test_data.copy()
-        if "extra_body" in test_payload:
-            extra_body = test_payload.pop("extra_body")
-            test_payload.update(extra_body)
+        headers = _provider_headers(config)
+        test_payload = _build_provider_request(config, test_data.copy())
 
         log_user_action(
             logger,
@@ -151,13 +191,11 @@ def test_ai_platform_api(platform):
             平台=platform,
             BaseURL=base_url,
         )
-        response = requests.post(base_url, headers=headers, json=test_payload, timeout=30)
+        timeout = runtime_config.get("timeout", 30) if isinstance(runtime_config, dict) else 30
+        response = requests.post(base_url, headers=headers, json=test_payload, timeout=timeout)
         response_data = response.json()
         if response.status_code != 200:
-            error_message = response_data.get("error", {}).get(
-                "message",
-                f"API request failed: {response.status_code}",
-            )
+            error_message = _ai_api_error_message(response_data, response.status_code)
             return error_response(None, response.status_code, error_message)
 
         return success_response(message=None, response=response_data)

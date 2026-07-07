@@ -50,8 +50,8 @@ python server.py 8090
 - `trpg_server/`：Flask app factory、蓝图路由、Socket.IO 事件、日志、安全与 JSON 存储工具。
 - `tests/`：后端单元测试和 API smoke tests。
 - `frontend/src/`：TypeScript 前端源码。
-- `js/`：TypeScript 构建生成的浏览器运行脚本，默认不提交到 Git。
-- `data/tools/`：前端小工具脚本构建产物。
+- `data/tools/`：前端小工具 TypeScript 源码。
+- `js/`：TypeScript 构建生成的浏览器运行脚本，默认不提交到 Git；小工具构建产物位于 `js/tools/`。
 - `data/config/`：TOML、JSON、角色提示词等运行配置数据。
 - `data/scenarios/`：剧本 JSON 数据。
 - `data/rooms/`：房间、房间消息、回档节点和自动存档数据。
@@ -202,7 +202,7 @@ npm run typecheck
 npm run build:frontend
 ```
 
-生成的浏览器文件输出到 `frontend/dist/`、`js/`、`data/tools/` 路径。未构建前端时，`python server.py` 可以启动后端，但浏览器页面会缺少页面或脚本而无法正常使用。
+生成的浏览器文件输出到 `frontend/dist/` 与 `js/` 路径。未构建前端时，`python server.py` 可以启动后端，但浏览器页面会缺少页面或脚本而无法正常使用。
 
 ## 进一步文档
 

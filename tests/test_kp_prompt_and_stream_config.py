@@ -16,6 +16,14 @@ def test_kp_prompt_is_valid_chinese_and_requires_tools_for_dice():
     assert "所有参与玩家的角色卡已经创建完毕" in prompt
     assert "玩家的名字就是其用户名" in prompt
     assert "当前房间绑定的剧本" in prompt
+    assert "优先调用 `check.roll_room_check`" in prompt
+    assert "fallback" in prompt
+    assert "不能直接用于角色属性或技能检定" in prompt
+    assert "不要为了获取属性、技能、HP、MP、SAN 等数值调用 `room.get_character_cards`" in prompt
+    assert "需要判断成败时直接调用 `check.roll_room_check`" in prompt
+    assert "不要要求玩家补充或描述角色卡数值" in prompt
+    assert "检定和投骰结果会由骰娘消息直接显示" in prompt
+    assert "不要用 KP 口吻复述检定成功或失败" in prompt
 
 
 def test_general_config_contains_ai_stream_output_flag():

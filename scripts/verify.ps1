@@ -43,6 +43,44 @@ try {
     Invoke-Checked npm run build:frontend
   }
 
+  $toolSourceFiles = @(
+    "data\tools\diceTool.ts",
+    "data\tools\toolManager.ts"
+  )
+
+  foreach ($file in $toolSourceFiles) {
+    if (-not (Test-Path $file)) {
+      Write-Error "Missing tool source: $file"
+      exit 1
+    }
+  }
+
+  $legacyToolSourceFiles = @(
+    "tools\diceTool.ts",
+    "tools\toolManager.ts",
+    "frontend\src\tools\diceTool.ts",
+    "frontend\src\tools\toolManager.ts"
+  )
+
+  foreach ($file in $legacyToolSourceFiles) {
+    if (Test-Path $file) {
+      Write-Error "Legacy tool source still exists: $file"
+      exit 1
+    }
+  }
+
+  $mixedToolBuildFiles = @(
+    "data\tools\diceTool.js",
+    "data\tools\toolManager.js"
+  )
+
+  foreach ($file in $mixedToolBuildFiles) {
+    if (Test-Path $file) {
+      Write-Error "Tool build output is mixed with source: $file"
+      exit 1
+    }
+  }
+
   $frontendFiles = @(
     "frontend\dist\index.html",
     "js\react\main.css"
@@ -56,8 +94,8 @@ try {
   }
 
   $jsFiles = @(
-    "data\tools\diceTool.js",
-    "data\tools\toolManager.js",
+    "js\tools\diceTool.js",
+    "js\tools\toolManager.js",
     "js\config\TestRequestConfig.js",
     "js\config\ConfigManager.js",
     "js\config\AIPlatformManager.js",

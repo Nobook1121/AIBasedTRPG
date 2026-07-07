@@ -484,6 +484,50 @@ body.dark-theme .modal-footer {
     background: #555;
 }
 
+.ai-platform-section-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.ai-platform-section-header .btn {
+    flex-shrink: 0;
+}
+
+.provider-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.provider-form-span {
+    grid-column: 1 / -1;
+}
+
+.provider-code-input {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.field-help {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    margin-left: 4px;
+    border: 1px solid var(--border-subtle);
+    border-radius: 50%;
+    color: #667085;
+    cursor: help;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    vertical-align: text-top;
+}
+
 .ai-platform-card {
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
@@ -776,6 +820,16 @@ body.dark-theme .modal-footer {
 
 /* 响应式设计 */
 @media (max-width: 768px) {
+    .ai-platform-section-header,
+    .platform-card-header {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .provider-form-grid {
+        grid-template-columns: 1fr;
+    }
+
     .platform-header {
         flex-direction: column;
         align-items: flex-start;

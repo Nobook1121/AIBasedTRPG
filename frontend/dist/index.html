@@ -585,9 +585,14 @@
                                 <div class="role-config-list" id="roleConfigList" aria-live="polite"></div>
                                 <div class="settings-message" id="roleConfigMessage" aria-live="polite"></div>
                             </div>
-                            <div class="mb-4">
-                                <h4>大模型提供商</h4>
-                                <p class="text-muted">管理和配置大模型提供商连接</p>
+                            <div class="mb-4 ai-platform-section-header">
+                                <div>
+                                    <h4>大模型提供商</h4>
+                                    <p class="text-muted">管理和配置大模型提供商连接</p>
+                                </div>
+                                <button type="button" class="btn btn-primary" id="addProviderOpenBtn">
+                                    <i class="fa fa-plus" aria-hidden="true"></i> 添加提供商
+                                </button>
                             </div>
                             
                             <!-- AI平台配置卡片 -->
@@ -1264,6 +1269,83 @@
         </div>
     </div>
 
+    <div class="modal fade" id="addProviderModal" tabindex="-1" aria-labelledby="addProviderModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addProviderModalLabel">添加大模型提供商</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="provider-form-grid">
+                        <div class="form-group">
+                            <label for="providerName" class="form-label">提供商名称 <span class="text-danger">*</span> <span class="field-help" tabindex="0" title="显示在平台卡片和角色配置下拉框里的名称。">?</span></label>
+                            <input type="text" class="form-control" id="providerName" maxlength="60" placeholder="例如 My Gateway">
+                        </div>
+                        <div class="form-group">
+                            <label for="providerId" class="form-label">提供商 ID <span class="text-danger">*</span> <span class="field-help" tabindex="0" title="保存为配置文件名，只能使用英文、数字、短横线或下划线。">?</span></label>
+                            <input type="text" class="form-control" id="providerId" maxlength="60" placeholder="my-gateway">
+                        </div>
+                        <div class="form-group">
+                            <label for="providerApiFormat" class="form-label">接口规范 <span class="field-help" tabindex="0" title="选择服务商的请求格式。AnythingLLM 会使用 /api/v1/workspace/{slug}/chat。">?</span></label>
+                            <select class="form-select" id="providerApiFormat">
+                                <option value="openai">OpenAI</option>
+                                <option value="anthropic">Anthropic</option>
+                                <option value="anythingllm">AnythingLLM</option>
+                                <option value="custom">自定义请求</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="providerTimeout" class="form-label">超时（秒） <span class="field-help" tabindex="0" title="等待服务商返回的最长秒数。">?</span></label>
+                            <input type="number" class="form-control" id="providerTimeout" min="10" max="300" value="30">
+                        </div>
+                        <div class="form-group provider-form-span">
+                            <label for="providerApiKey" class="form-label">API Key <span class="field-help" tabindex="0" title="填写服务商访问令牌。AnythingLLM 在实例设置里生成 API Key。">?</span></label>
+                            <input type="password" class="form-control" id="providerApiKey" autocomplete="off">
+                        </div>
+                        <div class="form-group provider-form-span">
+                            <label for="providerBaseUrl" class="form-label">Base URL <span class="text-danger">*</span> <span class="field-help" tabindex="0" title="接口根地址。AnythingLLM 填 http://localhost:3001/api/v1；OpenAI 兼容服务通常填 https://host/v1。">?</span></label>
+                            <input type="text" class="form-control" id="providerBaseUrl" placeholder="例如 http://localhost:3001/api/v1">
+                        </div>
+                        <div class="form-group provider-form-span">
+                            <label for="providerEndpointUrl" class="form-label">完整 Endpoint URL <span class="field-help" tabindex="0" title="通常留空。只有服务商路径不标准时才填写完整请求地址。">?</span></label>
+                            <input type="text" class="form-control" id="providerEndpointUrl" placeholder="留空时按接口规范从 Base URL 生成">
+                        </div>
+                        <div class="form-group">
+                            <label for="providerModelName" class="form-label">默认模型名称 <span class="text-danger">*</span> <span class="field-help" tabindex="0" title="显示用名称。AnythingLLM 可填工作区名称。">?</span></label>
+                            <input type="text" class="form-control" id="providerModelName" maxlength="80" placeholder="默认模型">
+                        </div>
+                        <div class="form-group">
+                            <label for="providerModelId" class="form-label">默认模型 ID <span class="text-danger">*</span> <span class="field-help" tabindex="0" title="OpenAI/Anthropic 填模型 ID；AnythingLLM 填 workspace slug。">?</span></label>
+                            <input type="text" class="form-control" id="providerModelId" maxlength="160" placeholder="模型 ID 或 AnythingLLM workspace slug">
+                        </div>
+                        <div class="form-group provider-anythingllm-field provider-form-span">
+                            <label for="providerWorkspaceSlug" class="form-label">AnythingLLM Workspace Slug <span class="field-help" tabindex="0" title="填写 AnythingLLM 工作区 URL 里的 slug。例如 /workspace/my-room 填 my-room。">?</span></label>
+                            <input type="text" class="form-control" id="providerWorkspaceSlug" maxlength="160" placeholder="例如 my-workspace">
+                        </div>
+                        <div class="form-group provider-custom-field provider-form-span">
+                            <label for="providerHeadersJson" class="form-label">自定义 Headers JSON <span class="field-help" tabindex="0" title="自定义请求时填写额外请求头 JSON，例如 {&quot;X-Custom&quot;:&quot;value&quot;}。">?</span></label>
+                            <textarea class="form-control provider-code-input" id="providerHeadersJson" rows="4" spellcheck="false" placeholder="{&quot;X-Custom&quot;:&quot;value&quot;}"></textarea>
+                        </div>
+                        <div class="form-group provider-custom-field provider-form-span">
+                            <label for="providerRequestTemplate" class="form-label">请求 Body 模板 JSON <span class="field-help" tabindex="0" title="自定义请求时填写 JSON 模板，支持 {{model}}、{{last_user_message}}、{{messages}}。">?</span></label>
+                            <textarea class="form-control provider-code-input" id="providerRequestTemplate" rows="7" spellcheck="false" placeholder="{&quot;model&quot;:&quot;{{model}}&quot;,&quot;prompt&quot;:&quot;{{last_user_message}}&quot;}"></textarea>
+                        </div>
+                        <div class="form-group provider-custom-field provider-form-span">
+                            <label for="providerResponsePath" class="form-label">响应文本路径 <span class="field-help" tabindex="0" title="自定义响应里助手文本的位置，例如 choices.0.message.content 或 textResponse。">?</span></label>
+                            <input type="text" class="form-control" id="providerResponsePath" placeholder="choices.0.message.content">
+                        </div>
+                    </div>
+                    <div class="settings-message mt-3" id="addProviderMessage" aria-live="polite"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="addProviderBtn" disabled>添加</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- API测试模态窗口 -->
     <div class="modal fade" id="apiTestModal" tabindex="-1" aria-labelledby="apiTestModalLabel" aria-hidden="true">
         <div class="modal-dialog" style="max-width: 600px;">
@@ -1371,8 +1453,8 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="data/tools/diceTool.js"></script>
-    <script src="data/tools/toolManager.js"></script>
+    <script src="js/tools/diceTool.js"></script>
+    <script src="js/tools/toolManager.js"></script>
     <script src="js/config/TestRequestConfig.js"></script>
     <script src="js/config/ConfigManager.js"></script>
     <script src="js/config/AIPlatformManager.js"></script>

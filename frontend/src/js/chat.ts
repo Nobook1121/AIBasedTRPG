@@ -22,6 +22,7 @@ interface ChatApiResponse {
     error?: string;
     message?: string;
     token_count?: number;
+    tool_messages?: ChatMessage[];
 }
 
 interface IncomingSocketMessage {
@@ -118,7 +119,7 @@ function initChat(): void {
             return;
         }
 
-        const commandResult = window.toolManager?.handleCommand(message) || null;
+        const commandResult = await window.toolManager?.handleCommand(message) || null;
         activeChatInput.value = "";
 
         if (commandResult) {
@@ -196,10 +197,21 @@ async function sendToAI(chatInput: HTMLInputElement, sendButton: HTMLButtonEleme
         const processingTime = Math.round((Date.now() - startTime) / 1000);
         const tokenCount = data.token_count ?? null;
         const messageContent = data.content || data.error || "AI 回复失败: 未知错误";
+        const toolMessages = data.tool_messages || [];
 
         pendingMessages = [];
-        replaceThinkingMessage(thinkingMessageId, messageContent, processingTime, tokenCount);
         broadcastAIThinkingEnd(aiRequestId);
+
+        if (toolMessages.length > 0) {
+            clearThinkingMessage(thinkingMessageId);
+        } else {
+            replaceThinkingMessage(thinkingMessageId, messageContent, processingTime, tokenCount);
+        }
+
+        for (const toolMessage of toolMessages) {
+            renderRoomMessage(toolMessage);
+            broadcastMessage(toolMessage);
+        }
 
         const persisted = await persistRoomMessage("kp", messageContent, {
             processingTime,
@@ -210,6 +222,9 @@ async function sendToAI(chatInput: HTMLInputElement, sendButton: HTMLButtonEleme
         });
         if (persisted) {
             persisted.sender_name = role.name || "KP";
+            if (toolMessages.length > 0) {
+                renderRoomMessage(persisted);
+            }
             broadcastMessage(persisted);
         }
     } catch (error) {

@@ -1,10 +1,16 @@
 import json
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
+from uuid import uuid4
 
 from trpg_server.agents.profiles import AgentProfile
 from trpg_server.agents.tools.base import ToolRegistry
+from trpg_server.json_store import read_json, write_json_atomic
+
+
+DICE_MESSAGE_TOOL_NAMES = {"check.roll_room_check", "dice.roll_coc_check"}
 
 
 @dataclass(frozen=True)
@@ -13,6 +19,7 @@ class AgentCompletionResult:
     token_count: int | None = None
     error: str | None = None
     response_data: dict[str, Any] | None = None
+    tool_messages: list[dict[str, Any]] | None = None
 
 
 def _extract_message(response_data: dict[str, Any]) -> dict[str, Any]:
@@ -48,6 +55,45 @@ def _tool_calls(message: dict[str, Any]) -> list[dict[str, Any]]:
     return []
 
 
+def _timestamp() -> str:
+    return time.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _room_message_time() -> str:
+    return time.strftime("%H:%M")
+
+
+def _append_dice_message(tool_name: str, result: dict[str, Any], context: Any) -> dict[str, Any] | None:
+    if tool_name not in DICE_MESSAGE_TOOL_NAMES:
+        return None
+    if result.get("error"):
+        return None
+    summary = str(result.get("summary") or "").strip()
+    room_dir = getattr(context, "room_dir", None)
+    if not summary or not room_dir:
+        return None
+
+    message = {
+        "id": uuid4().hex,
+        "type": "dice",
+        "sender_id": None,
+        "sender_name": "骰娘",
+        "avatar": "/assets/avatars/default_dice.jpg",
+        "content": summary,
+        "time": _room_message_time(),
+        "created_at": _timestamp(),
+        "metadata": {
+            "tool_name": tool_name,
+            "tool_result": result,
+        },
+    }
+    messages_file = room_dir / "messages.json"
+    messages = read_json(messages_file, default=[])
+    messages.append(message)
+    write_json_atomic(messages_file, messages)
+    return message
+
+
 def run_agent_completion(
     requester: Callable[[dict[str, Any]], dict[str, Any]],
     base_payload: dict[str, Any],
@@ -66,6 +112,7 @@ def run_agent_completion(
 
     enabled_by_name = {tool.name: tool for tool in enabled_tools}
     last_response = None
+    tool_messages = []
 
     for _round in range(max_tool_rounds + 1):
         response_data = requester(payload)
@@ -77,6 +124,7 @@ def run_agent_completion(
                 content=str(message.get("content") or ""),
                 token_count=_extract_token_count(response_data),
                 response_data=response_data,
+                tool_messages=tool_messages,
             )
 
         messages.append(message)
@@ -91,6 +139,9 @@ def run_agent_completion(
                 result = tool.handler(arguments, context)
             except Exception as exc:
                 result = {"error": str(exc)}
+            dice_message = _append_dice_message(tool_name, result, context)
+            if dice_message:
+                tool_messages.append(dice_message)
             messages.append(
                 {
                     "role": "tool",

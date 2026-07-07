@@ -8,7 +8,7 @@ async function initializeApplication(): Promise<void> {
     const dom = window.TrpgDom;
     window.TrpgI18n?.apply();
 
-    toolManager = new ToolManager();
+    toolManager = new window.ToolManager();
     window.toolManager = toolManager;
 
     initTabs();

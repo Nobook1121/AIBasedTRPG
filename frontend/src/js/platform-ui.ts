@@ -17,6 +17,7 @@ async function initAIPlatforms(): Promise<void> {
         renderPlatforms(platforms);
         bindRoleConfigSettings();
         await loadRoleConfigs();
+        bindCustomProviderEvents();
         bindAddModelEvents();
         bindAPITestEvents();
         console.log("AI 平台管理初始化完成");
@@ -202,6 +203,7 @@ async function openPlatformConfigModal(platformName: string): Promise<void> {
     bindPasswordToggles();
     bindTimeoutSlider(platform.platform);
     bindModelEvents(platform);
+    bindPlatformApiFormatToggle(platform.platform);
     bindPlatformSave(platform);
 
     new bootstrap.Modal(modalElement, { backdrop: false }).show();
@@ -210,20 +212,52 @@ async function openPlatformConfigModal(platformName: string): Promise<void> {
 function buildPlatformConfigHTML(platform: AIPlatformConfig): string {
     return `
         <div class="api-config">
+            <div class="form-group">
+                <label for="modal-api-format-${platformEscapeHtml(platform.platform)}">接口规范 ${helpIcon("选择这个提供商遵循的接口格式。AnythingLLM 使用 /api/v1/workspace/{slug}/chat。")}</label>
+                <select class="form-select api-format-input" id="modal-api-format-${platformEscapeHtml(platform.platform)}">
+                    ${buildApiFormatOptions(platform.api_format || "openai")}
+                </select>
+            </div>
             <h6>API 配置</h6>
             <div class="form-group">
-                <label for="modal-api-key-${platformEscapeHtml(platform.platform)}">API Key</label>
+                <label for="modal-api-key-${platformEscapeHtml(platform.platform)}">API Key ${helpIcon("填写服务商的访问令牌。AnythingLLM 可在实例的 API Key 设置中生成。")}</label>
                 <div class="password-input-group">
-                    <input type="password" class="form-control api-key-input" id="modal-api-key-${platformEscapeHtml(platform.platform)}" value="${platformEscapeHtml(platform.config.api_key || "")}">
+                    <input type="password" class="form-control api-key-input" id="modal-api-key-${platformEscapeHtml(platform.platform)}" value="${platformEscapeHtml(platform.config.api_key || "")}" placeholder="填写服务商 API Key">
                     <span class="password-toggle" data-target="modal-api-key-${platformEscapeHtml(platform.platform)}"><i class="bi bi-eye"></i></span>
                 </div>
             </div>
             <div class="form-group mt-2">
-                <label for="modal-base-url-${platformEscapeHtml(platform.platform)}">Base URL</label>
-                <input type="text" class="form-control base-url-input" id="modal-base-url-${platformEscapeHtml(platform.platform)}" value="${platformEscapeHtml(platform.config.base_url)}">
+                <label for="modal-base-url-${platformEscapeHtml(platform.platform)}">Base URL ${helpIcon("填写接口根地址。AnythingLLM 填 http://localhost:3001/api/v1；OpenAI 兼容接口通常填 https://host/v1。")}</label>
+                <input type="text" class="form-control base-url-input" id="modal-base-url-${platformEscapeHtml(platform.platform)}" value="${platformEscapeHtml(platform.config.base_url)}" placeholder="例如 http://localhost:3001/api/v1">
             </div>
             <div class="form-group mt-2">
-                <label for="modal-timeout-${platformEscapeHtml(platform.platform)}">超时设置 (${platform.config.timeout} 秒)</label>
+                <label for="modal-endpoint-url-${platformEscapeHtml(platform.platform)}">完整 Endpoint URL ${helpIcon("通常留空。只有服务商不是标准路径时才填写完整请求地址。")}</label>
+                <input type="text" class="form-control endpoint-url-input" id="modal-endpoint-url-${platformEscapeHtml(platform.platform)}" value="${platformEscapeHtml(platform.config.endpoint_url || "")}" placeholder="通常留空，按接口规范自动生成">
+            </div>
+            <div class="form-group mt-2 anythingllm-provider-config">
+                <label for="modal-anythingllm-workspace-${platformEscapeHtml(platform.platform)}">AnythingLLM Workspace Slug ${helpIcon("填写 AnythingLLM 工作区 URL 里的 slug。例如工作区地址是 /workspace/my-room，则填写 my-room。")}</label>
+                <input type="text" class="form-control anythingllm-workspace-input" id="modal-anythingllm-workspace-${platformEscapeHtml(platform.platform)}" value="${platformEscapeHtml(platform.config.workspace_slug || "")}" placeholder="例如 my-workspace">
+            </div>
+            <div class="form-group mt-2 anythingllm-provider-config">
+                <label for="modal-anythingllm-mode-${platformEscapeHtml(platform.platform)}">AnythingLLM 对话模式 ${helpIcon("chat 使用工作区文档和滚动历史；query 只在检索到相关资料时回答；automatic 允许 AnythingLLM 自动选择能力。")}</label>
+                <select class="form-select anythingllm-mode-input" id="modal-anythingllm-mode-${platformEscapeHtml(platform.platform)}">
+                    ${buildAnythingLLMModeOptions(platform.config.anythingllm_mode || "chat")}
+                </select>
+            </div>
+            <div class="form-group mt-2 anythingllm-provider-config">
+                <label for="modal-anythingllm-session-${platformEscapeHtml(platform.platform)}">AnythingLLM Session ID ${helpIcon("可留空。填写后 AnythingLLM 会用它区分 API 会话历史，例如 room-1-kp。")}</label>
+                <input type="text" class="form-control anythingllm-session-input" id="modal-anythingllm-session-${platformEscapeHtml(platform.platform)}" value="${platformEscapeHtml(platform.config.session_id || "")}" placeholder="可留空；例如 room-1-kp">
+            </div>
+            <div class="form-group mt-2 custom-provider-config">
+                <label for="modal-custom-response-path-${platformEscapeHtml(platform.platform)}">自定义响应文本路径 ${helpIcon("填写响应 JSON 中助手文本的位置，例如 choices.0.message.content 或 textResponse。")}</label>
+                <input type="text" class="form-control custom-response-path-input" id="modal-custom-response-path-${platformEscapeHtml(platform.platform)}" value="${platformEscapeHtml(platform.custom?.response_path || "")}" placeholder="choices.0.message.content">
+            </div>
+            <div class="form-group mt-2 custom-provider-config">
+                <label for="modal-custom-request-template-${platformEscapeHtml(platform.platform)}">自定义请求 Body 模板 JSON ${helpIcon("填写请求体 JSON。支持 {{model}}、{{last_user_message}}、{{messages}} 占位符。")}</label>
+                <textarea class="form-control provider-code-input custom-request-template-input" id="modal-custom-request-template-${platformEscapeHtml(platform.platform)}" rows="6" spellcheck="false">${platformEscapeHtml(JSON.stringify(platform.custom?.request_template || {}, null, 2))}</textarea>
+            </div>
+            <div class="form-group mt-2">
+                <label for="modal-timeout-${platformEscapeHtml(platform.platform)}">超时设置 (${platform.config.timeout} 秒) ${helpIcon("请求等待秒数。网络慢或本地模型响应慢时可调大。")}</label>
                 <input type="range" class="form-range timeout-slider" id="modal-timeout-${platformEscapeHtml(platform.platform)}" min="10" max="60" step="5" value="${platform.config.timeout}" data-platform="${platformEscapeHtml(platform.platform)}">
                 <div class="timeout-value" id="modal-timeout-value-${platformEscapeHtml(platform.platform)}">${platform.config.timeout} 秒</div>
             </div>
@@ -232,6 +266,28 @@ function buildPlatformConfigHTML(platform: AIPlatformConfig): string {
     `;
 }
 
+function buildApiFormatOptions(selectedFormat: string): string {
+    return [
+        ["openai", "OpenAI"],
+        ["anthropic", "Anthropic"],
+        ["anythingllm", "AnythingLLM"],
+        ["custom", "自定义请求"],
+    ].map(([value, label]) => {
+        const selected = value === selectedFormat ? "selected" : "";
+        return `<option value="${value}" ${selected}>${label}</option>`;
+    }).join("");
+}
+
+function buildAnythingLLMModeOptions(selectedMode: string): string {
+    return ["chat", "query", "automatic"].map((mode) => {
+        const selected = mode === selectedMode ? "selected" : "";
+        return `<option value="${mode}" ${selected}>${mode}</option>`;
+    }).join("");
+}
+
+function helpIcon(text: string): string {
+    return `<span class="field-help" tabindex="0" title="${platformEscapeHtml(text)}">?</span>`;
+}
 function buildModelList(platform: AIPlatformConfig): string {
     return `
         <div class="models-section">
@@ -294,18 +350,63 @@ function bindTimeoutSlider(platformName: string): void {
     });
 }
 
+function bindPlatformApiFormatToggle(platformName: string): void {
+    const select = document.getElementById(`modal-api-format-${platformName}`) as HTMLSelectElement | null;
+    const sync = () => {
+        const isCustom = select?.value === "custom";
+        const isAnythingLLM = select?.value === "anythingllm";
+        document.querySelectorAll<HTMLElement>(".custom-provider-config").forEach((element) => {
+            element.classList.toggle("d-none", !isCustom);
+        });
+        document.querySelectorAll<HTMLElement>(".anythingllm-provider-config").forEach((element) => {
+            element.classList.toggle("d-none", !isAnythingLLM);
+        });
+    };
+    select?.addEventListener("change", sync);
+    sync();
+}
+
 function bindPlatformSave(platform: AIPlatformConfig): void {
     const saveButton = document.getElementById("savePlatformConfigBtn");
     if (!saveButton) return;
     saveButton.onclick = async () => {
+        const apiFormat = document.getElementById(`modal-api-format-${platform.platform}`) as HTMLSelectElement | null;
         const apiKey = document.getElementById(`modal-api-key-${platform.platform}`) as HTMLInputElement | null;
         const baseUrl = document.getElementById(`modal-base-url-${platform.platform}`) as HTMLInputElement | null;
+        const endpointUrl = document.getElementById(`modal-endpoint-url-${platform.platform}`) as HTMLInputElement | null;
+        const anythingllmWorkspace = document.getElementById(`modal-anythingllm-workspace-${platform.platform}`) as HTMLInputElement | null;
+        const anythingllmMode = document.getElementById(`modal-anythingllm-mode-${platform.platform}`) as HTMLSelectElement | null;
+        const anythingllmSession = document.getElementById(`modal-anythingllm-session-${platform.platform}`) as HTMLInputElement | null;
+        const responsePath = document.getElementById(`modal-custom-response-path-${platform.platform}`) as HTMLInputElement | null;
+        const requestTemplate = document.getElementById(`modal-custom-request-template-${platform.platform}`) as HTMLTextAreaElement | null;
         const timeout = document.getElementById(`modal-timeout-${platform.platform}`) as HTMLInputElement | null;
-        if (!apiKey || !baseUrl || !timeout) return;
+        if (!apiFormat || !apiKey || !baseUrl || !endpointUrl || !timeout) return;
 
-        platform.config.api_key = apiKey.value;
-        platform.config.base_url = normalizeChatCompletionsUrl(baseUrl.value);
+        platform.api_format = apiFormat.value as NonNullable<AIPlatformConfig["api_format"]>;
+        platform.config.api_key = apiKey.value.trim();
+        platform.config.base_url = baseUrl.value.trim();
+        if (endpointUrl.value.trim()) {
+            platform.config.endpoint_url = endpointUrl.value.trim();
+        } else {
+            delete platform.config.endpoint_url;
+        }
         platform.config.timeout = Number.parseInt(timeout.value, 10);
+        if (platform.api_format === "custom") {
+            try {
+                platform.custom = {
+                    request_template: parseOptionalJsonObject(requestTemplate?.value || "{}"),
+                    response_path: responsePath?.value.trim() || "choices.0.message.content",
+                };
+            } catch (error) {
+                alert(`自定义请求 JSON 无效: ${platformErrorMessage(error)}`);
+                return;
+            }
+        }
+        if (platform.api_format === "anythingllm") {
+            platform.config.workspace_slug = anythingllmWorkspace?.value.trim() || "";
+            platform.config.anythingllm_mode = anythingllmMode?.value || "chat";
+            platform.config.session_id = anythingllmSession?.value.trim() || "";
+        }
         await aiPlatformManager.savePlatformConfig(platform.platform, platform);
         bootstrap.Modal.getInstance(document.getElementById("platformConfigModal"))?.hide();
         alert("配置保存成功");
@@ -336,6 +437,163 @@ function bindModelEvents(platform: AIPlatformConfig): void {
             if (modelId) void configModel(platform.platform, modelId);
         });
     });
+}
+
+function bindCustomProviderEvents(): void {
+    const openButton = document.getElementById("addProviderOpenBtn") as HTMLButtonElement | null;
+    if (openButton && openButton.dataset.bound !== "true") {
+        openButton.dataset.bound = "true";
+        openButton.addEventListener("click", () => {
+            resetAddProviderForm();
+            const modalElement = document.getElementById("addProviderModal");
+            if (modalElement) new bootstrap.Modal(modalElement).show();
+        });
+    }
+
+    ["providerName", "providerId", "providerBaseUrl", "providerModelName", "providerModelId", "providerWorkspaceSlug", "providerResponsePath"].forEach((id) => {
+        document.getElementById(id)?.addEventListener("input", validateAddProviderForm);
+    });
+
+    document.getElementById("providerName")?.addEventListener("input", () => {
+        const idInput = document.getElementById("providerId") as HTMLInputElement | null;
+        if (idInput && !idInput.value.trim()) idInput.value = slugifyProviderId(formValue("providerName"));
+        validateAddProviderForm();
+    });
+
+    document.getElementById("providerApiFormat")?.addEventListener("change", () => {
+        syncProviderCustomFields();
+        validateAddProviderForm();
+    });
+
+    const addButton = document.getElementById("addProviderBtn") as HTMLButtonElement | null;
+    if (addButton && addButton.dataset.bound !== "true") {
+        addButton.dataset.bound = "true";
+        addButton.addEventListener("click", async () => {
+            try {
+                const provider = buildCustomProviderConfig();
+                const success = await aiPlatformManager.savePlatformConfig(provider.platform, provider);
+                if (!success) {
+                    setAddProviderMessage("提供商保存失败", true);
+                    return;
+                }
+                bootstrap.Modal.getInstance(document.getElementById("addProviderModal"))?.hide();
+                renderPlatforms(await aiPlatformManager.loadPlatforms());
+                await loadRoleConfigs();
+                showNotification("大模型提供商已添加", "success");
+            } catch (error) {
+                setAddProviderMessage(platformErrorMessage(error), true);
+            }
+        });
+    }
+}
+
+function resetAddProviderForm(): void {
+    [
+        "providerName",
+        "providerId",
+        "providerApiKey",
+        "providerBaseUrl",
+        "providerEndpointUrl",
+        "providerModelName",
+        "providerModelId",
+        "providerWorkspaceSlug",
+        "providerHeadersJson",
+        "providerRequestTemplate",
+        "providerResponsePath",
+    ].forEach((id) => setFormValue(id, ""));
+    setFormValue("providerTimeout", "30");
+    const apiFormat = document.getElementById("providerApiFormat") as HTMLSelectElement | null;
+    if (apiFormat) apiFormat.value = "openai";
+    setAddProviderMessage("");
+    syncProviderCustomFields();
+    validateAddProviderForm();
+}
+
+function syncProviderCustomFields(): void {
+    const isCustom = formValue("providerApiFormat") === "custom";
+    const isAnythingLLM = formValue("providerApiFormat") === "anythingllm";
+    document.querySelectorAll<HTMLElement>(".provider-custom-field").forEach((element) => {
+        element.classList.toggle("d-none", !isCustom);
+    });
+    document.querySelectorAll<HTMLElement>(".provider-anythingllm-field").forEach((element) => {
+        element.classList.toggle("d-none", !isAnythingLLM);
+    });
+    if (isCustom && !formValue("providerRequestTemplate").trim()) {
+        setFormValue("providerRequestTemplate", JSON.stringify({
+            model: "{{model}}",
+            prompt: "{{last_user_message}}",
+            messages: "{{messages}}",
+        }, null, 2));
+        setFormValue("providerResponsePath", "choices.0.message.content");
+    }
+}
+
+function validateAddProviderForm(): void {
+    const required = [
+        formValue("providerName").trim(),
+        formValue("providerId").trim(),
+        formValue("providerBaseUrl").trim(),
+        formValue("providerModelName").trim(),
+        formValue("providerModelId").trim(),
+    ];
+    const isCustom = formValue("providerApiFormat") === "custom";
+    const isAnythingLLM = formValue("providerApiFormat") === "anythingllm";
+    const customReady = !isCustom || Boolean(formValue("providerRequestTemplate").trim() && formValue("providerResponsePath").trim());
+    const anythingllmReady = !isAnythingLLM || Boolean(formValue("providerWorkspaceSlug").trim());
+    setDisabled("addProviderBtn", required.some((value) => !value) || !customReady || !anythingllmReady);
+}
+
+function buildCustomProviderConfig(): AIPlatformConfig {
+    const platformId = slugifyProviderId(formValue("providerId"));
+    if (!platformId) throw new Error("提供商 ID 不能为空");
+    const apiFormat = (formValue("providerApiFormat") || "openai") as NonNullable<AIPlatformConfig["api_format"]>;
+    const headers = parseOptionalJsonObject(formValue("providerHeadersJson") || "{}") as Record<string, string>;
+    const config: AIPlatformConfig = {
+        platform: platformId,
+        name: formValue("providerName").trim(),
+        description: apiFormat === "anythingllm" ? "AnythingLLM 原生 Workspace Chat API" : "用户自定义大模型提供商",
+        icon: apiFormat === "anythingllm" ? "/assets/aiplatform/anythingllm.png" : "/assets/aiplatform/lmstudio.png",
+        enabled: true,
+        api_format: apiFormat,
+        config: {
+            api_key: formValue("providerApiKey").trim(),
+            base_url: formValue("providerBaseUrl").trim(),
+            timeout: Number.parseInt(formValue("providerTimeout") || "30", 10),
+            headers,
+        },
+        models: [
+            {
+                id: formValue("providerModelId").trim(),
+                name: formValue("providerModelName").trim(),
+                description: "默认模型",
+                enabled: true,
+                params: {
+                    context_window: 8192,
+                    temperature: 0.7,
+                    top_p: 0.95,
+                    max_tokens: 4096,
+                },
+            },
+        ],
+    };
+    const endpointUrl = formValue("providerEndpointUrl").trim();
+    if (endpointUrl) config.config.endpoint_url = endpointUrl;
+
+    if (apiFormat === "anthropic") {
+        config.config.anthropic_version = "2023-06-01";
+    }
+    if (apiFormat === "anythingllm") {
+        config.config.workspace_slug = formValue("providerWorkspaceSlug").trim();
+        config.config.anythingllm_mode = "chat";
+        config.config.session_id = "";
+    }
+    if (apiFormat === "custom") {
+        config.custom = {
+            request_template: parseOptionalJsonObject(formValue("providerRequestTemplate")),
+            response_path: formValue("providerResponsePath").trim(),
+        };
+    }
+    return config;
 }
 
 function bindAddModelEvents(): void {
@@ -525,10 +783,6 @@ function showNotification(message: string, type = "info"): void {
     setTimeout(() => notification.remove(), 3000);
 }
 
-function normalizeChatCompletionsUrl(url: string): string {
-    return url.endsWith("/v1/chat/completions") ? url : `${url.replace(/\/+$/, "")}/v1/chat/completions`;
-}
-
 function formValue(id: string): string {
     return (document.getElementById(id) as HTMLInputElement | HTMLTextAreaElement | null)?.value || "";
 }
@@ -545,6 +799,32 @@ function setDisabled(id: string, disabled: boolean): void {
 
 function toggleClass(id: string, className: string, force: boolean): void {
     document.getElementById(id)?.classList.toggle(className, force);
+}
+
+function setAddProviderMessage(message: string, isError = false): void {
+    const element = document.getElementById("addProviderMessage");
+    if (!element) return;
+    element.textContent = message;
+    element.classList.toggle("error", isError);
+    element.classList.toggle("success", Boolean(message && !isError));
+}
+
+function slugifyProviderId(value: string): string {
+    return value
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+}
+
+function parseOptionalJsonObject(value: string): Record<string, unknown> {
+    const text = value.trim();
+    if (!text) return {};
+    const parsed = JSON.parse(text) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        throw new Error("JSON 必须是对象");
+    }
+    return parsed as Record<string, unknown>;
 }
 
 function platformEscapeHtml(value: unknown): string {

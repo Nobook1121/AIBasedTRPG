@@ -182,8 +182,8 @@ interface ToolManagerConstructor {
 }
 
 interface ToolManager {
-    handleCommand(command: string): string | null;
-    handleCheckCommand(command: string): string;
+    handleCommand(command: string): Promise<string | null>;
+    handleCheckCommand(command: string): Promise<string>;
     recordCharacterChange(payload: Record<string, unknown>): Promise<unknown>;
 }
 
@@ -268,10 +268,21 @@ interface AIPlatformConfig {
     description: string;
     icon: string;
     enabled: boolean;
+    api_format?: "openai" | "anthropic" | "anythingllm" | "custom";
     config: {
         api_key?: string;
         base_url: string;
+        endpoint_url?: string;
         timeout: number;
+        anthropic_version?: string;
+        workspace_slug?: string;
+        anythingllm_mode?: string;
+        session_id?: string;
+        headers?: Record<string, string>;
+    };
+    custom?: {
+        request_template?: Record<string, unknown>;
+        response_path?: string;
     };
     models: AIModelConfig[];
 }
