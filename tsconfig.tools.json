@@ -5,11 +5,12 @@
     "moduleResolution": "Classic",
     "strict": true,
     "noEmit": false,
-    "rootDir": "frontend/src",
-    "outDir": "."
+    "rootDir": "data/tools",
+    "outDir": "data/tools"
   },
   "include": [
-    "frontend/src/js/**/*.ts"
+    "data/tools/**/*.ts",
+    "frontend/src/js/types.d.ts"
   ],
   "exclude": []
 }

@@ -3,7 +3,22 @@ class AIPlatformManager {
     private readonly platformsPath = "config/aiplatform";
 
     async loadPlatforms(): Promise<AIPlatformConfig[]> {
-        const platformIds = ["aliyun", "siliconflow", "deepseek", "openrouter", "lmstudio"];
+        try {
+            const response = await TrpgApi.get<ApiResponse<AIPlatformConfig[]>>("/api/config/aiplatforms");
+            if (response.success && Array.isArray(response.data)) {
+                Object.keys(this.platforms).forEach((platform) => delete this.platforms[platform]);
+                response.data
+                    .filter(isAIPlatformConfig)
+                    .forEach((platform) => {
+                        this.platforms[platform.platform] = platform;
+                    });
+                return this.getAllPlatforms();
+            }
+        } catch (error) {
+            console.error("鍔犺浇骞冲彴鍒楄〃澶辫触锛屽皾璇曢潤鎬侀€€鍥?:", error);
+        }
+
+        const platformIds = ["aliyun", "siliconflow", "deepseek", "openrouter", "lmstudio", "anythingllm"];
         const results = await Promise.all(platformIds.map((platform) => this.loadPlatform(platform)));
         return results.filter((platform): platform is AIPlatformConfig => platform !== null);
     }
@@ -154,7 +169,9 @@ class AIPlatformManager {
             const config = this.getPlatform(platform);
             if (!config) throw new Error("平台配置不存在");
             if (!config.enabled) throw new Error("平台未启用");
-            if (!config.config.api_key && platform !== "lmstudio") throw new Error("API Key 未设置");
+            if (!config.config.api_key && platform !== "lmstudio" && config.api_format !== "custom") {
+                throw new Error("API Key 未设置");
+            }
 
             const model = config.models.find((item) => item.id === modelId);
             if (!model) throw new Error("模型不存在");

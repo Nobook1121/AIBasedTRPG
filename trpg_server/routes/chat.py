@@ -2,6 +2,8 @@ import json
 import logging
 import re
 import time
+from copy import deepcopy
+from urllib.parse import quote
 
 import requests
 from flask import Blueprint, current_app, request, session
@@ -89,6 +91,255 @@ def _json_for_log(value):
     return json.dumps(value, ensure_ascii=False, default=str)
 
 
+def _provider_api_format(platform_config):
+    return str(platform_config.get("api_format") or platform_config.get("interface") or "openai").lower()
+
+
+def _provider_runtime_config(platform_config):
+    config = platform_config.get("config") or {}
+    return config if isinstance(config, dict) else {}
+
+
+def _resolve_provider_endpoint(platform_config, payload=None):
+    config = _provider_runtime_config(platform_config)
+    endpoint_url = str(config.get("endpoint_url") or "").strip()
+    if endpoint_url:
+        return endpoint_url.rstrip("/")
+
+    base_url = str(config.get("base_url") or "").strip().rstrip("/")
+    api_format = _provider_api_format(platform_config)
+    if not base_url:
+        return ""
+
+    if api_format == "anthropic":
+        if base_url.endswith("/v1/messages"):
+            return base_url
+        if base_url.endswith("/v1"):
+            return f"{base_url}/messages"
+        return f"{base_url}/v1/messages"
+
+    if api_format == "custom":
+        return base_url
+
+    if api_format == "anythingllm":
+        if base_url.endswith("/chat"):
+            return base_url
+        workspace_slug = str(config.get("workspace_slug") or "").strip()
+        if isinstance(payload, dict):
+            workspace_slug = workspace_slug or str(payload.get("model") or "").strip()
+        if not workspace_slug:
+            return base_url
+        if base_url.endswith("/api"):
+            base_url = f"{base_url}/v1"
+        return f"{base_url}/workspace/{quote(workspace_slug, safe='')}/chat"
+
+    if base_url.endswith("/chat/completions"):
+        return base_url
+    if base_url.endswith("/v1"):
+        return f"{base_url}/chat/completions"
+    return f"{base_url}/v1/chat/completions"
+
+
+def _provider_headers(platform_config):
+    config = _provider_runtime_config(platform_config)
+    api_format = _provider_api_format(platform_config)
+    headers = {"Content-Type": "application/json"}
+
+    configured_headers = config.get("headers")
+    if isinstance(configured_headers, dict):
+        headers.update({str(key): str(value) for key, value in configured_headers.items()})
+
+    api_key = str(config.get("api_key") or "").strip()
+    if api_format == "anthropic":
+        if api_key:
+            headers["x-api-key"] = api_key
+        headers["anthropic-version"] = str(config.get("anthropic_version") or "2023-06-01")
+        headers.pop("Authorization", None)
+        return headers
+
+    if api_key and "Authorization" not in headers:
+        headers["Authorization"] = f"Bearer {api_key}"
+    return headers
+
+
+def _last_user_message(messages):
+    for message in reversed(messages):
+        if message.get("role") == "user":
+            return str(message.get("content") or "")
+    return ""
+
+
+def _replace_template_values(value, payload):
+    if isinstance(value, dict):
+        return {key: _replace_template_values(item, payload) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_replace_template_values(item, payload) for item in value]
+    if not isinstance(value, str):
+        return value
+
+    messages = payload.get("messages") if isinstance(payload.get("messages"), list) else []
+    replacements = {
+        "{{model}}": payload.get("model"),
+        "{{messages}}": messages,
+        "{{last_user_message}}": _last_user_message(messages),
+    }
+    if value in replacements:
+        return replacements[value]
+
+    result = value
+    for placeholder, replacement in replacements.items():
+        if placeholder in result:
+            result = result.replace(placeholder, json.dumps(replacement, ensure_ascii=False) if isinstance(replacement, (dict, list)) else str(replacement or ""))
+    return result
+
+
+def _build_anthropic_request(payload):
+    messages = payload.get("messages") if isinstance(payload.get("messages"), list) else []
+    system_messages = [str(item.get("content") or "") for item in messages if item.get("role") == "system"]
+    anthropic_messages = []
+    for item in messages:
+        role = item.get("role")
+        if role == "system":
+            continue
+        if role not in {"user", "assistant"}:
+            role = "user"
+        anthropic_messages.append({"role": role, "content": item.get("content") or ""})
+
+    request_data = {
+        "model": payload.get("model"),
+        "messages": anthropic_messages,
+        "max_tokens": payload.get("max_tokens", 4096),
+    }
+    if system_messages:
+        request_data["system"] = "\n\n".join(system_messages)
+    for key in ("temperature", "top_p", "stream"):
+        if key in payload:
+            request_data[key] = payload[key]
+    return request_data
+
+
+def _build_anythingllm_request(platform_config, payload):
+    config = _provider_runtime_config(platform_config)
+    request_data = {
+        "message": _last_user_message(payload.get("messages") if isinstance(payload.get("messages"), list) else []),
+        "mode": str(config.get("anythingllm_mode") or "chat"),
+        "attachments": [],
+        "reset": False,
+    }
+    session_id = str(config.get("session_id") or "").strip()
+    if session_id:
+        request_data["sessionId"] = session_id
+    return request_data
+
+
+def _build_provider_request(platform_config, payload):
+    api_format = _provider_api_format(platform_config)
+    if api_format == "anthropic":
+        return _build_anthropic_request(payload)
+    if api_format == "anythingllm":
+        return _build_anythingllm_request(platform_config, payload)
+    if api_format == "custom":
+        custom = platform_config.get("custom") if isinstance(platform_config.get("custom"), dict) else {}
+        template = custom.get("request_template")
+        if isinstance(template, dict):
+            return _replace_template_values(deepcopy(template), payload)
+    request_data = payload.copy()
+    extra_body = request_data.pop("extra_body", None)
+    if isinstance(extra_body, dict):
+        request_data.update(extra_body)
+    return request_data
+
+
+def _value_at_path(value, path):
+    current = value
+    for part in str(path or "").split("."):
+        if not part:
+            continue
+        if isinstance(current, list):
+            try:
+                current = current[int(part)]
+            except (ValueError, IndexError):
+                return None
+        elif isinstance(current, dict):
+            current = current.get(part)
+        else:
+            return None
+    return current
+
+
+def _extract_openai_response(response_data):
+    ai_response = ""
+    choices = response_data.get("choices", [])
+    if choices:
+        choice = choices[0]
+        if "message" in choice and "content" in choice["message"]:
+            ai_response = choice["message"]["content"]
+        elif "delta" in choice and "content" in choice["delta"]:
+            ai_response = choice["delta"]["content"]
+
+    token_count = None
+    usage = response_data.get("usage")
+    if usage:
+        if "total_tokens" in usage:
+            token_count = usage["total_tokens"]
+        elif "completion_tokens" in usage and "prompt_tokens" in usage:
+            token_count = usage["completion_tokens"] + usage["prompt_tokens"]
+
+    return ai_response, token_count
+
+
+def _extract_anthropic_response(response_data):
+    content = response_data.get("content") if isinstance(response_data, dict) else []
+    text = ""
+    if isinstance(content, list):
+        text = "".join(str(item.get("text") or "") for item in content if isinstance(item, dict) and item.get("type") == "text")
+    usage = response_data.get("usage") if isinstance(response_data, dict) else {}
+    token_count = None
+    if isinstance(usage, dict):
+        output_tokens = usage.get("output_tokens")
+        input_tokens = usage.get("input_tokens")
+        if isinstance(output_tokens, int) and isinstance(input_tokens, int):
+            token_count = output_tokens + input_tokens
+        elif isinstance(output_tokens, int):
+            token_count = output_tokens
+    return text, token_count
+
+
+def _extract_anythingllm_response(response_data):
+    if isinstance(response_data, dict):
+        value = response_data.get("textResponse")
+        if value is not None:
+            return str(value), None
+        value = response_data.get("error")
+        if value is not None:
+            return str(value), None
+    return "", None
+
+
+def _extract_provider_response(platform_config, response_data):
+    api_format = _provider_api_format(platform_config)
+    if api_format == "anthropic":
+        return _extract_anthropic_response(response_data)
+    if api_format == "anythingllm":
+        return _extract_anythingllm_response(response_data)
+    if api_format == "custom":
+        custom = platform_config.get("custom") if isinstance(platform_config.get("custom"), dict) else {}
+        value = _value_at_path(response_data, custom.get("response_path"))
+        return (str(value), None) if value is not None else ("", None)
+    return _extract_openai_response(response_data)
+
+
+def _normalize_provider_response(platform_config, response_data):
+    if _provider_api_format(platform_config) == "openai":
+        return response_data
+
+    content, token_count = _extract_provider_response(platform_config, response_data)
+    normalized = {"choices": [{"message": {"role": "assistant", "content": content}}]}
+    if token_count is not None:
+        normalized["usage"] = {"total_tokens": token_count}
+    return normalized
+
+
 def _post_ai_request(base_url, headers):
     def requester(payload):
         logger.info("AI API request payload: %s", _json_for_log(payload))
@@ -100,6 +351,24 @@ def _post_ai_request(base_url, headers):
         return response_data
 
     return requester
+
+
+def _post_provider_request(platform_config):
+    headers = _provider_headers(platform_config)
+
+    def requester(payload):
+        endpoint = _resolve_provider_endpoint(platform_config, payload)
+        request_payload = _build_provider_request(platform_config, payload)
+        logger.info("AI API request payload: %s", _json_for_log(request_payload))
+        response = requests.post(endpoint, headers=headers, json=request_payload, timeout=300)
+        if not response.ok:
+            raise RuntimeError(f"API request failed: {response.status_code}")
+        response_data = response.json()
+        logger.info("AI API response payload: %s", _json_for_log(response_data))
+        return _normalize_provider_response(platform_config, response_data)
+
+    return requester
+
 
 
 def _load_kp_prompt():
@@ -145,12 +414,42 @@ def _select_model(platform_config):
 
 
 def _room_snapshot_system_message(snapshot):
-    return (
-        "当前房间资料由 function `room.get_room_snapshot` 读取。"
-        "这是本次回复必须优先采用的当前房间、绑定剧本和玩家角色卡上下文；"
-        "不得沿用其他房间的剧本、角色或记忆。\n"
-        f"{_json_for_log(snapshot)}"
-    )
+    room = snapshot.get("room") or {}
+    scenario = snapshot.get("scenario") or {}
+    members = snapshot.get("members") or []
+    memory = (snapshot.get("memory") or {}).get("items") or []
+
+    lines = [
+        "当前房间资料由 function `room.get_room_snapshot` 读取。",
+        "这是本次回复必须优先采用的当前房间、绑定剧本和调查员摘要上下文；不得沿用其他房间的剧本、角色或记忆。",
+        f"房间：{room.get('name') or '未命名房间'}（ID：{room.get('id') or 'unknown'}）。",
+    ]
+    if scenario:
+        lines.append(f"绑定剧本：{scenario.get('title') or room.get('scenario_title') or '未命名剧本'}。")
+        summary = scenario.get("summary")
+        if summary:
+            lines.append(str(summary))
+    else:
+        lines.append("绑定剧本：未读取到。")
+
+    if members:
+        lines.append("当前玩家与调查员摘要：")
+        for member in members:
+            character = member.get("character") or {}
+            character_name = character.get("name") or "未绑定调查员"
+            character_summary = character.get("summary") or "暂无叙事背景摘要。"
+            lines.append(f"- {member.get('username') or 'unknown'}：{character_name}。{character_summary}")
+    else:
+        lines.append("当前玩家与调查员摘要：暂无活跃玩家。")
+
+    if memory:
+        lines.append("房间记忆摘要：")
+        for item in memory[:10]:
+            content = str(item.get("content") or "").strip()
+            if content:
+                lines.append(f"- {content}")
+
+    return "\n".join(lines)
 
 
 def _build_messages(system_prompt, history, content, room_snapshot_message=None):
@@ -203,8 +502,11 @@ def chat():
                 "No enabled platform",
             )
 
-        api_key = platform_config.get("config", {}).get("api_key")
-        base_url = platform_config.get("config", {}).get("base_url")
+        runtime_config = platform_config.get("config", {})
+        if not isinstance(runtime_config, dict):
+            runtime_config = {}
+        api_key = runtime_config.get("api_key")
+        base_url = _resolve_provider_endpoint(platform_config)
         if not base_url:
             return error_response(
                 "AI platform config is incomplete",
@@ -213,8 +515,8 @@ def chat():
             )
 
         if not api_key and selected_platform == "lmstudio":
-            api_key = "lm-studio"
-        elif not api_key:
+            runtime_config["api_key"] = "lm-studio"
+        elif not api_key and _provider_api_format(platform_config) in {"openai", "anthropic"}:
             return error_response(
                 "AI platform config is incomplete",
                 400,
@@ -249,10 +551,6 @@ def chat():
         }
         if runtime_config.stream_output:
             request_data["stream"] = False
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
-        }
 
         log_user_action(
             logger,
@@ -264,7 +562,7 @@ def chat():
             内容长度=len(content),
         )
         result = run_agent_completion(
-            requester=_post_ai_request(base_url, headers),
+            requester=_post_provider_request(platform_config),
             base_payload=request_data,
             profile=agent_profile,
             registry=default_tool_registry(),
@@ -303,6 +601,7 @@ def chat():
             message=None,
             content=ai_response,
             token_count=token_count,
+            tool_messages=result.tool_messages or [],
         )
     except requests.exceptions.Timeout:
         return error_response("AI platform request timeout", 504, "Request timeout")
