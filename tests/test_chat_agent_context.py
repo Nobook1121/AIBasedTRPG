@@ -4,9 +4,16 @@ from flask import Flask, session
 
 from trpg_server.routes.chat import (
     _build_messages,
+    _compact_history_entries,
+    _compact_history_with_ai,
+    _format_user_content,
     _history_filename,
+    _history_needs_compaction,
+    _is_compact_command,
     _post_ai_request,
     _room_snapshot_system_message,
+    _speaker_for_user,
+    _strip_compact_command,
 )
 from trpg_server.routes.characters import _runtime_to_test_character, _test_character_to_runtime
 from trpg_server.socket_events import register_socket_events
@@ -108,6 +115,84 @@ def test_room_snapshot_system_message_preserves_compact_snapshot_details():
 
     assert "Wu Mingshan" in message
     assert '"scenes": 3' in message
+
+
+def test_current_user_message_is_tagged_with_compact_speaker_identity():
+    room_info = {
+        "members": [
+            {
+                "user_id": 9,
+                "username": "ADMIN",
+                "character_card": {"name": "\u65e0\u4e66"},
+            },
+            {
+                "user_id": 11,
+                "username": "test1",
+                "character_card": {"name": "\u5415\u5357\u679d"},
+            },
+        ]
+    }
+
+    speaker = _speaker_for_user(room_info, 11)
+    content = _format_user_content("@KP \u8be2\u95ee\u66f4\u591a\u7ec6\u8282", speaker)
+
+    assert content.splitlines()[0] == "[speaker=test1; character=\u5415\u5357\u679d]"
+    assert "\u65e0\u4e66" not in content
+    assert "ADMIN" not in content
+
+
+def test_build_messages_formats_historical_user_speakers():
+    history = [
+        {
+            "role": "user",
+            "content": "@KP look",
+            "speaker": {"username": "test1", "character_name": "\u5415\u5357\u679d"},
+        },
+        {"role": "assistant", "content": "response"},
+    ]
+
+    messages = _build_messages("KP prompt", history, "@KP continue")
+
+    assert messages[1]["content"].startswith("[speaker=test1; character=\u5415\u5357\u679d]")
+    assert messages[-1] == {"role": "user", "content": "@KP continue"}
+
+
+def test_compact_command_detection_and_response_stripping():
+    assert _is_compact_command("/compact") is True
+    assert _is_compact_command("@KP /compact") is True
+    assert _is_compact_command("@KP keep going") is False
+
+    content, requested = _strip_compact_command("scene ends\n/compact\n")
+
+    assert requested is True
+    assert content == "scene ends"
+
+
+def test_compact_history_with_ai_replaces_history_with_summary():
+    calls = []
+
+    def fake_requester(payload):
+        calls.append(payload)
+        assert payload["model"] == "model-a"
+        assert "old user line" in payload["messages"][-1]["content"]
+        return {"choices": [{"message": {"content": "compressed summary"}}]}
+
+    history = [
+        {"role": "user", "content": "old user line"},
+        {"role": "assistant", "content": "old assistant line"},
+    ]
+
+    compacted = _compact_history_with_ai(fake_requester, "model-a", history)
+
+    assert len(calls) == 1
+    assert compacted == _compact_history_entries("compressed summary")
+    assert compacted[0]["role"] == "system"
+    assert compacted[0]["compact"] is True
+
+
+def test_history_needs_compaction_uses_character_budget():
+    assert _history_needs_compaction([{"content": "x" * 10}], threshold=20) is False
+    assert _history_needs_compaction([{"content": "x" * 21}], threshold=20) is True
 
 
 def test_post_ai_request_logs_full_request_and_response_payload(monkeypatch, caplog):

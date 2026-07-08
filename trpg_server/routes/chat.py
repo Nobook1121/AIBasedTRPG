@@ -21,6 +21,7 @@ from trpg_server.settings import CONFIG_DIR, HISTORY_DIR, ROOMS_DIR, SCENARIOS_D
 bp = Blueprint("chat", __name__)
 logger = logging.getLogger(__name__)
 _HISTORY_SAFE_RE = re.compile(r"[^A-Za-z0-9_.-]+")
+HISTORY_COMPACT_CHAR_THRESHOLD = 12000
 
 
 def _timestamp():
@@ -135,6 +136,82 @@ def _load_history(user_id, room_id=None, agent_id="kp"):
     return history_file, read_json(history_file, default=[])
 
 
+def _speaker_for_user(room_info, user_id):
+    for member in room_info.get("members", []):
+        if str(member.get("user_id")) != str(user_id):
+            continue
+        character = member.get("character_card") or member.get("character") or {}
+        return {
+            "user_id": member.get("user_id"),
+            "username": member.get("username") or str(user_id),
+            "character_name": character.get("name"),
+        }
+    return {"user_id": user_id, "username": str(user_id)}
+
+
+def _format_user_content(content, speaker=None):
+    if not speaker:
+        return content
+
+    parts = [f"speaker={speaker.get('username') or speaker.get('user_id')}"]
+    character_name = speaker.get("character_name")
+    if character_name:
+        parts.append(f"character={character_name}")
+    return f"[{'; '.join(parts)}]\n{content}"
+
+
+def _is_compact_command(content):
+    text = str(content or "").strip()
+    if text.startswith("@KP"):
+        text = text[3:].strip()
+    return text.casefold() == "/compact"
+
+
+def _strip_compact_command(content):
+    lines = str(content or "").splitlines()
+    kept = []
+    requested = False
+    for line in lines:
+        if line.strip().casefold() == "/compact":
+            requested = True
+            continue
+        kept.append(line)
+    return "\n".join(kept).strip(), requested
+
+
+def _history_needs_compaction(history, threshold=HISTORY_COMPACT_CHAR_THRESHOLD):
+    return sum(len(str(item.get("content") or "")) for item in history) > threshold
+
+
+def _compact_history_entries(summary):
+    return [{"role": "system", "content": f"历史压缩摘要：\n{summary.strip()}", "compact": True}]
+
+
+def _compact_history_with_ai(requester, model, history):
+    if not history:
+        return []
+
+    payload = {
+        "model": model,
+        "max_tokens": 1200,
+        "temperature": 0.2,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "压缩TRPG房间历史。保留当前场景、关键事实、NPC状态、"
+                    "每位玩家/调查员行动、未解决线索、检定结果。不要编造。"
+                ),
+            },
+            {"role": "user", "content": _json_for_log(history)},
+        ],
+    }
+    summary, _token_count = _extract_ai_response(requester(payload))
+    if not summary.strip():
+        raise RuntimeError("AI platform did not return a compact summary")
+    return _compact_history_entries(summary)
+
+
 def _select_model(platform_config):
     models = platform_config.get("models", [])
     if not models:
@@ -237,7 +314,10 @@ def _build_messages(system_prompt, history, content, room_snapshot_message=None)
     if room_snapshot_message:
         messages.append({"role": "system", "content": room_snapshot_message})
     for item in history:
-        messages.append({"role": item["role"], "content": item["content"]})
+        item_content = item["content"]
+        if item.get("role") == "user":
+            item_content = _format_user_content(item_content, item.get("speaker"))
+        messages.append({"role": item["role"], "content": item_content})
     messages.append({"role": "user", "content": content})
     return messages
 
@@ -312,26 +392,50 @@ def chat():
         if room_id:
             room_snapshot_message = _room_snapshot_system_message(get_room_snapshot({}, agent_context))
 
-        history_file, history = _load_history(user_id, room_id=room_id, agent_id=agent_profile.id)
         runtime_config = load_ai_runtime_config(_get_config_dir())
+        model = _select_model(platform_config)
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        }
+        requester = _post_ai_request(base_url, headers)
+        history_file, history = _load_history(user_id, room_id=room_id, agent_id=agent_profile.id)
+
+        if _is_compact_command(content):
+            if history:
+                history = _compact_history_with_ai(requester, model, history)
+                write_json_atomic(history_file, history)
+                response_text = "历史已压缩。"
+            else:
+                response_text = "当前没有可压缩的历史。"
+            return success_response(message=None, content=response_text, token_count=None)
+
+        if _history_needs_compaction(history):
+            try:
+                history = _compact_history_with_ai(requester, model, history)
+                write_json_atomic(history_file, history)
+            except Exception:
+                logger.exception("Failed to compact chat history automatically")
+
+        speaker = _speaker_for_user(agent_context.room_info(), user_id) if room_id else None
+        user_content = _format_user_content(content, speaker)
+        system_prompt = agent_profile.prompt or _load_kp_prompt()
+        if room_id:
+            system_prompt = f"{system_prompt}\n- 需压缩历史时，单独输出 /compact。"
         request_data = {
             "messages": _build_messages(
-                agent_profile.prompt or _load_kp_prompt(),
+                system_prompt,
                 history,
-                content,
+                user_content,
                 room_snapshot_message=room_snapshot_message,
             ),
-            "model": _select_model(platform_config),
+            "model": model,
             "max_tokens": 4096,
             "temperature": 0.7,
             "top_p": 0.9,
         }
         if runtime_config.stream_output:
             request_data["stream"] = False
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
-        }
 
         log_user_action(
             logger,
@@ -343,7 +447,7 @@ def chat():
             内容长度=len(content),
         )
         result = run_agent_completion(
-            requester=_post_ai_request(base_url, headers),
+            requester=requester,
             base_payload=request_data,
             profile=agent_profile,
             registry=default_tool_registry(),
@@ -352,8 +456,10 @@ def chat():
         if result.error:
             return error_response("AI agent request failed", 500, result.error)
 
-        ai_response = result.content
+        ai_response, compact_requested_by_ai = _strip_compact_command(result.content)
         token_count = result.token_count
+        if not ai_response and compact_requested_by_ai:
+            ai_response = "历史已压缩。"
         if not ai_response:
             return error_response(
                 "AI platform did not return a response",
@@ -370,13 +476,19 @@ def chat():
             Token数=token_count,
         )
 
-        history.extend(
-            [
-                {"role": "user", "content": content},
-                {"role": "assistant", "content": ai_response},
-            ]
-        )
-        write_json_atomic(history_file, history[-20:])
+        user_history_item = {"role": "user", "content": content}
+        if speaker:
+            user_history_item["speaker"] = speaker
+        history.extend([user_history_item, {"role": "assistant", "content": ai_response}])
+        if compact_requested_by_ai:
+            try:
+                history = _compact_history_with_ai(requester, model, history)
+                write_json_atomic(history_file, history)
+            except Exception:
+                logger.exception("Failed to compact chat history after AI request")
+                write_json_atomic(history_file, history[-20:])
+        else:
+            write_json_atomic(history_file, history[-20:])
 
         return success_response(
             message=None,
