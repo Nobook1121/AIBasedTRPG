@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from flask import Flask, session
 
 from trpg_server.routes.chat import (
@@ -6,6 +8,7 @@ from trpg_server.routes.chat import (
     _post_ai_request,
     _room_snapshot_system_message,
 )
+from trpg_server.routes.characters import _runtime_to_test_character, _test_character_to_runtime
 from trpg_server.socket_events import register_socket_events
 from trpg_server.routes.rooms import create_room_message
 
@@ -41,6 +44,70 @@ def test_build_messages_includes_room_snapshot_context():
     assert "长生俑" in messages[1]["content"]
     assert "吴明山" in messages[1]["content"]
     assert messages[-1] == {"role": "user", "content": "@KP 开始"}
+
+
+def test_room_snapshot_system_message_omits_large_character_and_scenario_details():
+    snapshot = {
+        "room": {"id": "room-1", "name": "\u6d4b\u8bd5\u623f\u95f4"},
+        "scenario": {
+            "id": 7,
+            "title": "\u957f\u751f\u4fd1",
+            "description": "\u897f\u5b89\u8c03\u67e5",
+            "background": "\u4e0d\u5e94\u8be5\u8fdb\u5165\u6bcf\u8f6e AI \u8bf7\u6c42\u7684\u5b8c\u6574\u80cc\u666f",
+            "scenes": [{"id": 1, "content": "\u897f\u5b89\u9ad8\u94c1\u7ad9"}],
+        },
+        "members": [
+            {
+                "username": "ADMIN",
+                "character_card": {
+                    "id": "investigator-1",
+                    "name": "\u5434\u660e\u5c71",
+                    "attributes": {"DEX": 55, "STR": 60},
+                    "skills": [{"name": "\u4fa6\u5bdf", "value": 70}],
+                    "background": {"story": "\u5931\u8e2a\u8bb0\u8005"},
+                },
+                "character_state": {"current_san": 50},
+            }
+        ],
+    }
+
+    message = _room_snapshot_system_message(snapshot)
+
+    assert "room.get_room_snapshot" in message
+    assert "\u957f\u751f\u4fd1" in message
+    assert "\u5434\u660e\u5c71" in message
+    assert "skills" not in message
+    assert "attributes" not in message
+    assert "\u4fa6\u5bdf" not in message
+    assert "DEX" not in message
+    assert "\u897f\u5b89\u9ad8\u94c1\u7ad9" not in message
+
+
+def test_room_snapshot_system_message_preserves_compact_snapshot_details():
+    snapshot = {
+        "room": {"id": "room-1", "name": "test room"},
+        "scenario": {
+            "id": 7,
+            "title": "Long Life Figurine",
+            "description": "scenario summary",
+            "found": True,
+            "available_sections": {"scenes": 3},
+        },
+        "members": [
+            {
+                "user_id": 9,
+                "username": "ADMIN",
+                "active": True,
+                "character": {"id": "investigator-1", "name": "Wu Mingshan"},
+                "character_state": {"current_san": 50},
+            }
+        ],
+    }
+
+    message = _room_snapshot_system_message(snapshot)
+
+    assert "Wu Mingshan" in message
+    assert '"scenes": 3' in message
 
 
 def test_post_ai_request_logs_full_request_and_response_payload(monkeypatch, caplog):
@@ -155,3 +222,76 @@ def test_socket_broadcast_does_not_log_persisted_room_message(monkeypatch, caplo
 
     log_text = "\n".join(record.getMessage() for record in caplog.records)
     assert "alice:hello from player" not in log_text
+
+
+def test_login_success_does_not_report_post_login_initialization_errors_as_login_failure():
+    source = Path("frontend/src/js/auth/login-view.ts").read_text(encoding="utf-8")
+
+    assert "async function restorePostLoginState" in source
+    assert "await restorePostLoginState();" in source
+
+    restore_block = source.split("async function restorePostLoginState", 1)[1]
+    assert 'showMessage("loginMessage"' not in restore_block
+    assert "await window.autoLoadLastRoom?.();" in restore_block
+
+
+def test_character_template_exports_skill_base_key_instead_of_hardcoded_base():
+    character = {
+        "id": "investigator-1",
+        "name": "Alice",
+        "skills": [
+            {
+                "id": "libraryUse",
+                "skillKey": "libraryUse",
+                "baseKey": "libraryUse",
+                "name": "Library Use",
+                "base": 20,
+                "value": 45,
+                "category": "explore",
+            }
+        ],
+    }
+
+    payload = _runtime_to_test_character(character)
+    skill = payload["skillGroups"]["explore"][0]
+
+    assert skill["baseKey"] == "libraryUse"
+    assert "base" not in skill
+
+
+def test_character_template_import_preserves_skill_base_key_without_base_value():
+    payload = {
+        "id": "investigator-1",
+        "name": "Alice",
+        "skillGroups": {
+            "explore": [
+                {
+                    "id": "libraryUse",
+                    "skillKey": "libraryUse",
+                    "baseKey": "libraryUse",
+                    "name": "Library Use",
+                    "job": 20,
+                    "interest": 5,
+                    "growth": 0,
+                    "value": 45,
+                }
+            ]
+        },
+    }
+
+    character = _test_character_to_runtime(payload)
+    skill = character["skills"][0]
+
+    assert skill["baseKey"] == "libraryUse"
+    assert "base" not in skill
+
+
+def test_frontend_character_template_exports_base_key_not_base_value():
+    source = Path("frontend/src/js/character-sheet.ts").read_text(encoding="utf-8")
+
+    export_block = source.split("function convertCardToTestCharacterJson", 1)[1].split(
+        "function convertTestCharacterJsonToCardInput",
+        1,
+    )[0]
+    assert "baseKey:" in export_block
+    assert "base: skill.base" not in export_block

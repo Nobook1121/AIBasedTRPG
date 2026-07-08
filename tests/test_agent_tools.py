@@ -255,6 +255,66 @@ def test_room_memory_write_and_read(tmp_path):
     assert memory["items"][0]["content"] == "图书管理员开始怀疑调查员。"
 
 
+def test_room_snapshot_omits_full_character_card_and_scenario_details(tmp_path):
+    scenarios_dir = tmp_path / "scenarios"
+    scenarios_dir.mkdir()
+    room_dir = tmp_path / "rooms" / "room-1"
+    room_dir.mkdir(parents=True)
+    (room_dir / "info.json").write_text(
+        json.dumps(
+            {
+                "id": "room-1",
+                "name": "test room",
+                "scenario_id": 7,
+                "scenario_title": "Long Life Figurine",
+                "members": [
+                    {
+                        "user_id": 9,
+                        "username": "ADMIN",
+                        "status": "active",
+                        "is_active": True,
+                        "character_card": {
+                            "id": "investigator-1",
+                            "name": "Wu Mingshan",
+                            "attributes": {"DEX": 55},
+                            "skills": [{"name": "Spot Hidden", "value": 70}],
+                            "background": {"story": "Long character history"},
+                        },
+                        "character_state": {"current_hp": 15, "current_san": 50},
+                    }
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    (scenarios_dir / "scenario.json").write_text(
+        json.dumps(
+            {
+                "id": 7,
+                "title": "Long Life Figurine",
+                "background": "Large background should not be in snapshot",
+                "scenes": [{"id": 1, "content": "Large scene body should not be in snapshot"}],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    context = AgentRequestContext(room_id="room-1", room_dir=room_dir, scenarios_dir=scenarios_dir)
+
+    result = get_room_snapshot({}, context)
+    serialized = json.dumps(result, ensure_ascii=False)
+
+    assert result["members"][0]["character"]["name"] == "Wu Mingshan"
+    assert result["members"][0]["character_state"]["current_san"] == 50
+    assert "skills" not in serialized
+    assert "attributes" not in serialized
+    assert "Spot Hidden" not in serialized
+    assert "DEX" not in serialized
+    assert "Large scene body should not be in snapshot" not in serialized
+    assert "Large background should not be in snapshot" not in serialized
+
+
 def test_room_snapshot_returns_bound_scenario_and_character_cards(tmp_path):
     scenarios_dir = tmp_path / "scenarios"
     scenarios_dir.mkdir()
@@ -313,7 +373,8 @@ def test_room_snapshot_returns_bound_scenario_and_character_cards(tmp_path):
     assert result["room"]["id"] == "room-1"
     assert result["scenario"]["id"] == 1776085966397
     assert result["scenario"]["title"] == "长生俑"
-    assert result["scenario"]["scenes"][0]["content"] == "西安高铁站。冯教授迎接调查员。"
-    assert result["members"][0]["character_card"]["name"] == "吴明山"
+    assert result["scenario"]["available_sections"]["scenes"] == 1
+    assert result["members"][0]["character"]["name"] == "吴明山"
     assert result["members"][0]["character_state"]["current_san"] == 50
     assert result["memory"]["items"][0]["content"] == "ADMIN 已经找到门厅暗格。"
+    assert "skills" not in json.dumps(result, ensure_ascii=False)

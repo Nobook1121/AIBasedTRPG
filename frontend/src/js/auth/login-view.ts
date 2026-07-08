@@ -40,28 +40,41 @@ namespace AuthModule {
             showMessage("loginMessage", "请输入用户名或邮箱和密码", true);
             return;
         }
+
+        let response: ApiResponse<CurrentUser>;
         try {
-            const response = await TrpgApi.post<ApiResponse<CurrentUser>>("/api/auth/login", {
+            response = await TrpgApi.post<ApiResponse<CurrentUser>>("/api/auth/login", {
                 identifier,
                 password,
                 remember_me: rememberMe,
                 stay_logged_in: stayLoggedIn,
                 auto_login: autoLogin,
             });
-            if (!response.success || !response.data) {
-                showMessage("loginMessage", localizedAuthMessage(response, "登录失败"), true);
-                return;
-            }
-            setCurrentUser(response.data);
-            closeAuthModal();
-            TrpgCookies.set("trpg_last_username", response.data.username);
+        } catch (error) {
+            console.error("登录失败:", error);
+            showMessage("loginMessage", "登录失败，请稍后重试", true);
+            return;
+        }
+
+        if (!response.success || !response.data) {
+            showMessage("loginMessage", localizedAuthMessage(response, "登录失败"), true);
+            return;
+        }
+
+        setCurrentUser(response.data);
+        closeAuthModal();
+        TrpgCookies.set("trpg_last_username", response.data.username);
+        await restorePostLoginState();
+    }
+
+    async function restorePostLoginState(): Promise<void> {
+        try {
             window.reconnectSocket?.();
             window.clearCurrentRoom?.();
             window.clearChatMessages?.();
             await window.autoLoadLastRoom?.();
         } catch (error) {
-            console.error("登录失败:", error);
-            showMessage("loginMessage", "登录失败，请稍后重试", true);
+            console.warn("登录后的页面状态恢复失败:", error);
         }
     }
 }

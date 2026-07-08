@@ -144,12 +144,91 @@ def _select_model(platform_config):
     return model.get("id", "local-model")
 
 
+def _compact_character_card(character_card):
+    if not isinstance(character_card, dict):
+        return None
+
+    compact = {}
+    for key in ("id", "name", "occupation", "age", "gender", "sex"):
+        value = character_card.get(key)
+        if value not in (None, ""):
+            compact[key] = value
+    return compact or None
+
+
+def _compact_character_state(character_state):
+    if not isinstance(character_state, dict):
+        return None
+
+    compact = {}
+    for key in ("max_hp", "current_hp", "max_san", "current_san"):
+        value = character_state.get(key)
+        if value is not None:
+            compact[key] = value
+    return compact or None
+
+
+def _count_list_items(value):
+    return len(value) if isinstance(value, list) else 0
+
+
+def _compact_room_snapshot(snapshot):
+    if not isinstance(snapshot, dict):
+        return {}
+
+    scenario = snapshot.get("scenario")
+    if isinstance(scenario, dict):
+        available_sections = scenario.get("available_sections")
+        if not isinstance(available_sections, dict):
+            available_sections = {}
+            for key in ("scenes", "locations", "npcs", "clues", "endings"):
+                count = _count_list_items(scenario.get(key))
+                if count:
+                    available_sections[key] = count
+        compact_scenario = {
+            "id": scenario.get("id"),
+            "title": scenario.get("title"),
+            "description": scenario.get("description"),
+            "found": scenario.get("found"),
+            "available_sections": available_sections,
+        }
+    else:
+        compact_scenario = scenario
+
+    members = []
+    for member in snapshot.get("members") or []:
+        if not isinstance(member, dict):
+            continue
+        compact_member = {
+            "user_id": member.get("user_id"),
+            "username": member.get("username"),
+            "active": member.get("active"),
+        }
+        character_card = _compact_character_card(member.get("character_card") or member.get("character"))
+        if character_card:
+            compact_member["character"] = character_card
+        character_state = _compact_character_state(member.get("character_state"))
+        if character_state:
+            compact_member["character_state"] = character_state
+        members.append(compact_member)
+
+    return {
+        "room": snapshot.get("room"),
+        "scenario": compact_scenario,
+        "members": members,
+        "memory": snapshot.get("memory"),
+    }
+
+
 def _room_snapshot_system_message(snapshot):
+    compact_snapshot = _compact_room_snapshot(snapshot)
     return (
         "当前房间资料由 function `room.get_room_snapshot` 读取。"
         "这是本次回复必须优先采用的当前房间、绑定剧本和玩家角色卡上下文；"
         "不得沿用其他房间的剧本、角色或记忆。\n"
-        f"{_json_for_log(snapshot)}"
+        "自动注入的上下文已精简，不包含完整场景正文、角色卡技能或属性。"
+        "需要详细剧本、角色卡技能或属性时，必须调用相应 room function。\n"
+        f"{_json_for_log(compact_snapshot)}"
     )
 
 

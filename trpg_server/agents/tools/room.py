@@ -81,19 +81,61 @@ def _summarize_scenario(scenario: dict[str, Any] | None, room_info: dict[str, An
             "scenes": [],
         }
 
+    available_sections = {}
+    for key in ("scenes", "locations", "npcs", "clues", "endings"):
+        values = scenario.get(key)
+        if isinstance(values, list) and values:
+            available_sections[key] = len(values)
     summary = {
         "id": scenario.get("id"),
         "title": scenario.get("title"),
         "description": scenario.get("description"),
-        "background": scenario.get("background"),
-        "preparation": scenario.get("preparation"),
         "found": True,
+        "available_sections": available_sections,
     }
-    for key in ("scenes", "locations", "npcs", "clues", "endings"):
-        values = scenario.get(key)
-        if isinstance(values, list):
-            summary[key] = values
     return summary
+
+
+def _summarize_character_card(character_card: Any) -> dict[str, Any] | None:
+    if not isinstance(character_card, dict):
+        return None
+
+    summary = {}
+    for key in ("id", "name", "occupation", "age", "gender", "sex"):
+        value = character_card.get(key)
+        if value not in (None, ""):
+            summary[key] = value
+    return summary or None
+
+
+def _summarize_character_state(character_state: Any) -> dict[str, Any] | None:
+    if not isinstance(character_state, dict):
+        return None
+
+    summary = {}
+    for key in ("max_hp", "current_hp", "max_san", "current_san"):
+        value = character_state.get(key)
+        if value is not None:
+            summary[key] = value
+    return summary or None
+
+
+def _summarize_members(members: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    summarized = []
+    for member in members:
+        summary = {
+            "user_id": member.get("user_id"),
+            "username": member.get("username"),
+            "active": member.get("active"),
+        }
+        character = _summarize_character_card(member.get("character_card"))
+        if character:
+            summary["character"] = character
+        character_state = _summarize_character_state(member.get("character_state"))
+        if character_state:
+            summary["character_state"] = character_state
+        summarized.append(summary)
+    return summarized
 
 
 def get_room_snapshot(arguments: dict[str, Any], context: Any) -> dict[str, Any]:
@@ -111,14 +153,17 @@ def get_room_snapshot(arguments: dict[str, Any], context: Any) -> dict[str, Any]
             "scenario_title": info.get("scenario_title"),
         },
         "scenario": _summarize_scenario(scenario, info),
-        "members": characters["members"],
+        "members": _summarize_members(characters["members"]),
         "memory": read_room_memory({"limit": int(arguments.get("memory_limit") or 20)}, context),
     }
 
 
 GET_ROOM_SNAPSHOT_TOOL = AgentTool(
     name="room.get_room_snapshot",
-    description="Load the current room, its bound scenario, and active members' character cards in one call.",
+    description=(
+        "Load a compact current-room snapshot with bound scenario identity, member names, "
+        "character identities, HP/SAN state, and memory. Use room.get_character_cards for full stats."
+    ),
     parameters={
         "type": "object",
         "properties": {

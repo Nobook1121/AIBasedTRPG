@@ -25,6 +25,7 @@ interface LegacyAttributesInput extends Partial<COC7Attributes> {
 interface COC7Skill {
     id: string;
     skillKey?: string;
+    baseKey?: string;
     name: string;
     value: number;
     base: number;
@@ -1013,6 +1014,7 @@ interface Window {
         const source = skills && skills.length ? mergeSkillCatalog(skills) : BASE_SKILLS;
         return source.map((skill) => {
             const skillKey = resolveSkillKey(skill);
+            const baseKey = resolveSkillBaseKey(skill);
             const base = calculateSkillBase(skill, attributes, occupation);
             const occupationPoints = clampNumber(skill.occupationPoints, 0, 99, 0);
             const interestPoints = clampNumber(skill.interestPoints, 0, 99, 0);
@@ -1025,6 +1027,7 @@ interface Window {
             return {
                 id: skill.id || slugify(skill.name),
                 skillKey,
+                baseKey,
                 name: String(skill.name || "未命名技能").slice(0, 40),
                 base,
                 value,
@@ -1059,16 +1062,20 @@ interface Window {
     }
 
     function calculateSkillBase(skill: COC7Skill, attributes?: COC7Attributes, occupation?: COC7Occupation): number {
-        const skillKey = resolveSkillKey(skill);
-        if (occupation?.skillBases && Object.prototype.hasOwnProperty.call(occupation.skillBases, skillKey)) {
-            return clampNumber(occupation.skillBases[skillKey], 0, 99, clampNumber(skill.base, 0, 99, 0));
+        const baseKey = resolveSkillBaseKey(skill);
+        if (occupation?.skillBases && Object.prototype.hasOwnProperty.call(occupation.skillBases, baseKey)) {
+            return clampNumber(occupation.skillBases[baseKey], 0, 99, clampNumber(skill.base, 0, 99, 0));
         }
-        if (skill.id === "dodge" && attributes) return Math.floor(attributes.DEX / 2);
+        if (baseKey === "dodge" && attributes) return Math.floor(attributes.DEX / 2);
         return clampNumber(skill.base, 0, 99, 0);
     }
 
     function resolveSkillKey(skill: Pick<COC7Skill, "id" | "skillKey">): string {
         return skill.skillKey || skill.id.split("__")[0] || skill.id;
+    }
+
+    function resolveSkillBaseKey(skill: Pick<COC7Skill, "id" | "skillKey" | "baseKey">): string {
+        return skill.baseKey || skill.skillKey || skill.id.split("__")[0] || skill.id;
     }
 
     function getOccupationSpecialtyKey(occupation: COC7Occupation | undefined, skillKey: string): string {
@@ -1616,7 +1623,7 @@ interface Window {
             const customNameInput = buildCustomSkillNameInput(skill, rowId);
             const displayName = isCustomSkill(skillKey) ? (skill.name || skillNameById(skillKey)) : skill.name;
             return `
-                <tr data-skill-row-id="${rowId}" data-skill-key="${escapeHtml(skillKey)}" data-skill-category="${category}" data-skill-occupation="${skill.occupation ? "1" : "0"}" data-specialty-key="${escapeHtml(skill.specialtyKey || "")}" data-specialty-label="${escapeHtml(skill.specialty || "")}" ${allowed ? "" : 'hidden="hidden"'}>
+                <tr data-skill-row-id="${rowId}" data-skill-key="${escapeHtml(skillKey)}" data-skill-base-key="${escapeHtml(resolveSkillBaseKey(skill))}" data-skill-category="${category}" data-skill-occupation="${skill.occupation ? "1" : "0"}" data-specialty-key="${escapeHtml(skill.specialtyKey || "")}" data-specialty-label="${escapeHtml(skill.specialty || "")}" ${allowed ? "" : 'hidden="hidden"'}>
                     <td><input type="checkbox" class="form-check-input" data-skill-occupation-checkbox="${rowId}" ${skill.occupation ? "checked" : ""}></td>
                     <td>
                         <div class="character-skill-name-cell">
@@ -2346,6 +2353,7 @@ interface Window {
         return rows.map((row) => {
             const rowId = row.dataset.skillRowId || "";
             const skillKey = row.dataset.skillKey || rowId.split("__")[0] || rowId;
+            const baseKey = row.dataset.skillBaseKey || skillKey;
             const baseSkill = BASE_SKILLS.find((skill) => skill.id === rowId) || BASE_SKILLS.find((skill) => (skill.skillKey || skill.id) === skillKey);
             const occupation = row.querySelector<HTMLInputElement>("[data-skill-occupation-checkbox]")?.checked || false;
             const base = readSkillRowNumber(row, "base", 0);
@@ -2358,6 +2366,7 @@ interface Window {
                 ...(baseSkill || {}),
                 id: rowId,
                 skillKey,
+                baseKey,
                 name,
                 base,
                 value,
@@ -3199,8 +3208,8 @@ interface Window {
             group.push({
                 id: skill.id,
                 skillKey: skill.skillKey,
+                baseKey: resolveSkillBaseKey(skill),
                 name: skill.name,
-                base: skill.base,
                 job: skill.occupationPoints || 0,
                 interest: skill.interestPoints || 0,
                 growth: skill.growthPoints || 0,
@@ -3331,9 +3340,11 @@ interface Window {
                 const growthPoints = clampNumber(item.growth, 0, 99, 0);
                 const value = clampNumber(item.value, 0, 99, base + occupationPoints + interestPoints + growthPoints);
                 const name = stringField(item.name, "未命名技能");
+                const baseKey = stringField(item.baseKey || item.skillKey || item.id || `${slugify(name)}-${index}`);
                 const skill: COC7Skill = {
                     id: stringField(item.id || item.skillKey || `${slugify(name)}-${index}`),
                     skillKey: stringField(item.skillKey || item.id),
+                    baseKey,
                     name,
                     base,
                     value,

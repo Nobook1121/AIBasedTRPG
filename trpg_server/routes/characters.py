@@ -189,13 +189,14 @@ def _skill_group_key(skill):
 
 
 def _skill_to_test_item(skill):
-    base = _as_int(skill.get("base"), 0)
     occupation_points = _as_int(skill.get("occupationPoints"), 0)
     interest_points = _as_int(skill.get("interestPoints"), 0)
     growth_points = _as_int(skill.get("growthPoints"), 0)
+    name = _as_text(skill.get("name"), "未命名技能")
+    base_key = _as_text(skill.get("baseKey") or skill.get("skillKey") or skill.get("id") or _slug(name))
     item = {
-        "name": _as_text(skill.get("name"), "未命名技能"),
-        "base": base,
+        "name": name,
+        "baseKey": base_key,
         "job": occupation_points,
         "interest": interest_points,
         "growth": growth_points,
@@ -208,17 +209,18 @@ def _skill_to_test_item(skill):
 
 
 def _skill_from_test_item(item, group_key, index):
-    base = _as_int(item.get("base"), 0)
+    legacy_base = _as_int(item.get("base"), 0)
     occupation_points = _as_int(item.get("job"), 0)
     interest_points = _as_int(item.get("interest"), 0)
     growth_points = _as_int(item.get("growth"), 0)
-    value = _as_int(item.get("value"), base + occupation_points + interest_points + growth_points)
+    value = _as_int(item.get("value"), legacy_base + occupation_points + interest_points + growth_points)
     name = _as_text(item.get("name"), "未命名技能")
+    base_key = _as_text(item.get("baseKey") or item.get("skillKey") or item.get("id") or _slug(name))
     skill = {
         "id": _as_text(item.get("id") or item.get("skillKey") or f"{_slug(name)}-{index}"),
         "skillKey": _as_text(item.get("skillKey") or item.get("id") or ""),
+        "baseKey": base_key,
         "name": name,
-        "base": base,
         "value": value,
         "category": _as_text(item.get("category") or SKILL_GROUP_CATEGORIES.get(group_key, "其他")),
         "checked": bool(item.get("checked") if "checked" in item else item.get("isProfessional")),
