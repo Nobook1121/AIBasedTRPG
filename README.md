@@ -1,7 +1,6 @@
 # AIBasedTRPG
 
-AIBasedTRPG 是一个基于 Flask 后端与静态 HTML/CSS/JavaScript 前端的 AI TRPG 跑团辅助工具。当前架构保留原有页面、接口路径、JSON 数据格式和全局前端函数，并逐步拆分为更容易测试和维护的模块。
-
+AIBasedTRPG 是一个基于 Flask 后端与静态 HTML/CSS/JavaScript 前端的 AI TRPG 跑团辅助工具。使用AI辅助编写，让每位玩家可以享受TRPG的乐趣。
 ## 环境准备
 
 ```powershell
