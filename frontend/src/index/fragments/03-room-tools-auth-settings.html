@@ -29,10 +29,21 @@
                 <!-- 小工具内容 -->
                 <div id="tools" class="tab-content">
                     <div class="p-4">
-                        <h2>小工具</h2>
+                        <header class="page-command-header" data-page-header="tools">
+                            <div>
+                                <p class="page-kicker"><i class="fa fa-wrench" aria-hidden="true"></i> TABLE UTILITY BAY</p>
+                                <h2>小工具</h2>
+                                <p class="page-subtitle">集中执行骰点、COC 检定、房间资料读取、剧本检索、角色列表与状态记录。</p>
+                            </div>
+                        </header>
                         <!-- 工具子标签页 -->
                         <div class="tool-tabs mb-4">
                             <button class="tool-tab active" data-tool="dice">骰子工具</button>
+                            <button class="tool-tab" data-tool="coc-check">COC 检定</button>
+                            <button class="tool-tab" data-tool="room-snapshot">房间概览</button>
+                            <button class="tool-tab" data-tool="scenario-context">剧本检索</button>
+                            <button class="tool-tab" data-tool="character-cards">角色列表</button>
+                            <button class="tool-tab" data-tool="memory">房间记忆</button>
                             <button class="tool-tab" data-tool="character-record">房间角色记录</button>
                         </div>
                         
@@ -50,6 +61,103 @@
                                 </select>
                                 <button class="btn btn-primary" id="rollDice">投掷</button>
                                 <div class="dice-result mt-2" id="diceResult" aria-live="polite"></div>
+                            </div>
+                        </div>
+                        <div id="coc-check-tool-content" class="tool-content">
+                            <div class="tool-panel">
+                                <div class="tool-panel-header">
+                                    <h5><i class="fa fa-percent" aria-hidden="true"></i> COC7 百分骰检定</h5>
+                                    <span>/check 可视化</span>
+                                </div>
+                                <div class="tool-grid">
+                                    <label class="tool-field">玩家用户名
+                                        <input type="text" class="form-control" id="cocCheckPlayer" placeholder="当前房间成员用户名">
+                                    </label>
+                                    <label class="tool-field">技能或属性
+                                        <input type="text" class="form-control" id="cocCheckName" placeholder="侦查 / DEX / 幸运">
+                                    </label>
+                                    <label class="tool-field">难度
+                                        <select class="form-select" id="cocCheckDifficulty">
+                                            <option value="">普通</option>
+                                            <option value="困难">困难</option>
+                                            <option value="极难">极难</option>
+                                        </select>
+                                    </label>
+                                    <label class="tool-field">调整值
+                                        <input type="text" class="form-control" id="cocCheckAdjustment" placeholder="+10 或 -20">
+                                    </label>
+                                </div>
+                                <button class="btn btn-primary mt-3" id="submitCocCheck" type="button">
+                                    <i class="fa fa-random" aria-hidden="true"></i> 执行检定
+                                </button>
+                                <pre class="tool-output mt-3" id="cocCheckResult" aria-live="polite"></pre>
+                            </div>
+                        </div>
+                        <div id="room-snapshot-tool-content" class="tool-content">
+                            <div class="tool-panel">
+                                <div class="tool-panel-header">
+                                    <h5><i class="fa fa-server" aria-hidden="true"></i> 当前房间概览</h5>
+                                    <span>房间 / 剧本 / 成员</span>
+                                </div>
+                                <button class="btn btn-primary" id="refreshRoomSnapshot" type="button">
+                                    <i class="fa fa-refresh" aria-hidden="true"></i> 刷新概览
+                                </button>
+                                <pre class="tool-output mt-3" id="roomSnapshotResult" aria-live="polite"></pre>
+                            </div>
+                        </div>
+                        <div id="scenario-context-tool-content" class="tool-content">
+                            <div class="tool-panel">
+                                <div class="tool-panel-header">
+                                    <h5><i class="fa fa-search" aria-hidden="true"></i> 剧本资料检索</h5>
+                                    <span>当前房间绑定剧本</span>
+                                </div>
+                                <div class="tool-grid">
+                                    <label class="tool-field">关键词
+                                        <input type="text" class="form-control" id="scenarioContextQuery" placeholder="NPC、地点、线索或场景内容">
+                                    </label>
+                                    <label class="tool-field">最多结果
+                                        <input type="number" class="form-control" id="scenarioContextLimit" min="1" max="20" value="5">
+                                    </label>
+                                </div>
+                                <button class="btn btn-primary mt-3" id="submitScenarioContext" type="button">
+                                    <i class="fa fa-filter" aria-hidden="true"></i> 检索
+                                </button>
+                                <pre class="tool-output mt-3" id="scenarioContextResult" aria-live="polite"></pre>
+                            </div>
+                        </div>
+                        <div id="character-cards-tool-content" class="tool-content">
+                            <div class="tool-panel">
+                                <div class="tool-panel-header">
+                                    <h5><i class="fa fa-address-card-o" aria-hidden="true"></i> 房间角色列表</h5>
+                                    <span>成员绑定与 HP/SAN</span>
+                                </div>
+                                <button class="btn btn-primary" id="refreshCharacterCards" type="button">
+                                    <i class="fa fa-refresh" aria-hidden="true"></i> 刷新角色
+                                </button>
+                                <pre class="tool-output mt-3" id="characterCardsResult" aria-live="polite"></pre>
+                            </div>
+                        </div>
+                        <div id="memory-tool-content" class="tool-content">
+                            <div class="tool-panel">
+                                <div class="tool-panel-header">
+                                    <h5><i class="fa fa-database" aria-hidden="true"></i> 房间记忆记录</h5>
+                                    <span>本地可见的重要事实</span>
+                                </div>
+                                <div class="tool-grid">
+                                    <label class="tool-field">类型
+                                        <input type="text" class="form-control" id="memoryKind" placeholder="clue / npc / event">
+                                    </label>
+                                    <label class="tool-field">重要度
+                                        <input type="number" class="form-control" id="memoryImportance" min="1" max="5" value="3">
+                                    </label>
+                                </div>
+                                <label class="tool-field mt-3">内容
+                                    <textarea class="form-control" id="memoryContent" rows="3" placeholder="需要给 KP 保留的重要事实"></textarea>
+                                </label>
+                                <button class="btn btn-primary mt-3" id="submitRememberFact" type="button">
+                                    <i class="fa fa-save" aria-hidden="true"></i> 记录到当前会话
+                                </button>
+                                <pre class="tool-output mt-3" id="memoryToolResult" aria-live="polite"></pre>
                             </div>
                         </div>
                         <div id="character-record-tool-content" class="tool-content">
@@ -110,11 +218,11 @@
                                 </div>
                                 <div class="auth-options">
                                     <div class="form-check">
-                                        <input type="checkbox" class="form-check-input" id="rememberMe">
+                                        <input type="checkbox" class="auth-check-input" id="rememberMe">
                                         <label class="form-check-label" for="rememberMe">记住用户名</label>
                                     </div>
                                     <div class="form-check">
-                                        <input type="checkbox" class="form-check-input" id="autoLogin">
+                                        <input type="checkbox" class="auth-check-input" id="autoLogin">
                                         <label class="form-check-label" for="autoLogin">保持登录</label>
                                     </div>
                                 </div>
@@ -312,13 +420,20 @@
                 <!-- 设置内容 -->
                 <div id="settings" class="tab-content">
                     <div class="p-4">
-                        <h2>设置</h2>
+                        <header class="page-command-header" data-page-header="settings">
+                            <div>
+                                <p class="page-kicker"><i class="fa fa-sliders" aria-hidden="true"></i> SYSTEM CONTROL PANEL</p>
+                                <h2>设置</h2>
+                                <p class="page-subtitle">配置主题、模型、网络、角色卡规则与应用运行偏好。</p>
+                            </div>
+                        </header>
                         <!-- 设置子标签页 -->
                         <div class="settings-tabs mb-4">
                             <button class="settings-tab active" data-settings="general">常规设置</button>
                             <button class="settings-tab" data-settings="model">模型设置</button>
                             <button class="settings-tab" data-settings="network">网络配置</button>
                             <button class="settings-tab" data-settings="character">角色卡规则</button>
+                            <button class="settings-tab" data-settings="permissions">权限配置</button>
                             <button class="settings-tab" data-settings="about">关于应用</button>
                         </div>
                         
@@ -331,6 +446,7 @@
                                     <select class="form-select" id="themeSelect">
                                         <option value="light">浅色</option>
                                         <option value="dark">深色</option>
+                                        <option value="pattern_cyber_2">赛博档案</option>
                                         <option value="system">跟随系统</option>
                                     </select>
                                 </div>
@@ -499,6 +615,22 @@
                                 <button class="btn btn-primary" id="saveCharacterRuleSettings" type="button">保存角色卡规则</button>
                                 <span class="settings-message" id="characterRuleSettingsMessage" aria-live="polite"></span>
                             </div>
+                        </div>
+
+                        <div id="permissions-settings-content" class="settings-content">
+                            <section class="permission-settings-panel">
+                                <div class="permission-settings-header">
+                                    <div>
+                                        <h4>网站权限配置</h4>
+                                        <p class="text-muted">按账户、剧本、角色卡、设置和房间等权限区域配置不同等级用户可使用的功能。</p>
+                                    </div>
+                                    <button class="btn btn-primary" id="savePermissionConfig" type="button">
+                                        <i class="fa fa-save" aria-hidden="true"></i> 保存权限
+                                    </button>
+                                </div>
+                                <div class="permission-matrix" id="permissionMatrix" aria-live="polite"></div>
+                                <div class="settings-message" id="permissionConfigMessage" aria-live="polite"></div>
+                            </section>
                         </div>
                         
                         <!-- 关于应用内容 -->

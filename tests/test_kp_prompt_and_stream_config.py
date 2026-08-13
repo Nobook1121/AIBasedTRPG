@@ -27,8 +27,8 @@ def test_general_config_contains_ai_stream_output_flag():
 
 def test_frontend_settings_exposes_ai_stream_output_toggle():
     settings_html = Path("frontend/src/index/fragments/03-room-tools-auth-settings.html").read_text(encoding="utf-8")
-    config_source = Path("frontend/src/js/config/ConfigManager.ts").read_text(encoding="utf-8")
-    tabs_source = Path("frontend/src/js/tabs.ts").read_text(encoding="utf-8")
+    config_source = Path("frontend/src/app/config/ConfigManager.ts").read_text(encoding="utf-8")
+    tabs_source = Path("frontend/src/app/tabs.ts").read_text(encoding="utf-8")
 
     assert 'id="streamOutput"' in settings_html
     assert "stream_output" in config_source

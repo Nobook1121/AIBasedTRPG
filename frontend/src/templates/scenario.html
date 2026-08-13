@@ -13,6 +13,7 @@
 </template>
 
 <template id="scenario-preview-content">
+<div class="scenario-preview">
 <h3>{{ title }}</h3>
 <p><strong>作者:</strong> {{ author }}</p>
 <p><strong>推荐人数:</strong> {{ playerCount }}</p>
@@ -23,10 +24,11 @@
 {{{ scenesHtml }}}
 <h4>结局</h4>
 {{{ endingsHtml }}}
+</div>
 </template>
 
 <template id="scenario-preview-segment">
-<div class="mb-3">
+<div class="scenario-preview-segment">
     <h5>{{ label }} {{ id }}</h5>
     <p>{{ content }}</p>
     {{{ markerHtml }}}

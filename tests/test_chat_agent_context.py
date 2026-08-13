@@ -310,7 +310,7 @@ def test_socket_broadcast_does_not_log_persisted_room_message(monkeypatch, caplo
 
 
 def test_login_success_does_not_report_post_login_initialization_errors_as_login_failure():
-    source = Path("frontend/src/js/auth/login-view.ts").read_text(encoding="utf-8")
+    source = Path("frontend/src/app/auth/login-view.ts").read_text(encoding="utf-8")
 
     assert "async function restorePostLoginState" in source
     assert "await restorePostLoginState();" in source
@@ -372,7 +372,7 @@ def test_character_template_import_preserves_skill_base_key_without_base_value()
 
 
 def test_frontend_character_template_exports_base_key_not_base_value():
-    source = Path("frontend/src/js/character-sheet.ts").read_text(encoding="utf-8")
+    source = Path("frontend/src/app/character-sheet.ts").read_text(encoding="utf-8")
 
     export_block = source.split("function convertCardToTestCharacterJson", 1)[1].split(
         "function convertTestCharacterJsonToCardInput",

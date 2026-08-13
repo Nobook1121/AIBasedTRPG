@@ -1,3 +1,4 @@
+@import "../styles/00-theme-tokens.css";
 @import "../styles/01-foundation-chat.css";
 @import "./shell/sidebar.css";
 @import "../styles/02-scenario-character.css";

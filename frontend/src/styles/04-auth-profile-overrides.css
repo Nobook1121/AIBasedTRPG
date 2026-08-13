@@ -5,7 +5,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: var(--theme-bg-overlay);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -45,7 +45,7 @@
     border: none;
     font-size: 1.5rem;
     cursor: pointer;
-    color: #6c757d;
+    color: var(--theme-text-muted);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -54,8 +54,8 @@
 
 .close-btn:hover,
 .close-btn:focus-visible {
-    color: #343a40;
-    background-color: rgba(15, 23, 42, 0.06);
+    color: var(--theme-text-primary);
+    background-color: var(--theme-bg-panel-muted);
 }
 
 .auth-modal-body {
@@ -69,7 +69,7 @@
 .save-status-bar {
     padding: 10px 14px;
     border-bottom: 1px solid var(--border-subtle);
-    background: linear-gradient(180deg, #ffffff 0%, #f7f9fc 100%);
+    background: var(--theme-bg-panel);
 }
 
 .save-status-content {
@@ -132,7 +132,7 @@
 
 .auth-floating-input:focus {
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    box-shadow: 0 0 0 3px var(--theme-focus-ring);
 }
 
 .auth-floating-label {
@@ -171,6 +171,62 @@
 
 .terms-row {
     justify-content: flex-start;
+}
+
+.auth-options .form-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 24px;
+    margin: 0;
+    padding: 0;
+}
+
+.auth-check-input {
+    appearance: none;
+    -webkit-appearance: none;
+    position: relative;
+    flex: 0 0 18px;
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    border: 1px solid var(--border-subtle);
+    border-radius: 5px;
+    color: var(--theme-text-inverse);
+    background: var(--theme-input-bg);
+    cursor: pointer;
+    transition: border-color 0.16s ease, background-color 0.16s ease, transform 0.16s ease;
+}
+
+.auth-check-input:hover {
+    border-color: color-mix(in srgb, var(--color-primary) 70%, var(--border-subtle));
+    transform: translateY(-1px);
+}
+
+.auth-check-input:checked {
+    border-color: var(--color-primary);
+    background: var(--color-primary);
+}
+
+.auth-check-input:checked::after {
+    content: "";
+    position: absolute;
+    inset: 50% auto auto 50%;
+    width: 5px;
+    height: 9px;
+    border: solid currentColor;
+    border-width: 0 2px 2px 0;
+    transform: translate(-50%, -58%) rotate(45deg);
+}
+
+.auth-check-input:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+.auth-check-input:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
 }
 
 .auth-switch-line {
@@ -266,7 +322,7 @@
 }
 
 .user-card-menu-item.danger {
-    color: #b42318;
+    color: var(--theme-danger);
 }
 
 .menu-icon {
@@ -313,11 +369,11 @@
 }
 
 .presence-dot.online {
-    color: #12b76a;
+    color: var(--theme-success);
 }
 
 .presence-dot.dnd {
-    color: #f04438;
+    color: var(--theme-danger);
 }
 
 .presence-dot.invisible {
@@ -331,7 +387,7 @@
     display: none;
     align-items: center;
     justify-content: center;
-    background: rgba(15, 23, 42, 0.48);
+    background: var(--theme-bg-overlay);
 }
 
 .profile-dialog.open {
@@ -499,7 +555,7 @@
     margin: -18px -18px 14px;
     padding: 16px 18px;
     border-bottom: 1px solid var(--border-subtle);
-    background: rgba(255, 255, 255, 0.96);
+    background: color-mix(in srgb, var(--theme-bg-panel) 94%, transparent);
 }
 
 .profile-panel-section {
@@ -510,7 +566,7 @@
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-sm);
     background: var(--color-panel);
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    box-shadow: var(--theme-shadow-sm);
     scroll-margin-top: 78px;
 }
 
@@ -539,7 +595,7 @@
     margin: 12px -18px -18px;
     padding: 12px 18px;
     border-top: 1px solid var(--border-subtle);
-    background: rgba(255, 255, 255, 0.96);
+    background: color-mix(in srgb, var(--theme-bg-panel) 94%, transparent);
 }
 
 .profile-placeholder {
@@ -558,7 +614,7 @@
     display: none;
     align-items: center;
     justify-content: center;
-    background: rgba(15, 23, 42, 0.36);
+    background: var(--theme-bg-overlay);
 }
 
 .password-dialog.open {
@@ -610,8 +666,8 @@
 /* 用户信息区域样式 */
 .user-info {
     margin-top: auto;
-    background-color: rgba(255, 255, 255, 0.1);
-    color: white;
+    background-color: var(--theme-sidebar-hover-bg);
+    color: var(--theme-sidebar-text-active);
     border-radius: var(--radius-md);
     padding: 10px;
     display: flex;
@@ -621,7 +677,7 @@
 }
 
 .user-info:hover {
-    background-color: rgba(255, 255, 255, 0.2);
+    background-color: var(--theme-sidebar-active-bg);
 }
 
 .user-avatar {
@@ -631,8 +687,8 @@
 .user-avatar img {
     width: 40px;
     height: 40px;
-    border-radius: 50%;
-    border: 2px solid white;
+    border-radius: var(--theme-radius-round);
+    border: 2px solid var(--theme-sidebar-text-active);
 }
 
 .user-details {
@@ -641,7 +697,7 @@
 
 .user-name {
     font-weight: bold;
-    font-size: 14px;
+    font-size: var(--theme-font-size-md);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -674,9 +730,9 @@
 .avatar-preview {
     width: 100px;
     height: 100px;
-    border-radius: 50%;
+    border-radius: var(--theme-radius-round);
     overflow: hidden;
-    border: 2px solid #ddd;
+    border: 2px solid var(--theme-border-subtle);
     margin: 0 auto 10px;
 }
 
@@ -696,10 +752,10 @@
     margin: 0 auto;
     padding: 8px 16px;
     background-color: var(--color-primary);
-    color: white;
+    color: var(--theme-text-inverse);
     border-radius: var(--radius-sm);
     cursor: pointer;
-    font-size: 14px;
+    font-size: var(--theme-font-size-md);
     transition: background-color 0.2s ease;
 }
 
@@ -718,7 +774,7 @@
     width: 200px;
     height: 300px;
     overflow: hidden;
-    border: 2px solid #ddd;
+    border: 2px solid var(--theme-border-subtle);
     margin: 0 auto 10px;
 }
 
@@ -738,10 +794,10 @@
     margin: 0 auto;
     padding: 8px 16px;
     background-color: var(--color-primary);
-    color: white;
+    color: var(--theme-text-inverse);
     border-radius: var(--radius-sm);
     cursor: pointer;
-    font-size: 14px;
+    font-size: var(--theme-font-size-md);
     transition: background-color 0.2s ease;
 }
 
@@ -754,9 +810,9 @@
 }
 
 .user-settings-header {
-    background-color: #f8f9fa;
+    background-color: var(--theme-bg-panel-muted);
     padding: 15px;
-    border-bottom: 1px solid #dee2e6;
+    border-bottom: 1px solid var(--theme-border-subtle);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -794,20 +850,20 @@
     justify-content: center;
     height: 100%;
     min-height: 300px;
-    color: #999;
-    font-size: 14px;
+    color: var(--theme-text-muted);
+    font-size: var(--theme-font-size-md);
     text-align: center;
     user-select: none;
 }
 
 /* 存档状态栏样式 */
 .save-status-bar {
-    background-color: #f8f9fa;
-    color: #495057;
+    background-color: var(--theme-bg-panel);
+    color: var(--theme-text-secondary);
     padding: 6px 16px;
-    font-size: 12px;
-    border-bottom: 1px solid #dee2e6;
-    border-left: 3px solid #007bff;
+    font-size: var(--theme-font-size-xs);
+    border-bottom: 1px solid var(--theme-border-subtle);
+    border-left: 3px solid var(--theme-accent-primary);
     display: flex;
     align-items: center;
     animation: slideDown 0.3s ease;
@@ -820,41 +876,25 @@
 }
 
 .save-status-content .fa-save {
-    font-size: 12px;
-    color: #007bff;
+    font-size: var(--theme-font-size-xs);
+    color: var(--theme-accent-primary);
 }
 
 .save-status-label {
-    color: #6c757d;
+    color: var(--theme-text-muted);
 }
 
 .save-status-name {
     font-weight: 600;
-    color: #212529;
+    color: var(--theme-text-primary);
 }
 
 .save-status-divider {
-    color: #ced4da;
+    color: var(--theme-border-strong);
 }
 
 .save-status-scenario {
-    color: #6c757d;
-}
-
-body.dark-theme .save-status-bar {
-    background-color: #2d2d2d;
-    color: #ccc;
-    border-bottom-color: #444;
-    border-left-color: #007bff;
-}
-
-body.dark-theme .save-status-name {
-    color: #e0e0e0;
-}
-
-body.dark-theme .save-status-label,
-body.dark-theme .save-status-scenario {
-    color: #999;
+    color: var(--theme-text-muted);
 }
 
 /* AI思考中动画样式 */
@@ -874,8 +914,8 @@ body.dark-theme .save-status-scenario {
 .thinking-dot {
     width: 8px;
     height: 8px;
-    background-color: #007bff;
-    border-radius: 50%;
+    background-color: var(--theme-accent-primary);
+    border-radius: var(--theme-radius-round);
     display: inline-block;
     animation: thinkingBounce 1.4s ease-in-out infinite both;
 }
@@ -904,13 +944,9 @@ body.dark-theme .save-status-scenario {
 }
 
 .thinking-text {
-    color: #666;
-    font-size: 14px;
+    color: var(--theme-text-muted);
+    font-size: var(--theme-font-size-md);
     font-style: italic;
-}
-
-body.dark-theme .thinking-text {
-    color: #aaa;
 }
 
 /* 玩家消息右对齐增强 */
@@ -984,7 +1020,7 @@ body.dark-theme .thinking-text {
     position: absolute;
     top: 50%;
     right: 0;
-    color: #adb5bd;
+    color: var(--theme-sidebar-text);
     background: transparent;
     cursor: pointer;
     font-size: 13px;
@@ -994,8 +1030,8 @@ body.dark-theme .thinking-text {
 
 .sidebar-toggle:hover,
 .sidebar-toggle:focus-visible {
-    color: white;
-    background-color: rgba(255, 255, 255, 0.12);
+    color: var(--theme-sidebar-text-active);
+    background-color: var(--theme-sidebar-hover-bg);
 }
 
 /* 侧边栏收起状态 */
@@ -1091,15 +1127,15 @@ body.dark-theme .thinking-text {
     justify-content: space-between;
     gap: 16px;
     padding: 14px 16px;
-    border: 1px solid rgba(17, 24, 39, 0.12);
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.98);
-    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+    border: 1px solid var(--theme-border-subtle);
+    border-radius: var(--theme-radius-md);
+    background: color-mix(in srgb, var(--theme-bg-panel) 96%, transparent);
+    box-shadow: var(--theme-shadow-md);
 }
 
 .cookie-consent-text {
-    color: #111827;
-    font-size: 14px;
+    color: var(--theme-text-primary);
+    font-size: var(--theme-font-size-md);
     line-height: 1.5;
 }
 

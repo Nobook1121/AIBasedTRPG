@@ -36,7 +36,7 @@ function Test-OnlyConftestBaseline {
 
 Push-Location $RepositoryRoot
 try {
-  Invoke-Checked python -m py_compile server.py trpg_server\users\manager.py
+  Invoke-Checked python -m py_compile server.py backend\trpg_server\users\manager.py
 
   if (Test-Path "package.json") {
     Invoke-Checked npm run typecheck
@@ -44,8 +44,8 @@ try {
   }
 
   $frontendFiles = @(
-    "frontend\dist\index.html",
-    "js\react\main.css"
+    "dist\public\index.html",
+    "dist\public\js\react\main.css"
   )
 
   foreach ($file in $frontendFiles) {
@@ -56,43 +56,43 @@ try {
   }
 
   $jsFiles = @(
-    "data\tools\diceTool.js",
-    "data\tools\toolManager.js",
-    "js\config\TestRequestConfig.js",
-    "js\config\ConfigManager.js",
-    "js\config\AIPlatformManager.js",
-    "js\api-client.js",
-    "js\dom-utils.js",
-    "js\models\ScenarioModel.js",
-    "js\views\ScenarioView.js",
-    "js\controllers\ScenarioController.js",
-    "js\tabs.js",
-    "js\platform-ui.js",
-    "js\cookie-consent.js",
-    "js\generated\templates.js",
-    "js\chat.js",
-    "js\auth\api.js",
-    "js\auth\state.js",
-    "js\auth\floating-field.js",
-    "js\auth\login-view.js",
-    "js\auth\register-view.js",
-    "js\auth\profile-dialog.js",
-    "js\auth\user-card.js",
-    "js\auth\index.js",
-    "js\i18n.js",
-    "js\network.js",
-    "js\rooms.js",
-    "js\scenario.js",
-    "js\character-sheet.js",
-    "js\main.js",
-    "js\react\main.js"
+    "dist\public\data\tools\diceTool.js",
+    "dist\public\data\tools\toolManager.js",
+    "dist\public\js\config\TestRequestConfig.js",
+    "dist\public\js\config\ConfigManager.js",
+    "dist\public\js\config\AIPlatformManager.js",
+    "dist\public\js\api-client.js",
+    "dist\public\js\dom-utils.js",
+    "dist\public\js\models\ScenarioModel.js",
+    "dist\public\js\views\ScenarioView.js",
+    "dist\public\js\controllers\ScenarioController.js",
+    "dist\public\js\tabs.js",
+    "dist\public\js\platform-ui.js",
+    "dist\public\js\cookie-consent.js",
+    "dist\public\js\generated\templates.js",
+    "dist\public\js\chat.js",
+    "dist\public\js\auth\api.js",
+    "dist\public\js\auth\state.js",
+    "dist\public\js\auth\floating-field.js",
+    "dist\public\js\auth\login-view.js",
+    "dist\public\js\auth\register-view.js",
+    "dist\public\js\auth\profile-dialog.js",
+    "dist\public\js\auth\user-card.js",
+    "dist\public\js\auth\index.js",
+    "dist\public\js\i18n.js",
+    "dist\public\js\network.js",
+    "dist\public\js\rooms.js",
+    "dist\public\js\scenario.js",
+    "dist\public\js\character-sheet.js",
+    "dist\public\js\main.js",
+    "dist\public\js\react\main.js"
   )
 
   foreach ($file in $jsFiles) {
     Invoke-Checked node --check $file
   }
 
-  python -W error::DeprecationWarning -m pytest -q
+  python -W error::DeprecationWarning -W ignore::DeprecationWarning:certifi.core -m pytest -q
   $pytestExitCode = $LASTEXITCODE
 
   if ($pytestExitCode -eq 0) {

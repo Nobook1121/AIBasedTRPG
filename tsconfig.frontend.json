@@ -6,11 +6,22 @@
     "strict": true,
     "noEmit": false,
     "rootDir": "frontend/src",
-    "outDir": "."
+    "outDir": "dist/public"
   },
   "include": [
-    "frontend/src/js/**/*.ts",
-    "frontend/src/tools/**/*.ts"
+    "frontend/src/app/**/*.ts",
+    "frontend/src/tools/**/*.ts",
+    "frontend/src/types/**/*.d.ts"
   ],
-  "exclude": []
+  "exclude": [
+    "node_modules",
+    "js",
+    "frontend/dist",
+    "dist",
+    "data/runtime",
+    "data/history",
+    "data/logs",
+    "data/rooms",
+    "data/users"
+  ]
 }

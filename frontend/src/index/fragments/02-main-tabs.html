@@ -1,13 +1,19 @@
 ﻿            <div class="col-10" id="mainContent">
                 <!-- 主页内容 -->
-                <div id="home" class="tab-content active">
+                <div id="home" class="tab-content active" data-page-header="chat">
                     <div id="react-home-root"></div>
                 </div>
 
                 <!-- 剧本管理内容 -->
                 <div id="scenario" class="tab-content">
                     <div class="p-4">
-                        <h2>剧本管理</h2>
+                        <header class="page-command-header" data-page-header="scenario">
+                            <div>
+                                <p class="page-kicker"><i class="fa fa-map-o" aria-hidden="true"></i> SCENARIO ARCHIVE</p>
+                                <h2>剧本管理</h2>
+                                <p class="page-subtitle">整理跑团剧本、导入外部档案，并快速预览场景、线索与结局。</p>
+                            </div>
+                        </header>
                         <div class="mb-4">
                             <button class="btn btn-primary" id="createScenario">创建剧本</button>
                             <button class="btn btn-secondary" id="importScenario">导入剧本</button>
@@ -23,7 +29,7 @@
                 <div id="character" class="tab-content">
                     <div class="character-workspace p-4" id="characterWorkspace">
                         <div class="character-matrix-bg" aria-hidden="true"></div>
-                        <header class="character-command-header">
+                        <header class="character-command-header" data-page-header="characters">
                             <div>
                                 <p class="character-kicker"><i class="fa fa-terminal" aria-hidden="true"></i> COC7 INVESTIGATOR NODE</p>
                                 <h2>克苏鲁调查员角色卡</h2>
@@ -86,8 +92,14 @@
                 <div id="save" class="tab-content">
                     <div class="p-4">
                         <div id="save-list-view">
-                            <div class="d-flex justify-content-between align-items-center mb-4">
-                                <h2>房间管理</h2>
+                            <div class="d-flex justify-content-between align-items-start mb-4">
+                                <header class="page-command-header mb-0" data-page-header="save">
+                                    <div>
+                                        <p class="page-kicker"><i class="fa fa-server" aria-hidden="true"></i> ROOM OPERATIONS</p>
+                                        <h2>房间管理</h2>
+                                        <p class="page-subtitle">创建房间、加入跑团，并维护成员角色绑定与回档节点。</p>
+                                    </div>
+                                </header>
                                 <div class="room-join-toolbar d-flex gap-2">
                                     <input type="text" class="form-control" id="roomCodeInput" placeholder="输入房间码">
                                     <button class="btn btn-outline-primary" id="joinRoom">加入房间</button>

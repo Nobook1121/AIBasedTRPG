@@ -1,0 +1,653 @@
+{
+  "name": "Test",
+  "playerName": "",
+  "time": "",
+  "job": "作家(原作向)",
+  "age": "18",
+  "gender": "男",
+  "location": "test place 1",
+  "hometown": "test place 2",
+  "attributes": {
+    "str": 55,
+    "dex": 40,
+    "con": 70,
+    "app": 65,
+    "pow": 65,
+    "siz": 55,
+    "edu": 75,
+    "int": 55,
+    "luc": 40
+  },
+  "deriveAttributes": {
+    "sanity": {
+      "current": "65",
+      "start": "65",
+      "max": "99"
+    },
+    "hp": {
+      "current": "12",
+      "max": "12"
+    },
+    "mp": {
+      "current": "13",
+      "max": "13"
+    }
+  },
+  "battleAttributes": {
+    "db": "0",
+    "build": "0",
+    "mov": "7",
+    "movNote": "",
+    "armor": "5"
+  },
+  "characterStatus": {
+    "bodyStates": {
+      "重伤": true,
+      "昏迷": true,
+      "死亡": true
+    },
+    "mentalStates": {
+      "不定期疯狂": true,
+      "永久疯狂": true,
+      "临时疯狂": true
+    }
+  },
+  "pointValues": {},
+  "proSkills": [],
+  "skillPoints": [],
+  "weapons": [
+    {
+      "name": "徒手格斗",
+      "skill": "格斗(斗殴)",
+      "damage": "1D3+DB",
+      "range": "接触",
+      "round": "1",
+      "tho": "",
+      "num": "",
+      "err": "",
+      "weight": "",
+      "note": ""
+    }
+  ],
+  "stories": {
+    "app": "test appearance",
+    "belief": "test ideals",
+    "IPerson": "test important person",
+    "IPlace": "test remarkable place",
+    "IItem": "test precious item",
+    "trait": "test specials",
+    "scar": "test scars",
+    "mad": "test ill",
+    "desc": "test introduction"
+  },
+  "assets": {
+    "cash": "10",
+    "consumption": "20",
+    "assets": "test assets",
+    "items": "test possessions",
+    "magicItems": "test myth item",
+    "magics": "test spells",
+    "touches": "test touch"
+  },
+  "experiencedModules": "[{\"name\":\"test mod\",\"experience\":\"test experience\"},{\"name\":\"test mod1\",\"experience\":\"test experience1\"},{\"name\":\"test mod2\",\"experience\":\"test experience2\"},{\"name\":\"test mod3\",\"experience\":\"test experience3\"},{\"name\":\"test mod4\",\"experience\":\"test experience4\"},{\"name\":\"test mod5\",\"experience\":\"test experience5\"},{\"name\":\"\",\"experience\":\"\"},{\"name\":\"\",\"experience\":\"\"},{\"name\":\"\",\"experience\":\"\"}]",
+  "friends": "[{\"character\":\"test charactor\",\"relationship\":\"test companions\",\"player\":\"test player\"},{\"character\":\"test charactor2\",\"relationship\":\"test companions2\",\"player\":\"test player2\"},{\"character\":\"test charactor3\",\"relationship\":\"test companions3\",\"player\":\"test player3\"},{\"character\":\"test charactor4\",\"relationship\":\"test companions4\",\"player\":\"test player4\"},{\"character\":\"\",\"relationship\":\"\",\"player\":\"\"},{\"character\":\"\",\"relationship\":\"\",\"player\":\"\"},{\"character\":\"\",\"relationship\":\"\",\"player\":\"\"},{\"character\":\"\",\"relationship\":\"\",\"player\":\"\"}]",
+  "skillGroups": {
+    "special": [
+      {
+        "name": "信用评级",
+        "base": 0,
+        "job": 0,
+        "interest": 16,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "克苏鲁神话",
+        "base": 0,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      }
+    ],
+    "explore": [
+      {
+        "name": "侦查",
+        "base": 25,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "聆听",
+        "base": 20,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "潜行",
+        "base": 20,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "追踪",
+        "base": 10,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "读唇",
+        "base": 1,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "图书馆使用",
+        "base": 20,
+        "job": 10,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": true
+      },
+      {
+        "name": "导航",
+        "base": 10,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "计算机使用Ω",
+        "base": 5,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      }
+    ],
+    "social": [
+      {
+        "name": "取悦",
+        "base": 15,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "话术",
+        "base": 5,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "恐吓",
+        "base": 15,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "说服",
+        "base": 10,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "心理学",
+        "base": 10,
+        "job": 30,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": true
+      },
+      {
+        "name": "母语:英语",
+        "base": 75,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": true
+      },
+      {
+        "name": "外语:韩语",
+        "base": 1,
+        "job": 33,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": true
+      },
+      {
+        "name": "外语:",
+        "base": 1,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      }
+    ],
+    "combat": [
+      {
+        "name": "格斗:斗殴",
+        "base": 25,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "格斗:",
+        "base": 25,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "格斗:",
+        "base": 25,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "射击:手枪",
+        "base": 20,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "射击:步/霰",
+        "base": 25,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "射击:",
+        "base": 20,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "闪避",
+        "base": 20,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "投掷",
+        "base": 20,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "爆破",
+        "base": 1,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "炮术",
+        "base": 1,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      }
+    ],
+    "medical": [
+      {
+        "name": "急救",
+        "base": 30,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "医学",
+        "base": 1,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "精神分析",
+        "base": 1,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "催眠",
+        "base": 1,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      }
+    ],
+    "move": [
+      {
+        "name": "攀爬",
+        "base": 20,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "跳跃",
+        "base": 20,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "游泳",
+        "base": 20,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "潜水",
+        "base": 1,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      }
+    ],
+    "knowledge": [
+      {
+        "name": "估价",
+        "base": 5,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "人类学",
+        "base": 1,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "会计",
+        "base": 5,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "法律",
+        "base": 5,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "历史",
+        "base": 5,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": true
+      },
+      {
+        "name": "考古学",
+        "base": 1,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "博物学",
+        "base": 10,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "神秘学",
+        "base": 5,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "电子学Ω",
+        "base": 1,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "科学:植物学",
+        "base": 1,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "科学:",
+        "base": 1,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "科学:",
+        "base": 1,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      }
+    ],
+    "tech": [
+      {
+        "name": "乔装",
+        "base": 5,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "生存:",
+        "base": 5,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "生存:沙漠",
+        "base": 5,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "生存:",
+        "base": 5,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "技艺:文学",
+        "base": 5,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": true
+      },
+      {
+        "name": "技艺:",
+        "base": 5,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "技艺:",
+        "base": 5,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "妙手",
+        "base": 10,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "锁匠",
+        "base": 1,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "电气维修",
+        "base": 10,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "机械维修",
+        "base": 10,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "驯兽",
+        "base": 5,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      }
+    ],
+    "drive": [
+      {
+        "name": "骑术",
+        "base": 5,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "操作重型机械",
+        "base": 1,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "汽车驾驶",
+        "base": 20,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": "驾驶:",
+        "base": 1,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      }
+    ],
+    "other": [
+      {
+        "name": ":",
+        "base": 0,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": ":",
+        "base": 0,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      },
+      {
+        "name": ":",
+        "base": 0,
+        "job": 0,
+        "interest": 0,
+        "growth": 0,
+        "isProfessional": false
+      }
+    ]
+  },
+  "isEditable": true
+}

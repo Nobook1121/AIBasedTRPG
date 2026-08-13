@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -94,16 +94,23 @@ const TrpgTemplates = (() => {
 window.TrpgTemplates = TrpgTemplates;
 `;
 
-  const outputDir = path.join(root, "frontend", "src", "js", "generated");
+  const outputDir = path.join(root, "frontend", "src", "app", "generated");
   await mkdir(outputDir, { recursive: true });
   await writeFile(path.join(outputDir, "templates.ts"), generated, "utf8");
 }
 
 async function main() {
+  const assetsOnly = process.argv.includes("--assets-only");
+  if (!assetsOnly) {
+    await rm(path.join(root, "dist", "public"), { recursive: true, force: true });
+    await rm(path.join(root, "frontend", "dist"), { recursive: true, force: true });
+    await rm(path.join(root, "js"), { recursive: true, force: true });
+    await rm(path.join(root, "data", "tools"), { recursive: true, force: true });
+  }
   await writeConcatenatedFile({
     manifestPath: "frontend/src/index/index.parts.json",
     sourceDir: "frontend/src/index",
-    outputPath: "frontend/dist/index.html",
+    outputPath: "dist/public/index.html",
   });
   await generateTemplates();
 }

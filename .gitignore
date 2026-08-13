@@ -1,24 +1,51 @@
-# 忽略所有的日志文件
-*.log
-# 忽略所有的临时文件
-*.tmp
-__pycache__/
-/.worktrees/
+# Dependencies
 /node_modules/
+
+# TypeScript and frontend build outputs
 /js/
+/dist/
+/frontend/dist/
 /data/tools/*.js
+/frontend/src/app/generated/
+
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
 tests/**/__pycache__/
-/data/history/
-/data/rooms/
-/data/logs/
-/data/users/*.sqlite3
-/data/users/ip_configs/
-/docs
-/tests/*
+backend/trpg_server/**/__pycache__/
+trpg_server/**/__pycache__/
+
+# Runtime data
+/data/runtime/
 /data/characters/*
+/data/history/
 /data/history/*
+/data/logs/
 /data/logs/*
+/data/rooms/
 /data/rooms/*
-/data/scenarios/*
 /data/users/*
+/data/users/ip_configs/
+/data/scenarios/*
+
+# Local worktrees
+/.worktrees/
+
+# Logs and temp files
+*.log
+*.tmp
+/tmp/
+/temp/
+
+# Secrets and local env
+.env
+.env.*
+!.env.example
+*.secret
+docs/*.secret
+
+# Local databases
+*.sqlite3
+*.db
 

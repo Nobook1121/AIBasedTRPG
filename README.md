@@ -47,18 +47,19 @@ python server.py 8090
 
 ## 关键目录
 
-- `trpg_server/`：Flask app factory、蓝图路由、Socket.IO 事件、日志、安全与 JSON 存储工具。
+- `backend/trpg_server/`：Flask app factory、蓝图路由、Socket.IO 事件、日志、安全与 JSON 存储工具。
 - `tests/`：后端单元测试和 API smoke tests。
-- `frontend/src/`：TypeScript 前端源码。
-- `js/`：TypeScript 构建生成的浏览器运行脚本，默认不提交到 Git。
-- `data/tools/`：前端小工具脚本构建产物。
+- `frontend/src/app/`：浏览器全局脚本的 TypeScript 业务源码，构建后仍按 `/js/...` URL 加载。
+- `frontend/src/types/`：跨前端模块复用的手写类型声明。
+- `frontend/src/react/`、`frontend/src/styles/`、`frontend/src/templates/`、`frontend/src/tools/`：React island、全局样式、HTML 模板和前端工具源码。
+- `dist/public/`：统一的前端构建产物目录，默认不提交到 Git；浏览器运行时仍使用 `/js/...` 和 `/data/tools/...` URL。
 - `data/config/`：TOML、JSON、角色提示词等运行配置数据。
 - `data/scenarios/`：剧本 JSON 数据。
-- `data/rooms/`：房间、房间消息、回档节点和自动存档数据。
-- `data/users/`：用户数据与用户 IP 配置。
-- `data/characters/`：角色卡示例等角色数据资源；浏览器本地创建的角色卡仍保存在当前浏览器 `localStorage`。
+- `data/runtime/rooms/`：房间、房间消息、回档节点和自动存档数据。
+- `data/runtime/users/`：用户数据与用户 IP 配置。
+- `data/runtime/characters/`：角色卡运行数据；浏览器本地创建的角色卡仍保存在当前浏览器 `localStorage`。
 - `data/assets/avatars/`、`data/assets/scenario_covers/`、`data/assets/aiplatform/` 与 `data/assets/vendor/`：上传头像、剧本封面、AI 平台图标和本地第三方静态资源。
-- `data/logs/`：运行日志输出目录，运行时自动创建；默认只记录登录、消息、AI 请求和报错等关键事件。
+- `data/runtime/logs/`：运行日志输出目录，运行时自动创建；默认只记录登录、消息、AI 请求和报错等关键事件。
 
 ## 配置与安全
 
@@ -68,7 +69,7 @@ python server.py 8090
 $env:AI_TRPG_SECRET_KEY = "change-me"
 ```
 
-涉及用户输入路径的后端代码应使用 `trpg_server.security.safe_join`；写入 JSON 应使用 `trpg_server.json_store.write_json_atomic`，避免路径穿越和半写入文件。
+涉及用户输入路径的后端代码应使用 `trpg_server.security.safe_join`；写入 JSON 应使用 `trpg_server.json_store.write_json_atomic`，避免路径穿越和半写入文件。源码位于 `backend/trpg_server/`，根目录 `server.py` 会兼容导入该包。
 
 同一账号只允许一个有效会话。新的登录会使该账号旧会话失效，旧会话再次访问 API 时会收到 `401 Session expired`。
 
@@ -157,7 +158,7 @@ http://192.168.192.31:8086
 - 为每个好友创建独立账号，不共享账号。
 - 不把管理账号给普通玩家使用。
 - 仅暴露本程序端口，不暴露项目目录、远程桌面或系统管理端口。
-- 定期备份 `data/`。其中包含运行配置、剧本、房间、用户、上传头像、剧本封面、聊天历史和日志。
+- 定期备份 `data/`。其中包含运行配置、剧本、上传头像、剧本封面，以及 `data/runtime/` 下的房间、用户、聊天历史和日志。
 
 联机访问本程序时，页面和 REST API 使用 HTTP；实时聊天同步使用 Socket.IO，底层由 Engine.IO 管理，优先使用 WebSocket，必要时回退到 HTTP long-polling。ZeroTier 只提供虚拟网络通道，本程序本身不实现 ZeroTier 协议。若部署在反向代理和 HTTPS 后面，对外访问会变为 HTTPS，实时通道对应为 WSS。
 
@@ -194,7 +195,7 @@ location / {
 
 ### 前端开发构建
 
-`js/` 是构建产物，源码仓库默认不提交该目录。首次克隆、拉取前端源码更新，或修改 TypeScript 源码后运行：
+`dist/public/` 是构建产物，源码仓库默认不提交该目录。首次克隆、拉取前端源码更新，或修改 TypeScript 源码后运行：
 
 ```powershell
 npm install
@@ -202,7 +203,7 @@ npm run typecheck
 npm run build:frontend
 ```
 
-生成的浏览器文件输出到 `frontend/dist/`、`js/`、`data/tools/` 路径。未构建前端时，`python server.py` 可以启动后端，但浏览器页面会缺少页面或脚本而无法正常使用。
+生成的浏览器文件统一输出到 `dist/public/`，其中包含页面、`js/` 和 `data/tools/`。未构建前端时，`python server.py` 可以启动后端，但浏览器页面会缺少页面或脚本而无法正常使用。
 
 ## 进一步文档
 

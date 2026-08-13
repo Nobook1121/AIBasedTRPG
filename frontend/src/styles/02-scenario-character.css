@@ -41,6 +41,51 @@
     margin-top: 10px;
 }
 
+.scenario-preview {
+    color: var(--color-text);
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.scenario-preview h3 {
+    margin: 0 0 10px;
+}
+
+.scenario-preview h4 {
+    margin: 14px 0 6px;
+    font-size: 1.02rem;
+}
+
+.scenario-preview h5 {
+    margin: 0 0 4px;
+    font-size: 0.96rem;
+}
+
+.scenario-preview p,
+.scenario-preview-section,
+.scenario-preview-segment {
+    max-width: 100%;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.scenario-preview h3,
+.scenario-preview h4,
+.scenario-preview h5 {
+    color: var(--color-text);
+}
+
+.scenario-preview p {
+    margin: 0 0 8px;
+}
+
+.scenario-preview-section,
+.scenario-preview-segment {
+    margin: 0 0 8px;
+    padding: 0;
+}
+
 /* COC7 角色卡管理样式 */
 .character-workspace {
     position: relative;
@@ -67,6 +112,42 @@
     gap: 20px;
     align-items: flex-start;
     margin-bottom: 20px;
+}
+
+.page-command-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    align-items: flex-start;
+    margin-bottom: 20px;
+}
+
+.page-kicker {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+    margin: 0 0 6px;
+    color: var(--color-primary);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0;
+}
+
+.page-command-header h2 {
+    margin: 0;
+    color: var(--color-text);
+    font-size: 1.9rem;
+    line-height: 1.15;
+}
+
+.page-subtitle {
+    max-width: 720px;
+    margin: 8px 0 0;
+    color: var(--color-muted);
+}
+
+.chat-command-header {
+    margin: 18px 24px 10px;
 }
 
 .character-kicker {
@@ -109,7 +190,7 @@
     padding: 8px 14px;
     border: 1px solid var(--color-primary);
     border-radius: var(--radius-sm);
-    color: #fff;
+    color: var(--theme-text-inverse);
     background: var(--color-primary);
     box-shadow: var(--shadow-sm);
     transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
@@ -257,7 +338,7 @@
 
 .skill-rank-pill.active {
     border-color: var(--color-primary);
-    color: #fff;
+    color: var(--theme-text-inverse);
     background: var(--color-primary);
 }
 
@@ -335,8 +416,8 @@
     padding: 4px 8px;
     border-radius: var(--radius-sm);
     color: var(--color-primary);
-    background: #eef4ff;
-    border: 1px solid #d8e4ff;
+    background: var(--theme-accent-soft);
+    border: 1px solid color-mix(in srgb, var(--theme-accent-primary) 24%, transparent);
     font-size: 0.78rem;
     font-weight: 700;
 }
@@ -475,7 +556,7 @@
 
 .character-detail-table th {
     color: var(--color-primary);
-    background: #eef4ff;
+    background: var(--theme-accent-soft);
     font-weight: 800;
 }
 
@@ -501,8 +582,8 @@
     height: 6px;
     margin-top: 8px;
     overflow: hidden;
-    border-radius: 999px;
-    background: #e6ebf2;
+    border-radius: var(--theme-radius-pill);
+    background: var(--theme-bg-panel-muted);
 }
 
 .skill-card-meter span {
@@ -519,14 +600,14 @@
 .equipment-load-meter {
     height: 12px;
     overflow: hidden;
-    border-radius: 999px;
-    background: #e6ebf2;
+    border-radius: var(--theme-radius-pill);
+    background: var(--theme-bg-panel-muted);
 }
 
 .equipment-load-meter span {
     display: block;
     height: 100%;
-    background: linear-gradient(90deg, var(--color-primary), #f0c36a);
+    background: linear-gradient(90deg, var(--theme-accent-primary), var(--theme-warning));
 }
 
 .equipment-row,
@@ -692,8 +773,8 @@
     place-items: center;
     width: 32px;
     height: 32px;
-    border-radius: 999px;
-    color: #fff;
+    border-radius: var(--theme-radius-pill);
+    color: var(--theme-text-inverse);
     background: var(--color-primary);
     box-shadow: var(--shadow-sm);
 }

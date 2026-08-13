@@ -1,0 +1,42 @@
+interface Window {
+    TRPG?: TrpgNamespace;
+    TrpgApi: TrpgApiClient;
+    TrpgDom: TrpgDomClient;
+    TrpgTemplates: TrpgTemplateRenderer;
+    ScenarioModel: ScenarioModelConstructor;
+    ScenarioView: ScenarioViewConstructor;
+    ScenarioController: { new(): unknown };
+    DiceTool: DiceToolConstructor;
+    ToolManager: ToolManagerConstructor;
+    toolManager?: ToolManager;
+    currentRoom?: Room | null;
+    uploadedCoverFile?: File;
+    currentPlatform?: string;
+    currentTestingPlatform?: string;
+    loadAIRoles?: () => void;
+    showNotification?: (message: string, type?: string) => void;
+    recordCharacterChange?: (payload: Record<string, unknown>) => Promise<unknown>;
+    TrpgCookies?: TrpgCookieClient;
+    configManager: ConfigManager;
+    aiPlatformManager: AIPlatformManager;
+    testRequestConfigs: Record<string, TestRequestConfig>;
+    getTestRequestConfig(modelId: string): TestRequestConfig;
+    marked?: MarkedParser;
+    renderChatMessages?: (messages: ChatMessage[]) => void;
+    getCurrentChatMessages?: () => ChatMessage[];
+    clearChatMessages?: () => void;
+    joinSocketRoom?: (roomId: string) => void;
+    leaveSocketRoom?: (roomId: string) => void;
+    reconnectSocket?: () => void;
+    disconnectSocket?: () => void;
+    initRoomManagement?: () => void;
+    autoLoadLastRoom?: () => Promise<void>;
+    clearCurrentRoom?: () => void;
+}
+
+declare function showNotification(message: string, type?: string): void;
+declare function showAuthModal(): void;
+declare const TrpgCookies: TrpgCookieClient;
+declare function initAuth(): Promise<boolean>;
+declare const TrpgApi: TrpgApiClient;
+declare const TrpgDom: TrpgDomClient;

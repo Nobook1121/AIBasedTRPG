@@ -1,6 +1,16 @@
 export function HomeChat() {
     return (
         <>
+            <header className="page-command-header chat-command-header" data-page-header="chat">
+                <div>
+                    <p className="page-kicker">
+                        <i className="fa fa-comments-o" aria-hidden="true" /> LIVE TABLE CHANNEL
+                    </p>
+                    <h2>跑团频道</h2>
+                    <p className="page-subtitle">在当前房间内发送消息、调用 KP，并查看骰点与系统记录。</p>
+                </div>
+            </header>
+
             <div className="save-status-bar" id="saveStatusBar" style={{ display: "none" }} aria-live="polite">
                 <div className="save-status-content">
                     <span className="save-status-pill">

@@ -162,7 +162,7 @@ def test_kp_default_tools_include_room_check_function():
 
 def test_frontend_registers_check_command():
     manager_source = open("frontend/src/tools/toolManager.ts", encoding="utf-8").read()
-    chat_source = open("frontend/src/js/chat.ts", encoding="utf-8").read()
+    chat_source = open("frontend/src/app/chat.ts", encoding="utf-8").read()
 
     assert '"/check"' in manager_source
     assert "handleCheckCommand" in manager_source

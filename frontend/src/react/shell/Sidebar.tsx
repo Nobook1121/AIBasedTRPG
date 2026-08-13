@@ -62,7 +62,7 @@ function NavGroupSection({ group }: { group: NavGroup }) {
 
 export function Sidebar() {
     return (
-        <div className="col-2 bg-dark text-white sidebar-expanded" id="sidebar">
+        <div className="col-2 sidebar-expanded" id="sidebar">
             <div className="d-flex flex-column h-100 p-3">
                 <div className="sidebar-header">
                     <h2 className="sidebar-title" data-i18n="app.title">

@@ -1,6 +1,11 @@
 import logging
+from pathlib import Path
 import socket
 import sys
+
+BACKEND_DIR = Path(__file__).resolve().parent / "backend"
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
 
 from trpg_server.app_factory import create_app, socketio
 from trpg_server.network_discovery import (

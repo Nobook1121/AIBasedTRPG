@@ -1,0 +1,770 @@
+import json
+import logging
+import re
+import time
+import tomllib
+
+from flask import Blueprint, current_app, request, session
+
+from trpg_server.json_store import read_json, write_json_atomic
+from trpg_server.logging_config import log_user_action, user_action_text
+from trpg_server.permission_config import is_role_allowed, permission_config_path
+from trpg_server.responses import error_response, success_response
+from trpg_server.security import normalize_filename, safe_join
+from trpg_server.settings import CHARACTERS_DIR, CONFIG_DIR, OCCUPATIONS_DIR, ROOMS_DIR, WEAPONS_DIR
+
+bp = Blueprint("characters", __name__)
+logger = logging.getLogger(__name__)
+
+DEFAULT_MAX_CARDS_PER_USER = 5
+SKILL_GROUP_CATEGORIES = {
+    "special": "特殊",
+    "explore": "探索",
+    "social": "社交",
+    "combat": "战斗",
+    "medical": "医疗",
+    "move": "运动",
+    "knowledge": "知识",
+    "tech": "技术",
+    "drive": "操纵",
+    "other": "其他",
+}
+CATEGORY_SKILL_GROUPS = {value: key for key, value in SKILL_GROUP_CATEGORIES.items()}
+STATUS_BODY_FIELDS = {
+    "majorWound": "重伤",
+    "unconscious": "昏迷",
+    "dead": "死亡",
+}
+STATUS_MENTAL_FIELDS = {
+    "indefiniteInsanity": "不定期疯狂",
+    "permanentInsanity": "永久疯狂",
+    "temporaryInsanity": "临时疯狂",
+}
+
+
+def _get_characters_dir():
+    return current_app.config.get("CHARACTERS_DIR", CHARACTERS_DIR)
+
+
+def _get_config_dir():
+    return current_app.config.get("CONFIG_DIR", CONFIG_DIR)
+
+
+def _get_occupations_dir():
+    return current_app.config.get("OCCUPATIONS_DIR", OCCUPATIONS_DIR)
+
+
+def _get_weapons_dir():
+    return current_app.config.get("WEAPONS_DIR", WEAPONS_DIR)
+
+
+def _get_rooms_dir():
+    return current_app.config.get("ROOMS_DIR", ROOMS_DIR)
+
+
+def _require_login():
+    if "user_id" not in session:
+        return error_response("Please login first", 401, "Not logged in")
+    return None
+
+
+def _is_elevated():
+    config_dir = current_app.config.get("CONFIG_DIR")
+    config_path = current_app.config.get("PERMISSION_CONFIG_FILE") or permission_config_path(config_dir)
+    return is_role_allowed(session.get("role", "USER"), "characters.manage_all", config_path)
+
+
+def _current_player_ids():
+    return {str(session.get("user_id", "")), str(session.get("username", ""))}
+
+
+def _iter_character_files():
+    characters_dir = _get_characters_dir()
+    if not characters_dir.exists():
+        return []
+    return sorted(characters_dir.glob("*.json"))
+
+
+def _as_dict(value):
+    return value if isinstance(value, dict) else {}
+
+
+def _as_list(value):
+    return value if isinstance(value, list) else []
+
+
+def _as_text(value, fallback=""):
+    if value is None:
+        return fallback
+    return str(value)
+
+
+def _as_int(value, fallback=0):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _json_list(value):
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str) and value.strip():
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            return []
+        return parsed if isinstance(parsed, list) else []
+    return []
+
+
+def _json_list_text(items):
+    return json.dumps(items if isinstance(items, list) else [], ensure_ascii=False)
+
+
+def _slug(value):
+    slug = re.sub(r"\s+", "-", str(value or "").strip().lower())
+    slug = re.sub(r"[^a-z0-9\-\u4e00-\u9fff]", "", slug)
+    return slug or "skill"
+
+
+def _is_test_character_shape(character):
+    if not isinstance(character, dict):
+        return False
+    return any(
+        key in character
+        for key in (
+            "deriveAttributes",
+            "battleAttributes",
+            "characterStatus",
+            "skillGroups",
+            "stories",
+            "experiencedModules",
+            "friends",
+        )
+    )
+
+
+def _attribute_value(attributes, upper_key, lower_key, fallback=50):
+    return _as_int(attributes.get(upper_key, attributes.get(lower_key)), fallback)
+
+
+def _equipment_to_items_text(equipment):
+    if isinstance(equipment, str):
+        return equipment
+    lines = []
+    for item in _as_list(equipment):
+        if isinstance(item, str):
+            if item.strip():
+                lines.append(item.strip())
+            continue
+        if not isinstance(item, dict):
+            continue
+        name = _as_text(item.get("name")).strip()
+        if not name:
+            continue
+        quantity = _as_int(item.get("quantity"), 1)
+        notes = _as_text(item.get("notes")).strip()
+        line = f"{name} x{max(1, quantity)}"
+        if notes:
+            line = f"{line}：{notes}"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def _items_text_to_equipment(items_text):
+    text = _as_text(items_text).strip()
+    if not text:
+        return []
+    return [
+        {"name": line.strip(), "quantity": 1, "weight": 0, "notes": ""}
+        for line in re.split(r"[\r\n;；]+", text)
+        if line.strip()
+    ]
+
+
+def _skill_group_key(skill):
+    category = _as_text(skill.get("category")).strip()
+    if category in SKILL_GROUP_CATEGORIES:
+        return category
+    return CATEGORY_SKILL_GROUPS.get(category, "other")
+
+
+def _skill_to_test_item(skill):
+    occupation_points = _as_int(skill.get("occupationPoints"), 0)
+    interest_points = _as_int(skill.get("interestPoints"), 0)
+    growth_points = _as_int(skill.get("growthPoints"), 0)
+    name = _as_text(skill.get("name"), "未命名技能")
+    base_key = _as_text(skill.get("baseKey") or skill.get("skillKey") or skill.get("id") or _slug(name))
+    item = {
+        "name": name,
+        "baseKey": base_key,
+        "job": occupation_points,
+        "interest": interest_points,
+        "growth": growth_points,
+        "isProfessional": bool(skill.get("occupation") or skill.get("checked")),
+    }
+    for key in ("id", "skillKey", "category", "value", "checked", "specialty", "specialtyKey", "rank"):
+        if key in skill:
+            item[key] = skill.get(key)
+    return item
+
+
+def _skill_from_test_item(item, group_key, index):
+    legacy_base = _as_int(item.get("base"), 0)
+    occupation_points = _as_int(item.get("job"), 0)
+    interest_points = _as_int(item.get("interest"), 0)
+    growth_points = _as_int(item.get("growth"), 0)
+    value = _as_int(item.get("value"), legacy_base + occupation_points + interest_points + growth_points)
+    name = _as_text(item.get("name"), "未命名技能")
+    base_key = _as_text(item.get("baseKey") or item.get("skillKey") or item.get("id") or _slug(name))
+    skill = {
+        "id": _as_text(item.get("id") or item.get("skillKey") or f"{_slug(name)}-{index}"),
+        "skillKey": _as_text(item.get("skillKey") or item.get("id") or ""),
+        "baseKey": base_key,
+        "name": name,
+        "value": value,
+        "category": _as_text(item.get("category") or SKILL_GROUP_CATEGORIES.get(group_key, "其他")),
+        "checked": bool(item.get("checked") if "checked" in item else item.get("isProfessional")),
+        "occupation": bool(item.get("isProfessional")),
+        "occupationPoints": occupation_points,
+        "interestPoints": interest_points,
+        "growthPoints": growth_points,
+    }
+    for key in ("specialty", "specialtyKey", "rank"):
+        if key in item:
+            skill[key] = item.get(key)
+    return skill
+
+
+def _skills_to_test_groups(skills):
+    groups = {key: [] for key in SKILL_GROUP_CATEGORIES}
+    for skill in _as_list(skills):
+        if isinstance(skill, dict):
+            groups.setdefault(_skill_group_key(skill), []).append(_skill_to_test_item(skill))
+    return groups
+
+
+def _skills_from_test_groups(groups):
+    skills = []
+    if not isinstance(groups, dict):
+        return skills
+    for group_key, items in groups.items():
+        for index, item in enumerate(_as_list(items)):
+            if isinstance(item, dict):
+                skills.append(_skill_from_test_item(item, group_key, index))
+    return skills
+
+
+def _weapon_to_test_item(weapon):
+    item = {
+        "name": _as_text(weapon.get("name")),
+        "skill": _as_text(weapon.get("skill")),
+        "damage": _as_text(weapon.get("damage")),
+        "range": _as_text(weapon.get("range")),
+        "round": _as_text(weapon.get("attacks") or weapon.get("round")),
+        "tho": _as_text(weapon.get("tho")),
+        "num": _as_text(weapon.get("ammo") or weapon.get("num")),
+        "err": _as_text(weapon.get("malfunction") or weapon.get("err")),
+        "weight": _as_text(weapon.get("weight")),
+        "note": _as_text(weapon.get("note")),
+    }
+    for key in ("skillKey", "specialtyKey", "impale", "attacks", "ammo", "malfunction"):
+        if key in weapon:
+            item[key] = weapon.get(key)
+    return item
+
+
+def _weapon_from_test_item(weapon):
+    return {
+        "name": _as_text(weapon.get("name"), "未命名武器"),
+        "skill": _as_text(weapon.get("skill"), "格斗(斗殴)"),
+        "skillKey": _as_text(weapon.get("skillKey")),
+        "specialtyKey": _as_text(weapon.get("specialtyKey")),
+        "damage": _as_text(weapon.get("damage"), "1D3"),
+        "range": _as_text(weapon.get("range"), "接触"),
+        "impale": weapon.get("impale") if isinstance(weapon.get("impale"), bool) else None,
+        "attacks": _as_text(weapon.get("attacks") or weapon.get("round"), "1"),
+        "ammo": _as_text(weapon.get("ammo") or weapon.get("num"), "N/A"),
+        "malfunction": _as_text(weapon.get("malfunction") or weapon.get("err"), "N/A"),
+    }
+
+
+def _runtime_to_test_character(character):
+    attributes = _as_dict(character.get("attributes"))
+    background = _as_dict(character.get("background"))
+    assets = _as_dict(character.get("assets"))
+    status = _as_dict(character.get("status"))
+    now_text = _as_text(character.get("updatedAt") or character.get("createdAt"))
+    return {
+        "id": _as_text(character.get("id")),
+        "name": _as_text(character.get("name")),
+        "playerId": _as_text(character.get("playerId")),
+        "playerName": _as_text(character.get("playerName")),
+        "time": _as_text(character.get("era"), "1920s"),
+        "job": _as_text(character.get("occupationName") or character.get("job")),
+        "age": _as_text(character.get("age") or attributes.get("AGE")),
+        "gender": _as_text(character.get("gender")),
+        "location": _as_text(character.get("residence")),
+        "hometown": _as_text(character.get("birthplace")),
+        "attributes": {
+            "str": _attribute_value(attributes, "STR", "str"),
+            "dex": _attribute_value(attributes, "DEX", "dex"),
+            "con": _attribute_value(attributes, "CON", "con"),
+            "app": _attribute_value(attributes, "APP", "app"),
+            "pow": _attribute_value(attributes, "POW", "pow"),
+            "siz": _attribute_value(attributes, "SIZ", "siz"),
+            "edu": _attribute_value(attributes, "EDU", "edu"),
+            "int": _attribute_value(attributes, "INT", "int"),
+            "luc": _attribute_value(attributes, "LUC", "luc"),
+        },
+        "deriveAttributes": {
+            "sanity": {
+                "current": _as_text(character.get("currentSan"), "0"),
+                "start": _as_text(character.get("initialSan"), _as_text(character.get("currentSan"), "0")),
+                "max": _as_text(character.get("maxSan"), "99"),
+            },
+            "hp": {
+                "current": _as_text(character.get("currentHp"), "0"),
+                "max": _as_text(character.get("maxHp"), "0"),
+            },
+            "mp": {
+                "current": _as_text(character.get("currentMp") or character.get("magicPoints"), "0"),
+                "max": _as_text(character.get("maxMp"), "0"),
+            },
+        },
+        "battleAttributes": {
+            "db": _as_text(character.get("damageBonus")),
+            "build": _as_text(character.get("build")),
+            "mov": _as_text(character.get("mov")),
+            "movNote": _as_text(character.get("movNote")),
+            "armor": _as_text(character.get("armor")),
+        },
+        "characterStatus": {
+            "bodyStates": {label: bool(status.get(key)) for key, label in STATUS_BODY_FIELDS.items()},
+            "mentalStates": {label: bool(status.get(key)) for key, label in STATUS_MENTAL_FIELDS.items()},
+        },
+        "pointValues": character.get("pointValues", {}),
+        "proSkills": character.get("proSkills", []),
+        "skillPoints": character.get("skillPoints", []),
+        "weapons": [_weapon_to_test_item(weapon) for weapon in _as_list(character.get("weapons")) if isinstance(weapon, dict)],
+        "stories": {
+            "app": _as_text(background.get("appearance")),
+            "belief": _as_text(background.get("ideology")),
+            "IPerson": _as_text(background.get("significantPeople")),
+            "IPlace": _as_text(background.get("meaningfulLocations")),
+            "IItem": _as_text(background.get("treasuredPossessions")),
+            "trait": _as_text(background.get("traits")),
+            "scar": _as_text(background.get("injuriesScars")),
+            "mad": _as_text(background.get("phobiasManias")),
+            "desc": _as_text(background.get("story")),
+        },
+        "assets": {
+            "cash": _as_text(assets.get("cash"), "0"),
+            "consumption": _as_text(assets.get("spendingLevel"), "0"),
+            "assets": _as_text(assets.get("assetsText")),
+            "items": _equipment_to_items_text(character.get("equipment")),
+            "magicItems": _as_text(background.get("arcaneTomes")),
+            "magics": _as_text(background.get("spells")),
+            "touches": _as_text(background.get("encounters")),
+        },
+        "experiencedModules": _json_list_text(
+            [
+                {"name": _as_text(item.get("name")), "experience": _as_text(item.get("experience"))}
+                for item in _as_list(character.get("experiencedScenarios"))
+                if isinstance(item, dict)
+            ]
+        ),
+        "friends": _json_list_text(
+            [
+                {
+                    "character": _as_text(item.get("name")),
+                    "relationship": _as_text(item.get("description")),
+                    "player": _as_text(item.get("player")),
+                }
+                for item in _as_list(character.get("relationships"))
+                if isinstance(item, dict)
+            ]
+        ),
+        "skillGroups": _skills_to_test_groups(character.get("skills")),
+        "isEditable": bool(character.get("isEditable", True)),
+        "createdAt": _as_text(character.get("createdAt") or now_text),
+        "updatedAt": now_text,
+    }
+
+
+def _test_character_to_runtime(character, fallback_id=""):
+    attributes = _as_dict(character.get("attributes"))
+    derived = _as_dict(character.get("deriveAttributes"))
+    sanity = _as_dict(derived.get("sanity"))
+    hp = _as_dict(derived.get("hp"))
+    mp = _as_dict(derived.get("mp"))
+    battle = _as_dict(character.get("battleAttributes"))
+    status = _as_dict(character.get("characterStatus"))
+    body_states = _as_dict(status.get("bodyStates"))
+    mental_states = _as_dict(status.get("mentalStates"))
+    stories = _as_dict(character.get("stories"))
+    assets = _as_dict(character.get("assets"))
+    age = _as_int(character.get("age"), _as_int(attributes.get("age"), 25))
+    return {
+        "id": _as_text(character.get("id") or fallback_id),
+        "name": _as_text(character.get("name"), "未命名角色卡"),
+        "playerId": _as_text(character.get("playerId") or character.get("playerName")),
+        "playerName": _as_text(character.get("playerName")),
+        "era": _as_text(character.get("time"), "1920s"),
+        "gender": _as_text(character.get("gender")),
+        "age": age,
+        "occupationName": _as_text(character.get("job")),
+        "residence": _as_text(character.get("location")),
+        "birthplace": _as_text(character.get("hometown")),
+        "attributes": {
+            "STR": _attribute_value(attributes, "STR", "str"),
+            "DEX": _attribute_value(attributes, "DEX", "dex"),
+            "CON": _attribute_value(attributes, "CON", "con"),
+            "APP": _attribute_value(attributes, "APP", "app"),
+            "POW": _attribute_value(attributes, "POW", "pow"),
+            "SIZ": _attribute_value(attributes, "SIZ", "siz"),
+            "EDU": _attribute_value(attributes, "EDU", "edu"),
+            "INT": _attribute_value(attributes, "INT", "int"),
+            "LUC": _attribute_value(attributes, "LUC", "luc"),
+            "AGE": age,
+        },
+        "maxHp": _as_int(hp.get("max"), 0),
+        "currentHp": _as_int(hp.get("current"), _as_int(hp.get("max"), 0)),
+        "maxSan": _as_int(sanity.get("max"), 99),
+        "initialSan": _as_int(sanity.get("start"), _as_int(sanity.get("current"), 0)),
+        "currentSan": _as_int(sanity.get("current"), 0),
+        "maxMp": _as_int(mp.get("max"), 0),
+        "currentMp": _as_int(mp.get("current"), _as_int(mp.get("max"), 0)),
+        "magicPoints": _as_int(mp.get("current"), _as_int(mp.get("max"), 0)),
+        "damageBonus": _as_text(battle.get("db")),
+        "build": _as_int(battle.get("build"), 0),
+        "mov": _as_int(battle.get("mov"), 0),
+        "armor": _as_int(battle.get("armor"), 0),
+        "status": {
+            key: bool(body_states.get(label))
+            for key, label in STATUS_BODY_FIELDS.items()
+        } | {
+            key: bool(mental_states.get(label))
+            for key, label in STATUS_MENTAL_FIELDS.items()
+        },
+        "skills": _skills_from_test_groups(character.get("skillGroups")),
+        "weapons": [
+            _weapon_from_test_item(weapon)
+            for weapon in _as_list(character.get("weapons"))
+            if isinstance(weapon, dict)
+        ],
+        "equipment": _items_text_to_equipment(assets.get("items")),
+        "assets": {
+            "cash": _as_int(assets.get("cash"), 0),
+            "spendingLevel": _as_int(assets.get("consumption"), 0),
+            "assetsText": _as_text(assets.get("assets")),
+        },
+        "background": {
+            "appearance": _as_text(stories.get("app")),
+            "ideology": _as_text(stories.get("belief")),
+            "significantPeople": _as_text(stories.get("IPerson")),
+            "meaningfulLocations": _as_text(stories.get("IPlace")),
+            "treasuredPossessions": _as_text(stories.get("IItem")),
+            "traits": _as_text(stories.get("trait")),
+            "injuriesScars": _as_text(stories.get("scar")),
+            "phobiasManias": _as_text(stories.get("mad")),
+            "story": _as_text(stories.get("desc")),
+            "arcaneTomes": _as_text(assets.get("magicItems")),
+            "spells": _as_text(assets.get("magics")),
+            "encounters": _as_text(assets.get("touches")),
+        },
+        "relationships": [
+            {
+                "name": _as_text(item.get("character")),
+                "description": _as_text(item.get("relationship")),
+                "player": _as_text(item.get("player")),
+            }
+            for item in _json_list(character.get("friends"))
+            if isinstance(item, dict)
+        ],
+        "experiencedScenarios": [
+            {"name": _as_text(item.get("name")), "experience": _as_text(item.get("experience"))}
+            for item in _json_list(character.get("experiencedModules"))
+            if isinstance(item, dict)
+        ],
+        "createdAt": _as_text(character.get("createdAt")),
+        "updatedAt": _as_text(character.get("updatedAt")),
+    }
+
+
+def _character_from_storage(raw, fallback_id=""):
+    if not isinstance(raw, dict):
+        return None
+    if _is_test_character_shape(raw):
+        return _test_character_to_runtime(raw, fallback_id)
+    character = dict(raw)
+    character.setdefault("id", fallback_id)
+    return character
+
+
+def _iter_builtin_occupation_files():
+    occupations_dir = _get_occupations_dir() / "builtin"
+    if not occupations_dir.exists():
+        return []
+    return sorted(occupations_dir.glob("*.json"))
+
+
+def _iter_builtin_weapon_files():
+    weapons_dir = _get_weapons_dir() / "builtin"
+    if not weapons_dir.exists():
+        return []
+    return sorted(weapons_dir.glob("*.json"))
+
+
+def _skill_catalog_path():
+    return _get_config_dir() / "character_skills.json"
+
+
+def _max_cards_per_user():
+    config_path = _get_config_dir() / "general.toml"
+    try:
+        config = tomllib.loads(config_path.read_text(encoding="utf-8")) if config_path.exists() else {}
+    except (OSError, tomllib.TOMLDecodeError):
+        return DEFAULT_MAX_CARDS_PER_USER
+    value = (config.get("character_rules") or {}).get("max_cards_per_user", DEFAULT_MAX_CARDS_PER_USER)
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return DEFAULT_MAX_CARDS_PER_USER
+    return max(1, min(parsed, 999))
+
+
+def _owned_character_count(excluded_character_id=None):
+    current_ids = _current_player_ids()
+    count = 0
+    for path in _iter_character_files():
+        character = _character_from_storage(read_json(path, default=None), path.stem)
+        if not character:
+            continue
+        if excluded_character_id and str(character.get("id")) == str(excluded_character_id):
+            continue
+        if str(character.get("playerId") or "") in current_ids:
+            count += 1
+    return count
+
+
+def _character_filename(character_id):
+    return normalize_filename(f"{character_id or f'investigator-{int(time.time() * 1000)}'}.json")
+
+
+def _character_path(character_id):
+    return safe_join(_get_characters_dir(), _character_filename(character_id))
+
+
+def _iter_room_info_files():
+    rooms_dir = _get_rooms_dir()
+    if not rooms_dir.exists():
+        return []
+    return sorted(path / "info.json" for path in rooms_dir.iterdir() if path.is_dir() and (path / "info.json").exists())
+
+
+def _can_access_character(character):
+    if _is_elevated():
+        return True
+    player_id = str(character.get("playerId") or "")
+    return not player_id or player_id in _current_player_ids()
+
+
+def _normalize_character_payload(payload, existing=None):
+    if not isinstance(payload, dict):
+        return None
+
+    character = dict(existing or {})
+    character.update(payload)
+    character_id = str(character.get("id") or "").strip()
+    name = str(character.get("name") or "").strip()
+    if not character_id or not name:
+        return None
+
+    player_id = str(character.get("playerId") or "").strip()
+    if not _is_elevated():
+        player_id = str(session.get("user_id"))
+
+    character["id"] = character_id[:80]
+    character["name"] = name[:80]
+    character["playerId"] = player_id
+    character["updatedAt"] = time.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    character.setdefault("createdAt", character["updatedAt"])
+    return character
+
+
+def _bounded_int(value, minimum, maximum, fallback):
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return fallback
+    return max(minimum, min(maximum, parsed))
+
+
+def _sanitize_room_character_card(character):
+    attributes = character.get("attributes") if isinstance(character.get("attributes"), dict) else {}
+    return {
+        "id": str(character.get("id", ""))[:80],
+        "name": str(character.get("name", ""))[:80],
+        "occupationId": str(character.get("occupationId", character.get("occupation_id", "")))[:80],
+        "attributes": attributes,
+        "maxHp": _bounded_int(character.get("maxHp", character.get("max_hp")), 1, 999, 1),
+        "maxSan": _bounded_int(character.get("maxSan", character.get("max_san")), 0, 999, 0),
+        "mov": _bounded_int(character.get("mov"), 0, 99, 0),
+        "skills": character.get("skills", []) if isinstance(character.get("skills", []), list) else [],
+        "equipment": character.get("equipment", []) if isinstance(character.get("equipment", []), list) else [],
+        "background": character.get("background", {}) if isinstance(character.get("background", {}), dict) else {},
+    }
+
+
+def _sync_room_character_snapshots(character):
+    character_id = str(character.get("id") or "")
+    if not character_id:
+        return
+    sanitized = _sanitize_room_character_card(character)
+    for info_path in _iter_room_info_files():
+        info = read_json(info_path, default={})
+        members = info.get("members") if isinstance(info, dict) else None
+        if not isinstance(members, list):
+            continue
+        changed = False
+        for member in members:
+            bound = member.get("character_card") if isinstance(member, dict) else None
+            if not isinstance(bound, dict) or str(bound.get("id") or "") != character_id:
+                continue
+            member["character_card"] = dict(sanitized)
+            state = member.setdefault("character_state", {})
+            if isinstance(state, dict):
+                state["max_hp"] = sanitized["maxHp"]
+                state["current_hp"] = _bounded_int(state.get("current_hp"), 0, sanitized["maxHp"], sanitized["maxHp"])
+                state["max_san"] = sanitized["maxSan"]
+                state["current_san"] = _bounded_int(state.get("current_san"), 0, sanitized["maxSan"], sanitized["maxSan"])
+            changed = True
+        if changed:
+            info["updated_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+            write_json_atomic(info_path, info)
+
+
+@bp.route("/api/character-catalogs/occupations", methods=["GET"])
+def list_builtin_occupations():
+    login_error = _require_login()
+    if login_error:
+        return login_error
+
+    occupations = []
+    for path in _iter_builtin_occupation_files():
+        occupation = read_json(path, default=None)
+        if isinstance(occupation, dict):
+            occupations.append(occupation)
+    occupations.sort(key=lambda item: str(item.get("id") or item.get("nameKey") or ""))
+    return success_response(occupations, "Occupation catalogs loaded successfully")
+
+
+@bp.route("/api/character-catalogs/skills", methods=["GET"])
+def list_character_skills():
+    login_error = _require_login()
+    if login_error:
+        return login_error
+
+    catalog = read_json(_skill_catalog_path(), default={})
+    if not isinstance(catalog, dict):
+        catalog = {}
+    skills = catalog.get("skills")
+    if not isinstance(skills, list):
+        catalog["skills"] = []
+    locales = catalog.get("locales")
+    if not isinstance(locales, dict):
+        catalog["locales"] = {}
+    catalog.setdefault("version", 1)
+    catalog.setdefault("defaultLocale", "zh-CN")
+    return success_response(catalog, "Skill catalog loaded successfully")
+
+
+@bp.route("/api/character-catalogs/weapons", methods=["GET"])
+def list_builtin_weapons():
+    login_error = _require_login()
+    if login_error:
+        return login_error
+
+    weapons = []
+    for path in _iter_builtin_weapon_files():
+        weapon = read_json(path, default=None)
+        if isinstance(weapon, dict):
+            weapons.append(weapon)
+    weapons.sort(key=lambda item: str(item.get("id") or item.get("name") or ""))
+    return success_response(weapons, "Weapon catalogs loaded successfully")
+
+
+@bp.route("/api/characters", methods=["GET"])
+def list_characters():
+    login_error = _require_login()
+    if login_error:
+        return login_error
+
+    characters = []
+    for path in _iter_character_files():
+        character = _character_from_storage(read_json(path, default=None), path.stem)
+        if character and _can_access_character(character):
+            characters.append(character)
+    characters.sort(key=lambda item: item.get("updatedAt") or item.get("createdAt") or "", reverse=True)
+    return success_response(characters, "Characters loaded successfully")
+
+
+@bp.route("/api/characters/<character_id>", methods=["PUT"])
+def save_character(character_id):
+    login_error = _require_login()
+    if login_error:
+        return login_error
+
+    path = _character_path(character_id)
+    is_new_character = not path.exists()
+    existing = _character_from_storage(read_json(path, default={}), character_id) if path.exists() else {}
+    if existing and not _can_access_character(existing):
+        return error_response("Permission denied", 403, "Permission denied")
+
+    if not _is_elevated() and not existing and _owned_character_count() >= _max_cards_per_user():
+        return error_response("Character card limit reached", 403, "Character card limit reached")
+
+    payload = request.get_json(silent=True) or {}
+    if _is_test_character_shape(payload):
+        payload = _test_character_to_runtime(payload, character_id)
+    payload["id"] = character_id
+    character = _normalize_character_payload(payload, existing)
+    if character is None:
+        return error_response("Invalid character card", 400, "Invalid character card")
+
+    write_json_atomic(path, _runtime_to_test_character(character))
+    _sync_room_character_snapshots(character)
+    log_user_action(
+        logger,
+        user_action_text(session.get("username"), "保存了角色卡"),
+        用户ID=session.get("user_id"),
+        操作="创建" if is_new_character else "更新",
+        角色卡ID=character["id"],
+        角色名=character["name"],
+    )
+    return success_response(character, "Character saved successfully")
+
+
+@bp.route("/api/characters/<character_id>", methods=["DELETE"])
+def delete_character(character_id):
+    login_error = _require_login()
+    if login_error:
+        return login_error
+
+    path = _character_path(character_id)
+    if not path.exists():
+        return success_response(message="Character already deleted")
+    character = _character_from_storage(read_json(path, default={}), character_id) or {}
+    if character and not _can_access_character(character):
+        return error_response("Permission denied", 403, "Permission denied")
+    path.unlink()
+    log_user_action(
+        logger,
+        user_action_text(session.get("username"), "删除了角色卡"),
+        用户ID=session.get("user_id"),
+        角色卡ID=character_id,
+        角色名=character.get("name"),
+    )
+    return success_response(message="Character deleted successfully")

@@ -2,7 +2,7 @@
 .sidebar-title {
     margin: 0;
     white-space: nowrap;
-    font-size: clamp(1rem, 1.6vw, 1.5rem);
+    font-size: var(--theme-font-size-xl);
     line-height: 1.1;
 }
 
@@ -13,11 +13,13 @@
     left: 0;
     z-index: 1000;
     overflow-y: hidden;
+    color: var(--theme-sidebar-text);
+    background-color: var(--theme-sidebar-bg);
     transition: width 0.3s ease;
 }
 
 #sidebar .nav-link {
-    color: #ccc;
+    color: var(--theme-sidebar-text);
     transition: color 0.2s ease, background-color 0.2s ease;
     position: relative;
     display: block;
@@ -27,21 +29,21 @@
 }
 
 #sidebar .nav-link:hover {
-    color: white;
-    background-color: rgba(255, 255, 255, 0.1);
+    color: var(--theme-sidebar-text-active);
+    background-color: var(--theme-sidebar-hover-bg);
 }
 
 #sidebar .nav-link.active {
-    color: white;
-    background-color: rgba(255, 255, 255, 0.2);
+    color: var(--theme-sidebar-text-active);
+    background-color: var(--theme-sidebar-active-bg);
     border-left: 4px solid var(--color-primary);
 }
 
 #sidebar .dropdown-btn {
     padding: 6px 8px 6px 16px;
     text-decoration: none;
-    font-size: 16px;
-    color: #ccc;
+    font-size: var(--theme-font-size-base);
+    color: var(--theme-sidebar-text);
     display: block;
     border: none;
     background: none;
@@ -53,19 +55,19 @@
 }
 
 #sidebar .dropdown-btn:hover {
-    color: white;
-    background-color: rgba(255, 255, 255, 0.1);
+    color: var(--theme-sidebar-text-active);
+    background-color: var(--theme-sidebar-hover-bg);
 }
 
 #sidebar .dropdown-btn.active {
-    background-color: rgba(255, 255, 255, 0.2);
-    color: white;
+    color: var(--theme-sidebar-text-active);
+    background-color: var(--theme-sidebar-active-bg);
     border-left: 4px solid var(--color-primary);
 }
 
 #sidebar .dropdown-container {
     display: none;
-    background-color: #212529;
+    background-color: var(--theme-sidebar-surface);
     padding-left: 8px;
 }
 
