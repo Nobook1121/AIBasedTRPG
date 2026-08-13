@@ -5,6 +5,8 @@ from uuid import uuid4
 from flask import Blueprint, current_app, request, session
 
 from trpg_server.json_store import read_json, write_json_atomic
+from trpg_server.agents.context import AgentRequestContext
+from trpg_server.agents.tools.dice import roll_room_check
 from trpg_server.logging_config import log_user_action, user_action_text
 from trpg_server.permission_config import is_role_allowed, permission_config_path
 from trpg_server.responses import error_response, success_response
@@ -479,6 +481,36 @@ def bind_room_member_character(room_id, user_id):
         角色名=target.get("character_card", {}).get("name"),
     )
     return success_response(_room_summary(info), "Character bound successfully")
+
+
+@bp.route("/api/rooms/<room_id>/tools/check", methods=["POST"])
+def run_room_check_tool(room_id):
+    login_error = _require_login()
+    if login_error:
+        return login_error
+
+    room_dir, info = _find_room(room_id)
+    if not room_dir:
+        return error_response("Room not found", 404, "Room not found")
+    if not _can_access(info):
+        return error_response("Permission denied", 403, "Permission denied")
+
+    data = request.get_json(silent=True) or {}
+    context = AgentRequestContext(room_id=room_id, room_dir=room_dir, agent_id="tools")
+    result = roll_room_check(data, context)
+    if result.get("error"):
+        return error_response("Check failed", 400, result["error"])
+
+    log_user_action(
+        logger,
+        user_action_text(session.get("username"), "使用了房间检定工具"),
+        用户ID=session.get("user_id"),
+        房间ID=room_id,
+        玩家=result.get("player_name"),
+        检定=result.get("name"),
+        结果=result.get("summary"),
+    )
+    return success_response(result, "Check rolled")
 
 
 @bp.route("/api/rooms/<room_id>/members/<user_id>", methods=["DELETE"])

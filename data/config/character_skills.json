@@ -55,7 +55,7 @@
       "labelKey": "skills.lipRead",
       "repeatable": 1,
       "category": "探索",
-      "base": 0,
+      "base": 1,
       "specialties": []
     },
     {
@@ -79,7 +79,7 @@
       "labelKey": "skills.computerUse",
       "repeatable": 1,
       "category": "探索",
-      "base": 0,
+      "base": 5,
       "specialties": [],
       "eraLimited": true
     },
@@ -352,7 +352,7 @@
       "labelKey": "skills.dodge",
       "repeatable": 1,
       "category": "战斗",
-      "base": 25,
+      "base": 0,
       "specialties": []
     },
     {

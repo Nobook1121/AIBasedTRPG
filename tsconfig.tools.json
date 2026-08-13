@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "none",
+    "moduleResolution": "Classic",
+    "strict": true,
+    "noEmit": false,
+    "rootDir": "data/tools",
+    "outDir": "data/tools"
+  },
+  "include": [
+    "data/tools/**/*.ts",
+    "frontend/src/js/types.d.ts"
+  ],
+  "exclude": []
+}

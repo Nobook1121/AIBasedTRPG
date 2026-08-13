@@ -1,0 +1,36 @@
+{
+  "api_format": "anythingllm",
+  "auth_method": "api_key",
+  "config": {
+    "anythingllm_mode": "chat",
+    "api_key": "P6GHRK1-9ZMM39B-HR726G4-34EXC84",
+    "base_url": "http://localhost:3001/api/v1",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "session_id": "",
+    "timeout": 30,
+    "workspace_slug": "coc"
+  },
+  "description": "AnythingLLM 原生 Workspace Chat API。模型 ID 填 workspace slug。",
+  "enabled": false,
+  "icon": "/assets/aiplatform/anythingllm.png",
+  "models": [
+    {
+      "description": "把模型 ID 改成 AnythingLLM 工作区 slug，例如 sample-workspace",
+      "doc_url": "https://docs.useanything.com/features/api",
+      "enabled": true,
+      "id": "workspace-slug",
+      "name": "AnythingLLM 工作区",
+      "params": {
+        "context_window": 8192,
+        "max_tokens": 4096,
+        "temperature": 0.7,
+        "top_p": 0.95
+      }
+    }
+  ],
+  "name": "AnythingLLM",
+  "platform": "anythingllm",
+  "version": "1.0.0"
+}

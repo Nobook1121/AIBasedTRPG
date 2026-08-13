@@ -245,7 +245,11 @@ def execute_roll_room_check(arguments: dict[str, Any], context: Any) -> dict[str
 
 ROLL_COC_CHECK_TOOL = AgentTool(
     name="dice.roll_coc_check",
-    description="Roll a real backend COC7 percentile check. The model must not invent dice results.",
+    description=(
+        "Fallback COC7 percentile roll with an explicit target. Use only when check.roll_room_check cannot "
+        "resolve the rule check, such as unsupported inspiration or temporary target checks. Do not use as the "
+        "normal path for character skill or attribute checks."
+    ),
     parameters={
         "type": "object",
         "properties": {
@@ -264,8 +268,9 @@ ROLL_ROOM_CHECK_TOOL = AgentTool(
     name="check.roll_room_check",
     description=(
         "Resolve a current-room player's bound character_card by username, read a skill or attribute value, "
-        "roll 1d100, and return the formatted /check result. Use this for /check {*玩家名} {*技能/属性名} "
-        "{困难/极难} {+/-调整值}."
+        "roll 1d100, and return the formatted /check result. This is the primary tool for character skill or "
+        "attribute checks and should be used before dice.roll_coc_check. Use this for /check {*玩家名} "
+        "{*技能/属性名} {困难/极难} {+/-调整值}."
     ),
     parameters={
         "type": "object",
