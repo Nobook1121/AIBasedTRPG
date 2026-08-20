@@ -36,7 +36,8 @@ def _parse_arguments(raw_arguments: str | dict[str, Any] | None) -> dict[str, An
         return raw_arguments
     if not raw_arguments:
         return {}
-    return json.loads(raw_arguments)
+    parsed = json.loads(raw_arguments)
+    return parsed if isinstance(parsed, dict) else {}
 
 
 def _tool_calls(message: dict[str, Any]) -> list[dict[str, Any]]:
@@ -46,6 +47,29 @@ def _tool_calls(message: dict[str, Any]) -> list[dict[str, Any]]:
     if isinstance(function_call, dict):
         return [{"id": "function-call", "type": "function", "function": function_call}]
     return []
+
+
+def _resolve_tool(tool_name: str, enabled_by_name: dict[str, Any]) -> tuple[str, Any] | tuple[None, None]:
+    tool = enabled_by_name.get(tool_name)
+    if tool:
+        return tool_name, tool
+    if "_" in tool_name:
+        alias_name = tool_name.replace("_", ".", 1)
+        tool = enabled_by_name.get(alias_name)
+        if tool:
+            return alias_name, tool
+    return None, None
+
+
+def _assistant_tool_call_message(message: dict[str, Any]) -> dict[str, Any]:
+    clean_message = {
+        "role": "assistant",
+        "content": "",
+        "tool_calls": message.get("tool_calls", []),
+    }
+    if "function_call" in message:
+        clean_message["function_call"] = message["function_call"]
+    return clean_message
 
 
 def run_agent_completion(
@@ -79,11 +103,11 @@ def run_agent_completion(
                 response_data=response_data,
             )
 
-        messages.append(message)
+        messages.append(_assistant_tool_call_message(message))
         for call in calls:
             function = call.get("function") or {}
             tool_name = str(function.get("name") or "")
-            tool = enabled_by_name.get(tool_name)
+            resolved_name, tool = _resolve_tool(tool_name, enabled_by_name)
             if not tool:
                 return AgentCompletionResult(error=f"Tool {tool_name} is not enabled for agent {profile.id}")
             try:
@@ -95,7 +119,7 @@ def run_agent_completion(
                 {
                     "role": "tool",
                     "tool_call_id": call.get("id") or tool_name,
-                    "name": tool_name,
+                    "name": resolved_name,
                     "content": json.dumps(result, ensure_ascii=False),
                 }
             )

@@ -160,6 +160,16 @@ def _format_user_content(content, speaker=None):
     return f"[{'; '.join(parts)}]\n{content}"
 
 
+def _wrap_user_input(content):
+    return "\n".join(
+        [
+            "---->USER_INPUT<----",
+            str(content or ""),
+            "---->END_USER_INPUT<----",
+        ]
+    )
+
+
 def _is_compact_command(content):
     text = str(content or "").strip()
     if text.startswith("@KP"):
@@ -317,8 +327,9 @@ def _build_messages(system_prompt, history, content, room_snapshot_message=None)
         item_content = item["content"]
         if item.get("role") == "user":
             item_content = _format_user_content(item_content, item.get("speaker"))
+            item_content = _wrap_user_input(item_content)
         messages.append({"role": item["role"], "content": item_content})
-    messages.append({"role": "user", "content": content})
+    messages.append({"role": "user", "content": _wrap_user_input(content)})
     return messages
 
 

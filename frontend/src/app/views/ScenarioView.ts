@@ -31,8 +31,11 @@ class ScenarioView {
                 fallbackCover: DEFAULT_SCENARIO_COVER,
                 title: scenario.title,
                 author: scenario.author,
+                createdBy: scenario.creator_username || scenario.author || "未知",
                 playerCount: scenario.playerCount,
                 id: scenario.id,
+                publicId: scenario.public_id || String(scenario.id),
+                actionButtons: this.renderScenarioActionButtons(scenario),
             });
             this.scenarioList.appendChild(card);
         });
@@ -59,6 +62,7 @@ class ScenarioView {
     previewScenario(scenario: Scenario): void {
         const previewContent = window.TrpgTemplates.render("scenario-preview-content", {
             title: scenario.title,
+            publicId: scenario.public_id || String(scenario.id),
             author: scenario.author,
             playerCount: scenario.playerCount,
             notes: scenario.notes || "无",
@@ -147,17 +151,32 @@ class ScenarioView {
             if (!Number.isFinite(id)) return;
 
             if (button.classList.contains("preview-scenario")) {
-                this.handlers?.onPreviewScenario(id);
+                if (await confirmScenarioSpoilerAccess(id)) this.handlers?.onPreviewScenario(id);
             } else if (button.classList.contains("edit-scenario")) {
-                this.handlers?.onEditScenario(id);
+                if (await confirmScenarioSpoilerAccess(id)) this.handlers?.onEditScenario(id);
+            } else if (button.classList.contains("play-scenario")) {
+                this.handlers?.onPlayScenario(id);
             } else if (button.classList.contains("delete-scenario")) {
                 await this.handlers?.onDeleteScenario(id);
             }
         });
     }
 
+    private renderScenarioActionButtons(scenario: Scenario): string {
+        const id = scenarioEscapeHtml(scenario.id);
+        const canPreview = canUseScenarioPermission("scenarios.preview");
+        const canEdit = canUseScenarioPermission("scenarios.edit") && canModifyScenario(scenario);
+        const canDelete = canUseScenarioPermission("scenarios.delete") && canModifyScenario(scenario);
+        return [
+            canPreview ? `<button class="btn btn-sm btn-primary preview-scenario" data-id="${id}">预览</button>` : "",
+            canEdit ? `<button class="btn btn-sm btn-secondary edit-scenario" data-id="${id}">编辑</button>` : "",
+            canDelete ? `<button class="btn btn-sm btn-danger delete-scenario" data-id="${id}">删除</button>` : "",
+        ].join("");
+    }
+
     private resetScenarioForm(): void {
         input("scenarioTitle").value = "";
+        input("scenarioPublicId").value = "保存后自动生成";
         input("scenarioAuthor").value = "";
         input("scenarioPlayerCount").value = "0";
         textarea("scenarioNotes").value = "";
@@ -171,6 +190,7 @@ class ScenarioView {
 
     private fillScenarioForm(scenario: Scenario): void {
         input("scenarioTitle").value = scenario.title;
+        input("scenarioPublicId").value = scenario.public_id || String(scenario.id);
         input("scenarioAuthor").value = scenario.author;
         input("scenarioPlayerCount").value = String(scenario.playerCount);
         textarea("scenarioNotes").value = scenario.notes || "";
@@ -293,6 +313,80 @@ function scenarioEscapeHtml(value: unknown): string {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
+}
+
+function canUseScenarioPermission(nodeId: string): boolean {
+    const role = window.currentUser?.role || "USER";
+    if (role === "OWNER") return true;
+    if (role === "ADMIN") return true;
+    return ["scenarios.preview", "scenarios.edit", "scenarios.delete"].includes(nodeId);
+}
+
+function canModifyScenario(scenario: Scenario): boolean {
+    const role = window.currentUser?.role || "USER";
+    if (role === "ADMIN" || role === "OWNER") return true;
+    return String(scenario.owner_id ?? scenario.user_id ?? "") === String(window.currentUser?.user_id ?? "");
+}
+
+async function confirmScenarioSpoilerAccess(scenarioId: number): Promise<boolean> {
+    try {
+        const response = await TrpgApi.get<ApiResponse<Room[]>>("/api/rooms");
+        const rooms = response.success && Array.isArray(response.data) ? response.data : [];
+        const playing = rooms.some((room) => String(room.scenario_id || "") === String(scenarioId));
+        if (!playing) return true;
+    } catch {
+        return true;
+    }
+    return showLongPressConfirm("检测到您正在游玩该剧本，继续操作可能导致剧透，是否继续？");
+}
+
+function showLongPressConfirm(message: string): Promise<boolean> {
+    return new Promise((resolve) => {
+        const modal = document.createElement("div");
+        modal.className = "modal fade";
+        modal.tabIndex = -1;
+        modal.innerHTML = `
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">剧透提示</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body"><p>${scenarioEscapeHtml(message)}</p></div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                        <button type="button" class="btn btn-danger long-press-confirm">长按确认查看</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        const instance = new bootstrap.Modal(modal);
+        let timer: number | null = null;
+        let completed = false;
+        const button = modal.querySelector<HTMLButtonElement>(".long-press-confirm");
+        const clearTimer = () => {
+            if (timer !== null) window.clearTimeout(timer);
+            timer = null;
+            button?.classList.remove("holding");
+        };
+        button?.addEventListener("pointerdown", () => {
+            button.classList.add("holding");
+            timer = window.setTimeout(() => {
+                completed = true;
+                instance.hide();
+            }, 1200);
+        });
+        ["pointerup", "pointerleave", "pointercancel"].forEach((eventName) => {
+            button?.addEventListener(eventName, clearTimer);
+        });
+        modal.addEventListener("hidden.bs.modal", () => {
+            clearTimer();
+            modal.remove();
+            resolve(completed);
+        });
+        instance.show();
+    });
 }
 
 window.ScenarioView = ScenarioView;

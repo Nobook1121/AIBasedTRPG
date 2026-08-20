@@ -12,6 +12,14 @@ PERMISSION_CONFIG_FILENAME = "permissions.json"
 
 DEFAULT_PERMISSION_GROUPS: list[dict[str, Any]] = [
     {
+        "id": "navigation",
+        "label": "导航",
+        "description": "控制左侧导航中仅面向管理员的入口。",
+        "nodes": [
+            {"id": "navigation.admin_tabs", "label": "管理员标签页", "description": "显示设置等管理员专用标签页。"},
+        ],
+    },
+    {
         "id": "accounts",
         "label": "账户管理",
         "description": "用户列表、用户状态、角色分配与认证策略。",
@@ -26,6 +34,9 @@ DEFAULT_PERMISSION_GROUPS: list[dict[str, Any]] = [
         "description": "剧本创建、编辑、删除和跨用户管理。",
         "nodes": [
             {"id": "scenarios.create", "label": "创建剧本", "description": "创建和导入自己的剧本。"},
+            {"id": "scenarios.preview", "label": "预览剧本", "description": "查看剧本详情与完整内容。"},
+            {"id": "scenarios.edit", "label": "编辑剧本", "description": "编辑自己拥有或被授权管理的剧本。"},
+            {"id": "scenarios.delete", "label": "删除剧本", "description": "删除自己拥有或被授权管理的剧本。"},
             {"id": "scenarios.manage_own", "label": "管理自己的剧本", "description": "编辑或删除自己拥有的剧本。"},
             {"id": "scenarios.manage_all", "label": "管理全部剧本", "description": "编辑或删除任意用户的剧本。"},
         ],
@@ -38,6 +49,8 @@ DEFAULT_PERMISSION_GROUPS: list[dict[str, Any]] = [
             {"id": "characters.create", "label": "创建角色卡", "description": "创建自己的角色卡。"},
             {"id": "characters.manage_own", "label": "管理自己的角色卡", "description": "编辑或删除自己拥有的角色卡。"},
             {"id": "characters.manage_all", "label": "管理全部角色卡", "description": "编辑或删除任意用户的角色卡。"},
+            {"id": "characters.gallery.publish", "label": "发布到角色卡广场", "description": "在角色卡广场新建或导入公开角色卡。"},
+            {"id": "characters.gallery.apply", "label": "应用广场角色卡", "description": "从角色卡广场复制角色卡为个人角色卡。"},
         ],
     },
     {
@@ -65,19 +78,25 @@ DEFAULT_PERMISSION_GROUPS: list[dict[str, Any]] = [
 ]
 
 DEFAULT_PERMISSION_MATRIX: dict[str, list[str]] = {
+    "navigation.admin_tabs": ["ADMIN", "OWNER"],
     "accounts.manage_users": ["ADMIN", "OWNER"],
     "accounts.auth_settings": ["ADMIN", "OWNER"],
     "scenarios.create": ["USER", "ADMIN", "OWNER"],
+    "scenarios.preview": ["USER", "ADMIN", "OWNER"],
+    "scenarios.edit": ["USER", "ADMIN", "OWNER"],
+    "scenarios.delete": ["USER", "ADMIN", "OWNER"],
     "scenarios.manage_own": ["USER", "ADMIN", "OWNER"],
     "scenarios.manage_all": ["ADMIN", "OWNER"],
     "characters.create": ["USER", "ADMIN", "OWNER"],
     "characters.manage_own": ["USER", "ADMIN", "OWNER"],
     "characters.manage_all": ["ADMIN", "OWNER"],
+    "characters.gallery.publish": ["USER", "ADMIN", "OWNER"],
+    "characters.gallery.apply": ["USER", "ADMIN", "OWNER"],
     "settings.general": ["ADMIN", "OWNER"],
     "settings.ai_models": ["ADMIN", "OWNER"],
     "settings.network": ["ADMIN", "OWNER"],
     "settings.character_rules": ["ADMIN", "OWNER"],
-    "settings.permissions": ["OWNER"],
+    "settings.permissions": ["ADMIN", "OWNER"],
     "rooms.create": ["USER", "ADMIN", "OWNER"],
     "rooms.manage_members": ["ADMIN", "OWNER"],
     "rooms.runtime_records": ["USER", "ADMIN", "OWNER"],

@@ -1,5 +1,7 @@
 import json
 import logging
+import secrets
+import string
 import time
 from pathlib import Path
 from urllib.parse import unquote
@@ -25,6 +27,7 @@ _scenarios_cache = []
 _cache_timestamp = 0
 _cache_duration = 60
 _allowed_cover_extensions = {"png", "jpg", "jpeg", "gif"}
+_public_id_alphabet = string.ascii_letters + string.digits
 
 
 def clear_scenarios_cache():
@@ -40,6 +43,14 @@ def _current_timestamp():
 
 def _scenario_filename(title):
     return normalize_filename(f"{title or 'unnamed'}.json")
+
+
+def _generate_public_id(existing_ids):
+    for _ in range(200):
+        value = "".join(secrets.choice(_public_id_alphabet) for _ in range(6))
+        if value not in existing_ids:
+            return value
+    raise RuntimeError("Failed to generate unique scenario public id")
 
 
 def _cover_filename(value):
@@ -92,6 +103,7 @@ def load_scenarios():
         return _scenarios_cache
 
     scenarios = []
+    public_ids = set()
     for path in _iter_scenario_files():
         try:
             scenario = read_json(path, default={})
@@ -107,6 +119,11 @@ def load_scenarios():
                 scenario["id"] = int(path.stem.split("_")[-1])
             except (ValueError, IndexError):
                 scenario["id"] = int(time.time() * 1000)
+        public_id = str(scenario.get("public_id") or "")
+        if len(public_id) != 6 or not public_id.isalnum() or public_id in public_ids:
+            public_id = _generate_public_id(public_ids)
+            scenario["public_id"] = public_id
+        public_ids.add(public_id)
         scenarios.append(scenario)
 
     _scenarios_cache = scenarios
@@ -130,6 +147,12 @@ def get_all_scenarios():
 @bp.route("/api/scenarios/<int:scenario_id>", methods=["GET"])
 def get_scenario(scenario_id):
     try:
+        login_error = _require_login()
+        if login_error:
+            return login_error
+        if not _can_use_permission("scenarios.preview"):
+            return error_response("Permission denied", 403, "Permission denied")
+
         scenario = next(
             (item for item in load_scenarios() if item.get("id") == scenario_id),
             None,
@@ -149,6 +172,8 @@ def create_scenario():
         login_error = _require_login()
         if login_error:
             return login_error
+        if not _can_use_permission("scenarios.create"):
+            return error_response("Permission denied", 403, "Permission denied")
 
         scenario_data = request.get_json(silent=True)
         if not scenario_data:
@@ -172,6 +197,14 @@ def create_scenario():
         scenario_id = int(time.time() * 1000)
         scenario_data["id"] = scenario_id
         scenario_data["owner_id"] = session["user_id"]
+        scenario_data["creator_username"] = session.get("username", "")
+        scenario_data["public_id"] = _generate_public_id(
+            {
+                str(item.get("public_id"))
+                for item in load_scenarios()
+                if item.get("public_id")
+            }
+        )
         scenario_data["createdAt"] = _current_timestamp()
         if not scenario_data.get("cover"):
             scenario_data["cover"] = "/assets/scenario_covers/default_cover.png"
@@ -219,9 +252,19 @@ def update_scenario(scenario_id):
 
         if not _can_modify_scenario(existing_scenario):
             return error_response("Permission denied", 403, "Permission denied")
+        if not _can_use_permission("scenarios.edit"):
+            return error_response("Permission denied", 403, "Permission denied")
 
         scenario_data["id"] = scenario_id
         scenario_data["owner_id"] = existing_scenario.get("owner_id")
+        scenario_data["creator_username"] = existing_scenario.get("creator_username") or session.get("username", "")
+        scenario_data["public_id"] = existing_scenario.get("public_id") or _generate_public_id(
+            {
+                str(item.get("public_id"))
+                for item in load_scenarios()
+                if item.get("public_id") and item.get("id") != scenario_id
+            }
+        )
         scenario_data["updatedAt"] = _current_timestamp()
         if "createdAt" not in scenario_data:
             scenario_data["createdAt"] = existing_scenario.get(
@@ -266,6 +309,8 @@ def delete_scenario(scenario_id):
             )
 
         if not _can_modify_scenario(scenario_data):
+            return error_response("Permission denied", 403, "Permission denied")
+        if not _can_use_permission("scenarios.delete"):
             return error_response("Permission denied", 403, "Permission denied")
 
         target_file.unlink()

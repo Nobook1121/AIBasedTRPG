@@ -234,6 +234,8 @@ def get_auth_status():
         user = _get_user_manager().get_user_by_id(session["user_id"])
         if not user:
             return error_response("User not found", 404, "User not found")
+        session["username"] = user.get("username", session.get("username"))
+        session["role"] = user.get("role", session.get("role", "USER"))
 
         logger.debug(
             "Auth status user_id=%s username=%s ip=%s",

@@ -55,6 +55,153 @@ def test_runtime_executes_enabled_tool_and_finishes():
     assert requester.calls[1]["messages"][-1]["role"] == "tool"
 
 
+def test_runtime_sanitizes_assistant_content_when_tool_calls_are_present():
+    class NoisyToolRequester:
+        def __init__(self):
+            self.calls = []
+
+        def __call__(self, payload):
+            self.calls.append(payload)
+            if len(self.calls) == 1:
+                return {
+                    "choices": [
+                        {
+                            "message": {
+                                "role": "assistant",
+                                "content": "noisy protocol text that must not be replayed",
+                                "tool_calls": [
+                                    {
+                                        "id": "call-1",
+                                        "type": "function",
+                                        "function": {"name": "test.echo", "arguments": "{\"value\":\"hello\"}"},
+                                    }
+                                ],
+                            }
+                        }
+                    ]
+                }
+            return {"choices": [{"message": {"role": "assistant", "content": "final answer"}}]}
+
+    tool = AgentTool(
+        name="test.echo",
+        description="Echo value",
+        parameters={"type": "object", "properties": {"value": {"type": "string"}}},
+        handler=lambda arguments, context: {"echo": arguments["value"]},
+    )
+    requester = NoisyToolRequester()
+
+    result = run_agent_completion(
+        requester=requester,
+        base_payload={"model": "fake-model", "messages": [{"role": "user", "content": "@KP hi"}]},
+        profile=AgentProfile(id="kp", name="KP", prompt="prompt", tool_names=["test.echo"]),
+        registry=ToolRegistry([tool]),
+        context=AgentRequestContext(room_id="room-1"),
+    )
+
+    replayed_assistant_message = requester.calls[1]["messages"][-2]
+    assert result.content == "final answer"
+    assert replayed_assistant_message["role"] == "assistant"
+    assert replayed_assistant_message["content"] == ""
+    assert "noisy protocol text" not in str(requester.calls[1]["messages"])
+
+
+def test_runtime_treats_non_object_tool_arguments_as_empty_dict():
+    class NumericArgumentRequester:
+        def __init__(self):
+            self.calls = []
+
+        def __call__(self, payload):
+            self.calls.append(payload)
+            if len(self.calls) == 1:
+                return {
+                    "choices": [
+                        {
+                            "message": {
+                                "role": "assistant",
+                                "content": "",
+                                "tool_calls": [
+                                    {
+                                        "id": "call-1",
+                                        "type": "function",
+                                        "function": {"name": "test.echo", "arguments": "10"},
+                                    }
+                                ],
+                            }
+                        }
+                    ]
+                }
+            return {"choices": [{"message": {"role": "assistant", "content": "final answer"}}]}
+
+    seen_arguments = []
+    tool = AgentTool(
+        name="test.echo",
+        description="Echo value",
+        parameters={"type": "object", "properties": {}},
+        handler=lambda arguments, context: seen_arguments.append(arguments) or {"ok": True},
+    )
+
+    result = run_agent_completion(
+        requester=NumericArgumentRequester(),
+        base_payload={"model": "fake-model", "messages": [{"role": "user", "content": "@KP hi"}]},
+        profile=AgentProfile(id="kp", name="KP", prompt="prompt", tool_names=["test.echo"]),
+        registry=ToolRegistry([tool]),
+        context=AgentRequestContext(room_id="room-1"),
+    )
+
+    assert result.content == "final answer"
+    assert seen_arguments == [{}]
+
+
+def test_runtime_resolves_underscore_tool_name_aliases():
+    class AliasRequester:
+        def __init__(self):
+            self.calls = []
+
+        def __call__(self, payload):
+            self.calls.append(payload)
+            if len(self.calls) == 1:
+                return {
+                    "choices": [
+                        {
+                            "message": {
+                                "role": "assistant",
+                                "content": "",
+                                "tool_calls": [
+                                    {
+                                        "id": "call-1",
+                                        "type": "function",
+                                        "function": {
+                                            "name": "room_get_room_snapshot",
+                                            "arguments": "{\"include_inactive\":false}",
+                                        },
+                                    }
+                                ],
+                            }
+                        }
+                    ]
+                }
+            return {"choices": [{"message": {"role": "assistant", "content": "final answer"}}]}
+
+    seen_calls = []
+    tool = AgentTool(
+        name="room.get_room_snapshot",
+        description="Load snapshot",
+        parameters={"type": "object", "properties": {}},
+        handler=lambda arguments, context: seen_calls.append(arguments) or {"ok": True},
+    )
+
+    result = run_agent_completion(
+        requester=AliasRequester(),
+        base_payload={"model": "fake-model", "messages": [{"role": "user", "content": "@KP hi"}]},
+        profile=AgentProfile(id="kp", name="KP", prompt="prompt", tool_names=["room.get_room_snapshot"]),
+        registry=ToolRegistry([tool]),
+        context=AgentRequestContext(room_id="room-1"),
+    )
+
+    assert result.content == "final answer"
+    assert seen_calls == [{"include_inactive": False}]
+
+
 def test_runtime_rejects_unauthorized_tool():
     requester = FakeRequester()
 

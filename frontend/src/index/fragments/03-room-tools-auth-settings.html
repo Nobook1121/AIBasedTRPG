@@ -272,9 +272,13 @@
                         </div>
                     </div>
                     <div class="user-card-menu-section">
+                        <button type="button" class="user-card-menu-item" id="open-personal-home">
+                            <span class="menu-icon"><i class="fa fa-home" aria-hidden="true"></i></span>
+                            <span>个人主页</span>
+                        </button>
                         <button type="button" class="user-card-menu-item" id="open-profile-dialog">
-                            <span class="menu-icon"><i class="fa fa-user" aria-hidden="true"></i></span>
-                            <span>编辑个人资料</span>
+                            <span class="menu-icon"><i class="fa fa-cog" aria-hidden="true"></i></span>
+                            <span>用户设置</span>
                         </button>
                     </div>
                     <div class="user-card-menu-section">
@@ -314,7 +318,7 @@
                         <div class="profile-dialog-topbar">
                             <div>
                                 <div class="profile-dialog-eyebrow">User Settings</div>
-                                <h3>编辑个人资料</h3>
+                                <h3>用户设置</h3>
                             </div>
                             <button type="button" id="close-settings-panel" class="profile-dialog-close" aria-label="关闭用户设置">
                                 <i class="fa fa-times" aria-hidden="true"></i>
@@ -345,6 +349,12 @@
                                 <summary><span><i class="fa fa-bell-o" aria-hidden="true"></i>通知</span><i class="fa fa-chevron-down" aria-hidden="true"></i></summary>
                                 <div class="profile-subnav">
                                     <button type="button" class="profile-section-tab" data-profile-target="profile-notifications">提醒方式</button>
+                                </div>
+                            </details>
+                            <details class="profile-nav-group">
+                                <summary><span><i class="fa fa-cog" aria-hidden="true"></i>网站设置</span><i class="fa fa-chevron-down" aria-hidden="true"></i></summary>
+                                <div class="profile-subnav">
+                                    <button type="button" class="profile-section-tab" data-profile-target="profile-website-theme">外观偏好</button>
                                 </div>
                             </details>
                         </div>
@@ -385,11 +395,31 @@
                                 <h4>提醒方式</h4>
                                 <p class="profile-placeholder">消息提醒、房间邀请和系统通知设置将在后续版本开放。</p>
                             </section>
+                            <section class="profile-panel-section" id="profile-website-theme">
+                                <h4>网站设置</h4>
+                                <label class="profile-setting-row" id="profileThemeSetting" for="profileThemeSelect">
+                                    <span>网站主题切换：</span>
+                                    <select class="form-select" id="profileThemeSelect">
+                                        <option value="">跟随默认主题</option>
+                                        <option value="light">浅色</option>
+                                        <option value="dark">深色</option>
+                                        <option value="pattern_cyber_2">赛博档案</option>
+                                        <option value="system">跟随系统</option>
+                                    </select>
+                                </label>
+                            </section>
                             <div class="profile-save-bar">
                                 <div class="settings-message" id="settingsMessage" aria-live="polite"></div>
                                 <button class="btn btn-primary" id="saveUserSettings">
                                     <i class="fa fa-check" aria-hidden="true"></i>保存编辑
                                 </button>
+                            </div>
+                            <div class="profile-pending-save-bar" id="profilePendingSaveBar" hidden>
+                                <span><strong id="profilePendingChangeCount">0</strong> 项更改未保存</span>
+                                <div>
+                                    <button type="button" class="btn btn-secondary" id="cancelProfilePendingChanges">取消</button>
+                                    <button type="button" class="btn btn-primary" id="saveProfilePendingChanges">保存</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -442,13 +472,20 @@
                             <div class="mb-4">
                                 <h4>界面设置</h4>
                                 <div class="form-group">
-                                    <label>主题</label>
+                                    <label>默认主题</label>
                                     <select class="form-select" id="themeSelect">
                                         <option value="light">浅色</option>
                                         <option value="dark">深色</option>
                                         <option value="pattern_cyber_2">赛博档案</option>
                                         <option value="system">跟随系统</option>
                                     </select>
+                                </div>
+                                <div class="settings-pending-save-bar" id="defaultThemePendingSaveBar" hidden>
+                                    <span><strong id="defaultThemePendingChangeCount">0</strong> 项默认主题更改未保存</span>
+                                    <div>
+                                        <button type="button" class="btn btn-secondary" id="cancelDefaultThemeChange">取消</button>
+                                        <button type="button" class="btn btn-primary" id="saveDefaultThemeChange">保存</button>
+                                    </div>
                                 </div>
                                 <div class="form-group mt-2">
                                     <label>语言</label>
@@ -591,8 +628,8 @@
                                 </div>
                                 <div class="form-group">
                                     <label for="maxCardsPerUser">普通用户角色卡数量上限</label>
-                                    <input type="number" class="form-control" id="maxCardsPerUser" min="1" max="999" value="5">
-                                    <small class="text-muted">默认 5 张。管理员和 OWNER 不受该数量限制。</small>
+                                    <input type="number" class="form-control" id="maxCardsPerUser" min="1" max="999" value="3">
+                                    <small class="text-muted">默认 3 张。管理员和 OWNER 不受该数量限制。</small>
                                 </div>
                                 <div class="form-group">
                                     <label for="weaponSlotCount">默认武器栏位数量</label>

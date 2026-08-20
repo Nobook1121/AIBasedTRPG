@@ -8,6 +8,7 @@ FRONTEND_DIST_DIR = BASE_DIR / "dist" / "public"
 
 SCENARIOS_DIR = DATA_DIR / "scenarios"
 CHARACTERS_DIR = RUNTIME_DIR / "characters"
+CHARACTER_GALLERY_DIR = RUNTIME_DIR / "character_gallery"
 SCENARIO_COVERS_DIR = DATA_DIR / "assets" / "scenario_covers"
 AVATARS_DIR = DATA_DIR / "assets" / "avatars"
 AI_PLATFORM_ASSETS_DIR = DATA_DIR / "assets" / "aiplatform"

@@ -33,7 +33,8 @@ def create_app(config=None):
     if config:
         app.config.update(config)
     configure_logging(app.config.get("LOGS_DIR", LOGS_DIR))
-    _configure_user_service(app)
+    if "USER_MANAGER" not in app.config:
+        _configure_user_service(app)
     CORS(app)
     socketio.init_app(app)
     register_session_guard(app)

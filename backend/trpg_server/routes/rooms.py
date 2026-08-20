@@ -372,7 +372,7 @@ def create_room():
         )
     room_id = uuid4().hex
     room_dir = _room_dir(room_id)
-    member = _current_member()
+    member = _current_member(data.get("character_card"))
     member["room_role"] = ROOM_ROLE_OWNER
     now = _timestamp()
     info = {
@@ -400,7 +400,9 @@ def create_room():
         房间名=name,
         剧本=scenario_title,
     )
-    return success_response(_room_summary(info), "Room created successfully", 201)
+    data = _room_summary(info)
+    data["messages"] = []
+    return success_response(data, "Room created successfully", 201)
 
 
 @bp.route("/api/rooms/join", methods=["POST"])
@@ -415,12 +417,13 @@ def join_room_by_code():
         return error_response("Room not found", 404, "Room not found")
 
     user_id = session["user_id"]
+    character_card = data.get("character_card")
     member = _find_member(info, user_id=user_id)
     if not member:
-        info.setdefault("members", []).append(_current_member())
+        info.setdefault("members", []).append(_current_member(character_card))
         _write_room(room_dir, info)
     elif not _is_active_member(member):
-        current_member = _current_member()
+        current_member = _current_member(character_card)
         member.update(
             {
                 "username": current_member["username"],
@@ -431,6 +434,11 @@ def join_room_by_code():
                 "rejoined_at": _timestamp(),
             }
         )
+        if character_card:
+            _bind_character(member, character_card)
+        _write_room(room_dir, info)
+    elif character_card and not member.get("character_card"):
+        _bind_character(member, character_card)
         _write_room(room_dir, info)
 
     log_user_action(
@@ -441,7 +449,9 @@ def join_room_by_code():
         房间码=info.get("room_code"),
         房间名=info.get("name"),
     )
-    return success_response(_room_summary(info), "Room joined successfully")
+    data = _room_summary(info)
+    data["messages"] = _read_messages(room_dir)
+    return success_response(data, "Room joined successfully")
 
 
 @bp.route("/api/rooms/<room_id>/members/<user_id>/character", methods=["PUT"])
@@ -478,7 +488,9 @@ def bind_room_member_character(room_id, user_id):
         角色卡ID=target.get("character_card", {}).get("id"),
         角色名=target.get("character_card", {}).get("name"),
     )
-    return success_response(_room_summary(info), "Character bound successfully")
+    data = _room_summary(info)
+    data["messages"] = _read_messages(room_dir)
+    return success_response(data, "Character bound successfully")
 
 
 @bp.route("/api/rooms/<room_id>/members/<user_id>", methods=["DELETE"])

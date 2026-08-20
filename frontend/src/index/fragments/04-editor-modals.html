@@ -12,6 +12,10 @@
                         <input type="text" class="form-control" id="scenarioTitle" required>
                     </div>
                     <div class="form-group">
+                        <label>剧本ID</label>
+                        <input type="text" class="form-control" id="scenarioPublicId" value="保存后自动生成" readonly>
+                    </div>
+                    <div class="form-group">
                         <label>封面图片</label>
                         <div class="cover-upload-container">
                             <div class="cover-preview">
@@ -85,7 +89,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                    <button type="button" class="btn btn-primary" id="saveScenario">保存</button>
+                    <button type="button" class="btn btn-primary" id="saveScenario">保存并发布</button>
                 </div>
             </div>
         </div>
@@ -109,6 +113,30 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
                     <button type="button" class="btn btn-primary" id="confirmRoomCharacterBind">保存绑定</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="roomEntryCharacterModal" tabindex="-1" aria-labelledby="roomEntryCharacterModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="roomEntryCharacterModalLabel">进入房间前选择角色卡</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted mb-3" id="roomEntryCharacterMessage">进入房间前请选择要使用的角色卡。</p>
+                    <div class="alert alert-warning mb-3" id="roomEntryCharacterEmpty" hidden>当前账户还没有角色卡，请先创建角色卡再进入房间。</div>
+                    <label class="form-label" for="roomEntryCharacterSelect">角色卡</label>
+                    <select class="form-select" id="roomEntryCharacterSelect">
+                        <option value="">请选择角色卡</option>
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="roomEntryCreateCharacter">创建角色卡</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="confirmRoomEntryCharacter">进入房间</button>
                 </div>
             </div>
         </div>
@@ -204,6 +232,10 @@
                                 <button type="button" class="character-icon-button" id="randomizeAttributes" title="随机生成属性" aria-label="随机生成属性">
                                     <i class="fa fa-random" aria-hidden="true"></i>
                                 </button>
+                            </div>
+                            <div class="character-attribute-summary" aria-live="polite">
+                                <span>基础总和</span>
+                                <strong id="attributeBaseTotal">0 / 900</strong>
                             </div>
                             <div class="attribute-editor-grid">
                                 <label class="attribute-editor-card"><span class="attribute-name">力量 <small>STR</small></span><small class="attribute-roll-hint" data-attribute-roll="STR">3d6x5</small><div class="attribute-value-row"><input type="number" class="form-control character-attribute-input" id="attributeSTR" min="1" max="99" aria-label="力量属性值"><input type="number" class="form-control" id="attributeSTRHalf" readonly aria-label="力量半值"><input type="number" class="form-control" id="attributeSTRRatio" readonly aria-label="力量五分之一值"></div></label>

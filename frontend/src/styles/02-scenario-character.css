@@ -37,8 +37,47 @@
 
 .scenario-card-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 10px;
     margin-top: 10px;
+}
+
+.scenario-id-chip {
+    margin-top: 10px;
+    color: var(--color-text-muted);
+    font-size: 0.78rem;
+    text-align: right;
+}
+
+.long-press-confirm {
+    position: relative;
+    overflow: hidden;
+}
+
+.long-press-confirm::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    width: 0;
+    background: rgba(180, 180, 180, 0.24);
+    pointer-events: none;
+}
+
+.long-press-confirm.holding::before {
+    width: 100%;
+    transition: width 1.2s linear;
+}
+
+.personal-home-panel {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 0;
+}
+
+.personal-home-panel img {
+    border-radius: 50%;
+    border: 1px solid var(--border-subtle);
 }
 
 .scenario-preview {
@@ -148,6 +187,12 @@
 
 .chat-command-header {
     margin: 18px 24px 10px;
+}
+
+.home-room-meta {
+    margin: 6px 0 0;
+    color: var(--color-muted);
+    font-size: 0.95rem;
 }
 
 .character-kicker {
@@ -452,6 +497,45 @@
     margin: 0 0 10px;
     color: var(--color-text);
     font-size: 1rem;
+}
+
+.character-detail-band-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.character-detail-band-head h4 {
+    margin: 0;
+}
+
+.character-attribute-summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    width: fit-content;
+    padding: 8px 12px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background: var(--color-panel-muted);
+    color: var(--color-text);
+    font-size: 0.9rem;
+}
+
+.character-attribute-summary span {
+    color: var(--color-muted);
+    font-weight: 600;
+}
+
+.character-attribute-summary strong {
+    margin-left: auto;
+    font-variant-numeric: tabular-nums;
+}
+
+.character-attribute-summary-inline {
+    margin-bottom: 0;
 }
 
 .character-detail-band-vitals .character-vital-grid {

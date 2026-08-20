@@ -4,21 +4,21 @@
                     <div id="react-home-root"></div>
                 </div>
 
-                <!-- 剧本管理内容 -->
+                <!-- 剧本内容 -->
                 <div id="scenario" class="tab-content">
                     <div class="p-4">
-                        <header class="page-command-header" data-page-header="scenario">
+                        <header class="page-command-header d-flex justify-content-between align-items-start" data-page-header="scenario">
                             <div>
                                 <p class="page-kicker"><i class="fa fa-map-o" aria-hidden="true"></i> SCENARIO ARCHIVE</p>
-                                <h2>剧本管理</h2>
+                                <h2>剧本</h2>
                                 <p class="page-subtitle">整理跑团剧本、导入外部档案，并快速预览场景、线索与结局。</p>
                             </div>
-                        </header>
-                        <div class="mb-4">
-                            <button class="btn btn-primary" id="createScenario">创建剧本</button>
-                            <button class="btn btn-secondary" id="importScenario">导入剧本</button>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-primary" id="createScenario">创建剧本</button>
+                                <button class="btn btn-secondary" id="importScenario">导入剧本</button>
+                            </div>
                             <input type="file" id="importScenarioFile" accept=".json" style="display: none;" multiple>
-                        </div>
+                        </header>
                         <div class="scenario-list" id="scenarioList">
                             <!-- 剧本卡片将在这里动态生成 -->
                         </div>
@@ -49,25 +49,15 @@
                                     <i class="fa fa-user-plus" aria-hidden="true"></i>
                                     <span>新建</span>
                                 </button>
+                                <button class="character-command-button secondary" id="openCharacterGallery" type="button" title="打开角色卡广场">
+                                    <i class="fa fa-users" aria-hidden="true"></i>
+                                    <span>角色卡广场</span>
+                                </button>
                             </div>
                         </header>
 
                         <div class="character-list-view" id="character-list-view">
-                            <section class="character-roster-panel" aria-label="角色卡列表">
-                                <div class="character-panel-title">
-                                    <i class="fa fa-address-card-o" aria-hidden="true"></i>
-                                    <span>调查员档案</span>
-                                </div>
-                                <div class="skill-filter-strip" id="skillLevelFilters" aria-label="技能等级筛选">
-                                    <button type="button" class="skill-rank-pill active" data-rank-filter="all">全部</button>
-                                    <button type="button" class="skill-rank-pill" data-rank-filter="mine">我的角色卡</button>
-                                    <button type="button" class="skill-rank-pill" data-rank-filter="新手">新手</button>
-                                    <button type="button" class="skill-rank-pill" data-rank-filter="学习">学习</button>
-                                    <button type="button" class="skill-rank-pill" data-rank-filter="熟修">熟修</button>
-                                    <button type="button" class="skill-rank-pill" data-rank-filter="主修">主修</button>
-                                </div>
-                                <div class="character-list" id="characterList" aria-live="polite"></div>
-                            </section>
+                            <div class="character-list" id="characterList" aria-live="polite"></div>
                         </div>
 
                         <div class="character-detail-page" id="character-detail-page" hidden>
@@ -85,6 +75,56 @@
                                 <div class="character-detail-view" id="characterDetailView" hidden></div>
                             </section>
                         </div>
+                    </div>
+                </div>
+
+                <!-- 角色卡广场内容 -->
+                <div id="character-gallery" class="tab-content">
+                    <div class="character-workspace p-4">
+                        <div class="character-matrix-bg" aria-hidden="true"></div>
+                        <header class="character-command-header" data-page-header="character-gallery">
+                            <div>
+                                <p class="character-kicker"><i class="fa fa-users" aria-hidden="true"></i> INVESTIGATOR GALLERY</p>
+                                <h2>角色卡广场</h2>
+                                <p class="character-subtitle">发布、预览并应用公开角色卡，作为个人角色卡的创建模板。</p>
+                            </div>
+                            <div class="character-command-actions">
+                                <button class="character-command-button secondary" id="importGalleryCharacter" type="button" title="导入并发布角色卡">
+                                    <i class="fa fa-upload" aria-hidden="true"></i>
+                                    <span>导入</span>
+                                </button>
+                                <input type="file" id="importGalleryCharacterFile" accept=".json" style="display: none;" multiple>
+                                <button class="character-command-button secondary" id="exportGalleryCharacter" type="button" title="导出选中的广场角色">
+                                    <i class="fa fa-download" aria-hidden="true"></i>
+                                    <span>导出</span>
+                                </button>
+                                <button class="character-command-button" id="createGalleryCharacter" type="button" title="新建并发布角色卡">
+                                    <i class="fa fa-user-plus" aria-hidden="true"></i>
+                                    <span>新建</span>
+                                </button>
+                            </div>
+                        </header>
+                        <div class="character-list" id="characterGalleryList" aria-live="polite"></div>
+                    </div>
+                </div>
+
+                <!-- 个人主页内容 -->
+                <div id="personal-home" class="tab-content">
+                    <div class="p-4">
+                        <header class="page-command-header" data-page-header="personal-home">
+                            <div>
+                                <p class="page-kicker"><i class="fa fa-user-circle" aria-hidden="true"></i> PERSONAL HOME</p>
+                                <h2>个人主页</h2>
+                                <p class="page-subtitle">查看当前账户信息、身份和在线状态。</p>
+                            </div>
+                        </header>
+                        <section class="personal-home-panel">
+                            <img id="personalHomeAvatar" src="/assets/avatars/default.jpg" alt="用户头像" width="72" height="72">
+                            <div>
+                                <h3 id="personalHomeName">未登录</h3>
+                                <p id="personalHomeMeta">USER</p>
+                            </div>
+                        </section>
                     </div>
                 </div>
 

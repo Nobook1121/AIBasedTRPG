@@ -25,6 +25,7 @@ class ScenarioController {
             onSaveScenario: () => this.onSaveScenario(),
             onPreviewScenario: (id) => this.onPreviewScenario(id),
             onEditScenario: (id) => this.onEditScenario(id),
+            onPlayScenario: (id) => this.onPlayScenario(id),
             onDeleteScenario: (id) => this.onDeleteScenario(id),
             onImportScenario: (files) => this.onImportScenario(files),
         });
@@ -113,6 +114,11 @@ class ScenarioController {
                 saveButton.addEventListener("click", this.view.saveScenarioHandler);
             }
         };
+    }
+
+    private onPlayScenario(id: number): void {
+        window.switchMainTab?.("save");
+        void window.openCreateRoomWithScenario?.(id);
     }
 
     private async onDeleteScenario(id: number): Promise<void> {

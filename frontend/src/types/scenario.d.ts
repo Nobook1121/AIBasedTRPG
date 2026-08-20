@@ -16,6 +16,8 @@ interface Scenario {
     endings: ScenarioSegment[];
     cover?: string;
     owner_id?: string | number;
+    public_id?: string;
+    creator_username?: string;
     createdAt?: string;
     updatedAt?: string;
     user_id?: string | number;
@@ -53,6 +55,7 @@ interface ScenarioViewHandlers {
     onSaveScenario(): Promise<void>;
     onPreviewScenario(id: number): void;
     onEditScenario(id: number): void;
+    onPlayScenario(id: number): void;
     onDeleteScenario(id: number): Promise<void>;
     onImportScenario(files: FileList | null): Promise<void>;
 }

@@ -50,7 +50,10 @@ def test_build_messages_includes_room_snapshot_context():
     assert "room.get_room_snapshot" in messages[1]["content"]
     assert "长生俑" in messages[1]["content"]
     assert "吴明山" in messages[1]["content"]
-    assert messages[-1] == {"role": "user", "content": "@KP 开始"}
+    assert messages[-1]["role"] == "user"
+    assert "---->USER_INPUT<----" in messages[-1]["content"]
+    assert "@KP 开始" in messages[-1]["content"]
+    assert "---->END_USER_INPUT<----" in messages[-1]["content"]
 
 
 def test_room_snapshot_system_message_omits_large_character_and_scenario_details():
@@ -153,8 +156,11 @@ def test_build_messages_formats_historical_user_speakers():
 
     messages = _build_messages("KP prompt", history, "@KP continue")
 
-    assert messages[1]["content"].startswith("[speaker=test1; character=\u5415\u5357\u679d]")
-    assert messages[-1] == {"role": "user", "content": "@KP continue"}
+    assert "[speaker=test1; character=\u5415\u5357\u679d]" in messages[1]["content"]
+    assert "---->USER_INPUT<----" in messages[1]["content"]
+    assert messages[-1]["role"] == "user"
+    assert "@KP continue" in messages[-1]["content"]
+    assert "---->END_USER_INPUT<----" in messages[-1]["content"]
 
 
 def test_compact_command_detection_and_response_stripping():

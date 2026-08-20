@@ -26,6 +26,7 @@ namespace AuthModule {
             console.debug("未登录或会话已失效", error);
         }
         setCurrentUser(null);
+        window.clearCharacterManagement?.();
         showAuthModal();
         return false;
     }
@@ -72,6 +73,7 @@ namespace AuthModule {
             window.reconnectSocket?.();
             window.clearCurrentRoom?.();
             window.clearChatMessages?.();
+            await window.reloadCharacterManagement?.();
             await window.autoLoadLastRoom?.();
         } catch (error) {
             console.warn("登录后的页面状态恢复失败:", error);

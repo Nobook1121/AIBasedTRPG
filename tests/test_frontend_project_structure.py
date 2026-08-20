@@ -137,3 +137,77 @@ def test_settings_exposes_data_driven_permission_matrix():
     assert "renderPermissionMatrix" in tabs_ts
     assert "savePermissionConfig" in tabs_ts
     assert "permission-node-card" in styles
+
+
+def test_improvement_sidebar_exposes_discovery_and_admin_gated_settings():
+    sidebar = (ROOT / "frontend/src/react/shell/Sidebar.tsx").read_text(encoding="utf-8")
+
+    assert 'label: "角色卡"' in sidebar
+    assert 'label: "房间"' in sidebar
+    assert 'label: "剧本管理"' not in sidebar
+    assert 'label: "角色卡管理"' not in sidebar
+    assert 'label: "房间管理"' not in sidebar
+    assert 'label: "探索发现"' in sidebar
+    assert 'label: "角色卡广场"' in sidebar
+    assert "data-admin-only" in sidebar
+    assert '"true"' in sidebar
+
+
+def test_improvement_frontend_exposes_gallery_and_profile_tabs():
+    main_tabs = (ROOT / "frontend/src/index/fragments/02-main-tabs.html").read_text(encoding="utf-8")
+    auth_settings = (ROOT / "frontend/src/index/fragments/03-room-tools-auth-settings.html").read_text(encoding="utf-8")
+    character_source = (ROOT / "frontend/src/app/character-sheet.ts").read_text(encoding="utf-8")
+    tabs_source = (ROOT / "frontend/src/app/tabs.ts").read_text(encoding="utf-8")
+
+    assert 'id="character-gallery"' in main_tabs
+    assert 'id="personal-home"' in main_tabs
+    assert 'id="openCharacterGallery"' in main_tabs
+    assert 'id="open-personal-home"' in auth_settings
+    assert "/api/character-gallery" in character_source
+    assert "applyGalleryCharacter" in character_source
+    assert "switchMainTab" in tabs_source
+
+
+def test_improvement_scenario_cards_expose_permissions_and_public_ids():
+    scenario_template = (ROOT / "frontend/src/templates/scenario.html").read_text(encoding="utf-8")
+    scenario_view = (ROOT / "frontend/src/app/views/ScenarioView.ts").read_text(encoding="utf-8")
+    editor_fragment = (ROOT / "frontend/src/index/fragments/04-editor-modals.html").read_text(encoding="utf-8")
+
+    assert "play-scenario" in scenario_template
+    assert "createdBy" in scenario_template
+    assert "publicId" in scenario_template
+    assert "scenario-id-chip" in scenario_template
+    assert "保存并发布" in editor_fragment
+    assert "confirmScenarioSpoilerAccess" in scenario_view
+
+
+def test_home_title_is_bound_to_current_room_name():
+    home_chat = (ROOT / "frontend/src/react/home/HomeChat.tsx").read_text(encoding="utf-8")
+    rooms = (ROOT / "frontend/src/app/rooms.ts").read_text(encoding="utf-8")
+
+    assert 'id="homeRoomTitle"' in home_chat
+    assert "跑团频道" not in home_chat
+    assert 'setText("homeRoomTitle", room.name)' in rooms
+    assert 'setText("homeRoomTitle", "未加入房间")' in rooms
+
+
+def test_profile_settings_contains_personal_theme_with_pending_save_controls():
+    settings_fragment = (ROOT / "frontend/src/index/fragments/03-room-tools-auth-settings.html").read_text(encoding="utf-8")
+    profile_source = (ROOT / "frontend/src/app/auth/profile-dialog.ts").read_text(encoding="utf-8")
+    user_card_source = (ROOT / "frontend/src/app/auth/user-card.ts").read_text(encoding="utf-8")
+    config_source = (ROOT / "frontend/src/app/config/ConfigManager.ts").read_text(encoding="utf-8")
+
+    assert "编辑个人资料" not in settings_fragment
+    assert "用户设置" in settings_fragment
+    assert "网站设置" in settings_fragment
+    assert "fa-cog" in settings_fragment
+    assert 'id="profileThemeSelect"' in settings_fragment
+    assert "网站主题切换：" in settings_fragment
+    assert 'id="profilePendingSaveBar"' in settings_fragment
+    assert 'id="saveProfilePendingChanges"' in settings_fragment
+    assert 'id="cancelProfilePendingChanges"' in settings_fragment
+    assert "profile-setting-dirty" in profile_source
+    assert "trpg_user_theme" in profile_source
+    assert "closeUserCardOnOutsideClick" in user_card_source
+    assert "getEffectiveTheme" in config_source
+    assert "默认主题" in settings_fragment

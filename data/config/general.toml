@@ -1,5 +1,5 @@
 [appearance]
-theme = "dark"
+theme = "pattern_cyber_2"
 
 [language]
 language = "zh-CN"
@@ -22,7 +22,7 @@ stream_output = false
 
 [character_rules]
 attribute_ratio_percent = 20
-max_cards_per_user = 5
+max_cards_per_user = 3
 weapon_slot_count = 5
 attribute_roll_str = "3d6x5"
 attribute_roll_dex = "3d6x5"

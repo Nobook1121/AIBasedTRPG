@@ -8,6 +8,7 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 from trpg_server.app_factory import create_app, socketio
+from trpg_server.console_commands import start_console_command_loop
 from trpg_server.network_discovery import (
     find_available_port,
     get_local_ip,
@@ -58,6 +59,7 @@ def run_server(argv=None):
     logger.debug("Starting server on port %s", port)
     logger.debug("LAN URL: http://%s:%s", local_ip, port)
     _log_listening_addresses(local_ip, port)
+    start_console_command_loop()
 
     try:
         socketio.run(

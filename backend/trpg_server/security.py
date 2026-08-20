@@ -117,6 +117,7 @@ def register_session_guard(app):
         ):
             session.clear()
             return error_response("Session expired", 401, "Session expired")
+        _refresh_session_user_fields(manager)
 
         return None
 
@@ -136,6 +137,7 @@ def require_permission(required_role):
             ):
                 session.clear()
                 return error_response("Session expired", 401, "Session expired")
+            _refresh_session_user_fields(manager)
 
             if not manager.check_permission(session["user_id"], required_role):
                 return error_response("Permission denied", 403, "Permission denied")
@@ -159,8 +161,19 @@ def _validate_current_session():
     ):
         session.clear()
         return None, error_response("Session expired", 401, "Session expired")
+    _refresh_session_user_fields(manager)
 
     return manager, None
+
+
+def _refresh_session_user_fields(manager) -> None:
+    if "user_id" not in session or not hasattr(manager, "get_user_by_id"):
+        return
+    user = manager.get_user_by_id(session["user_id"])
+    if not user:
+        return
+    session["username"] = user.get("username", session.get("username"))
+    session["role"] = user.get("role", session.get("role", "USER"))
 
 
 def require_permission_node(node_id):

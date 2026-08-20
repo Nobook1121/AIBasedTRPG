@@ -3,11 +3,8 @@ export function HomeChat() {
         <>
             <header className="page-command-header chat-command-header" data-page-header="chat">
                 <div>
-                    <p className="page-kicker">
-                        <i className="fa fa-comments-o" aria-hidden="true" /> LIVE TABLE CHANNEL
-                    </p>
-                    <h2>跑团频道</h2>
-                    <p className="page-subtitle">在当前房间内发送消息、调用 KP，并查看骰点与系统记录。</p>
+                    <h2 id="homeRoomTitle">未加入房间</h2>
+                    <p className="home-room-meta" id="homeRoomOnlineCount">当前房间在线玩家 0</p>
                 </div>
             </header>
 
@@ -31,7 +28,7 @@ export function HomeChat() {
             </div>
 
             <div className="chat-history" id="chatHistory">
-                <div className="welcome-text">欢迎来到AI TRPG系统，请选择一个剧本开始游戏</div>
+                <div className="welcome-text">欢迎来到 AI TRPG 系统，请选择一个剧本开始游戏。</div>
             </div>
 
             <div className="chat-input p-3 border-top">

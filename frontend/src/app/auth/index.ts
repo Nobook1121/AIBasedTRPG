@@ -14,6 +14,10 @@ namespace AuthModule {
         document.getElementById("close-auth-modal")?.addEventListener("click", closeAuthModal);
         document.getElementById("logoutButton")?.addEventListener("click", logout);
         document.getElementById("switchAccountButton")?.addEventListener("click", switchAccount);
+        document.getElementById("open-personal-home")?.addEventListener("click", () => {
+            closeUserCard();
+            window.switchMainTab?.("personal-home", { clearNav: true });
+        });
         document.getElementById("open-profile-dialog")?.addEventListener("click", openProfileDialog);
         document.getElementById("close-settings-panel")?.addEventListener("click", closeProfileDialog);
         document.getElementById("saveUserSettings")?.addEventListener("click", saveUserSettings);
@@ -22,6 +26,7 @@ namespace AuthModule {
         document.getElementById("cancelPasswordDialog")?.addEventListener("click", closePasswordDialog);
         document.getElementById("changePasswordButton")?.addEventListener("click", changePassword);
         document.getElementById("userInfo")?.addEventListener("click", toggleUserCard);
+        closeUserCardOnOutsideClick();
         bindProfileNavigation();
         bindAvatarPreview();
         document.querySelectorAll<HTMLButtonElement>("[data-presence]").forEach((button) => {

@@ -18,6 +18,7 @@ function initTabs(): void {
         });
 
         bindDropdownButtons();
+        refreshAdminNavigation();
         console.log("标签切换初始化成功");
     } catch (error) {
         console.error("初始化标签切换时出错:", error);
@@ -64,6 +65,35 @@ function handleMainNavigationClick(
         const toolsTab = link.hash.replace("#", "");
         if (toolsTab === "tools-dice") switchToolTab("dice");
     }
+}
+
+function switchMainTab(tabId: string, options: { clearNav?: boolean } = {}): void {
+    const navLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>("#sidebar .nav-link"));
+    const tabContents = Array.from(document.querySelectorAll<HTMLElement>(".tab-content"));
+    tabContents.forEach((tab) => tab.classList.remove("active"));
+    const targetTab = document.getElementById(tabId);
+    if (!targetTab) {
+        console.error(`找不到 id 为 ${tabId} 的标签内容`);
+        return;
+    }
+    targetTab.classList.add("active");
+
+    navLinks.forEach((item) => item.classList.remove("active"));
+    if (!options.clearNav) {
+        const activeLink = navLinks.find((link) => link.dataset.tab === tabId);
+        activeLink?.classList.add("active");
+        updateNavigationState(activeLink || null, navLinks);
+    } else {
+        updateNavigationState(null, navLinks);
+    }
+}
+
+function refreshAdminNavigation(): void {
+    const role = window.currentUser?.role || "USER";
+    const canSeeAdmin = role === "ADMIN" || role === "OWNER";
+    document.querySelectorAll<HTMLElement>("[data-admin-only='true']").forEach((element) => {
+        element.hidden = !canSeeAdmin;
+    });
 }
 
 function updateNavigationState(activeLink: HTMLAnchorElement | null, navLinks: HTMLAnchorElement[]): void {
@@ -183,15 +213,13 @@ function initSettingsTabs(): void {
 
     const themeSelect = document.getElementById("themeSelect") as HTMLSelectElement | null;
     if (themeSelect) {
-        themeSelect.addEventListener("change", async () => {
-            const generalConfig = configManager.getConfig("general");
-            const appearance = isConfigObject(generalConfig.appearance) ? generalConfig.appearance : {};
-            appearance.theme = themeSelect.value;
-            generalConfig.appearance = appearance;
-            await configManager.saveConfig("general", generalConfig);
-            configManager.applyTheme();
-        });
+        themeSelect.dataset.savedValue = themeSelect.value;
+        themeSelect.addEventListener("change", () => updateDefaultThemePendingState());
     }
+    document.getElementById("saveDefaultThemeChange")?.addEventListener("click", () => {
+        void saveDefaultThemeChange();
+    });
+    document.getElementById("cancelDefaultThemeChange")?.addEventListener("click", cancelDefaultThemeChange);
 
     bindGeneralCheckboxSetting("streamOutput", "ai", "stream_output");
     document.getElementById("savePermissionConfig")?.addEventListener("click", () => {
@@ -213,6 +241,41 @@ function bindGeneralCheckboxSetting(elementId: string, sectionName: string, key:
 
 function isConfigObject(value: unknown): value is TomlConfig {
     return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function updateDefaultThemePendingState(): void {
+    const themeSelect = document.getElementById("themeSelect") as HTMLSelectElement | null;
+    const pendingBar = document.getElementById("defaultThemePendingSaveBar");
+    const count = document.getElementById("defaultThemePendingChangeCount");
+    const themeSetting = themeSelect?.closest<HTMLElement>(".form-group");
+    if (!themeSelect || !pendingBar || !count) return;
+
+    const isDirty = themeSelect.value !== (themeSelect.dataset.savedValue || "");
+    pendingBar.hidden = !isDirty;
+    count.textContent = isDirty ? "1" : "0";
+    themeSetting?.classList.toggle("setting-dirty", isDirty);
+}
+
+async function saveDefaultThemeChange(): Promise<void> {
+    const themeSelect = document.getElementById("themeSelect") as HTMLSelectElement | null;
+    if (!themeSelect) return;
+
+    const generalConfig = configManager.getConfig("general");
+    const appearance = isConfigObject(generalConfig.appearance) ? generalConfig.appearance : {};
+    appearance.theme = themeSelect.value;
+    generalConfig.appearance = appearance;
+    if (await configManager.saveConfig("general", generalConfig)) {
+        themeSelect.dataset.savedValue = themeSelect.value;
+        updateDefaultThemePendingState();
+        configManager.applyTheme();
+    }
+}
+
+function cancelDefaultThemeChange(): void {
+    const themeSelect = document.getElementById("themeSelect") as HTMLSelectElement | null;
+    if (!themeSelect) return;
+    themeSelect.value = themeSelect.dataset.savedValue || "light";
+    updateDefaultThemePendingState();
 }
 
 async function loadPermissionConfig(): Promise<void> {
@@ -312,3 +375,6 @@ function settingsEscapeHtml(value: unknown): string {
 function settingsErrorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
 }
+
+window.switchMainTab = switchMainTab;
+window.refreshAdminNavigation = refreshAdminNavigation;

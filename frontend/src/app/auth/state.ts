@@ -5,6 +5,8 @@ interface Window {
     disconnectSocket?: () => void;
     clearCurrentRoom?: () => void;
     clearChatMessages?: () => void;
+    clearCharacterManagement?: () => void;
+    reloadCharacterManagement?: () => Promise<void>;
     autoLoadLastRoom?: () => Promise<void>;
     setCurrentEditingScenarioId?: (id: string | number | null) => void;
 }
@@ -34,6 +36,9 @@ namespace AuthModule {
         const cardName = document.getElementById("userCardName");
         const cardRole = document.getElementById("userCardRole");
         const cardAvatar = document.getElementById("userCardAvatar") as HTMLImageElement | null;
+        const homeAvatar = document.getElementById("personalHomeAvatar") as HTMLImageElement | null;
+        const homeName = document.getElementById("personalHomeName");
+        const homeMeta = document.getElementById("personalHomeMeta");
         const presenceButtonLabel = document.querySelector<HTMLElement>("#presence-menu-button .presence-current-label");
         if (user) {
             if (name) name.textContent = user.username;
@@ -41,6 +46,9 @@ namespace AuthModule {
             if (cardName) cardName.textContent = user.username;
             if (cardRole) cardRole.textContent = user.role || "USER";
             if (cardAvatar) cardAvatar.src = user.avatar || "/assets/avatars/default.jpg";
+            if (homeAvatar) homeAvatar.src = user.avatar || "/assets/avatars/default.jpg";
+            if (homeName) homeName.textContent = user.nickname || user.username;
+            if (homeMeta) homeMeta.textContent = `${user.role || "USER"} · ${user.email || "未设置邮箱"}`;
             if (presenceButtonLabel) presenceButtonLabel.textContent = presenceLabel(user.presence || "online");
         } else {
             if (name) name.textContent = "未登录";
@@ -48,8 +56,12 @@ namespace AuthModule {
             if (cardName) cardName.textContent = "未登录";
             if (cardRole) cardRole.textContent = "USER";
             if (cardAvatar) cardAvatar.src = "/assets/avatars/default.jpg";
+            if (homeAvatar) homeAvatar.src = "/assets/avatars/default.jpg";
+            if (homeName) homeName.textContent = "未登录";
+            if (homeMeta) homeMeta.textContent = "USER";
             if (presenceButtonLabel) presenceButtonLabel.textContent = "在线状态";
         }
+        window.refreshAdminNavigation?.();
     }
 
     function presenceLabel(presence: CurrentUser["presence"]): string {

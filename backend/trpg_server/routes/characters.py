@@ -1,8 +1,11 @@
 import json
 import logging
 import re
+import secrets
+import string
 import time
 import tomllib
+from pathlib import Path
 
 from flask import Blueprint, current_app, request, session
 
@@ -11,12 +14,12 @@ from trpg_server.logging_config import log_user_action, user_action_text
 from trpg_server.permission_config import is_role_allowed, permission_config_path
 from trpg_server.responses import error_response, success_response
 from trpg_server.security import normalize_filename, safe_join
-from trpg_server.settings import CHARACTERS_DIR, CONFIG_DIR, OCCUPATIONS_DIR, ROOMS_DIR, WEAPONS_DIR
+from trpg_server.settings import CHARACTER_GALLERY_DIR, CHARACTERS_DIR, CONFIG_DIR, OCCUPATIONS_DIR, ROOMS_DIR, WEAPONS_DIR
 
 bp = Blueprint("characters", __name__)
 logger = logging.getLogger(__name__)
 
-DEFAULT_MAX_CARDS_PER_USER = 5
+DEFAULT_MAX_CARDS_PER_USER = 3
 SKILL_GROUP_CATEGORIES = {
     "special": "特殊",
     "explore": "探索",
@@ -44,6 +47,10 @@ STATUS_MENTAL_FIELDS = {
 
 def _get_characters_dir():
     return current_app.config.get("CHARACTERS_DIR", CHARACTERS_DIR)
+
+
+def _get_character_gallery_dir():
+    return current_app.config.get("CHARACTER_GALLERY_DIR", CHARACTER_GALLERY_DIR)
 
 
 def _get_config_dir():
@@ -74,6 +81,12 @@ def _is_elevated():
     return is_role_allowed(session.get("role", "USER"), "characters.manage_all", config_path)
 
 
+def _can_use_permission(node_id):
+    config_dir = current_app.config.get("CONFIG_DIR")
+    config_path = current_app.config.get("PERMISSION_CONFIG_FILE") or permission_config_path(config_dir)
+    return is_role_allowed(session.get("role", "USER"), node_id, config_path)
+
+
 def _current_player_ids():
     return {str(session.get("user_id", "")), str(session.get("username", ""))}
 
@@ -83,6 +96,13 @@ def _iter_character_files():
     if not characters_dir.exists():
         return []
     return sorted(characters_dir.glob("*.json"))
+
+
+def _iter_gallery_character_files():
+    gallery_dir = _get_character_gallery_dir()
+    if not gallery_dir.exists():
+        return []
+    return sorted(gallery_dir.glob("*.json"))
 
 
 def _as_dict(value):
@@ -298,6 +318,9 @@ def _runtime_to_test_character(character):
     now_text = _as_text(character.get("updatedAt") or character.get("createdAt"))
     return {
         "id": _as_text(character.get("id")),
+        "public_id": _as_text(character.get("public_id")),
+        "publisher_id": character.get("publisher_id"),
+        "publisher_name": _as_text(character.get("publisher_name")),
         "name": _as_text(character.get("name")),
         "playerId": _as_text(character.get("playerId")),
         "playerName": _as_text(character.get("playerName")),
@@ -408,6 +431,9 @@ def _test_character_to_runtime(character, fallback_id=""):
     age = _as_int(character.get("age"), _as_int(attributes.get("age"), 25))
     return {
         "id": _as_text(character.get("id") or fallback_id),
+        "public_id": _as_text(character.get("public_id")),
+        "publisher_id": character.get("publisher_id"),
+        "publisher_name": _as_text(character.get("publisher_name")),
         "name": _as_text(character.get("name"), "未命名角色卡"),
         "playerId": _as_text(character.get("playerId") or character.get("playerName")),
         "playerName": _as_text(character.get("playerName")),
@@ -551,6 +577,34 @@ def _owned_character_count(excluded_character_id=None):
 
 def _character_filename(character_id):
     return normalize_filename(f"{character_id or f'investigator-{int(time.time() * 1000)}'}.json")
+
+
+def _short_public_id(existing_ids):
+    alphabet = string.ascii_letters + string.digits
+    for _ in range(200):
+        value = "".join(secrets.choice(alphabet) for _ in range(6))
+        if value not in existing_ids:
+            return value
+    raise RuntimeError("Failed to generate unique public id")
+
+
+def _gallery_public_ids(excluded_path=None):
+    ids = set()
+    for path in _iter_gallery_character_files():
+        if excluded_path and Path(path) == Path(excluded_path):
+            continue
+        data = read_json(path, default={})
+        if isinstance(data, dict) and data.get("public_id"):
+            ids.add(str(data["public_id"]))
+    return ids
+
+
+def _gallery_character_filename(public_id):
+    return normalize_filename(f"{public_id}.json")
+
+
+def _gallery_character_path(public_id):
+    return safe_join(_get_character_gallery_dir(), _gallery_character_filename(public_id))
 
 
 def _character_path(character_id):
@@ -709,6 +763,61 @@ def list_characters():
             characters.append(character)
     characters.sort(key=lambda item: item.get("updatedAt") or item.get("createdAt") or "", reverse=True)
     return success_response(characters, "Characters loaded successfully")
+
+
+@bp.route("/api/character-gallery", methods=["GET"])
+def list_character_gallery():
+    login_error = _require_login()
+    if login_error:
+        return login_error
+
+    gallery = []
+    for path in _iter_gallery_character_files():
+        character = _character_from_storage(read_json(path, default=None), path.stem)
+        if character:
+            gallery.append(character)
+    gallery.sort(key=lambda item: item.get("updatedAt") or item.get("createdAt") or "", reverse=True)
+    return success_response(gallery, "Character gallery loaded successfully")
+
+
+@bp.route("/api/character-gallery", methods=["POST"])
+def publish_character_gallery():
+    login_error = _require_login()
+    if login_error:
+        return login_error
+    if not _can_use_permission("characters.gallery.publish"):
+        return error_response("Permission denied", 403, "Permission denied")
+
+    payload = request.get_json(silent=True) or {}
+    if _is_test_character_shape(payload):
+        payload = _test_character_to_runtime(payload)
+    character = _normalize_character_payload(payload)
+    if character is None:
+        return error_response("Invalid character card", 400, "Invalid character card")
+
+    now = time.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    public_id = _short_public_id(_gallery_public_ids())
+    character["id"] = public_id
+    character["public_id"] = public_id
+    character["publisher_id"] = session.get("user_id")
+    character["publisher_name"] = session.get("username")
+    character["createdAt"] = character.get("createdAt") or now
+    character["updatedAt"] = now
+
+    path = _gallery_character_path(public_id)
+    write_json_atomic(path, _runtime_to_test_character(character) | {
+        "public_id": public_id,
+        "publisher_id": character["publisher_id"],
+        "publisher_name": character["publisher_name"],
+    })
+    log_user_action(
+        logger,
+        user_action_text(session.get("username"), "发布了角色卡到广场"),
+        用户ID=session.get("user_id"),
+        角色卡ID=public_id,
+        角色名=character["name"],
+    )
+    return success_response(character, "Character published successfully", 201)
 
 
 @bp.route("/api/characters/<character_id>", methods=["PUT"])

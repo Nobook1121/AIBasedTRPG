@@ -1,4 +1,4 @@
-type COC7CoreAttributeKey = "STR" | "DEX" | "SIZ" | "APP" | "CON" | "INT" | "POW" | "EDU" | "LUC";
+﻿type COC7CoreAttributeKey = "STR" | "DEX" | "SIZ" | "APP" | "CON" | "INT" | "POW" | "EDU" | "LUC";
 type COC7AttributeKey = COC7CoreAttributeKey | "AGE";
 type SkillRank = "新手" | "学习" | "熟修" | "主修";
 type SkillCategory = "特殊" | "探索" | "社交" | "战斗" | "医疗" | "运动" | "知识" | "技术" | "操纵" | "其他";
@@ -339,6 +339,7 @@ interface CharacterApi {
     PRESET_OCCUPATIONS: COC7Occupation[];
     calculateHalfAndFifth: (value: number) => COC7HalfAndFifth;
     calculateAttributeDisplayValues: (value: number, ratioPercent?: number) => AttributeDisplayValues;
+    calculateAttributeBaseTotal: (attributes: COC7Attributes) => number;
     calculateMaxHp: (attributes: COC7Attributes) => number;
     calculateMaxSan: (attributes: COC7Attributes) => number;
     calculateMaxMp: (attributes: COC7Attributes) => number;
@@ -362,6 +363,8 @@ interface CharacterApi {
     createCharacterCard: (input?: COC7CharacterCardInput) => COC7CharacterCard;
     listCharacterCards: () => COC7CharacterCard[];
     getCharacterCardSnapshot: (cardId: string) => Partial<COC7CharacterCard> | null;
+    clearCharacterManagement: () => void;
+    reloadCharacterManagement: () => Promise<void>;
     initCharacterSheet: () => void;
 }
 
@@ -631,6 +634,7 @@ interface Window {
     ];
 
     let cards: COC7CharacterCard[] = [];
+    let galleryCards: COC7CharacterCard[] = [];
     let activeCardId = "";
     let activeCharacterFilter = "all";
     let assignableUsers: CharacterAssignableUser[] = [];
@@ -786,6 +790,10 @@ interface Window {
         };
     }
 
+    function calculateAttributeBaseTotal(attributes: COC7Attributes): number {
+        return ATTRIBUTE_KEYS.reduce((total, key) => total + clampNumber(attributes[key], 0, 99, 0), 0);
+    }
+
     function calculateOccupationSkillPoints(attributes: COC7Attributes, occupationId: string): number {
         const occupation = getOccupationById(occupationId);
         return occupation.pointsFormula.reduce((total, term) => {
@@ -894,8 +902,9 @@ interface Window {
         const occupation = getOccupation(card);
         const bonusEntries = Object.entries(occupation.skillBonuses);
         const skills = card.skills.map((skill) => {
-            const occupationSkill = occupation.occupationSkills.includes(skill.id);
-            const bonusEntry = bonusEntries.find(([skillId]) => skillId === skill.id);
+            const skillKey = resolveSkillKey(skill);
+            const occupationSkill = occupation.occupationSkills.includes(skillKey);
+            const bonusEntry = bonusEntries.find(([skillId]) => skillId === skillKey);
             const bonus = bonusEntry ? bonusEntry[1] : 0;
             const value = clampNumber(skill.value + bonus, 0, 99, skill.value);
             return {
@@ -1451,6 +1460,76 @@ interface Window {
         activeCardId = cards[0]?.id || "";
     }
 
+    async function loadCharacterGallery(): Promise<void> {
+        galleryCards = [];
+        try {
+            const response = await TrpgApi.get<ApiResponse<COC7CharacterCardInput[]>>("/api/character-gallery");
+            if (response.success && Array.isArray(response.data)) {
+                galleryCards = response.data.map((card) => createCharacterCard(card));
+            }
+        } catch (error) {
+            console.warn("加载角色卡广场失败:", error);
+        }
+        renderCharacterGallery();
+    }
+
+    function renderCharacterGallery(): void {
+        const list = byId("characterGalleryList");
+        if (!list) return;
+        if (!galleryCards.length) {
+            list.innerHTML = `<div class="character-empty-filter">角色卡广场暂无公开角色卡。</div>`;
+            return;
+        }
+        list.innerHTML = galleryCards.map((card) => `
+            <article class="character-card" data-gallery-character-id="${escapeHtml(card.id)}">
+                <div class="character-card-avatar">${card.avatar ? `<img src="${escapeHtml(card.avatar)}" alt="">` : `<i class="fa fa-id-card-o"></i>`}</div>
+                <h5>${escapeHtml(card.name)}</h5>
+                <p>${escapeHtml(card.occupationName || "未命名职业")}</p>
+                <div class="character-card-actions">
+                    <button type="button" data-gallery-action="apply">应用</button>
+                </div>
+            </article>
+        `).join("");
+    }
+
+    function handleGalleryClick(event: Event): void {
+        const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-gallery-action='apply']");
+        if (!button) return;
+        const card = button.closest<HTMLElement>("[data-gallery-character-id]");
+        if (card?.dataset.galleryCharacterId) applyGalleryCharacter(card.dataset.galleryCharacterId);
+    }
+
+    function applyGalleryCharacter(galleryCharacterId: string): void {
+        const source = galleryCards.find((card) => card.id === galleryCharacterId);
+        if (!source || !canCreateCharacterCard()) return;
+        openEditor(createCharacterCard({
+            ...cloneCard(source),
+            id: `gallery-${Date.now()}`,
+            playerId: currentPlayerId()
+        }));
+    }
+
+    function clearCharacterSheetState(): void {
+        cards = [];
+        galleryCards = [];
+        activeCardId = "";
+        editorSkills = [];
+        pendingGeneratedName = "";
+        pendingSkillSpecialtyTarget = "";
+        pendingWeaponPickerTarget = "";
+        modal?.hide();
+        occupationTemplateModal?.hide();
+        skillSpecialtyModal?.hide();
+        weaponPickerModal?.hide();
+        render();
+    }
+
+    async function reloadCharacterSheet(): Promise<void> {
+        await loadCards();
+        await loadAssignableUsers();
+        render();
+    }
+
     async function saveCardToServer(card: COC7CharacterCard): Promise<COC7CharacterCard | null> {
         try {
             const response = await TrpgApi.put<ApiResponse<COC7CharacterCard>>(`/api/characters/${encodeURIComponent(card.id)}`, card);
@@ -1495,7 +1574,7 @@ interface Window {
         bindEvents();
         void Promise.all([loadSkillCatalog(), loadOccupationCatalogs(), loadWeaponCatalog()]).then(() => {
             hydrateOccupationSelect();
-            void loadCards().then(render);
+            void Promise.all([loadCards(), loadCharacterGallery()]).then(render);
         });
         void loadAssignableUsers().then(render);
     }
@@ -1520,6 +1599,10 @@ interface Window {
         byId("nameRegionSelect")?.addEventListener("change", regenerateNamePreview);
         byId("nameGenderSelect")?.addEventListener("change", regenerateNamePreview);
         byId("openOccupationTemplatePicker")?.addEventListener("click", openOccupationTemplatePicker);
+        byId("createGalleryCharacter")?.addEventListener("click", () => {
+            if (canCreateCharacterCard()) openEditor();
+        });
+        byId("characterGalleryList")?.addEventListener("click", handleGalleryClick);
         byId("characterAvatarPreview")?.addEventListener("click", () => byId<HTMLInputElement>("characterAvatarUpload")?.click());
         byId("unbindCharacterPlayer")?.addEventListener("click", unbindCharacterPlayerFromEditor);
         byId("randomizeAttributes")?.addEventListener("click", () => {
@@ -2178,7 +2261,16 @@ interface Window {
         const occupation = getOccupationById(occupationId);
         setInputValue("characterOccupation", occupation.name);
         occupationSkillPointsManuallyEdited = false;
-        editorSkills = readChecklistSkills();
+        const currentSkills = readChecklistSkills().map((skill) => ({
+            ...skill,
+            checked: false,
+            occupation: false
+        }));
+        editorSkills = normalizeSkills(mergeSkillCatalog(currentSkills), readAttributes(), occupation);
+        activeSkillCategoryFilter = "全部技能";
+        document.querySelectorAll<HTMLElement>("#characterSkillCategoryFilters [data-skill-category]").forEach((item) => {
+            item.classList.toggle("is-active", item.dataset.skillCategory === activeSkillCategoryFilter);
+        });
         hydrateSkillChecklist(editorSkills);
         refreshEditorRuleSummary();
         syncEditorCreditRating();
@@ -2489,6 +2581,7 @@ interface Window {
 
     function refreshEditorRuleSummary(): void {
         const attributes = readAttributes();
+        setText("attributeBaseTotal", `${calculateAttributeBaseTotal(attributes)} / 900`);
         syncAttributeDerivedFields(attributes);
         syncEditorResourceLimits(attributes);
         syncEditorCombatStats(attributes);
@@ -2669,6 +2762,7 @@ interface Window {
 
     function render(): void {
         renderList();
+        renderCharacterGallery();
         showCharacterList();
     }
 
@@ -2773,7 +2867,13 @@ interface Window {
             <div class="character-detail-dashboard">
                 ${renderCharacterBasicInfo(card)}
                 <section class="character-detail-band">
-                    <h4>属性</h4>
+                    <div class="character-detail-band-head">
+                        <h4>属性</h4>
+                        <div class="character-attribute-summary character-attribute-summary-inline">
+                            <span>基础总和</span>
+                            <strong>${calculateAttributeBaseTotal(card.attributes)} / 900</strong>
+                        </div>
+                    </div>
                     <div class="character-attribute-grid">${ATTRIBUTE_KEYS.map((key) => renderAttributeChip(key, card.attributes[key])).join("")}</div>
                 </section>
                 ${renderCharacterVitals(card)}
@@ -3587,6 +3687,7 @@ interface Window {
         PRESET_OCCUPATIONS,
         calculateHalfAndFifth,
         calculateAttributeDisplayValues,
+        calculateAttributeBaseTotal,
         calculateMaxHp,
         calculateMaxSan,
         calculateMaxMp,
@@ -3610,9 +3711,13 @@ interface Window {
         createCharacterCard,
         listCharacterCards,
         getCharacterCardSnapshot,
+        clearCharacterManagement: clearCharacterSheetState,
+        reloadCharacterManagement: reloadCharacterSheet,
         initCharacterSheet
     };
 
     global.COC7CharacterSheet = api;
+    global.clearCharacterManagement = clearCharacterSheetState;
+    global.reloadCharacterManagement = reloadCharacterSheet;
 })(typeof window !== "undefined" ? window : globalThis as Window & typeof globalThis);
 

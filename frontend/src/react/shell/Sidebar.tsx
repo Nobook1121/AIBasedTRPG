@@ -3,18 +3,19 @@ interface NavLinkItem {
     tab: string;
     label: string;
     active?: boolean;
+    adminOnly?: boolean;
 }
 
 interface NavGroup {
     label: string;
     links: NavLinkItem[];
+    adminOnly?: boolean;
 }
 
 const primaryLinks: NavLinkItem[] = [
     { href: "#home", tab: "home", label: "主页", active: true },
-    { href: "#scenario", tab: "scenario", label: "剧本管理" },
-    { href: "#character", tab: "character", label: "角色卡管理" },
-    { href: "#save", tab: "save", label: "房间管理" },
+    { href: "#character", tab: "character", label: "角色卡" },
+    { href: "#save", tab: "save", label: "房间" },
 ];
 
 const groupedLinks: NavGroup[] = [
@@ -26,7 +27,15 @@ const groupedLinks: NavGroup[] = [
         ],
     },
     {
+        label: "探索发现",
+        links: [
+            { href: "#scenario", tab: "scenario", label: "剧本" },
+            { href: "#character-gallery", tab: "character-gallery", label: "角色卡广场" },
+        ],
+    },
+    {
         label: "设置",
+        adminOnly: true,
         links: [
             { href: "#settings-general", tab: "settings", label: "常规设置" },
             { href: "#settings-model", tab: "settings", label: "模型设置" },
@@ -36,9 +45,9 @@ const groupedLinks: NavGroup[] = [
     },
 ];
 
-function NavLink({ href, tab, label, active = false }: NavLinkItem) {
+function NavLink({ href, tab, label, active = false, adminOnly = false }: NavLinkItem) {
     return (
-        <a className={`nav-link${active ? " active" : ""}`} href={href} data-tab={tab}>
+        <a className={`nav-link${active ? " active" : ""}`} href={href} data-tab={tab} data-admin-only={adminOnly ? "true" : undefined}>
             {label}
         </a>
     );
@@ -46,7 +55,7 @@ function NavLink({ href, tab, label, active = false }: NavLinkItem) {
 
 function NavGroupSection({ group }: { group: NavGroup }) {
     return (
-        <li className="nav-item">
+        <li className="nav-item" data-admin-only={group.adminOnly ? "true" : undefined}>
             <button className="dropdown-btn" type="button">
                 {group.label}
                 <i className="fa fa-caret-down" aria-hidden="true" />

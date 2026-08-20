@@ -1,9 +1,13 @@
 namespace AuthModule {
+    const USER_THEME_COOKIE = "trpg_user_theme";
+    let initialProfileTheme = "";
+
     export function openProfileDialog(): void {
         const dialog = document.getElementById("edit-profile-dialog");
         dialog?.classList.add("open");
         dialog?.setAttribute("aria-hidden", "false");
         scrollProfileSection("profile-account-info", false);
+        resetProfileThemeSetting();
         TrpgApi.get<ApiResponse<CurrentUser>>("/api/user/profile")
             .then((response) => {
                 if (!response.success || !response.data) return;
@@ -27,6 +31,7 @@ namespace AuthModule {
         document.querySelectorAll<HTMLButtonElement>(".profile-section-tab[data-profile-target]").forEach((tab) => {
             tab.addEventListener("click", () => scrollProfileSection(tab.dataset.profileTarget || "profile-account-info"));
         });
+        bindProfileThemeSettings();
     }
 
     export function bindAvatarPreview(): void {
@@ -127,6 +132,72 @@ namespace AuthModule {
             const input = document.getElementById(id) as HTMLInputElement | null;
             if (input) input.value = "";
         });
+    }
+
+    function bindProfileThemeSettings(): void {
+        const themeSelect = document.getElementById("profileThemeSelect") as HTMLSelectElement | null;
+        if (!themeSelect || themeSelect.dataset.bound === "true") return;
+        themeSelect.dataset.bound = "true";
+        themeSelect.addEventListener("change", updateProfilePendingState);
+        document.getElementById("saveProfilePendingChanges")?.addEventListener("click", saveProfilePendingChanges);
+        document.getElementById("cancelProfilePendingChanges")?.addEventListener("click", cancelProfilePendingChanges);
+        resetProfileThemeSetting();
+    }
+
+    function resetProfileThemeSetting(): void {
+        initialProfileTheme = getUserThemePreference();
+        const themeSelect = document.getElementById("profileThemeSelect") as HTMLSelectElement | null;
+        if (themeSelect) {
+            themeSelect.value = initialProfileTheme;
+        }
+        updateProfilePendingState();
+    }
+
+    function updateProfilePendingState(): void {
+        const themeSelect = document.getElementById("profileThemeSelect") as HTMLSelectElement | null;
+        const pendingBar = document.getElementById("profilePendingSaveBar");
+        const count = document.getElementById("profilePendingChangeCount");
+        const themeSetting = document.getElementById("profileThemeSetting");
+        if (!themeSelect || !pendingBar || !count) return;
+
+        const isDirty = themeSelect.value !== initialProfileTheme;
+        pendingBar.hidden = !isDirty;
+        count.textContent = isDirty ? "1" : "0";
+        themeSetting?.classList.toggle("profile-setting-dirty", isDirty);
+    }
+
+    function saveProfilePendingChanges(): void {
+        const themeSelect = document.getElementById("profileThemeSelect") as HTMLSelectElement | null;
+        if (!themeSelect) return;
+        setUserThemePreference(themeSelect.value);
+        initialProfileTheme = themeSelect.value;
+        updateProfilePendingState();
+        window.configManager?.applyTheme();
+    }
+
+    function cancelProfilePendingChanges(): void {
+        const themeSelect = document.getElementById("profileThemeSelect") as HTMLSelectElement | null;
+        if (!themeSelect) return;
+        themeSelect.value = initialProfileTheme;
+        updateProfilePendingState();
+    }
+
+    function getUserThemePreference(): string {
+        const prefix = `${USER_THEME_COOKIE}=`;
+        const item = document.cookie
+            .split(";")
+            .map((part) => part.trim())
+            .find((part) => part.startsWith(prefix));
+        return item ? decodeURIComponent(item.slice(prefix.length)) : "";
+    }
+
+    function setUserThemePreference(theme: string): void {
+        if (!theme) {
+            document.cookie = `${USER_THEME_COOKIE}=; Max-Age=0; Path=/; SameSite=Lax`;
+            return;
+        }
+        const maxAge = 365 * 24 * 60 * 60;
+        document.cookie = `${USER_THEME_COOKIE}=${encodeURIComponent(theme)}; Max-Age=${maxAge}; Path=/; SameSite=Lax`;
     }
 
     export async function updatePresence(presence: "online" | "dnd" | "invisible"): Promise<void> {

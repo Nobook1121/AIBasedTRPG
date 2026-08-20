@@ -32,6 +32,11 @@ interface Window {
     initRoomManagement?: () => void;
     autoLoadLastRoom?: () => Promise<void>;
     clearCurrentRoom?: () => void;
+    clearCharacterManagement?: () => void;
+    reloadCharacterManagement?: () => Promise<void>;
+    switchMainTab?: (tabId: string, options?: { clearNav?: boolean }) => void;
+    refreshAdminNavigation?: () => void;
+    openCreateRoomWithScenario?: (scenarioId: number) => Promise<void>;
 }
 
 declare function showNotification(message: string, type?: string): void;

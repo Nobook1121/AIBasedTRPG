@@ -116,8 +116,13 @@ class ConfigManager {
         console.log("常规设置已应用到 UI");
     }
 
+    getEffectiveTheme(): string {
+        const personalTheme = getPersonalThemeCookie();
+        return personalTheme || this.get<string>("general", "appearance", "theme", "light");
+    }
+
     applyTheme(): void {
-        const theme = this.get<string>("general", "appearance", "theme", "light");
+        const theme = this.getEffectiveTheme();
         const themeClassNames = ["theme-light", "theme-dark", "theme-cyber-2", "light-theme", "dark-theme"];
         document.body.classList.remove(...themeClassNames);
 
@@ -195,3 +200,12 @@ function configErrorMessage(error: unknown): string {
 
 const configManager = new ConfigManager();
 window.configManager = configManager;
+
+function getPersonalThemeCookie(): string {
+    const prefix = "trpg_user_theme=";
+    const item = document.cookie
+        .split(";")
+        .map((part) => part.trim())
+        .find((part) => part.startsWith(prefix));
+    return item ? decodeURIComponent(item.slice(prefix.length)) : "";
+}

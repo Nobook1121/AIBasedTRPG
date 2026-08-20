@@ -72,7 +72,7 @@ def configure_logging(log_dir: str | Path = "logs") -> None:
     started_at = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_path = Path(log_dir) / f"ai_trpg_{started_at}.log"
 
-    formatter = CompactFormatter("[%(asctime)s][%(levelname)s][%(name)s] %(message)s")
+    formatter = CompactFormatter("[%(asctime)s][%(levelname)s][%(threadName)s] %(message)s")
 
     file_handler = RotatingFileHandler(
         log_path,
