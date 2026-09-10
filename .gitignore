@@ -29,6 +29,13 @@ trpg_server/**/__pycache__/
 /data/users/ip_configs/
 /data/scenarios/*
 
+# User-uploaded avatars; keep bundled defaults tracked
+/data/assets/avatars/*
+!/data/assets/avatars/default.jpg
+!/data/assets/avatars/default_kp.jpg
+!/data/assets/avatars/default_dice.jpg
+!/data/assets/avatars/default_system.jpg
+
 # Local worktrees
 /.worktrees/
 

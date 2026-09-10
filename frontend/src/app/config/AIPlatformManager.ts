@@ -154,7 +154,6 @@ class AIPlatformManager {
             const config = this.getPlatform(platform);
             if (!config) throw new Error("平台配置不存在");
             if (!config.enabled) throw new Error("平台未启用");
-            if (!config.config.api_key && platform !== "lmstudio") throw new Error("API Key 未设置");
 
             const model = config.models.find((item) => item.id === modelId);
             if (!model) throw new Error("模型不存在");

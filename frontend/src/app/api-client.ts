@@ -8,8 +8,10 @@
 
     function buildOptions(options: TrpgRequestOptions): RequestInit {
         const requestOptions: TrpgRequestOptions = { ...options };
+        const method = String(requestOptions.method || "GET").toUpperCase();
         const hasBody = Object.prototype.hasOwnProperty.call(requestOptions, "body");
         const isFormData = typeof FormData !== "undefined" && requestOptions.body instanceof FormData;
+        const csrfToken = window.currentUser?.csrf_token;
 
         if (hasBody && requestOptions.body !== null && typeof requestOptions.body === "object" && !isFormData) {
             requestOptions.body = JSON.stringify(requestOptions.body);
@@ -17,6 +19,17 @@
                 "Content-Type": "application/json",
                 ...(requestOptions.headers || {}),
             };
+        }
+
+        if (csrfToken && ["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
+            requestOptions.headers = {
+                ...(requestOptions.headers || {}),
+                "X-CSRF-Token": csrfToken,
+            };
+        }
+
+        if (method === "GET") {
+            requestOptions.cache = "no-store";
         }
 
         return requestOptions as RequestInit;

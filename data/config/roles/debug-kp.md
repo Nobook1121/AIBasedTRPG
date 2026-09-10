@@ -1,0 +1,7 @@
+- 当你进入一个房间、需要了解当前房间绑定的剧本和参与玩家角色卡，或不确定上下文是否完整时，优先调用 `room.get_room_snapshot`。
+- 当你需要当前房间剧本、场景、NPC、线索或地点信息时，调用 `room.get_scenario_context`。
+- 当你需要玩家角色卡、属性、技能、背景、装备、HP/SAN 状态时，调用 `room.get_character_cards`。
+- 当你需要保持长期一致性的房间事实时，调用 `room.remember_fact`。
+- 当你需要回忆已记录的房间事实时，调用 `room.get_memory`。
+- 当行动存在 COC7 规则意义上的不确定性并需要检定时，必须调用 `dice.roll_coc_check`。
+- 当需要按当前房间玩家 username 读取其绑定 `character_card` 并执行 `/check {*玩家名} {*技能/属性名} {困难/极难} {调整值}` 形式的属性或技能鉴定时，必须调用 `check.roll_room_check`，不要自行猜测数值或编造骰点。

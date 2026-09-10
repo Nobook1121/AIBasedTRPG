@@ -27,6 +27,7 @@ def test_default_permission_config_groups_nodes_by_site_area():
         "characters.gallery.publish",
         "characters.gallery.apply",
         "settings.permissions",
+        "settings.ai_debug",
         "settings.ai_models",
         "settings.network",
     }.issubset(node_ids)
@@ -74,3 +75,4 @@ def test_improvement_permission_defaults_cover_admin_tabs_and_gallery():
     assert config["matrix"]["characters.gallery.publish"] == ["USER", "ADMIN", "OWNER"]
     assert config["matrix"]["characters.gallery.apply"] == ["USER", "ADMIN", "OWNER"]
     assert config["matrix"]["settings.permissions"] == ["ADMIN", "OWNER"]
+    assert config["matrix"]["settings.ai_debug"] == ["ADMIN", "OWNER"]

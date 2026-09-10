@@ -20,6 +20,15 @@ interface DiceToolConstructor {
 interface DiceTool {
     handleDiceCommand(command: string): string;
     parseDiceCommand(command: string): DiceParseResult;
+    rollPercentile(bonusDice?: number, penaltyDice?: number): { result: number; rolls: number[] };
+}
+
+interface CheckToolConstructor {
+    new(dice: DiceTool): CheckTool;
+}
+
+interface CheckTool {
+    handleCheckCommand(command: string): string;
 }
 
 interface ToolManagerConstructor {

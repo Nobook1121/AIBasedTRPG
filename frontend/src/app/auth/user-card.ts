@@ -49,4 +49,14 @@ namespace AuthModule {
     export async function switchAccount(): Promise<void> {
         await logout();
     }
+
+    export async function stopImpersonation(): Promise<void> {
+        try {
+            await TrpgApi.post<ApiResponse>("/api/auth/impersonation/stop");
+            window.location.reload();
+        } catch (error) {
+            console.error("退出模拟失败:", error);
+            showNotification("退出模拟失败", "error");
+        }
+    }
 }

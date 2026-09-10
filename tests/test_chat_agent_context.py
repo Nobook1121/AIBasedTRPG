@@ -6,6 +6,8 @@ from trpg_server.routes.chat import (
     _build_messages,
     _compact_history_entries,
     _compact_history_with_ai,
+    _get_debug_kp_prompt_file,
+    _load_debug_kp_prompt,
     _format_user_content,
     _history_filename,
     _history_needs_compaction,
@@ -23,6 +25,18 @@ from trpg_server.routes.rooms import create_room_message
 def test_history_filename_is_room_scoped_when_room_is_available():
     assert _history_filename("user-1", "room-alpha", "kp") == "room-room-alpha-kp.json"
     assert _history_filename("user-1", "room-beta", "kp") == "room-room-beta-kp.json"
+
+
+def test_debug_prompt_uses_configured_config_directory(tmp_path):
+    prompt_file = tmp_path / "roles" / "debug-kp.md"
+    prompt_file.parent.mkdir(parents=True)
+    prompt_file.write_text("# Debug\ncheck.roll_room_check only", encoding="utf-8")
+
+    app = Flask(__name__)
+    app.config["CONFIG_DIR"] = tmp_path
+    with app.app_context():
+        assert _get_debug_kp_prompt_file() == prompt_file
+        assert _load_debug_kp_prompt() == "check.roll_room_check only"
 
 
 def test_history_filename_falls_back_to_user_for_non_room_chat():
@@ -326,7 +340,7 @@ def test_login_success_does_not_report_post_login_initialization_errors_as_login
     assert "await window.autoLoadLastRoom?.();" in restore_block
 
 
-def test_character_template_exports_skill_base_key_instead_of_hardcoded_base():
+def test_character_template_exports_skill_base_instead_of_legacy_fields():
     character = {
         "id": "investigator-1",
         "name": "Alice",
@@ -334,7 +348,6 @@ def test_character_template_exports_skill_base_key_instead_of_hardcoded_base():
             {
                 "id": "libraryUse",
                 "skillKey": "libraryUse",
-                "baseKey": "libraryUse",
                 "name": "Library Use",
                 "base": 20,
                 "value": 45,
@@ -346,25 +359,24 @@ def test_character_template_exports_skill_base_key_instead_of_hardcoded_base():
     payload = _runtime_to_test_character(character)
     skill = payload["skillGroups"]["explore"][0]
 
-    assert skill["baseKey"] == "libraryUse"
-    assert "base" not in skill
+    assert skill["base"] == 20
+    assert "baseKey" not in skill
+    assert "value" not in skill
+    assert "skillKey" not in skill
 
 
-def test_character_template_import_preserves_skill_base_key_without_base_value():
+def test_character_template_import_keeps_skill_base_and_omits_legacy_fields():
     payload = {
         "id": "investigator-1",
         "name": "Alice",
         "skillGroups": {
             "explore": [
                 {
-                    "id": "libraryUse",
-                    "skillKey": "libraryUse",
-                    "baseKey": "libraryUse",
                     "name": "Library Use",
+                    "base": 20,
                     "job": 20,
                     "interest": 5,
                     "growth": 0,
-                    "value": 45,
                 }
             ]
         },
@@ -373,16 +385,74 @@ def test_character_template_import_preserves_skill_base_key_without_base_value()
     character = _test_character_to_runtime(payload)
     skill = character["skills"][0]
 
-    assert skill["baseKey"] == "libraryUse"
-    assert "base" not in skill
+    assert skill["base"] == 20
+    assert "baseKey" not in skill
+    assert "specialtyKey" not in skill
+    assert "rank" not in skill
 
 
-def test_frontend_character_template_exports_base_key_not_base_value():
+def test_character_template_import_assigns_unique_ids_to_repeated_skills():
+    payload = {
+        "id": "investigator-1",
+        "name": "Alice",
+        "skillGroups": {
+            "social": [
+                {"name": "外语", "base": 1, "job": 0, "interest": 0, "growth": 0},
+                {"name": "外语", "base": 1, "job": 0, "interest": 0, "growth": 0},
+            ]
+        },
+    }
+
+    character = _test_character_to_runtime(payload)
+    skills = character["skills"]
+
+    assert [skill["id"] for skill in skills] == ["languageOther", "languageOther__2"]
+
+
+def test_character_template_clears_placeholder_weapon_rows():
+    character = {
+        "id": "investigator-1",
+        "name": "Alice",
+        "weapons": [
+            {
+                "name": "选择武器",
+                "skill": "格斗(斗殴)",
+                "damage": "1D3",
+                "range": "接触",
+                "attacks": "1",
+                "ammo": "N/A",
+                "malfunction": "N/A",
+            },
+            {"name": "徒手格斗", "skill": "格斗(斗殴)", "damage": "1D3+DB"},
+        ],
+    }
+
+    payload = _runtime_to_test_character(character)
+    empty_weapon, actual_weapon = payload["weapons"]
+
+    assert empty_weapon == {
+        "name": "",
+        "skill": "",
+        "damage": "",
+        "range": "",
+        "round": "",
+        "tho": "",
+        "num": "",
+        "err": "",
+        "weight": "",
+        "note": "",
+    }
+    assert actual_weapon["name"] == "徒手格斗"
+    assert actual_weapon["damage"] == "1D3+DB"
+
+
+def test_frontend_character_template_exports_base_not_base_key():
     source = Path("frontend/src/app/character-sheet.ts").read_text(encoding="utf-8")
 
     export_block = source.split("function convertCardToTestCharacterJson", 1)[1].split(
         "function convertTestCharacterJsonToCardInput",
         1,
     )[0]
-    assert "baseKey:" in export_block
-    assert "base: skill.base" not in export_block
+    assert "base: skill.base" in export_block
+    assert "baseKey:" not in export_block
+    assert "allowSkillBaseEdit" in source

@@ -57,6 +57,7 @@ try {
 
   $jsFiles = @(
     "dist\public\data\tools\diceTool.js",
+    "dist\public\data\tools\checkTool.js",
     "dist\public\data\tools\toolManager.js",
     "dist\public\js\config\TestRequestConfig.js",
     "dist\public\js\config\ConfigManager.js",

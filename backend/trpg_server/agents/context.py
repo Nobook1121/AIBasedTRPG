@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +13,8 @@ class AgentRequestContext:
     scenarios_dir: Path | None = None
     user_id: str | int | None = None
     agent_id: str = "kp"
+    request_content: str = ""
+    tool_state: dict[str, Any] = field(default_factory=dict)
 
     def room_info(self) -> dict[str, Any]:
         if not self.room_dir:
@@ -25,7 +27,14 @@ class AgentRequestContext:
         return read_json(self.room_dir / "messages.json", default=[])
 
 
-def build_agent_context(room_id, rooms_dir, scenarios_dir, user_id=None, agent_id="kp") -> AgentRequestContext:
+def build_agent_context(
+    room_id,
+    rooms_dir,
+    scenarios_dir,
+    user_id=None,
+    agent_id="kp",
+    request_content="",
+) -> AgentRequestContext:
     room_dir = safe_join(rooms_dir, room_id) if room_id else None
     return AgentRequestContext(
         room_id=str(room_id) if room_id else None,
@@ -33,4 +42,5 @@ def build_agent_context(room_id, rooms_dir, scenarios_dir, user_id=None, agent_i
         scenarios_dir=scenarios_dir,
         user_id=user_id,
         agent_id=agent_id,
+        request_content=str(request_content or ""),
     )

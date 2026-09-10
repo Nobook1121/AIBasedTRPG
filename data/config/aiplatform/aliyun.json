@@ -5,7 +5,6 @@
   "icon": "/assets/aiplatform/aliyun.png",
   "enabled": true,
   "config": {
-    "api_key": "",
     "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
     "timeout": 20,
     "headers": {

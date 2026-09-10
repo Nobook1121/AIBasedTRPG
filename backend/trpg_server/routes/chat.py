@@ -1,4 +1,4 @@
-import json
+﻿import json
 import logging
 import re
 import time
@@ -6,17 +6,25 @@ import time
 import requests
 from flask import Blueprint, current_app, request, session
 
+from trpg_server.ai_platform_config import load_platform_config
 from trpg_server.agents.config import load_ai_runtime_config
 from trpg_server.agents.context import build_agent_context
 from trpg_server.agents.profiles import resolve_agent_profile
 from trpg_server.agents.runtime import run_agent_completion
 from trpg_server.agents.tools import default_tool_registry
 from trpg_server.agents.tools.room import get_room_snapshot
+from trpg_server.agents.memory import remember_room_fact
 from trpg_server.json_store import read_json, write_json_atomic
 from trpg_server.logging_config import log_user_action, user_action_text
 from trpg_server.responses import error_response, success_response
 from trpg_server.role_config import load_roles, select_role_for_content
-from trpg_server.settings import CONFIG_DIR, HISTORY_DIR, ROOMS_DIR, SCENARIOS_DIR
+from trpg_server.settings import (
+    AI_PLATFORM_SECRET_DIR,
+    CONFIG_DIR,
+    HISTORY_DIR,
+    ROOMS_DIR,
+    SCENARIOS_DIR,
+)
 
 bp = Blueprint("chat", __name__)
 logger = logging.getLogger(__name__)
@@ -44,6 +52,10 @@ def _get_ai_platform_dir():
     return current_app.config.get("AI_PLATFORM_DIR", CONFIG_DIR / "aiplatform")
 
 
+def _get_ai_platform_secret_dir():
+    return current_app.config.get("AI_PLATFORM_SECRET_DIR", AI_PLATFORM_SECRET_DIR)
+
+
 def _get_config_dir():
     return current_app.config.get("CONFIG_DIR", CONFIG_DIR)
 
@@ -56,12 +68,17 @@ def _get_kp_prompt_file():
     return current_app.config.get("KP_PROMPT_FILE", CONFIG_DIR / "roles" / "kp.md")
 
 
+def _get_debug_kp_prompt_file():
+    return current_app.config.get("DEBUG_KP_PROMPT_FILE", _get_config_dir() / "roles" / "debug-kp.md")
+
+
 def _get_role_config_file():
     return current_app.config.get("ROLE_CONFIG_FILE", CONFIG_DIR / "roles" / "roles.json")
 
 
 def _load_enabled_platform(provider_id=None):
     platform_dir = _get_ai_platform_dir()
+    secret_dir = _get_ai_platform_secret_dir()
     if not platform_dir.exists():
         logger.warning("AI platform config directory does not exist: %s", platform_dir)
         return None, None
@@ -70,7 +87,8 @@ def _load_enabled_platform(provider_id=None):
         if provider_id and path.stem != provider_id:
             continue
         try:
-            config = read_json(path, default={})
+            secret_path = secret_dir / path.name
+            config = load_platform_config(path, secret_path)
         except (json.JSONDecodeError, OSError):
             logger.exception("Failed to read AI platform config: %s", path.name)
             continue
@@ -95,8 +113,15 @@ def _post_ai_request(base_url, headers):
         logger.info("AI API request payload: %s", _json_for_log(payload))
         response = requests.post(base_url, headers=headers, json=payload, timeout=300)
         if not response.ok:
-            raise RuntimeError(f"API request failed: {response.status_code}")
+            try:
+                detail = response.json()
+                detail = detail.get("error", detail) if isinstance(detail, dict) else detail
+            except (ValueError, requests.exceptions.JSONDecodeError):
+                detail = str(getattr(response, "text", ""))[:500]
+            raise RuntimeError(f"AI 平台请求失败（HTTP {response.status_code}）：{detail}")
         response_data = response.json()
+        if not isinstance(response_data, dict):
+            raise RuntimeError("AI 平台返回的数据格式无效：响应必须是对象")
         logger.info("AI API response payload: %s", _json_for_log(response_data))
         return response_data
 
@@ -116,7 +141,21 @@ def _load_kp_prompt():
     if content_lines:
         return "\n".join(content_lines)
 
-    return "你是KP（守密人），负责主持TRPG游戏，引导玩家进行游戏。"
+    return "你是KP（守秘人），负责主持以克苏鲁的呼唤第七版规则为基础的桌上角色扮演游戏。"
+
+
+def _load_debug_kp_prompt():
+    prompt_path = _get_debug_kp_prompt_file()
+    try:
+        content = prompt_path.read_text(encoding="utf-8")
+    except OSError:
+        return (
+            "你是用于调试工具调用的KP。只能使用已启用的房间资料和检定工具。\n"
+            "需要检定时调用 check.roll_room_check，并在工具返回后复述检定摘要。"
+        )
+
+    content_lines = [line for line in content.splitlines() if not line.startswith("#") and line.strip()]
+    return "\n".join(content_lines) or "你是用于调试工具调用的KP。"
 
 
 def _safe_history_part(value):
@@ -129,6 +168,10 @@ def _history_filename(user_id, room_id=None, agent_id="kp"):
     if room_id:
         return f"room-{_safe_history_part(room_id)}-{safe_agent}.json"
     return f"user-{_safe_history_part(user_id)}-{safe_agent}.json"
+
+
+def _room_session_id(room_id, agent_id="kp"):
+    return f"room:{_safe_history_part(room_id)}:agent:{_safe_history_part(agent_id)}"
 
 
 def _load_history(user_id, room_id=None, agent_id="kp"):
@@ -193,8 +236,52 @@ def _history_needs_compaction(history, threshold=HISTORY_COMPACT_CHAR_THRESHOLD)
     return sum(len(str(item.get("content") or "")) for item in history) > threshold
 
 
+def _request_allows_check(content):
+    text = str(content or "").strip()
+    if text.startswith("@KP"):
+        text = text[3:].strip()
+    return bool(re.search(r"(?:^|\s)(?:/check|检定|投骰|掷骰|侦察|侦查|观察|搜索|搜查|调查|检查)(?:\s|$)", text, re.IGNORECASE))
+
+
+def _request_allows_manual_trigger(content):
+    text = str(content or "").strip()
+    if text.startswith("@KP"):
+        text = text[3:].strip()
+    return text.startswith("/trigger") or "手动触发" in text
+
+
+def _request_allows_scene_transition(content):
+    text = str(content or "").strip()
+    if text.startswith("@KP"):
+        text = text[3:].strip()
+    if text.startswith("/scene"):
+        return True
+    if re.search(r"(?:不要|别|不想|无需)(?:进入|前往|来到|离开|跑到|去往|转场|切换场景)", text, re.IGNORECASE):
+        return False
+    return bool(re.search(r"(进入|前往|来到|离开|跑到|去往|转场|切换场景|go to|enter|leave)", text, re.IGNORECASE))
+
+
+def _maybe_remember_important_action(content, context):
+    """Persist explicit continuity decisions without storing every chat line."""
+    text = str(content or "").strip()
+    if not context.room_dir or len(text) < 8:
+        return
+    patterns = (r"(?:进入|前往|来到|离开|跑到|去往|转场|切换场景)", r"(?:带上|带着|留下|加入|护送|跟随)")
+    if not any(re.search(pattern, text, re.IGNORECASE) for pattern in patterns):
+        return
+    try:
+        remember_room_fact({"kind": "player_decision", "content": text, "importance": 3}, context)
+    except Exception:
+        logger.exception("Failed to remember important player action")
+
+
 def _compact_history_entries(summary):
-    return [{"role": "system", "content": f"历史压缩摘要：\n{summary.strip()}", "compact": True}]
+    # Keep the persisted summary useful without imposing an output-token cap on
+    # normal KP replies.
+    clean = str(summary or "").strip()
+    if len(clean) > 4000:
+        clean = clean[:3999].rstrip() + "…"
+    return [{"role": "system", "content": f"历史压缩摘要：\n{clean}", "compact": True}]
 
 
 def _compact_history_with_ai(requester, model, history):
@@ -203,14 +290,13 @@ def _compact_history_with_ai(requester, model, history):
 
     payload = {
         "model": model,
-        "max_tokens": 1200,
         "temperature": 0.2,
         "messages": [
             {
                 "role": "system",
                 "content": (
-                    "压缩TRPG房间历史。保留当前场景、关键事实、NPC状态、"
-                    "每位玩家/调查员行动、未解决线索、检定结果。不要编造。"
+                    "请压缩当前桌上角色扮演房间的历史记录。保留当前场景、关键事实、NPC状态、"
+                    "每位玩家的行动、未解决线索和检定结果；使用短句和键值格式，不要编造内容。"
                 ),
             },
             {"role": "user", "content": _json_for_log(history)},
@@ -218,7 +304,7 @@ def _compact_history_with_ai(requester, model, history):
     }
     summary, _token_count = _extract_ai_response(requester(payload))
     if not summary.strip():
-        raise RuntimeError("AI platform did not return a compact summary")
+        raise RuntimeError("AI 平台未返回历史压缩摘要")
     return _compact_history_entries(summary)
 
 
@@ -255,10 +341,6 @@ def _compact_character_state(character_state):
     return compact or None
 
 
-def _count_list_items(value):
-    return len(value) if isinstance(value, list) else 0
-
-
 def _compact_room_snapshot(snapshot):
     if not isinstance(snapshot, dict):
         return {}
@@ -268,16 +350,18 @@ def _compact_room_snapshot(snapshot):
         available_sections = scenario.get("available_sections")
         if not isinstance(available_sections, dict):
             available_sections = {}
-            for key in ("scenes", "locations", "npcs", "clues", "endings"):
-                count = _count_list_items(scenario.get(key))
-                if count:
-                    available_sections[key] = count
         compact_scenario = {
             "id": scenario.get("id"),
             "title": scenario.get("title"),
             "description": scenario.get("description"),
             "found": scenario.get("found"),
             "available_sections": available_sections,
+            "allow_open_ending": scenario.get("allow_open_ending"),
+            "module_count": scenario.get("module_count"),
+            "trigger_count": scenario.get("trigger_count"),
+            "active_scene_id": scenario.get("active_scene_id"),
+            "scene_manifest": (scenario.get("scene_manifest", []) if isinstance(scenario.get("scene_manifest", []), list) else [])[:40],
+            "global_manifest": (scenario.get("global_manifest", []) if isinstance(scenario.get("global_manifest", []), list) else [])[:12],
         }
     else:
         compact_scenario = scenario
@@ -299,22 +383,32 @@ def _compact_room_snapshot(snapshot):
             compact_member["character_state"] = character_state
         members.append(compact_member)
 
+    memory = snapshot.get("memory")
+    if isinstance(memory, dict) and isinstance(memory.get("items"), list):
+        memory = {"items": [
+            {**item, "content": str(item.get("content") or "")[:240]}
+            for item in memory["items"][:8] if isinstance(item, dict)
+        ]}
     return {
         "room": snapshot.get("room"),
         "scenario": compact_scenario,
         "members": members,
-        "memory": snapshot.get("memory"),
+        "memory": memory,
+        "triggers": snapshot.get("triggers", []),
     }
 
 
 def _room_snapshot_system_message(snapshot):
     compact_snapshot = _compact_room_snapshot(snapshot)
     return (
-        "当前房间资料由 function `room.get_room_snapshot` 读取。"
-        "这是本次回复必须优先采用的当前房间、绑定剧本和玩家角色卡上下文；"
-        "不得沿用其他房间的剧本、角色或记忆。\n"
-        "自动注入的上下文已精简，不包含完整场景正文、角色卡技能或属性。"
-        "需要详细剧本、角色卡技能或属性时，必须调用相应 room function。\n"
+        "当前房间资料必须通过工具 `room.get_room_snapshot` 获取。\n"
+        "优先使用当前房间、绑定剧本、触发器目录和成员角色卡。\n"
+        "不要复用其他房间的剧本、角色或记忆资料。\n"
+        "注入的上下文是精简版，不包含完整场景文本或完整角色详情。\n"
+        "需要详细剧本模块或触发器内容时，调用相应的房间或触发器工具。\n"
+        "需要剧本摘要时先调用 `room.get_scenario_context`，需要完整模块内容时调用 `room.get_scenario_module`。\n"
+        "scene_manifest 是剧本提供的唯一场景索引；global_manifest 是背景/公开信息/时间线的短摘要。"
+        "summary 仅用于检索，不能替代原文，也不能据此推断未写出的设施。\n"
         f"{_json_for_log(compact_snapshot)}"
     )
 
@@ -331,6 +425,28 @@ def _build_messages(system_prompt, history, content, room_snapshot_message=None)
         messages.append({"role": item["role"], "content": item_content})
     messages.append({"role": "user", "content": _wrap_user_input(content)})
     return messages
+
+
+def _history_for_request(history, max_chars=8000, recent_items=12):
+    """Keep prompt history bounded without an extra summarization request.
+
+    Persisted history remains untouched; only the copy sent to the model is
+    compacted. Existing explicit ``compact`` summaries are always retained.
+    """
+    if not isinstance(history, list):
+        return []
+    pinned = [item for item in history if isinstance(item, dict) and item.get("compact")]
+    recent = [item for item in history if isinstance(item, dict) and not item.get("compact")][-recent_items:]
+    selected = pinned[-1:] + recent
+    total = 0
+    result = []
+    for item in reversed(selected):
+        size = len(str(item.get("content") or ""))
+        if result and total + size > max_chars:
+            break
+        result.append(item)
+        total += size
+    return list(reversed(result))
 
 
 def _extract_ai_response(response_data):
@@ -364,7 +480,11 @@ def chat():
         user_id = message_data.get("user_id", "unknown")
         content = message_data.get("content", "")
         role_config = _load_role_for_content(content)
-        agent_profile = resolve_agent_profile(role_config, _get_kp_prompt_file())
+        agent_profile = resolve_agent_profile(
+            role_config,
+            _get_kp_prompt_file(),
+            prefer_prompt_file=str(role_config.get("id") or "kp") == "kp",
+        )
         selected_platform, platform_config = _load_enabled_platform(agent_profile.provider)
         if not platform_config:
             return error_response(
@@ -398,10 +518,20 @@ def chat():
             scenarios_dir=current_app.config.get("SCENARIOS_DIR", SCENARIOS_DIR),
             user_id=user_id,
             agent_id=agent_profile.id,
+            request_content=content,
+        )
+        agent_context.tool_state.update(
+            {
+                "allow_checks": _request_allows_check(content),
+                "allow_unconditional_trigger": _request_allows_manual_trigger(content),
+                "allow_scene_transition": _request_allows_scene_transition(content),
+            }
         )
         room_snapshot_message = None
         if room_id:
-            room_snapshot_message = _room_snapshot_system_message(get_room_snapshot({}, agent_context))
+            room_snapshot_message = _room_snapshot_system_message(
+                get_room_snapshot({}, agent_context)
+            )
 
         runtime_config = load_ai_runtime_config(_get_config_dir())
         model = _select_model(platform_config)
@@ -410,15 +540,19 @@ def chat():
             "Authorization": f"Bearer {api_key}",
         }
         requester = _post_ai_request(base_url, headers)
-        history_file, history = _load_history(user_id, room_id=room_id, agent_id=agent_profile.id)
+        history_file, history = _load_history(
+            user_id,
+            room_id=room_id,
+            agent_id=agent_profile.id,
+        )
 
         if _is_compact_command(content):
             if history:
                 history = _compact_history_with_ai(requester, model, history)
                 write_json_atomic(history_file, history)
-                response_text = "历史已压缩。"
+                response_text = "历史记录已压缩。"
             else:
-                response_text = "当前没有可压缩的历史。"
+                response_text = "暂无可压缩的历史记录。"
             return success_response(message=None, content=response_text, token_count=None)
 
         if _history_needs_compaction(history):
@@ -430,32 +564,52 @@ def chat():
 
         speaker = _speaker_for_user(agent_context.room_info(), user_id) if room_id else None
         user_content = _format_user_content(content, speaker)
-        system_prompt = agent_profile.prompt or _load_kp_prompt()
+        system_prompt = (
+            _load_debug_kp_prompt()
+            if runtime_config.debug_mode
+            else agent_profile.prompt or _load_kp_prompt()
+        )
+        if not runtime_config.show_ai_hints:
+            system_prompt += "\n设置：禁止在回复结尾主动提供提示、选项、行动列表或下一步建议；仅在玩家明确询问时回答。"
         if room_id:
-            system_prompt = f"{system_prompt}\n- 需压缩历史时，单独输出 /compact。"
+            system_prompt = (
+                f"{system_prompt}\n"
+                "房间快照中的 scene_manifest/global_manifest 是唯一索引；摘要不是事实。"
+                "仅在用户明确需要时按 ID 加载模块原文；转场先调用 room.activate_scenario_scene，再读模块。"
+                "不得创造剧本未写出的地点、设施、NPC、道具或触发器内容；未提供就明确说明。"
+                "剧本、房间快照、角色卡和工具返回值是唯一事实来源；不得把猜测写成既定事实。"
+                "不要因问候、摘要或关键词自动检定/揭示/记忆；工具完成后立即简短叙事回复。"
+            )
+
         request_data = {
             "messages": _build_messages(
                 system_prompt,
-                history,
+                _history_for_request(history),
                 user_content,
                 room_snapshot_message=room_snapshot_message,
             ),
             "model": model,
-            "max_tokens": 4096,
-            "temperature": 0.7,
-            "top_p": 0.9,
+            "temperature": 0.5,
+            "top_p": 0.85,
         }
+        if room_id:
+            request_data["metadata"] = {
+                **request_data.get("metadata", {}),
+                "session_id": _room_session_id(room_id, agent_profile.id),
+                "room_id": str(room_id),
+                "agent_id": agent_profile.id,
+            }
         if runtime_config.stream_output:
             request_data["stream"] = False
 
         log_user_action(
             logger,
-            user_action_text(session.get("username") or user_id, "发起了 AI 对话"),
-            用户ID=session.get("user_id") or user_id,
-            角色=role_config.get("id"),
-            平台=selected_platform,
-            模型=request_data["model"],
-            内容长度=len(content),
+            user_action_text(session.get("username") or user_id, "Started AI chat"),
+            user_id=session.get("user_id") or user_id,
+            role=role_config.get("id"),
+            platform=selected_platform,
+            model=request_data["model"],
+            content_length=len(content),
         )
         result = run_agent_completion(
             requester=requester,
@@ -467,10 +621,22 @@ def chat():
         if result.error:
             return error_response("AI agent request failed", 500, result.error)
 
+        direct_message = None
+        if isinstance(result.response_data, dict):
+            direct_message = result.response_data.get("direct_message")
+        direct_messages = result.direct_messages or []
+        if direct_message and not direct_messages:
+            direct_messages = [direct_message]
+
         ai_response, compact_requested_by_ai = _strip_compact_command(result.content)
         token_count = result.token_count
         if not ai_response and compact_requested_by_ai:
-            ai_response = "历史已压缩。"
+            ai_response = "历史记录已压缩。"
+        # A few providers terminate after a successful tool call without a
+        # second assistant message. Keep the tool/direct message visible and
+        # return a normal chat response instead of surfacing a false failure.
+        if not ai_response and (result.direct_messages or result.tool_messages):
+            ai_response = "已完成检定/场景处理，详情见上方记录。"
         if not ai_response:
             return error_response(
                 "AI platform did not return a response",
@@ -479,18 +645,19 @@ def chat():
             )
         log_user_action(
             logger,
-            user_action_text(session.get("username") or user_id, "收到了 AI 对话回复"),
-            用户ID=session.get("user_id") or user_id,
-            平台=selected_platform,
-            模型=request_data["model"],
-            回复长度=len(ai_response),
-            Token数=token_count,
+            user_action_text(session.get("username") or user_id, "Received AI chat response"),
+            user_id=session.get("user_id") or user_id,
+            platform=selected_platform,
+            model=request_data["model"],
+            response_length=len(ai_response),
+            token_count=token_count,
         )
 
         user_history_item = {"role": "user", "content": content}
         if speaker:
             user_history_item["speaker"] = speaker
         history.extend([user_history_item, {"role": "assistant", "content": ai_response}])
+        _maybe_remember_important_action(content, agent_context)
         if compact_requested_by_ai:
             try:
                 history = _compact_history_with_ai(requester, model, history)
@@ -505,6 +672,9 @@ def chat():
             message=None,
             content=ai_response,
             token_count=token_count,
+            direct_message=direct_messages[0] if direct_messages else None,
+            direct_messages=direct_messages,
+            tool_messages=result.tool_messages or [],
         )
     except requests.exceptions.Timeout:
         return error_response("AI platform request timeout", 504, "Request timeout")
@@ -536,9 +706,9 @@ def send_home_message():
 
         log_user_action(
             logger,
-            user_action_text(session.get("username") or user_id, "发送了主页对话"),
-            用户ID=session.get("user_id") or user_id,
-            内容长度=len(message_content),
+            user_action_text(session.get("username") or user_id, "Sent a home message"),
+            user_id=session.get("user_id") or user_id,
+            content_length=len(message_content),
         )
         return _message_response(user_id, message_content, "Message sent successfully")
     except Exception as exc:
@@ -564,10 +734,10 @@ def send_message(script_id):
 
         log_user_action(
             logger,
-            user_action_text(session.get("username") or user_id, "发送了剧本对话"),
-            用户ID=session.get("user_id") or user_id,
-            剧本ID=script_id,
-            内容长度=len(message_content),
+            user_action_text(session.get("username") or user_id, "Sent a scenario message"),
+            user_id=session.get("user_id") or user_id,
+            scenario_id=script_id,
+            content_length=len(message_content),
         )
         return _message_response(
             user_id,

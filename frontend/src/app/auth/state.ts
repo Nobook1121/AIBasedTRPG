@@ -21,6 +21,10 @@ namespace AuthModule {
         nickname?: string;
         presence?: "online" | "dnd" | "invisible";
         two_factor_enabled?: boolean;
+        csrf_token?: string;
+        impersonation_mode?: boolean;
+        impersonated_by?: number | string;
+        impersonated_by_username?: string;
     }
 
     export let currentEditingScenarioId: string | number | null = null;
@@ -35,6 +39,8 @@ namespace AuthModule {
         const avatar = document.querySelector<HTMLImageElement>(".user-avatar img");
         const cardName = document.getElementById("userCardName");
         const cardRole = document.getElementById("userCardRole");
+        const cardImpersonation = document.getElementById("userCardImpersonation");
+        const cardImpersonationText = document.getElementById("userCardImpersonationText");
         const cardAvatar = document.getElementById("userCardAvatar") as HTMLImageElement | null;
         const homeAvatar = document.getElementById("personalHomeAvatar") as HTMLImageElement | null;
         const homeName = document.getElementById("personalHomeName");
@@ -45,34 +51,52 @@ namespace AuthModule {
             if (avatar) avatar.src = user.avatar || "/assets/avatars/default.jpg";
             if (cardName) cardName.textContent = user.username;
             if (cardRole) cardRole.textContent = user.role || "USER";
+            if (cardImpersonation) cardImpersonation.hidden = !user.impersonation_mode;
+            if (cardImpersonationText) {
+                cardImpersonationText.textContent = user.impersonation_mode
+                    ? `${authText("auth.status.impersonating", "模拟登录中")}${user.impersonated_by_username ? ` · ${authText("auth.status.original_account", "原账号 {name}", { name: user.impersonated_by_username })}` : ""}`
+                    : "";
+            }
             if (cardAvatar) cardAvatar.src = user.avatar || "/assets/avatars/default.jpg";
             if (homeAvatar) homeAvatar.src = user.avatar || "/assets/avatars/default.jpg";
             if (homeName) homeName.textContent = user.nickname || user.username;
-            if (homeMeta) homeMeta.textContent = `${user.role || "USER"} · ${user.email || "未设置邮箱"}`;
+            if (homeMeta) {
+                const baseMeta = `${user.role || "USER"} · ${user.email || authText("auth.status.email_missing", "未设置邮箱")}`;
+                homeMeta.textContent = user.impersonation_mode
+                    ? `${baseMeta} · ${authText("auth.status.impersonating", "模拟登录中")}`
+                    : baseMeta;
+            }
             if (presenceButtonLabel) presenceButtonLabel.textContent = presenceLabel(user.presence || "online");
         } else {
-            if (name) name.textContent = "未登录";
+            if (name) name.textContent = authText("auth.status.guest", "未登录");
             if (avatar) avatar.src = "/assets/avatars/default.jpg";
-            if (cardName) cardName.textContent = "未登录";
+            if (cardName) cardName.textContent = authText("auth.status.guest", "未登录");
             if (cardRole) cardRole.textContent = "USER";
+            if (cardImpersonation) cardImpersonation.hidden = true;
+            if (cardImpersonationText) cardImpersonationText.textContent = "";
             if (cardAvatar) cardAvatar.src = "/assets/avatars/default.jpg";
             if (homeAvatar) homeAvatar.src = "/assets/avatars/default.jpg";
-            if (homeName) homeName.textContent = "未登录";
+            if (homeName) homeName.textContent = authText("auth.status.guest", "未登录");
             if (homeMeta) homeMeta.textContent = "USER";
-            if (presenceButtonLabel) presenceButtonLabel.textContent = "在线状态";
+            if (presenceButtonLabel) presenceButtonLabel.textContent = authText("presence.status", "在线状态");
         }
         window.refreshAdminNavigation?.();
+        window.refreshScenarioManagement?.();
     }
 
     function presenceLabel(presence: CurrentUser["presence"]): string {
         switch (presence) {
             case "dnd":
-                return "请勿打扰";
+                return authText("presence.dnd", "请勿打扰");
             case "invisible":
-                return "隐身";
+                return authText("presence.invisible", "隐身");
             default:
-                return "在线";
+                return authText("presence.online", "在线");
         }
+    }
+
+    export function authText(key: string, fallback: string, values: Record<string, string | number> = {}): string {
+        return window.TrpgI18n?.t(key, fallback, values) || fallback;
     }
 
     export function showAuthModal(): void {
@@ -92,3 +116,7 @@ namespace AuthModule {
         element.style.color = isError ? "red" : "green";
     }
 }
+
+window.addEventListener("trpg:locale-changed", () => {
+    AuthModule.setCurrentUser(window.currentUser || null);
+});

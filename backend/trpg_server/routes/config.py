@@ -5,13 +5,14 @@ import re
 import requests
 from flask import Blueprint, current_app, request, session
 
-from trpg_server.json_store import read_json, write_json_atomic
+from trpg_server.ai_platform_config import load_platform_config, save_platform_config
+from trpg_server.json_store import write_json_atomic
 from trpg_server.logging_config import log_user_action, user_action_text
 from trpg_server.permission_config import load_permission_config, permission_config_path, save_permission_config
 from trpg_server.responses import error_response, success_response
 from trpg_server.role_config import enabled_provider_options, load_roles, save_role
 from trpg_server.security import require_permission_node, safe_join
-from trpg_server.settings import CONFIG_DIR
+from trpg_server.settings import AI_PLATFORM_SECRET_DIR, CONFIG_DIR
 
 bp = Blueprint("config", __name__)
 logger = logging.getLogger(__name__)
@@ -29,12 +30,20 @@ def _get_ai_platform_dir():
     return current_app.config.get("AI_PLATFORM_DIR", _get_config_dir() / "aiplatform")
 
 
+def _get_ai_platform_secret_dir():
+    return current_app.config.get("AI_PLATFORM_SECRET_DIR", AI_PLATFORM_SECRET_DIR)
+
+
 def _get_ai_model_dir():
     return current_app.config.get("AI_MODEL_DIR", _get_config_dir() / "aimodel")
 
 
 def _get_kp_prompt_file():
     return current_app.config.get("KP_PROMPT_FILE", _get_config_dir() / "roles" / "kp.md")
+
+
+def _get_debug_kp_prompt_file():
+    return current_app.config.get("DEBUG_KP_PROMPT_FILE", _get_config_dir() / "roles" / "debug-kp.md")
 
 
 def _get_role_config_file():
@@ -151,7 +160,8 @@ def save_ai_platform_config(platform):
             return error_response("Invalid config data", 400)
 
         config_path = safe_join(_get_ai_platform_dir(), f"{platform}.json")
-        write_json_atomic(config_path, config_data)
+        secret_path = safe_join(_get_ai_platform_secret_dir(), f"{platform}.json")
+        save_platform_config(config_path, secret_path, config_data)
 
         log_user_action(
             logger,
@@ -174,10 +184,11 @@ def test_ai_platform_api(platform):
             return error_response("Invalid test data", 400)
 
         config_path = safe_join(_get_ai_platform_dir(), f"{platform}.json")
+        secret_path = safe_join(_get_ai_platform_secret_dir(), f"{platform}.json")
         if not config_path.exists():
             return error_response("Platform config file does not exist", 404)
 
-        config = read_json(config_path, default={})
+        config = load_platform_config(config_path, secret_path)
         api_key = config.get("config", {}).get("api_key")
         base_url = config.get("config", {}).get("base_url")
         if not base_url:
@@ -271,6 +282,18 @@ def get_system_prompt():
         return error_response(f"Load failed: {exc}", 500)
 
 
+@bp.route("/api/config/debug-prompt", methods=["GET"])
+@require_permission_node("settings.ai_debug")
+def get_debug_prompt():
+    prompt_path = _get_debug_kp_prompt_file()
+    try:
+        content = prompt_path.read_text(encoding="utf-8") if prompt_path.exists() else ""
+        return success_response(data={"content": content})
+    except OSError as exc:
+        logger.exception("Failed to load debug prompt")
+        return error_response(f"Load failed: {exc}", 500)
+
+
 @bp.route("/api/config/system-prompt", methods=["POST"])
 @require_permission_node("settings.ai_models")
 def save_system_prompt():
@@ -297,6 +320,34 @@ def save_system_prompt():
         return success_response(message="System prompt saved successfully")
     except Exception as exc:
         logger.exception("Failed to save system prompt")
+        return error_response(f"Save failed: {exc}", 500)
+
+
+@bp.route("/api/config/debug-prompt", methods=["POST"])
+@require_permission_node("settings.ai_debug")
+def save_debug_prompt():
+    try:
+        prompt_data = request.get_json(silent=True)
+        if not isinstance(prompt_data, dict):
+            return error_response("Invalid debug prompt data", 400)
+
+        content = prompt_data.get("content")
+        if not isinstance(content, str) or not content.strip():
+            return error_response("Debug prompt content is required", 400)
+
+        prompt_path = _get_debug_kp_prompt_file()
+        prompt_path.parent.mkdir(parents=True, exist_ok=True)
+        prompt_path.write_text(content, encoding="utf-8")
+        log_user_action(
+            logger,
+            user_action_text(session.get("username"), "Updated AI debug prompt"),
+            user_id=session.get("user_id"),
+            file=prompt_path.name,
+            content_length=len(content),
+        )
+        return success_response(message="Debug prompt saved successfully")
+    except Exception as exc:
+        logger.exception("Failed to save debug prompt")
         return error_response(f"Save failed: {exc}", 500)
 
 

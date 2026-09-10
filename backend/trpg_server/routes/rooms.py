@@ -1,4 +1,5 @@
 import logging
+import tomllib
 import time
 from uuid import uuid4
 
@@ -8,8 +9,9 @@ from trpg_server.json_store import read_json, write_json_atomic
 from trpg_server.logging_config import log_user_action, user_action_text
 from trpg_server.permission_config import is_role_allowed, permission_config_path
 from trpg_server.responses import error_response, success_response
-from trpg_server.security import safe_join
-from trpg_server.settings import ROOMS_DIR
+from trpg_server.role_config import load_roles
+from trpg_server.security import is_socket_user_online, safe_join
+from trpg_server.settings import CONFIG_DIR, ROOMS_DIR, SCENARIOS_DIR
 
 bp = Blueprint("rooms", __name__)
 logger = logging.getLogger(__name__)
@@ -20,10 +22,37 @@ ROOM_ROLE_ADMIN = "admin"
 ROOM_ROLE_MEMBER = "member"
 ROOM_MEMBER_ACTIVE = "active"
 ROOM_MEMBER_REMOVED = "removed"
+DEFAULT_AUTOSAVE_NODE_LIMIT = 3
 
 
 def _get_rooms_dir():
     return current_app.config.get("ROOMS_DIR", ROOMS_DIR)
+
+
+def _get_config_dir():
+    return current_app.config.get("CONFIG_DIR", CONFIG_DIR)
+
+
+def _get_ai_platform_dir():
+    return current_app.config.get("AI_PLATFORM_DIR", _get_config_dir() / "aiplatform")
+
+
+def _get_kp_prompt_file():
+    return current_app.config.get("KP_PROMPT_FILE", _get_config_dir() / "roles" / "kp.md")
+
+
+def _get_role_config_file():
+    return current_app.config.get("ROLE_CONFIG_FILE", _get_config_dir() / "roles" / "roles.json")
+
+
+def _autosave_node_limit():
+    config_path = _get_config_dir() / "general.toml"
+    try:
+        config = tomllib.loads(config_path.read_text(encoding="utf-8")) if config_path.exists() else {}
+        value = int((config.get("autosave") or {}).get("max_nodes", DEFAULT_AUTOSAVE_NODE_LIMIT))
+    except (OSError, ValueError, tomllib.TOMLDecodeError):
+        value = DEFAULT_AUTOSAVE_NODE_LIMIT
+    return max(1, min(value, 50))
 
 
 def _timestamp():
@@ -281,6 +310,12 @@ def _write_messages(room_dir, messages):
     write_json_atomic(_messages_file(room_dir), messages)
 
 
+def _configured_role(role_id="kp"):
+    roles = load_roles(_get_role_config_file(), _get_kp_prompt_file(), _get_ai_platform_dir())
+    expected = str(role_id or "kp")
+    return next((role for role in roles if str(role.get("id")) == expected), roles[0] if roles else {})
+
+
 def _new_room_code():
     existing = {
         _read_room(room_dir).get("room_code")
@@ -306,6 +341,13 @@ def _room_permission_label(member, info):
     return label
 
 
+def _is_member_online(member):
+    if not _is_active_member(member):
+        return False
+    user_id = member.get("user_id")
+    return user_id is not None and is_socket_user_online(user_id)
+
+
 def _room_summary(info):
     _normalize_members(info)
     return {
@@ -320,12 +362,22 @@ def _room_summary(info):
             {
                 **member,
                 "is_active": _is_active_member(member),
+                "is_online": _is_member_online(member),
                 "permission_label": _room_permission_label(member, info),
             }
             for member in info.get("members", [])
         ],
         "created_at": info.get("created_at"),
         "updated_at": info.get("updated_at"),
+    }
+
+
+def _invisible_room_view(room_dir, info):
+    return {
+        "id": info.get("id"),
+        "name": info.get("name"),
+        "messages": _read_messages(room_dir),
+        "invisible_view": True,
     }
 
 
@@ -387,6 +439,21 @@ def create_room():
         "created_at": now,
         "updated_at": now,
     }
+    # Pin a deterministic starting scene in room state. The KP receives this
+    # pointer and can only move it via room.activate_scenario_scene.
+    try:
+        from trpg_server.scenario_store import load_scenario_by_id
+        _, bound_scenario = load_scenario_by_id(
+            current_app.config.get("SCENARIOS_DIR", SCENARIOS_DIR), scenario_id
+        )
+        if bound_scenario:
+            scene = next((m for m in bound_scenario.get("modules", [])
+                          if isinstance(m, dict) and str(m.get("module_type")) == "scene"), None)
+            if scene:
+                info["active_scene_id"] = str(scene.get("scene_id") or scene.get("id"))
+                info["active_scene_title"] = scene.get("title")
+    except Exception:
+        logger.exception("Failed to initialize room active scene")
     write_json_atomic(room_dir / "info.json", info)
     _write_messages(room_dir, [])
     write_json_atomic(room_dir / "autosave.json", {"updated_at": now, "messages": []})
@@ -403,6 +470,21 @@ def create_room():
     data = _room_summary(info)
     data["messages"] = []
     return success_response(data, "Room created successfully", 201)
+
+
+@bp.route("/api/rooms/spectate", methods=["POST"])
+def spectate_room_by_code():
+    login_error = _require_login()
+    if login_error:
+        return login_error
+    if not _is_elevated():
+        return error_response("Permission denied", 403, "Permission denied")
+
+    data = request.get_json(silent=True) or {}
+    room_dir, info = _find_room_by_code(data.get("room_code"))
+    if not room_dir:
+        return error_response("Room not found", 404, "Room not found")
+    return success_response(_invisible_room_view(room_dir, info), "Room spectated successfully")
 
 
 @bp.route("/api/rooms/join", methods=["POST"])
@@ -578,6 +660,20 @@ def get_room(room_id):
     return success_response(data, "Room loaded successfully")
 
 
+@bp.route("/api/rooms/<room_id>/spectate", methods=["GET"])
+def spectate_room(room_id):
+    login_error = _require_login()
+    if login_error:
+        return login_error
+    if not _is_elevated():
+        return error_response("Permission denied", 403, "Permission denied")
+
+    room_dir, info = _find_room(room_id)
+    if not room_dir:
+        return error_response("Room not found", 404, "Room not found")
+    return success_response(_invisible_room_view(room_dir, info), "Room spectated successfully")
+
+
 @bp.route("/api/rooms/<room_id>", methods=["DELETE"])
 def delete_room(room_id):
     login_error = _require_login()
@@ -650,9 +746,10 @@ def create_room_message(room_id):
         "metadata": data.get("metadata", {}),
     }
     if message["type"] == "kp":
+        role = _configured_role((message.get("metadata") or {}).get("roleId") or data.get("role_id") or "kp")
         message["sender_id"] = None
-        message["sender_name"] = data.get("sender_name", "KP")
-        message["avatar"] = "/assets/avatars/default_kp.jpg"
+        message["sender_name"] = data.get("sender_name") or role.get("name") or "KP"
+        message["avatar"] = data.get("avatar") or role.get("avatar") or "/assets/avatars/default_kp.jpg"
     elif message["type"] == "dice":
         message["sender_id"] = None
         message["sender_name"] = data.get("sender_name", "骰娘")
@@ -661,6 +758,10 @@ def create_room_message(room_id):
         message["sender_id"] = None
         message["sender_name"] = data.get("sender_name", "系统")
         message["avatar"] = "/assets/avatars/default_system.jpg"
+    elif message["type"] == "trigger":
+        message["sender_id"] = None
+        message["sender_name"] = data.get("sender_name") or "触发器"
+        message["avatar"] = data.get("avatar") or "/assets/avatars/default_system.jpg"
 
     messages = _read_messages(room_dir)
     messages.append(message)
@@ -672,6 +773,61 @@ def create_room_message(room_id):
         f"{message['sender_name']}:{content}",
     )
     return success_response(message, "Room message saved successfully", 201)
+
+
+@bp.route("/api/rooms/<room_id>/triggers", methods=["POST"])
+def trigger_room_scenario(room_id):
+    login_error = _require_login()
+    if login_error:
+        return login_error
+
+    room_dir, info = _find_room(room_id)
+    if not room_dir:
+        return error_response("Room not found", 404, "Room not found")
+    if not _can_access(info):
+        return error_response("Permission denied", 403, "Permission denied")
+    if not _can_manage_members(info):
+        return error_response("Permission denied", 403, "Permission denied")
+
+    data = request.get_json(silent=True) or {}
+    trigger_id = data.get("trigger_id")
+    if trigger_id in (None, ""):
+        return error_response("Please provide trigger id", 400, "No trigger id")
+
+    scenarios_dir = current_app.config.get("SCENARIOS_DIR", ROOMS_DIR.parent / "scenarios")
+    from trpg_server.scenario_store import build_trigger_message, load_scenario_by_id
+
+    _, scenario = load_scenario_by_id(scenarios_dir, info.get("scenario_id"))
+    if not scenario:
+        return error_response("Scenario not found", 404, "Scenario not found")
+
+    trigger_message = build_trigger_message(scenario, trigger_id)
+    if not trigger_message:
+        return error_response("Trigger not found", 404, "Trigger not found")
+
+    message = {
+        "id": uuid4().hex,
+        "type": "trigger",
+        "sender_id": None,
+        "sender_name": trigger_message.get("sender_name", "触发器"),
+        "avatar": trigger_message.get("avatar", "/assets/avatars/default_system.jpg"),
+        "content": trigger_message.get("content", ""),
+        "time": data.get("time") or time.strftime("%H:%M"),
+        "created_at": _timestamp(),
+        "metadata": trigger_message.get("metadata", {}),
+    }
+    messages = _read_messages(room_dir)
+    messages.append(message)
+    _write_messages(room_dir, messages)
+    _write_room(room_dir, info)
+    log_user_action(
+        logger,
+        user_action_text(session.get("username"), "触发了场景触发器"),
+        用户ID=session.get("user_id"),
+        房间ID=room_id,
+        触发器ID=trigger_id,
+    )
+    return success_response(message, "Trigger executed successfully", 201)
 
 
 @bp.route("/api/rooms/<room_id>/character-records", methods=["POST"])
@@ -720,6 +876,9 @@ def _create_character_record_for_room(room_dir, info):
         state["injury_records"].insert(0, record)
     else:
         state["current_san"] = max(0, state["current_san"] - value)
+        if isinstance(target.get("character_card"), dict):
+            target["character_card"]["currentSan"] = state["current_san"]
+            target["character_card"]["current_san"] = state["current_san"]
         record["san_after"] = state["current_san"]
         state["sanity_records"].insert(0, record)
 
@@ -799,12 +958,15 @@ def list_room_nodes(room_id):
     nodes_dir = room_dir / "nodes"
     nodes = []
     for node_file in nodes_dir.glob("*.json") if nodes_dir.exists() else []:
+        if node_file.name == "autosave.json":
+            continue
         node = read_json(node_file, default={})
         nodes.append(
             {
                 "filename": node_file.name,
                 "created_at": node.get("created_at", ""),
                 "message_count": len(node.get("messages", [])),
+                "automatic": bool(node.get("automatic")),
             }
         )
     nodes.sort(key=lambda item: item["created_at"], reverse=True)
@@ -827,6 +989,7 @@ def create_room_node(room_id):
     node = {
         "filename": f"{timestamp}.json",
         "created_at": _timestamp(),
+        "automatic": False,
         "messages": _read_messages(room_dir),
     }
     write_json_atomic(room_dir / "nodes" / node["filename"], node)
@@ -924,8 +1087,26 @@ def save_room_autosave(room_id):
     if not _can_access(info):
         return error_response("Permission denied", 403, "Permission denied")
 
-    autosave = {"updated_at": _timestamp(), "messages": _read_messages(room_dir)}
+    timestamp = int(time.time() * 1000)
+    autosave = {
+        "filename": f"autosave-{timestamp}.json",
+        "updated_at": _timestamp(),
+        "created_at": _timestamp(),
+        "automatic": True,
+        "messages": _read_messages(room_dir),
+    }
+    nodes_dir = room_dir / "nodes"
+    nodes_dir.mkdir(parents=True, exist_ok=True)
+    write_json_atomic(nodes_dir / autosave["filename"], autosave)
     write_json_atomic(room_dir / "autosave.json", autosave)
+    automatic_nodes = []
+    for node_file in nodes_dir.glob("autosave-*.json"):
+        node = read_json(node_file, default={})
+        if node.get("automatic"):
+            automatic_nodes.append((str(node.get("created_at") or ""), node_file))
+    automatic_nodes.sort(key=lambda item: item[0], reverse=True)
+    for _, old_file in automatic_nodes[_autosave_node_limit():]:
+        old_file.unlink(missing_ok=True)
     log_user_action(
         logger,
         user_action_text(session.get("username"), "保存了房间自动存档"),

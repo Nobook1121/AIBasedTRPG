@@ -2,53 +2,58 @@ interface NavLinkItem {
     href: string;
     tab: string;
     label: string;
+    labelKey?: string;
     active?: boolean;
     adminOnly?: boolean;
 }
 
 interface NavGroup {
     label: string;
+    labelKey?: string;
     links: NavLinkItem[];
     adminOnly?: boolean;
 }
 
 const primaryLinks: NavLinkItem[] = [
-    { href: "#home", tab: "home", label: "主页", active: true },
-    { href: "#character", tab: "character", label: "角色卡" },
-    { href: "#save", tab: "save", label: "房间" },
+    { href: "#home", tab: "home", label: "主页", labelKey: "nav.home", active: true },
+    { href: "#character", tab: "character", label: "角色卡", labelKey: "nav.character" },
+    { href: "#save", tab: "save", label: "房间", labelKey: "nav.rooms" },
 ];
 
 const groupedLinks: NavGroup[] = [
     {
         label: "小工具",
+        labelKey: "nav.tools",
         links: [
-            { href: "#tools-dice", tab: "tools", label: "骰子工具" },
-            { href: "#tools-other", tab: "tools", label: "其他工具" },
+            { href: "#tools-dice", tab: "tools", label: "骰子工具", labelKey: "nav.dice" },
+            { href: "#tools-other", tab: "tools", label: "其他工具", labelKey: "nav.other_tools" },
         ],
     },
     {
         label: "探索发现",
+        labelKey: "nav.explore",
         links: [
-            { href: "#scenario", tab: "scenario", label: "剧本" },
-            { href: "#character-gallery", tab: "character-gallery", label: "角色卡广场" },
+            { href: "#scenario", tab: "scenario", label: "剧本", labelKey: "nav.scenarios" },
+            { href: "#character-gallery", tab: "character-gallery", label: "角色卡广场", labelKey: "nav.character_gallery" },
         ],
     },
     {
         label: "设置",
+        labelKey: "nav.settings",
         adminOnly: true,
         links: [
-            { href: "#settings-general", tab: "settings", label: "常规设置" },
-            { href: "#settings-model", tab: "settings", label: "模型设置" },
-            { href: "#settings-network", tab: "settings", label: "网络配置" },
-            { href: "#settings-about", tab: "settings", label: "关于应用" },
+            { href: "#settings-general", tab: "settings", label: "常规设置", labelKey: "nav.general" },
+            { href: "#settings-model", tab: "settings", label: "模型设置", labelKey: "nav.model" },
+            { href: "#settings-network", tab: "settings", label: "网络配置", labelKey: "nav.network" },
+            { href: "#settings-about", tab: "settings", label: "关于应用", labelKey: "nav.about" },
         ],
     },
 ];
 
-function NavLink({ href, tab, label, active = false, adminOnly = false }: NavLinkItem) {
+function NavLink({ href, tab, label, labelKey, active = false, adminOnly = false }: NavLinkItem) {
     return (
         <a className={`nav-link${active ? " active" : ""}`} href={href} data-tab={tab} data-admin-only={adminOnly ? "true" : undefined}>
-            {label}
+            <span data-i18n={labelKey}>{label}</span>
         </a>
     );
 }
@@ -57,7 +62,7 @@ function NavGroupSection({ group }: { group: NavGroup }) {
     return (
         <li className="nav-item" data-admin-only={group.adminOnly ? "true" : undefined}>
             <button className="dropdown-btn" type="button">
-                {group.label}
+                <span data-i18n={group.labelKey}>{group.label}</span>
                 <i className="fa fa-caret-down" aria-hidden="true" />
             </button>
             <div className="dropdown-container">
@@ -83,6 +88,8 @@ export function Sidebar() {
                         id="sidebarToggle"
                         title="收起侧边栏"
                         aria-label="收起侧边栏"
+                        data-i18n-title="nav.collapse_sidebar"
+                        data-i18n-aria-label="nav.collapse_sidebar"
                         aria-expanded="true"
                     >
                         <i className="fa fa-angle-double-left" aria-hidden="true" />
@@ -98,9 +105,9 @@ export function Sidebar() {
                         <NavGroupSection key={group.label} group={group} />
                     ))}
                 </ul>
-                <div className="user-info mt-auto" id="userInfo" role="button" tabIndex={0} aria-label="打开用户设置">
+                <div className="user-info mt-auto" id="userInfo" role="button" tabIndex={0} aria-label="打开用户设置" data-i18n-aria-label="nav.open_user_settings">
                     <div className="user-avatar" id="userAvatar">
-                        <img src="https://via.placeholder.com/40" alt="用户头像" width="40" height="40" />
+                        <img src="https://via.placeholder.com/40" alt="用户头像" data-i18n-alt="nav.user_avatar" width="40" height="40" />
                     </div>
                     <div className="user-details">
                         <div className="user-name" id="userName" data-i18n="auth.status.guest">

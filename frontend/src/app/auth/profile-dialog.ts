@@ -51,7 +51,7 @@ namespace AuthModule {
         const nickname = (document.getElementById("editNickname") as HTMLInputElement | null)?.value.trim() || "";
         const avatarFile = (document.getElementById("avatarUpload") as HTMLInputElement | null)?.files?.[0];
         if (!username || !email) {
-            showMessage("settingsMessage", "请输入用户名和电子邮件", true);
+            showMessage("settingsMessage", authText("profile.error.username_email_required", "请输入用户名和电子邮件"), true);
             return;
         }
         try {
@@ -63,14 +63,14 @@ namespace AuthModule {
 
             const response = await TrpgApi.post<ApiResponse<CurrentUser>>("/api/auth/update", formData);
             if (!response.success || !response.data) {
-                showMessage("settingsMessage", apiMessage(response, "保存失败"), true);
+                showMessage("settingsMessage", apiMessage(response, authText("profile.error.save_failed", "保存失败")), true);
                 return;
             }
             setCurrentUser({ ...(window.currentUser as CurrentUser), ...response.data });
-            showMessage("settingsMessage", "设置已保存");
+            showMessage("settingsMessage", authText("profile.success.saved", "设置已保存"));
         } catch (error) {
             console.error("更新用户资料失败:", error);
-            showMessage("settingsMessage", "保存失败，请稍后重试", true);
+            showMessage("settingsMessage", authText("profile.error.save_failed_retry", "保存失败，请稍后重试"), true);
         }
     }
 
@@ -92,11 +92,11 @@ namespace AuthModule {
         const newPassword = (document.getElementById("passwordNewPassword") as HTMLInputElement | null)?.value || "";
         const confirmPassword = (document.getElementById("passwordConfirmPassword") as HTMLInputElement | null)?.value || "";
         if (!currentPassword || !newPassword || !confirmPassword) {
-            showMessage("passwordMessage", "请完整填写密码信息", true);
+            showMessage("passwordMessage", authText("profile.error.password_required", "请完整填写密码信息"), true);
             return;
         }
         if (newPassword !== confirmPassword) {
-            showMessage("passwordMessage", "两次输入的新密码不一致", true);
+            showMessage("passwordMessage", authText("auth.error.password_mismatch", "两次输入的新密码不一致"), true);
             return;
         }
         try {
@@ -106,15 +106,15 @@ namespace AuthModule {
                 confirm_password: confirmPassword,
             });
             if (!response.success) {
-                showMessage("passwordMessage", apiMessage(response, "密码修改失败"), true);
+                showMessage("passwordMessage", apiMessage(response, authText("profile.error.password_change_failed", "密码修改失败")), true);
                 return;
             }
             clearPasswordDialogFields();
-            showMessage("passwordMessage", "密码已修改");
+            showMessage("passwordMessage", authText("profile.success.password_changed", "密码已修改"));
             setTimeout(closePasswordDialog, 500);
         } catch (error) {
             console.error("密码修改失败:", error);
-            showMessage("passwordMessage", "密码修改失败，请稍后重试", true);
+            showMessage("passwordMessage", authText("profile.error.password_change_failed_retry", "密码修改失败，请稍后重试"), true);
         }
     }
 
@@ -208,10 +208,10 @@ namespace AuthModule {
                 closeUserCard();
                 return;
             }
-            showMessage("settingsMessage", apiMessage(response, "在线状态更新失败"), true);
+            showMessage("settingsMessage", apiMessage(response, authText("profile.error.presence_update_failed", "在线状态更新失败")), true);
         } catch (error) {
             console.error("在线状态更新失败:", error);
-            showMessage("settingsMessage", "在线状态更新失败，请稍后重试", true);
+            showMessage("settingsMessage", authText("profile.error.presence_update_failed_retry", "在线状态更新失败，请稍后重试"), true);
         }
     }
 }

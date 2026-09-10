@@ -13,11 +13,15 @@ class AgentCompletionResult:
     token_count: int | None = None
     error: str | None = None
     response_data: dict[str, Any] | None = None
+    tool_messages: list[dict[str, Any]] | None = None
+    direct_messages: list[dict[str, Any]] | None = None
 
 
-def _extract_message(response_data: dict[str, Any]) -> dict[str, Any]:
+def _extract_message(response_data: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(response_data, dict):
+        return {}
     choices = response_data.get("choices", [])
-    if not choices:
+    if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
         return {}
     return choices[0].get("message") or choices[0].get("delta") or {}
 
@@ -78,7 +82,7 @@ def run_agent_completion(
     profile: AgentProfile,
     registry: ToolRegistry,
     context: Any,
-    max_tool_rounds: int = 4,
+    max_tool_rounds: int = 8,
 ) -> AgentCompletionResult:
     payload = {**base_payload}
     messages = list(payload.get("messages", []))
@@ -90,17 +94,44 @@ def run_agent_completion(
 
     enabled_by_name = {tool.name: tool for tool in enabled_tools}
     last_response = None
+    tool_messages: list[dict[str, Any]] = []
+    direct_messages: list[dict[str, Any]] = []
+    empty_completion_retries = 0
+    total_token_count = 0
+    has_token_count = False
 
     for _round in range(max_tool_rounds + 1):
         response_data = requester(payload)
         last_response = response_data
+        round_token_count = _extract_token_count(response_data)
+        if round_token_count is not None:
+            total_token_count += round_token_count
+            has_token_count = True
         message = _extract_message(response_data)
         calls = _tool_calls(message)
         if not calls:
+            content = str(message.get("content") or "")
+            # Some providers occasionally return an empty assistant message
+            # after a tool call (or transiently on a normal completion). Give
+            # the model one chance to continue before reporting no response.
+            if not content and empty_completion_retries < 2:
+                empty_completion_retries += 1
+                messages.append(
+                    {
+                        "role": "system",
+                        "content": (
+                            "上一轮生成没有返回可显示内容。请继续生成简洁的KP回复；"
+                            "如果刚才使用了工具，请根据工具结果作出叙事判断，除非条件确实满足，否则不要再次调用触发器工具。"
+                        ),
+                    }
+                )
+                continue
             return AgentCompletionResult(
-                content=str(message.get("content") or ""),
-                token_count=_extract_token_count(response_data),
+                content=content,
+                token_count=total_token_count if has_token_count else None,
                 response_data=response_data,
+                tool_messages=tool_messages,
+                direct_messages=direct_messages,
             )
 
         messages.append(_assistant_tool_call_message(message))
@@ -115,6 +146,24 @@ def run_agent_completion(
                 result = tool.handler(arguments, context)
             except Exception as exc:
                 result = {"error": str(exc)}
+            if isinstance(result, dict) and result.get("error"):
+                import logging
+                logging.getLogger(__name__).warning("Agent tool %s failed: %s", resolved_name, result.get("error"))
+
+            tool_state = getattr(context, "tool_state", None)
+            if isinstance(tool_state, dict) and isinstance(result, dict):
+                tool_state["last_tool"] = resolved_name
+                if resolved_name in {"check.roll_room_check", "dice.roll_coc_check"}:
+                    tool_state["last_check"] = result
+
+            if isinstance(result, dict) and result.get("direct_message"):
+                direct_message = result["direct_message"]
+                if isinstance(direct_message, dict):
+                    direct_messages.append(direct_message)
+
+            if isinstance(result, dict) and isinstance(result.get("visible_message"), dict):
+                tool_messages.append(result["visible_message"])
+
             messages.append(
                 {
                     "role": "tool",
@@ -124,4 +173,10 @@ def run_agent_completion(
                 }
             )
 
-    return AgentCompletionResult(error="Agent tool loop limit exceeded", response_data=last_response)
+    return AgentCompletionResult(
+        error="Agent tool loop limit exceeded",
+        token_count=total_token_count if has_token_count else None,
+        response_data=last_response,
+        tool_messages=tool_messages,
+        direct_messages=direct_messages,
+    )

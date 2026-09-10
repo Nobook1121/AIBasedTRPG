@@ -33,6 +33,7 @@ def test_general_config_contains_ai_stream_output_flag():
 
     assert "[ai]" in general_config
     assert "stream_output = false" in general_config
+    assert "debug_mode = false" in general_config
 
 
 def test_frontend_settings_exposes_ai_stream_output_toggle():
@@ -43,3 +44,16 @@ def test_frontend_settings_exposes_ai_stream_output_toggle():
     assert 'id="streamOutput"' in settings_html
     assert "stream_output" in config_source
     assert "streamOutput" in tabs_source
+
+
+def test_debug_mode_exposes_independent_prompt_settings():
+    settings_html = Path("frontend/src/index/fragments/03-room-tools-auth-settings.html").read_text(encoding="utf-8")
+    platform_source = Path("frontend/src/app/platform-ui.ts").read_text(encoding="utf-8")
+    chat_source = Path("backend/trpg_server/routes/chat.py").read_text(encoding="utf-8")
+    debug_prompt = Path("data/config/roles/debug-kp.md").read_text(encoding="utf-8")
+
+    assert 'id="debugMode"' in settings_html
+    assert 'id="debugKpPrompt"' in settings_html
+    assert "/api/config/debug-prompt" in platform_source
+    assert "debug_mode" in chat_source
+    assert "check.roll_room_check" in debug_prompt

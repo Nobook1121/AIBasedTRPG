@@ -104,13 +104,18 @@ class ConfigManager {
 
         configSetSelectValue("themeSelect", this.get("general", "appearance", "theme", "light"));
         this.applyTheme();
-        configSetSelectValue("languageSelect", this.get("general", "language", "language", "zh-CN"));
+        const language = this.get("general", "language", "language", "zh-CN");
+        configSetSelectValue("languageSelect", language);
+        void window.TrpgI18n?.setLocale(language);
         configSetCheckboxValue("enableSound", this.get("general", "notification", "enable_sound", true));
         configSetCheckboxValue("enableNotification", this.get("general", "notification", "enable_desktop_notification", false));
         configSetCheckboxValue("enableAutosave", this.get("general", "autosave", "enabled", true));
         configSetInputValue("autosaveInterval", this.get("general", "autosave", "interval", 300));
+        configSetInputValue("autosaveMaxNodes", this.get("general", "autosave", "max_nodes", 3));
+        configSetInputValue("triggerMaxFileSize", this.get("general", "scenario", "trigger_max_file_size", 5242880));
         configSetCheckboxValue("showTimestamp", this.get("general", "chat", "show_timestamp", true));
         configSetCheckboxValue("streamOutput", this.get("general", "ai", "stream_output", false));
+        configSetCheckboxValue("showAIHints", this.get("general", "ai", "show_ai_hints", true));
         configSetInputValue("messageFontSize", this.get("general", "chat", "message_font_size", 14));
 
         console.log("常规设置已应用到 UI");

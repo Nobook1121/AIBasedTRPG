@@ -9,6 +9,7 @@ from trpg_server.agents.memory import read_room_memory, remember_room_fact
 from trpg_server.agents.tools.room import (
     get_room_character_cards,
     get_room_scenario_context,
+    get_room_scenario_module,
     get_room_snapshot,
 )
 
@@ -91,6 +92,8 @@ def test_room_check_reads_skill_from_bound_character_by_username(tmp_path):
     assert result["threshold"] == 60
     assert result["success"] is True
     assert result["summary"] == "\u4fa6\u5bdf d%: [30] = 30 / 60 \u6210\u529f"
+    assert result["visible_message"]["type"] == "dice"
+    assert result["visible_message"]["content"] == result["summary"]
 
 
 def test_room_check_applies_difficulty_and_adjustment(tmp_path):

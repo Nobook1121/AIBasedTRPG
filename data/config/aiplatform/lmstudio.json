@@ -5,7 +5,6 @@
   "enabled": false,
   "icon": "/assets/aiplatform/lmstudio.png",
   "config": {
-    "api_key": "lm-studio",
     "base_url": "http://localhost:1234/v1/chat/completions",
     "timeout": 30
   },

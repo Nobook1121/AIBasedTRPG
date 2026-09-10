@@ -5,3 +5,4 @@ Werkzeug==2.3.8
 flask-socketio==5.3.6
 python-socketio==5.11.2
 pytest==8.4.0
+olefile==0.47

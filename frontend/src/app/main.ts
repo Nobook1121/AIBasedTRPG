@@ -6,37 +6,32 @@ document.addEventListener("DOMContentLoaded", () => {
 
 async function initializeApplication(): Promise<void> {
     const dom = window.TrpgDom;
+    await window.TrpgI18n?.ready;
     window.TrpgI18n?.apply();
 
     toolManager = new ToolManager();
     window.toolManager = toolManager;
 
     initTabs();
-    initScenarioManagement();
     initDiceTool();
     initCommandToolPanels();
     initToolTabs();
     initSettingsTabs();
 
     await loadAndApplyConfigs();
-
     await initAIPlatforms();
     await initAuth();
+    initScenarioManagement();
     initCharacterManagement();
     initChat();
     await initNetworkConfig();
     initRoomManagement();
     initSidebarToggle();
-
     await autoLoadLastRoom();
 
     dom.on(document, "hidden.bs.modal", () => {
         setTimeout(() => {
-            if (dom.removeModalBackdropsWhenIdle()) {
-                console.log("所有模态框已关闭，已移除所有遮罩层");
-            } else {
-                console.log("还有其他模态框打开，保留遮罩层");
-            }
+            dom.removeModalBackdropsWhenIdle();
         }, 100);
     });
 }
@@ -46,9 +41,8 @@ async function loadAndApplyConfigs(): Promise<void> {
         await configManager.loadConfig("general");
         configManager.applyGeneralSettings();
         configManager.initThemeSystem();
-        console.log("配置文件加载和应用完成");
     } catch (error) {
-        console.error("加载配置文件时出错:", error);
+        console.error("failed to load config", error);
     }
 }
 
@@ -86,14 +80,14 @@ function submitCocCheck(): void {
     const difficulty = toolInputValue("cocCheckDifficulty");
     const adjustment = toolInputValue("cocCheckAdjustment");
     const command = ["/check", player, name, difficulty, adjustment].filter(Boolean).join(" ");
-    const result = window.toolManager?.handleCommand(command) || "工具管理器尚未初始化";
+    const result = window.toolManager?.handleCommand(command) || "tool manager not ready";
     setToolOutput("cocCheckResult", result);
 }
 
 function renderRoomSnapshotTool(): void {
     const room = window.currentRoom;
     if (!room) {
-        setToolOutput("roomSnapshotResult", "当前没有加入房间。");
+        setToolOutput("roomSnapshotResult", "no room joined");
         return;
     }
 
@@ -119,7 +113,7 @@ function renderRoomSnapshotTool(): void {
 async function submitScenarioContext(): Promise<void> {
     const room = window.currentRoom;
     if (!room?.scenario_id) {
-        setToolOutput("scenarioContextResult", "当前房间未绑定剧本。");
+        setToolOutput("scenarioContextResult", "no scenario bound");
         return;
     }
 
@@ -127,38 +121,37 @@ async function submitScenarioContext(): Promise<void> {
         const response = await TrpgApi.get<ApiResponse<Scenario[]>>("/api/scenarios");
         const scenario = response.data?.find((item) => String(item.id) === String(room.scenario_id));
         if (!response.success || !scenario) {
-            setToolOutput("scenarioContextResult", "未找到当前房间绑定剧本。");
+            setToolOutput("scenarioContextResult", "scenario not found");
             return;
         }
 
         const query = toolInputValue("scenarioContextQuery").toLowerCase();
         const limit = Math.max(1, Math.min(20, Number.parseInt(toolInputValue("scenarioContextLimit") || "5", 10) || 5));
-        const sections = [
-            ...((scenario.scenes || []).map((item) => ({ section: "scenes", ...item }))),
-            ...((scenario.endings || []).map((item) => ({ section: "endings", ...item }))),
-        ];
-        const matches = sections.filter((item) => {
+        const modules = normalizeScenarioModulesForTool(scenario);
+        const matches = modules.filter((item) => {
             if (!query) return true;
             return JSON.stringify(item).toLowerCase().includes(query);
         }).slice(0, limit);
+
         setToolOutput("scenarioContextResult", JSON.stringify({
             scenario: {
                 id: scenario.id,
                 title: scenario.title,
                 notes: scenario.notes,
-                background: scenario.background,
+                allow_open_ending: scenario.allow_open_ending,
+                module_count: modules.length,
             },
             matches,
         }, null, 2));
     } catch (error) {
-        setToolOutput("scenarioContextResult", `剧本检索失败: ${toolErrorMessage(error)}`);
+        setToolOutput("scenarioContextResult", `scenario lookup failed: ${toolErrorMessage(error)}`);
     }
 }
 
 function renderCharacterCardsTool(): void {
     const room = window.currentRoom;
     if (!room) {
-        setToolOutput("characterCardsResult", "当前没有加入房间。");
+        setToolOutput("characterCardsResult", "no room joined");
         return;
     }
 
@@ -174,7 +167,7 @@ function renderCharacterCardsTool(): void {
 function submitRememberFact(): void {
     const content = toolInputValue("memoryContent");
     if (!content) {
-        setToolOutput("memoryToolResult", "请先填写需要记录的内容。");
+        setToolOutput("memoryToolResult", "fill memory content first");
         return;
     }
 
@@ -215,6 +208,26 @@ function toolErrorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
 }
 
+function normalizeScenarioModulesForTool(scenario: Scenario): Array<Record<string, unknown>> {
+    const modules: Array<Record<string, unknown>> = Array.isArray(scenario.modules)
+        ? (scenario.modules as unknown as Array<Record<string, unknown>>)
+        : [];
+
+    return modules.map((module, index) => {
+        const record = module as Record<string, unknown>;
+        return {
+            id: record.id || `module-${index + 1}`,
+            module_type: record.module_type,
+            title: record.title,
+            summary: record.summary,
+            content: record.content,
+            code: record.code,
+            open_ending: record.open_ending,
+            triggers: record.triggers,
+        };
+    });
+}
+
 function initSidebarToggle(): void {
     const dom = window.TrpgDom;
     const toggleBtn = dom.byId("sidebarToggle");
@@ -229,8 +242,8 @@ function initSidebarToggle(): void {
         mainContent?.classList.toggle("sidebar-collapsed-content", !isExpanded);
         dom.setButtonDisclosure(toggleBtn, {
             expanded: isExpanded,
-            expandedLabel: "收起侧边栏",
-            collapsedLabel: "展开侧边栏",
+            expandedLabel: "Collapse sidebar",
+            collapsedLabel: "Expand sidebar",
             expandedIconClass: "fa fa-angle-double-left",
             collapsedIconClass: "fa fa-angle-double-right",
         });

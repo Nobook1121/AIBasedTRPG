@@ -14,6 +14,7 @@ namespace AuthModule {
         document.getElementById("close-auth-modal")?.addEventListener("click", closeAuthModal);
         document.getElementById("logoutButton")?.addEventListener("click", logout);
         document.getElementById("switchAccountButton")?.addEventListener("click", switchAccount);
+        document.getElementById("exitImpersonationButton")?.addEventListener("click", stopImpersonation);
         document.getElementById("open-personal-home")?.addEventListener("click", () => {
             closeUserCard();
             window.switchMainTab?.("personal-home", { clearNav: true });

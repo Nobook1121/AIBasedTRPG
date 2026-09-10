@@ -1,101 +1,91 @@
 ﻿    <!-- 模态框 -->
-    <div class="modal fade" id="scenarioModal" tabindex="-1" aria-labelledby="scenarioModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-xl">
+    <div class="modal fade" id="scenarioModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-labelledby="scenarioModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="scenarioModalLabel">创建剧本</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <h5 class="modal-title" id="scenarioModalLabel" data-i18n="scenario.modal.create">创建剧本</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" data-i18n-aria-label="scenario.modal.close" aria-label="关闭"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="form-group">
-                        <label>剧本标题 *</label>
-                        <input type="text" class="form-control" id="scenarioTitle" required>
-                    </div>
-                    <div class="form-group">
-                        <label>剧本ID</label>
-                        <input type="text" class="form-control" id="scenarioPublicId" value="保存后自动生成" readonly>
-                    </div>
-                    <div class="form-group">
-                        <label>封面图片</label>
-                        <div class="cover-upload-container">
-                            <div class="cover-preview">
-                                <img id="coverPreview" src="https://via.placeholder.com/200x300?text=封面图片" alt="剧本封面" width="200" height="300">
+                    <div class="scenario-basic-layout">
+                        <label class="form-group scenario-cover-field">
+                            <span data-i18n="scenario.field.cover">封面图片</span>
+                            <div class="cover-upload-container">
+                                <div class="cover-preview">
+                                    <img id="coverPreview" src="/assets/scenario_covers/default_cover.png" alt="剧本封面" width="200" height="300">
+                                </div>
+                                <input type="file" id="coverUpload" class="cover-upload-input" accept="image/*">
+                                <label for="coverUpload" class="cover-upload-label" data-i18n="scenario.cover.upload">上传封面</label>
                             </div>
-                            <input type="file" id="coverUpload" class="cover-upload-input" accept="image/*">
-                            <label for="coverUpload" class="cover-upload-label">上传封面</label>
-                        </div>
-                        <input type="hidden" id="scenarioCoverUrl" value="">
-                    </div>
-                    <div class="form-group">
-                        <label>作者 *</label>
-                        <input type="text" class="form-control" id="scenarioAuthor" required>
-                    </div>
-                    <div class="form-group">
-                        <label>推荐人数 *</label>
-                        <input type="number" class="form-control" id="scenarioPlayerCount" value="0" required>
-                    </div>
-                    <div class="form-group">
-                        <label>备注</label>
-                        <textarea class="form-control" id="scenarioNotes" rows="2"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>背景/引入</label>
-                        <textarea class="form-control" id="scenarioBackground" rows="3"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>游戏准备</label>
-                        <textarea class="form-control" id="scenarioPreparation" rows="3"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>场景</label>
-                        <div id="scenarioScenes">
-                            <div class="scene-item mb-3 p-3 border rounded">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <h6>场景 1</h6>
-                                    <button type="button" class="btn btn-sm btn-danger remove-scene">删除</button>
-                                </div>
-                                <div class="form-group">
-                                    <label>场景内容</label>
-                                    <textarea class="form-control" rows="3"></textarea>
-                                </div>
-                                <div class="form-group mt-2">
-                                    <label>场景标记</label>
-                                    <textarea class="form-control" rows="2" placeholder="AI总结内容将显示在这里"></textarea>
-                                </div>
+                            <input type="hidden" id="scenarioCoverUrl" value="">
+                        </label>
+                        <div class="scenario-basic-main">
+                            <div class="scenario-basic-grid">
+                                <label class="form-group">
+                                    <span data-i18n="scenario.field.title">剧本标题 *</span>
+                                    <input type="text" class="form-control" id="scenarioTitle" required>
+                                </label>
+                                <label class="form-group">
+                                    <span data-i18n="scenario.field.id">剧本ID</span>
+                                    <input type="text" class="form-control" id="scenarioPublicId" value="保存后自动生成" readonly>
+                                </label>
+                                <label class="form-group">
+                                    <span data-i18n="scenario.field.author">作者 *</span>
+                                    <input type="text" class="form-control" id="scenarioAuthor" required>
+                                </label>
+                                <label class="form-group">
+                                    <span data-i18n="scenario.field.player_count">推荐人数 *</span>
+                                    <input type="number" class="form-control" id="scenarioPlayerCount" value="0" required>
+                                </label>
                             </div>
+                            <label class="form-group scenario-notes-field">
+                                <span data-i18n="scenario.field.notes">剧本简介</span>
+                                <textarea class="form-control" id="scenarioNotes" rows="3"></textarea>
+                            </label>
                         </div>
-                        <button type="button" class="btn btn-sm btn-primary mt-2" id="addScene">添加场景</button>
                     </div>
-                    <div class="form-group">
-                        <label>结局</label>
-                        <div id="scenarioEndings">
-                            <div class="ending-item mb-3 p-3 border rounded">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <h6>结局 1</h6>
-                                    <button type="button" class="btn btn-sm btn-danger remove-ending">删除</button>
-                                </div>
-                                <div class="form-group">
-                                    <label>结局内容</label>
-                                    <textarea class="form-control" rows="3"></textarea>
-                                </div>
-                                <div class="form-group mt-2">
-                                    <label>结局标记</label>
-                                    <textarea class="form-control" rows="2" placeholder="AI总结内容将显示在这里"></textarea>
-                                </div>
-                            </div>
+
+                    <div class="scenario-module-toolbar">
+                        <div>
+                            <h6 data-i18n="scenario.module.group">模块</h6>
+                            <p class="text-muted mb-0" data-i18n="scenario.module.add.hint">选择模块类型后点击添加即可生成对应编辑卡。</p>
                         </div>
-                        <button type="button" class="btn btn-sm btn-primary mt-2" id="addEnding">添加结局</button>
+                        <div class="scenario-module-toolbar-actions">
+                            <button type="button" class="btn btn-primary" id="addModule">
+                                <i class="fa fa-plus" aria-hidden="true"></i>
+                                <span data-i18n="scenario.module.add">添加模块</span>
+                            </button>
+                            <select class="form-select" id="scenarioModuleType">
+                                <option value="background" data-i18n="scenario.module.type.background">背景</option>
+                                <option value="public_info" data-i18n="scenario.module.type.public_info">公开信息</option>
+                                <option value="preparation" data-i18n="scenario.module.type.preparation">游戏准备</option>
+                                <option value="timeline" data-i18n="scenario.module.type.timeline">时间线</option>
+                                <option value="scene" selected data-i18n="scenario.module.type.scene">场景</option>
+                                <option value="ending" data-i18n="scenario.module.type.ending">结局</option>
+                                <option value="monster" data-i18n="scenario.module.type.monster">怪物信息</option>
+                                <option value="npc" data-i18n="scenario.module.type.npc">NPC信息</option>
+                                <option value="custom" data-i18n="scenario.module.type.custom">自定义模块</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <label class="scenario-open-ending-toggle">
+                        <input type="checkbox" id="scenarioAllowOpenEnding">
+                        <span data-i18n="scenario.open_ending">开放结局</span>
+                    </label>
+
+                    <div id="scenarioModules" class="scenario-module-list">
+                        <!-- 模块将在这里动态生成 -->
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-outline-secondary" id="saveScenarioDraft">保存草稿</button>
                     <button type="button" class="btn btn-primary" id="saveScenario">保存并发布</button>
                 </div>
             </div>
         </div>
-    </div>
-
-    <div class="modal fade" id="roomCharacterBindModal" tabindex="-1" aria-labelledby="roomCharacterBindModalLabel" aria-hidden="true">
+    </div>    <div class="modal fade" id="roomCharacterBindModal" tabindex="-1" aria-labelledby="roomCharacterBindModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
@@ -136,6 +126,7 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="roomEntryCreateCharacter">创建角色卡</button>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-outline-secondary" id="roomEntryInvisible" hidden>隐身进入</button>
                     <button type="button" class="btn btn-primary" id="confirmRoomEntryCharacter">进入房间</button>
                 </div>
             </div>
@@ -235,7 +226,7 @@
                             </div>
                             <div class="character-attribute-summary" aria-live="polite">
                                 <span>基础总和</span>
-                                <strong id="attributeBaseTotal">0 / 900</strong>
+                                <strong id="attributeBaseTotal">0</strong>
                             </div>
                             <div class="attribute-editor-grid">
                                 <label class="attribute-editor-card"><span class="attribute-name">力量 <small>STR</small></span><small class="attribute-roll-hint" data-attribute-roll="STR">3d6x5</small><div class="attribute-value-row"><input type="number" class="form-control character-attribute-input" id="attributeSTR" min="1" max="99" aria-label="力量属性值"><input type="number" class="form-control" id="attributeSTRHalf" readonly aria-label="力量半值"><input type="number" class="form-control" id="attributeSTRRatio" readonly aria-label="力量五分之一值"></div></label>

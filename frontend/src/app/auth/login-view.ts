@@ -3,7 +3,7 @@ namespace AuthModule {
         document.getElementById("login-view")?.classList.add("active");
         document.getElementById("register-view")?.classList.remove("active");
         const title = document.querySelector<HTMLHeadingElement>(".auth-modal-header h2");
-        if (title) title.textContent = "登录";
+        if (title) title.textContent = authText("auth.login.title", "登录");
     }
 
     export function prefillRememberedUsername(): void {
@@ -38,7 +38,7 @@ namespace AuthModule {
         const stayLoggedIn = (document.getElementById("stayLoggedIn") as HTMLInputElement | null)?.checked || false;
         const autoLogin = (document.getElementById("autoLogin") as HTMLInputElement | null)?.checked || false;
         if (!identifier || !password) {
-            showMessage("loginMessage", "请输入用户名或邮箱和密码", true);
+            showMessage("loginMessage", authText("auth.error.missing_credentials", "请输入用户名或邮箱和密码"), true);
             return;
         }
 
@@ -53,12 +53,12 @@ namespace AuthModule {
             });
         } catch (error) {
             console.error("登录失败:", error);
-            showMessage("loginMessage", "登录失败，请稍后重试", true);
+            showMessage("loginMessage", authText("auth.error.login_failed_retry", "登录失败，请稍后重试"), true);
             return;
         }
 
         if (!response.success || !response.data) {
-            showMessage("loginMessage", localizedAuthMessage(response, "登录失败"), true);
+            showMessage("loginMessage", localizedAuthMessage(response, authText("auth.error.login_failed", "登录失败")), true);
             return;
         }
 
@@ -70,6 +70,7 @@ namespace AuthModule {
 
     async function restorePostLoginState(): Promise<void> {
         try {
+            await window.reloadRoleConfigs?.();
             window.reconnectSocket?.();
             window.clearCurrentRoom?.();
             window.clearChatMessages?.();

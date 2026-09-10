@@ -1,0 +1,11 @@
+{
+  "roles": [
+    {
+      "id": "kp",
+      "name": "KP",
+      "avatar": "/assets/avatars/default_kp.jpg",
+      "wake_words": ["@KP"],
+      "provider": "aliyun"
+    }
+  ]
+}

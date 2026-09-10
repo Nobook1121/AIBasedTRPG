@@ -14,6 +14,25 @@ class DiceTool {
         return Math.floor(Math.random() * sides) + 1;
     }
 
+    rollPercentile(bonusDice = 0, penaltyDice = 0): { result: number; rolls: number[] } {
+        if (bonusDice > 0 && penaltyDice > 0) throw new Error("奖励骰和惩罚骰不能同时使用");
+        if (!bonusDice && !penaltyDice) return { result: this.rollSingleDice("d100"), rolls: [] };
+        const units = this.rollSingleDice("d10") % 10;
+        const tens: number[] = [];
+        const count = (bonusDice || penaltyDice) + 1;
+        let attempts = 0;
+        while (tens.length < count && attempts < 100) {
+            attempts += 1;
+            const value = this.rollSingleDice("d10") - 1;
+            if (!tens.includes(value)) tens.push(value);
+        }
+        for (let value = 0; tens.length < count && value < 10; value += 1) {
+            if (!tens.includes(value)) tens.push(value);
+        }
+        const rolls = tens.map((ten) => ten === 0 && units === 0 ? 100 : ten * 10 + units);
+        return { result: bonusDice ? Math.min(...rolls) : Math.max(...rolls), rolls };
+    }
+
     parseDiceCommand(command: string): DiceParseResult {
         const match = command.match(/^(\d+)d(\d+)$/i);
         if (!match) {

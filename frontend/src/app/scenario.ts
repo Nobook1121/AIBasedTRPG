@@ -2,8 +2,10 @@ interface ScenarioCoverUploadResponse {
     cover_url: string;
 }
 
+let scenarioController: ScenarioController | null = null;
+
 function initScenarioManagement(): void {
-    new ScenarioController();
+    if (!scenarioController) scenarioController = new ScenarioController();
 
     document.addEventListener("change", (event) => {
         const target = event.target as HTMLElement | null;
@@ -12,6 +14,12 @@ function initScenarioManagement(): void {
         }
     });
 }
+
+function refreshScenarioManagement(): void {
+    scenarioController?.refresh();
+}
+
+window.refreshScenarioManagement = refreshScenarioManagement;
 
 async function handleCoverUpload(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement | null;

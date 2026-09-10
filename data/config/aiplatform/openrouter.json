@@ -5,7 +5,6 @@
   "icon": "/assets/aiplatform/openrouter.png",
   "enabled": false,
   "config": {
-    "api_key": "",
     "base_url": "https://openrouter.ai/api/v1",
     "timeout": 30,
     "headers": {

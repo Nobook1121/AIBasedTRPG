@@ -1,3 +1,15 @@
+interface AdminUserRecord {
+    id: number;
+    username: string;
+    email: string;
+    role: string;
+    status: string;
+    is_online?: boolean;
+    presence?: string;
+    created_at?: string;
+    last_login?: string;
+}
+
 function initTabs(): void {
     try {
         const navLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>("#sidebar .nav-link"));
@@ -86,6 +98,7 @@ function switchMainTab(tabId: string, options: { clearNav?: boolean } = {}): voi
     } else {
         updateNavigationState(null, navLinks);
     }
+    refreshMainTabData(tabId);
 }
 
 function refreshAdminNavigation(): void {
@@ -104,6 +117,12 @@ function updateNavigationState(activeLink: HTMLAnchorElement | null, navLinks: H
             link.removeAttribute("aria-current");
         }
     });
+}
+
+function refreshMainTabData(tabId: string): void {
+    if (tabId === "save") {
+        void window.loadRoomsList?.();
+    }
 }
 
 function bindDropdownButtons(): void {
@@ -154,6 +173,9 @@ function switchSettingsTab(tabName: string): void {
     targetContent?.classList.add("active");
     if (tabName === "permissions") {
         void loadPermissionConfig();
+    }
+    if (tabName === "users") {
+        void loadUserManagement();
     }
 }
 
@@ -220,10 +242,25 @@ function initSettingsTabs(): void {
         void saveDefaultThemeChange();
     });
     document.getElementById("cancelDefaultThemeChange")?.addEventListener("click", cancelDefaultThemeChange);
+    window.addEventListener("trpg:locale-changed", () => {
+        const generalConfig = configManager.getConfig("general");
+        const language = isConfigObject(generalConfig.language) ? generalConfig.language : {};
+        language.language = window.TrpgI18n?.getLocale() === "en_us" ? "en-US" : "zh-CN";
+        generalConfig.language = language;
+        void configManager.saveConfig("general", generalConfig);
+    });
 
     bindGeneralCheckboxSetting("streamOutput", "ai", "stream_output");
+    bindGeneralCheckboxSetting("debugMode", "ai", "debug_mode");
+    bindGeneralCheckboxSetting("showAIHints", "ai", "show_ai_hints");
+    bindGeneralNumberSetting("autosaveInterval", "autosave", "interval", 30, 3600);
+    bindGeneralNumberSetting("autosaveMaxNodes", "autosave", "max_nodes", 1, 50);
+    bindGeneralNumberSetting("triggerMaxFileSize", "scenario", "trigger_max_file_size", 1024, 52428800);
     document.getElementById("savePermissionConfig")?.addEventListener("click", () => {
         void savePermissionConfig();
+    });
+    document.getElementById("refreshUserManagement")?.addEventListener("click", () => {
+        void loadUserManagement(true);
     });
 }
 
@@ -241,6 +278,20 @@ function bindGeneralCheckboxSetting(elementId: string, sectionName: string, key:
 
 function isConfigObject(value: unknown): value is TomlConfig {
     return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function bindGeneralNumberSetting(elementId: string, sectionName: string, key: string, minimum: number, maximum: number): void {
+    const input = document.getElementById(elementId) as HTMLInputElement | null;
+    if (!input) return;
+    input.addEventListener("change", async () => {
+        const value = Math.max(minimum, Math.min(maximum, Number.parseInt(input.value || "0", 10) || minimum));
+        input.value = String(value);
+        const generalConfig = configManager.getConfig("general");
+        const section = isConfigObject(generalConfig[sectionName]) ? generalConfig[sectionName] : {};
+        section[key] = value;
+        generalConfig[sectionName] = section;
+        await configManager.saveConfig("general", generalConfig);
+    });
 }
 
 function updateDefaultThemePendingState(): void {
@@ -292,6 +343,104 @@ async function loadPermissionConfig(): Promise<void> {
     } catch (error) {
         matrix.textContent = settingsErrorMessage(error);
     }
+}
+
+async function loadUserManagement(forceReload = false): Promise<void> {
+    const list = document.getElementById("userManagementList");
+    const message = document.getElementById("userManagementMessage");
+    if (!list) return;
+    if (!forceReload && list.dataset.loaded === "true") return;
+
+    list.innerHTML = `<tr><td colspan="8" class="text-muted">正在加载用户信息...</td></tr>`;
+    if (message) {
+        message.textContent = "";
+        message.className = "settings-message";
+    }
+
+    try {
+        const response = await TrpgApi.get<ApiResponse<AdminUserRecord[]>>("/api/users");
+        if (!response.success || !response.data) {
+            throw new Error(response.message || response.error || "用户信息加载失败");
+        }
+        renderUserManagementList(response.data);
+        list.dataset.loaded = "true";
+        if (message) {
+            message.textContent = `已加载 ${response.data.length} 名用户`;
+            message.className = "settings-message success";
+        }
+    } catch (error) {
+        list.innerHTML = `<tr><td colspan="8" class="text-muted">${settingsEscapeHtml(settingsErrorMessage(error))}</td></tr>`;
+        if (message) {
+            message.textContent = settingsErrorMessage(error);
+            message.className = "settings-message error";
+        }
+    }
+}
+
+function renderUserManagementList(users: AdminUserRecord[]): void {
+    const list = document.getElementById("userManagementList");
+    if (!list) return;
+    if (!users.length) {
+        list.innerHTML = `<tr><td colspan="8" class="text-muted">暂无用户</td></tr>`;
+        return;
+    }
+
+    list.innerHTML = users.map((user) => renderUserManagementRow(user)).join("");
+    list.querySelectorAll<HTMLButtonElement>("[data-impersonate-user-id]").forEach((button) => {
+        button.addEventListener("click", () => void startImpersonation(Number.parseInt(button.dataset.impersonateUserId || "", 10)));
+    });
+}
+
+function renderUserManagementRow(user: AdminUserRecord): string {
+    const currentUserId = window.currentUser?.user_id;
+    const isCurrentUser = String(currentUserId) === String(user.id);
+    const canImpersonate = user.status === "active" && !isCurrentUser;
+    return `
+        <tr>
+            <td>${settingsEscapeHtml(user.username)}</td>
+            <td>${settingsEscapeHtml(user.email)}</td>
+            <td>${settingsEscapeHtml(user.role)}</td>
+            <td>${settingsEscapeHtml(user.status)}</td>
+            <td>${settingsEscapeHtml(formatOnlineState(user.is_online))}</td>
+            <td>${settingsEscapeHtml(formatTimestamp(user.created_at))}</td>
+            <td>${settingsEscapeHtml(formatTimestamp(user.last_login))}</td>
+            <td class="text-end">
+                <div class="user-management-actions">
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-impersonate-user-id="${user.id}" ${canImpersonate ? "" : "disabled"}>
+                        <i class="fa fa-user-secret" aria-hidden="true"></i> 模拟
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `;
+}
+
+async function startImpersonation(userId: number): Promise<void> {
+    if (!Number.isFinite(userId)) return;
+    try {
+        const response = await TrpgApi.post<ApiResponse<unknown>>("/api/auth/impersonation/start", { user_id: userId });
+        if (!response.success) {
+            throw new Error(response.message || response.error || "模拟登录失败");
+        }
+        window.location.reload();
+    } catch (error) {
+        const message = settingsErrorMessage(error);
+        const statusMessage = document.getElementById("userManagementMessage");
+        if (statusMessage) {
+            statusMessage.textContent = message;
+            statusMessage.className = "settings-message error";
+        }
+    }
+}
+
+function formatOnlineState(isOnline?: boolean): string {
+    return isOnline ? "在线" : "离线";
+}
+
+function formatTimestamp(value?: string): string {
+    if (!value) return "-";
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { hour12: false });
 }
 
 function renderPermissionMatrix(config: PermissionConfig): void {

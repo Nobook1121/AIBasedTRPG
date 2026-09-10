@@ -2,6 +2,7 @@
     filename: string;
     created_at?: string;
     message_count?: number;
+    automatic?: boolean;
 }
 
 interface RoomNodeList {
@@ -14,7 +15,8 @@ interface RoomRecordResponse {
 }
 
 interface RoomEntrySelection {
-    action: "join" | "create";
+    action: "join" | "create" | "invisible";
+    createCharacter?: boolean;
     characterCard?: Partial<COC7CharacterCard>;
 }
 
@@ -25,6 +27,7 @@ let roomEntryCharacterModal: BootstrapModalInstance | null = null;
 let roomEntrySelectionResolver: ((result: RoomEntrySelection | null) => void) | null = null;
 let roomEntrySelectionSettled = false;
 let roomEntrySelectionAction: RoomEntrySelection["action"] = "join";
+let roomEntrySelectionRoomId: string | null = null;
 const roomActionLocks = new Set<string>();
 
 function initRoomManagement(): void {
@@ -65,16 +68,26 @@ function initRoomManagement(): void {
     document.getElementById("confirmRoomEntryCharacter")?.addEventListener("click", () => {
         void confirmRoomEntryCharacterSelection();
     });
+    document.getElementById("roomEntryInvisible")?.addEventListener("click", () => {
+        settleRoomEntrySelection({ action: "invisible" });
+        roomEntryCharacterModal?.hide();
+    });
     document.getElementById("roomEntryCreateCharacter")?.addEventListener("click", () => {
         createCharacterFromRoomEntry();
     });
 
     populateCharacterSelectors();
+    window.loadRoomsList = loadRoomsList;
     void loadRoomsList();
 }
 
 function getLastRoomStorageKey(): string {
     return `trpg_last_room_${window.currentUser?.user_id}`;
+}
+
+function getLastRoomCharacterStorageKey(roomId?: string): string {
+    const scopedRoomId = roomId || TrpgCookies.get(getLastRoomStorageKey()) || "";
+    return `trpg_last_room_character_${window.currentUser?.user_id}_${scopedRoomId}`;
 }
 
 function isElevatedUser(): boolean {
@@ -86,7 +99,14 @@ function getCharacterCards(): COC7CharacterCard[] {
 }
 
 function getRoomEntryCards(): COC7CharacterCard[] {
-    return getCharacterCards();
+    const cards = getCharacterCards();
+    if (isElevatedUser()) return cards;
+    const user = window.currentUser;
+    if (!user) return [];
+    return cards.filter((card) => {
+        const playerId = String(card.playerId || "");
+        return playerId === String(user.user_id) || playerId === user.username;
+    });
 }
 
 function isActiveRoomMember(member: RoomMember): boolean {
@@ -131,16 +151,24 @@ function populateRoomEntryCharacterSelect(): void {
         option.textContent = card.name;
         select.appendChild(option);
     });
-    if (cards.some((card) => card.id === currentValue)) select.value = currentValue;
+    const rememberedCardId = roomEntrySelectionRoomId ? TrpgCookies.get(getLastRoomCharacterStorageKey(roomEntrySelectionRoomId)) : "";
+    const nextValue = cards.some((card) => card.id === rememberedCardId)
+        ? rememberedCardId
+        : (cards.some((card) => card.id === currentValue) ? currentValue : "");
+    if (nextValue) select.value = nextValue;
     if (emptyMessage) emptyMessage.hidden = cards.length > 0;
     if (confirmButton) confirmButton.disabled = cards.length === 0;
+    const invisibleButton = document.getElementById("roomEntryInvisible") as HTMLButtonElement | null;
+    if (invisibleButton) invisibleButton.hidden = !isElevatedUser() || roomEntrySelectionAction === "create";
 }
 
-function promptRoomEntryCharacterSelection(action: RoomEntrySelection["action"]): Promise<RoomEntrySelection | null> {
-    if (isElevatedUser()) return Promise.resolve({ action });
-
-    populateRoomEntryCharacterSelect();
+async function promptRoomEntryCharacterSelection(action: RoomEntrySelection["action"], roomId: string | null = null): Promise<RoomEntrySelection | null> {
     roomEntrySelectionAction = action;
+    roomEntrySelectionRoomId = roomId;
+    // Character management loads cards asynchronously during application
+    // startup. Refreshing the room list can happen before that request ends.
+    await window.reloadCharacterManagement?.();
+    populateRoomEntryCharacterSelect();
     roomEntrySelectionSettled = false;
     setText("roomEntryCharacterMessage", action === "create" ? "创建房间前请选择要使用的角色卡。" : "进入房间前请选择要使用的角色卡。");
     if (!roomEntryCharacterModal) return Promise.resolve(null);
@@ -166,11 +194,14 @@ async function confirmRoomEntryCharacterSelection(): Promise<void> {
         return;
     }
     settleRoomEntrySelection({ action: roomEntrySelectionAction, characterCard });
+    if (roomEntrySelectionRoomId) {
+        syncRoomCharacterSelection(roomEntrySelectionRoomId, characterCard);
+    }
     roomEntryCharacterModal?.hide();
 }
 
 function createCharacterFromRoomEntry(): void {
-    settleRoomEntrySelection({ action: "create" });
+    settleRoomEntrySelection({ action: roomEntrySelectionAction, createCharacter: true });
     roomEntryCharacterModal?.hide();
     window.switchMainTab?.("characters");
     document.getElementById("createCharacter")?.click();
@@ -180,6 +211,17 @@ function getSelectedCharacterCardSnapshot(selectId: string): Partial<COC7Charact
     const cardId = (document.getElementById(selectId) as HTMLSelectElement | null)?.value;
     if (!cardId) return null;
     return window.COC7CharacterSheet?.getCharacterCardSnapshot?.(cardId) || null;
+}
+
+function syncRoomCharacterSelection(roomId: string, characterCard: Partial<COC7CharacterCard> | null): void {
+    if (!window.currentUser?.user_id || !roomId) return;
+    const storageKey = getLastRoomCharacterStorageKey(roomId);
+    const characterId = String(characterCard?.id || "").trim();
+    if (!characterId) {
+        TrpgCookies.remove(storageKey);
+        return;
+    }
+    TrpgCookies.set(storageKey, characterId);
 }
 
 async function openCreateRoomModal(): Promise<void> {
@@ -223,17 +265,17 @@ async function createRoomUnlocked(): Promise<void> {
     const scenarioTitle = selectedOption?.dataset.title || "";
 
     if (!roomName) {
-        showNotification("???????", "error");
+        showNotification("请输入房间名称", "error");
         return;
     }
     if (!scenarioId) {
-        showNotification("???????", "error");
+        showNotification("请选择剧本", "error");
         return;
     }
 
+    bootstrap.Modal.getInstance(document.getElementById("createSaveModal"))?.hide();
     const roomEntrySelection = await promptRoomEntryCharacterSelection("create");
-    if (!roomEntrySelection) return;
-    if (roomEntrySelection.action === "create") return;
+    if (!roomEntrySelection || roomEntrySelection.createCharacter || roomEntrySelection.action === "invisible") return;
 
     try {
         const data = await TrpgApi.post<ApiResponse<Room>>("/api/rooms", {
@@ -243,16 +285,16 @@ async function createRoomUnlocked(): Promise<void> {
             character_card: roomEntrySelection.characterCard,
         });
         if (!data.success || !data.data) {
-            showNotification(`??????: ${data.message || data.error || "????"}`, "error");
+            showNotification(`创建房间失败：${data.message || data.error || "未知错误"}`, "error");
             return;
         }
 
         bootstrap.Modal.getInstance(document.getElementById("createSaveModal"))?.hide();
         await enterRoom(data.data);
         await loadRoomsList();
-        showNotification(`???????????${data.data.room_code || data.data.code || data.data.id}`, "success");
+        showNotification(`房间已创建：${data.data.room_code || data.data.code || data.data.id}`, "success");
     } catch (error) {
-        showNotification(`??????: ${roomErrorMessage(error)}`, "error");
+        showNotification(`创建房间失败：${roomErrorMessage(error)}`, "error");
     }
 }
 
@@ -265,28 +307,29 @@ async function joinRoomByCode(): Promise<void> {
 async function joinRoomByCodeUnlocked(): Promise<void> {
     const roomCode = (document.getElementById("roomCodeInput") as HTMLInputElement | null)?.value.trim() || "";
     if (!roomCode) {
-        showNotification("??????", "error");
+        showNotification("请输入房间码", "error");
         return;
     }
 
     const roomEntrySelection = await promptRoomEntryCharacterSelection("join");
     if (!roomEntrySelection) return;
-    if (roomEntrySelection.action === "create") return;
+    if (roomEntrySelection.createCharacter || roomEntrySelection.action === "create") return;
 
     try {
-        const data = await TrpgApi.post<ApiResponse<Room>>("/api/rooms/join", {
+        const endpoint = roomEntrySelection.action === "invisible" ? "/api/rooms/spectate" : "/api/rooms/join";
+        const data = await TrpgApi.post<ApiResponse<Room>>(endpoint, {
             room_code: roomCode,
-            character_card: roomEntrySelection.characterCard,
+            ...(roomEntrySelection.action === "invisible" ? {} : { character_card: roomEntrySelection.characterCard }),
         });
         if (!data.success || !data.data) {
-            showNotification(`??????: ${data.message || data.error || "????"}`, "error");
+            showNotification(`加入房间失败：${data.message || data.error || "未知错误"}`, "error");
             return;
         }
         await enterRoom(data.data);
         await loadRoomsList();
-        showNotification("?????", "success");
+        showNotification(roomEntrySelection.action === "invisible" ? "已隐身进入房间" : "已加入房间", "success");
     } catch (error) {
-        showNotification(`??????: ${roomErrorMessage(error)}`, "error");
+        showNotification(`加入房间失败：${roomErrorMessage(error)}`, "error");
     }
 }
 
@@ -343,21 +386,53 @@ async function openRoomDetail(roomId: string): Promise<void> {
             showNotification(`加载房间失败: ${data.message || data.error || "未知错误"}`, "error");
             return;
         }
-        if (currentRoom?.id === roomId) {
-            await enterRoom(data.data);
-            return;
-        }
-        if (isElevatedUser()) {
+
+        // A refresh restores the room from its cookie. If the server already
+        // has an active member record with a bound card, re-enter directly.
+        // Prompting here races character-card loading and can incorrectly
+        // present an empty selector, while also rebinding the card.
+        const currentUserId = String(window.currentUser?.user_id || "");
+        const existingMember = currentUserId
+            ? activeRoomMembers(data.data).find((member) => String(member.user_id) === currentUserId)
+            : undefined;
+        if (existingMember?.character_card || (isElevatedUser() && !existingMember)) {
             await enterRoom(data.data);
             return;
         }
 
-        const roomEntrySelection = await promptRoomEntryCharacterSelection("join");
-        if (!roomEntrySelection || roomEntrySelection.action === "create") return;
-        const userId = String(window.currentUser?.user_id || "");
+        const roomEntrySelection = await promptRoomEntryCharacterSelection("join", roomId);
+        if (!roomEntrySelection || roomEntrySelection.createCharacter || roomEntrySelection.action === "create") return;
+
+        if (roomEntrySelection.action === "invisible") {
+            const spectateResponse = await TrpgApi.get<ApiResponse<Room>>(`/api/rooms/${encodeURIComponent(roomId)}/spectate`);
+            if (!spectateResponse.success || !spectateResponse.data) {
+                showNotification(spectateResponse.message || spectateResponse.error || "隐身进入房间失败", "error");
+                return;
+            }
+            await enterRoom(spectateResponse.data);
+            showNotification("已隐身进入房间", "success");
+            return;
+        }
+
+        const userId = currentUserId;
         if (!userId) return;
+
+        if (!existingMember) {
+            const joinResponse = await TrpgApi.post<ApiResponse<Room>>("/api/rooms/join", {
+                room_code: data.data.room_code || data.data.code,
+                character_card: roomEntrySelection.characterCard,
+            });
+            if (!joinResponse.success || !joinResponse.data) {
+                showNotification(joinResponse.message || joinResponse.error || "加入房间失败", "error");
+                return;
+            }
+            await enterRoom(joinResponse.data);
+            showNotification("已加入房间", "success");
+            return;
+        }
+
         const bindResponse = await TrpgApi.put<ApiResponse<Room>>(
-            `/api/rooms/${roomId}/members/${encodeURIComponent(userId)}/character`,
+            `/api/rooms/${encodeURIComponent(roomId)}/members/${encodeURIComponent(userId)}/character`,
             { character_card: roomEntrySelection.characterCard },
         );
         if (!bindResponse.success || !bindResponse.data) {
@@ -375,7 +450,11 @@ async function enterRoom(room: Room): Promise<void> {
 
     currentRoom = room;
     window.currentRoom = currentRoom;
-    TrpgCookies.set(getLastRoomStorageKey(), room.id);
+    window.restoreThinkingState?.();
+    window.resumePendingAIRequest?.();
+    const invisibleView = room.invisible_view === true;
+    if (invisibleView) TrpgCookies.remove(getLastRoomStorageKey());
+    else TrpgCookies.set(getLastRoomStorageKey(), room.id);
 
     showRoomDetailView();
     updateRoomDetail(room);
@@ -385,10 +464,34 @@ async function enterRoom(room: Room): Promise<void> {
         : window.getCurrentChatMessages?.() || [];
     window.renderChatMessages?.(messages);
     setText("homeRoomTitle", room.name);
-    setText("homeRoomOnlineCount", `当前房间在线玩家 ${activeRoomMembers(room).length}`);
+    setText("homeRoomOnlineCount", formatRoomOnlineCount(room));
+    const selfMember = activeRoomMembers(room).find((member) => String(member.user_id) === String(window.currentUser?.user_id));
+    if (selfMember?.character_card) {
+        syncRoomCharacterSelection(room.id, selfMember.character_card);
+    }
+    window.setChatReadOnly?.(invisibleView);
+    applyInvisibleRoomView(invisibleView);
+    if (invisibleView) {
+        stopAutosaveTimer();
+        renderRoomNodeList([]);
+        return;
+    }
     window.joinSocketRoom?.(room.id);
     startAutosaveTimer();
     await loadRoomNodes();
+}
+
+function applyInvisibleRoomView(invisible: boolean): void {
+    document.querySelectorAll<HTMLElement>("[data-room-sensitive]").forEach((element) => {
+        element.hidden = invisible;
+    });
+    const onlineCount = document.getElementById("homeRoomOnlineCount") as HTMLElement | null;
+    if (onlineCount) onlineCount.hidden = invisible;
+    setDisplay("saveStatusBar", invisible ? "none" : "block");
+    const deleteButton = document.getElementById("deleteSave") as HTMLButtonElement | null;
+    const createNodeButton = document.getElementById("createSaveNode") as HTMLButtonElement | null;
+    if (deleteButton) deleteButton.hidden = invisible;
+    if (createNodeButton) createNodeButton.hidden = invisible;
 }
 
 function showRoomListView(): void {
@@ -409,6 +512,7 @@ function updateRoomDetail(room: Room): void {
     setText("saveParticipants", activeRoomMembers(room).map((member) => member.username).join(", ") || "-");
     setText("roomDetailCode", room.room_code || room.code || "-");
     setInput("recordRoomName", room.name);
+    setText("homeRoomOnlineCount", formatRoomOnlineCount(room));
     renderRoomCharacterBindings(room);
 }
 
@@ -434,6 +538,9 @@ function renderRoomCharacterBindings(room: Room): void {
     container.querySelectorAll<HTMLButtonElement>("[data-promote-user-id]").forEach((button) => {
         button.addEventListener("click", () => void promoteRoomMember(button.dataset.promoteUserId || ""));
     });
+    container.querySelectorAll<HTMLButtonElement>("[data-room-character-preview]").forEach((button) => {
+        button.addEventListener("click", () => previewRoomCharacter(button.dataset.roomCharacterPreview || ""));
+    });
 }
 
 function renderRoomMemberBindingRow(room: Room, member: RoomMember): string {
@@ -441,14 +548,19 @@ function renderRoomMemberBindingRow(room: Room, member: RoomMember): string {
     const canManage = canManageRoomMembers(room);
     const isSelf = String(member.user_id) === String(window.currentUser?.user_id);
     const isActive = isActiveRoomMember(member);
-    const canChangeCard = isActive && (isElevatedUser() || isSelf);
+    const isOnline = member.is_online === true;
+    const canChangeCard = isActive && (isElevatedUser() || isSelf || canManage);
     const canRemove = isActive && canManage && String(member.user_id) !== String(room.creator_id);
     const canPromote = isActive && canManage && String(member.user_id) !== String(room.creator_id) && member.room_role !== "admin";
+    const cardPreviewHtml = card
+        ? `<button type="button" class="btn btn-link p-0 room-character-preview" data-room-character-preview="${encodeURIComponent(JSON.stringify(card))}">${escapeRoomHtml(card.name || "未命名角色卡")}</button>`
+        : "未绑定";
     return window.TrpgTemplates.render("room-character-binding-row", {
         userId: member.user_id || "",
-        username: member.username || "-",
+        username: `${member.username || "-"}（${isOnline ? "在线" : "离线"}）`,
         rowClass: isActive ? "" : "room-member-removed",
         cardName: card ? card.name || "未命名角色卡" : "未绑定",
+        cardPreviewHtml,
         permission: member.permission_label || roomPermissionLabel(room, member),
         changeButtonHtml: canChangeCard ? window.TrpgTemplates.render("room-bind-character-button", { userId: member.user_id || "" }) : "",
         removeButtonHtml: canRemove ? window.TrpgTemplates.render("room-remove-member-button", { userId: member.user_id || "" }) : "",
@@ -500,6 +612,9 @@ async function confirmRoomCharacterBindingUnlocked(userId: string): Promise<void
     if (!response.success || !response.data) {
         showNotification(response.message || response.error || "绑定角色卡失败", "error");
         return;
+    }
+    if (String(userId) === String(window.currentUser?.user_id)) {
+        syncRoomCharacterSelection(currentRoom.id, characterCard);
     }
     bootstrap.Modal.getInstance(document.getElementById("roomCharacterBindModal"))?.hide();
     await enterRoom(response.data);
@@ -666,6 +781,7 @@ function renderRoomNodeItem(node: RoomNode): string {
         filename: node.filename,
         createdAt: node.created_at || "-",
         messageCount: node.message_count || 0,
+        nodeLabel: node.automatic ? "自动存档" : "回档节点",
     });
 }
 
@@ -772,6 +888,7 @@ async function saveRoomAutosave(): Promise<void> {
     if (!currentRoom) return;
     try {
         await TrpgApi.post<ApiResponse>(`/api/rooms/${currentRoom.id}/autosave`);
+        await loadRoomNodes();
     } catch (error) {
         console.error("自动存档失败:", error);
     }
@@ -789,10 +906,46 @@ function clearCurrentRoom(): void {
     currentRoom = null;
     window.currentRoom = null;
     stopAutosaveTimer();
+    window.setChatReadOnly?.(false);
+    applyInvisibleRoomView(false);
     setDisplay("saveStatusBar", "none");
     setText("homeRoomTitle", "未加入房间");
-    setText("homeRoomOnlineCount", "当前房间在线玩家 0");
+    setText("homeRoomOnlineCount", "在线玩家 0/0");
     showRoomListView();
+}
+
+function previewRoomCharacter(encodedCard: string): void {
+    try {
+        const rawCard = JSON.parse(decodeURIComponent(encodedCard)) as Partial<COC7CharacterCard>;
+        const card = window.COC7CharacterSheet?.createCharacterCard?.(rawCard as COC7CharacterCardInput) || (rawCard as COC7CharacterCard);
+        const previewHtml = window.COC7CharacterSheet?.renderCharacterDetail?.(card) || `<h4>${escapeRoomHtml(card.name || "未命名角色卡")}</h4>`;
+        const modalElement = document.createElement("div");
+        modalElement.className = "modal fade";
+        modalElement.innerHTML = `<div class="modal-dialog modal-xl"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">角色卡预览</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body">${previewHtml}</div></div></div>`;
+        document.body.appendChild(modalElement);
+        const instance = new bootstrap.Modal(modalElement);
+        instance.show();
+        modalElement.addEventListener("hidden.bs.modal", () => modalElement.remove());
+    } catch {
+        showNotification("角色卡预览失败", "error");
+    }
+}
+
+function formatRoomOnlineCount(room: Room): string {
+    const members = room.members || [];
+    const online = members.filter((member) => member.is_online === true).length;
+    const total = members.filter((member) => member.status !== "removed").length;
+    return window.TrpgI18n?.t("room.status.online_players.count", `在线玩家 ${online}/${total}`, { online, total })
+        || `在线玩家 ${online}/${total}`;
+}
+
+function escapeRoomHtml(value: unknown): string {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 }
 
 function roomInputValue(id: string): string {
@@ -810,7 +963,18 @@ function setInput(id: string, value: string): void {
 
 function setText(id: string, value: string): void {
     const element = document.getElementById(id);
-    if (element) element.textContent = value;
+    if (!element) return;
+    const fallbackKeys: Record<string, [string, string]> = {
+        homeRoomTitle: ["home.not_joined", "未加入房间"],
+        homeRoomOnlineCount: ["room.status.online_players", "在线玩家 0/0"],
+        saveStatusName: ["room.status.not_joined", "未加入"],
+    };
+    const fallback = fallbackKeys[id];
+    const nextValue = fallback && value === fallback[1]
+        ? window.TrpgI18n?.t(fallback[0], value) || value
+        : value;
+    if (fallback) element.removeAttribute("data-i18n");
+    element.textContent = nextValue;
 }
 
 async function runRoomAction(actionKey: string, buttonId: string, action: () => Promise<void>): Promise<void> {

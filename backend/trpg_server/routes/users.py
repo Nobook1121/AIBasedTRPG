@@ -4,7 +4,7 @@ from flask import Blueprint, current_app, request, session
 
 from trpg_server.logging_config import log_user_action, user_action_text
 from trpg_server.responses import error_response, success_response
-from trpg_server.security import get_user_manager, require_permission_node
+from trpg_server.security import get_user_manager, is_socket_user_online, require_permission_node
 from trpg_server.users.smtp import (
     admin_auth_settings,
     get_auth_settings,
@@ -32,6 +32,8 @@ def _public_user(user):
         "username": user["username"],
         "email": user["email"],
         "role": user["role"],
+        "is_online": is_socket_user_online(user["id"]),
+        "presence": user.get("presence", "online"),
         "created_at": user["created_at"],
         "last_login": user["last_login"],
         "status": user["status"],

@@ -3,8 +3,8 @@ export function HomeChat() {
         <>
             <header className="page-command-header chat-command-header" data-page-header="chat">
                 <div>
-                    <h2 id="homeRoomTitle">未加入房间</h2>
-                    <p className="home-room-meta" id="homeRoomOnlineCount">当前房间在线玩家 0</p>
+                    <h2 id="homeRoomTitle" data-i18n="home.not_joined" data-i18n-dynamic="true">未加入房间</h2>
+                    <p className="home-room-meta" id="homeRoomOnlineCount" data-i18n="room.status.online_players" data-i18n-dynamic="true">在线玩家 0/0</p>
                 </div>
             </header>
 
@@ -15,7 +15,7 @@ export function HomeChat() {
                         <span className="save-status-label" data-i18n="room.status.current_room">
                             当前房间
                         </span>
-                        <strong className="save-status-name" id="saveStatusName">
+                        <strong className="save-status-name" id="saveStatusName" data-i18n="room.status.not_joined" data-i18n-dynamic="true">
                             未加入
                         </strong>
                     </span>
@@ -28,7 +28,7 @@ export function HomeChat() {
             </div>
 
             <div className="chat-history" id="chatHistory">
-                <div className="welcome-text">欢迎来到 AI TRPG 系统，请选择一个剧本开始游戏。</div>
+                <div className="welcome-text" data-i18n="home.welcome">欢迎来到 AI TRPG 系统，请选择一个剧本开始游戏。</div>
             </div>
 
             <div className="chat-input p-3 border-top">
