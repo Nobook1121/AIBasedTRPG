@@ -4,6 +4,7 @@ from typing import Any
 
 from trpg_server.json_store import read_json
 from trpg_server.security import safe_join
+from trpg_server.agents.room_state import load_room_state
 
 
 @dataclass(frozen=True)
@@ -25,6 +26,11 @@ class AgentRequestContext:
         if not self.room_dir:
             return []
         return read_json(self.room_dir / "messages.json", default=[])
+
+    def room_state(self) -> dict[str, Any]:
+        if not self.room_dir:
+            return {}
+        return load_room_state(self.room_dir)
 
 
 def build_agent_context(
