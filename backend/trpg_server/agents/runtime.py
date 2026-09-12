@@ -15,6 +15,9 @@ class AgentCompletionResult:
     response_data: dict[str, Any] | None = None
     tool_messages: list[dict[str, Any]] | None = None
     direct_messages: list[dict[str, Any]] | None = None
+    prompt_token_count: int | None = None
+    completion_token_count: int | None = None
+    cached_token_count: int | None = None
 
 
 def _extract_message(response_data: dict[str, Any] | None) -> dict[str, Any]:
@@ -33,6 +36,19 @@ def _extract_token_count(response_data: dict[str, Any]) -> int | None:
     if "completion_tokens" in usage and "prompt_tokens" in usage:
         return usage["completion_tokens"] + usage["prompt_tokens"]
     return None
+
+
+def _extract_usage_counts(response_data: dict[str, Any] | None) -> tuple[int | None, int | None, int | None]:
+    usage = (response_data or {}).get("usage") or {}
+    prompt = usage.get("prompt_tokens")
+    completion = usage.get("completion_tokens")
+    details = usage.get("prompt_tokens_details") or usage.get("input_tokens_details") or {}
+    cached = usage.get("cached_tokens") or details.get("cached_tokens") or details.get("cache_read_input_tokens")
+    return (
+        int(prompt) if prompt is not None else None,
+        int(completion) if completion is not None else None,
+        int(cached) if cached is not None else None,
+    )
 
 
 def _parse_arguments(raw_arguments: str | dict[str, Any] | None) -> dict[str, Any]:
@@ -99,11 +115,27 @@ def run_agent_completion(
     empty_completion_retries = 0
     total_token_count = 0
     has_token_count = False
+    prompt_token_count = 0
+    completion_token_count = 0
+    cached_token_count = 0
+    has_prompt_count = False
+    has_completion_count = False
+    has_cached_count = False
 
     for _round in range(max_tool_rounds + 1):
         response_data = requester(payload)
         last_response = response_data
         round_token_count = _extract_token_count(response_data)
+        round_prompt, round_completion, round_cached = _extract_usage_counts(response_data)
+        if round_prompt is not None:
+            prompt_token_count += round_prompt
+            has_prompt_count = True
+        if round_completion is not None:
+            completion_token_count += round_completion
+            has_completion_count = True
+        if round_cached is not None:
+            cached_token_count += round_cached
+            has_cached_count = True
         if round_token_count is not None:
             total_token_count += round_token_count
             has_token_count = True
@@ -132,6 +164,9 @@ def run_agent_completion(
                 response_data=response_data,
                 tool_messages=tool_messages,
                 direct_messages=direct_messages,
+                prompt_token_count=prompt_token_count if has_prompt_count else None,
+                completion_token_count=completion_token_count if has_completion_count else None,
+                cached_token_count=cached_token_count if has_cached_count else None,
             )
 
         messages.append(_assistant_tool_call_message(message))
@@ -179,4 +214,7 @@ def run_agent_completion(
         response_data=last_response,
         tool_messages=tool_messages,
         direct_messages=direct_messages,
+        prompt_token_count=prompt_token_count if has_prompt_count else None,
+        completion_token_count=completion_token_count if has_completion_count else None,
+        cached_token_count=cached_token_count if has_cached_count else None,
     )
