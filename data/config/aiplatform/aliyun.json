@@ -26,6 +26,12 @@
       "doc_url": "https://help.aliyun.com/zh/model-studio/developer-reference/qwen3-5-model-api-reference"
     }
   ],
+  "small_models": {
+    "intent_classification": {"id": "qwen-turbo", "name": "Qwen Turbo", "enabled": true},
+    "state_update": {"id": "qwen-turbo", "name": "Qwen Turbo", "enabled": true},
+    "summarization": {"id": "qwen-turbo", "name": "Qwen Turbo", "enabled": true},
+    "schema_repair": {"id": "qwen-turbo", "name": "Qwen Turbo", "enabled": true}
+  },
   "auth_method": "api_key",
   "version": "1.0.0"
 }

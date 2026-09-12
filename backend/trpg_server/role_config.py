@@ -34,6 +34,25 @@ def enabled_provider_options(platform_dir: Path) -> list[dict[str, str]]:
     ]
 
 
+def provider_small_model_config(provider_config: dict[str, Any], task: str) -> dict[str, Any]:
+    """Return a configured small model for a task, falling back to the primary model."""
+    small_models = provider_config.get("small_models")
+    candidate = small_models.get(task) if isinstance(small_models, dict) else None
+    if isinstance(candidate, str):
+        candidate = {"id": candidate}
+    if isinstance(candidate, dict) and candidate.get("id"):
+        return dict(candidate)
+    models = provider_config.get("models")
+    if isinstance(models, list):
+        for model in models:
+            if isinstance(model, dict) and model.get("enabled", True) and model.get("id"):
+                return dict(model)
+        for model in models:
+            if isinstance(model, dict) and model.get("id"):
+                return dict(model)
+    return {"id": "local-model"}
+
+
 def load_prompt_text(prompt_file: Path) -> str:
     if not prompt_file.exists():
         return "你是KP（守秘人），负责主持TRPG游戏，引导玩家进行游戏。"
