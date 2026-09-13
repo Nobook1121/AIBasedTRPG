@@ -23,6 +23,12 @@ stream_output = false
 debug_mode = false
 show_ai_hints = true
 
+[ai.small_models]
+intent_classification = ""
+state_update = ""
+summarization = ""
+schema_repair = ""
+
 [character_rules]
 attribute_ratio_percent = 20
 max_cards_per_user = 3
