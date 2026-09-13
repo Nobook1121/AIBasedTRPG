@@ -14,6 +14,7 @@ from trpg_server.agents.runtime import run_agent_completion
 from trpg_server.agents.structured_output import apply_state_updates, parse_kp_response, validate_state_updates
 from trpg_server.agents.telemetry import build_provider_cache_key, calculate_cache_hit_rate, record_ai_usage
 from trpg_server.agents.prompt_builder import build_prompt_layers
+from trpg_server.agents.cache import ProviderPrefixCache
 from trpg_server.agents.tools import default_tool_registry
 from trpg_server.agents.tools.room import get_room_snapshot
 from trpg_server.agents.memory import remember_room_fact
@@ -33,6 +34,7 @@ from trpg_server.settings import (
 
 bp = Blueprint("chat", __name__)
 logger = logging.getLogger(__name__)
+_PREFIX_CACHE = ProviderPrefixCache(default_ttl=3600)
 _HISTORY_SAFE_RE = re.compile(r"[^A-Za-z0-9_.-]+")
 HISTORY_COMPACT_CHAR_THRESHOLD = 12000
 
@@ -619,6 +621,7 @@ def chat():
         )
         if room_snapshot_message:
             prompt_layers.messages.insert(3, {"role": "system", "content": room_snapshot_message})
+        prefix_cache_hit = _PREFIX_CACHE.lookup(prompt_layers.cache_key)
         request_data = {
             "messages": prompt_layers.messages,
             "model": model,
@@ -681,6 +684,7 @@ def chat():
                 "room_id": str(room_id) if room_id else None,
                 "scene_id": scenario_info.get("active_scene_id") if isinstance(scenario_info, dict) else None,
                 "cache_key": cache_key,
+                "prefix_cache_hit": prefix_cache_hit,
                 "prompt_tokens": prompt_tokens,
                 "completion_tokens": completion_tokens,
                 "total_tokens": total_tokens,
@@ -783,6 +787,7 @@ def chat():
             cache_hit_rate=usage_record["cache_hit_rate"],
             elapsed_ms=usage_record["elapsed_ms"],
             cache_key=cache_key,
+            prefix_cache_hit=prefix_cache_hit,
             structured_output=(
                 {
                     "options": structured.options,
