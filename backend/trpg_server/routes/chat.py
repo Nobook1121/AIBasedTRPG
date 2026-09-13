@@ -11,19 +11,24 @@ from trpg_server.agents.config import load_ai_runtime_config
 from trpg_server.agents.context import build_agent_context
 from trpg_server.agents.profiles import resolve_agent_profile
 from trpg_server.agents.runtime import run_agent_completion
+from trpg_server.agents.structured_output import apply_state_updates, parse_kp_response, validate_state_updates
+from trpg_server.agents.telemetry import build_provider_cache_key, calculate_cache_hit_rate, record_ai_usage
+from trpg_server.agents.prompt_builder import build_prompt_layers
 from trpg_server.agents.tools import default_tool_registry
 from trpg_server.agents.tools.room import get_room_snapshot
 from trpg_server.agents.memory import remember_room_fact
+from trpg_server.agents.room_state import append_room_event, project_room_state
 from trpg_server.json_store import read_json, write_json_atomic
 from trpg_server.logging_config import log_user_action, user_action_text
 from trpg_server.responses import error_response, success_response
-from trpg_server.role_config import load_roles, select_role_for_content
+from trpg_server.role_config import load_roles, provider_small_model_config, select_role_for_content
 from trpg_server.settings import (
     AI_PLATFORM_SECRET_DIR,
     CONFIG_DIR,
     HISTORY_DIR,
     ROOMS_DIR,
     SCENARIOS_DIR,
+    LOGS_DIR,
 )
 
 bp = Blueprint("chat", __name__)
@@ -271,6 +276,7 @@ def _maybe_remember_important_action(content, context):
         return
     try:
         remember_room_fact({"kind": "player_decision", "content": text, "importance": 3}, context)
+        append_room_event(context.room_dir, {"kind": "player_decision", "content": text})
     except Exception:
         logger.exception("Failed to remember important player action")
 
@@ -362,6 +368,7 @@ def _compact_room_snapshot(snapshot):
             "active_scene_id": scenario.get("active_scene_id"),
             "scene_manifest": (scenario.get("scene_manifest", []) if isinstance(scenario.get("scene_manifest", []), list) else [])[:40],
             "global_manifest": (scenario.get("global_manifest", []) if isinstance(scenario.get("global_manifest", []), list) else [])[:12],
+            "opening": scenario.get("opening"),
         }
     else:
         compact_scenario = scenario
@@ -398,8 +405,10 @@ def _compact_room_snapshot(snapshot):
     }
 
 
-def _room_snapshot_system_message(snapshot):
+def _room_snapshot_system_message(snapshot, room_state=None):
     compact_snapshot = _compact_room_snapshot(snapshot)
+    if room_state is not None:
+        compact_snapshot["state"] = project_room_state(room_state, snapshot)
     return (
         "当前房间资料必须通过工具 `room.get_room_snapshot` 获取。\n"
         "优先使用当前房间、绑定剧本、触发器目录和成员角色卡。\n"
@@ -408,6 +417,7 @@ def _room_snapshot_system_message(snapshot):
         "需要详细剧本模块或触发器内容时，调用相应的房间或触发器工具。\n"
         "需要剧本摘要时先调用 `room.get_scenario_context`，需要完整模块内容时调用 `room.get_scenario_module`。\n"
         "scene_manifest 是剧本提供的唯一场景索引；global_manifest 是背景/公开信息/时间线的短摘要。"
+        "若 scenario.sequential=true，优先按照 scene_manifest 的 order 顺序加载模块；否则按玩家当前需求检索。"
         "summary 仅用于检索，不能替代原文，也不能据此推断未写出的设施。\n"
         f"{_json_for_log(compact_snapshot)}"
     )
@@ -479,7 +489,12 @@ def chat():
 
         user_id = message_data.get("user_id", "unknown")
         content = message_data.get("content", "")
-        role_config = _load_role_for_content(content)
+        requested_role_id = str(message_data.get("role_id") or "").strip()
+        if requested_role_id:
+            roles = load_roles(_get_role_config_file(), _get_kp_prompt_file(), _get_ai_platform_dir())
+            role_config = next((role for role in roles if str(role.get("id")) == requested_role_id), None) or _load_role_for_content(content)
+        else:
+            role_config = _load_role_for_content(content)
         agent_profile = resolve_agent_profile(
             role_config,
             _get_kp_prompt_file(),
@@ -528,13 +543,17 @@ def chat():
             }
         )
         room_snapshot_message = None
+        room_snapshot = None
         if room_id:
+            room_snapshot = get_room_snapshot({}, agent_context)
             room_snapshot_message = _room_snapshot_system_message(
-                get_room_snapshot({}, agent_context)
+                room_snapshot,
+                agent_context.room_state(),
             )
 
         runtime_config = load_ai_runtime_config(_get_config_dir())
         model = _select_model(platform_config)
+        small_model = str(provider_small_model_config(platform_config, "summarization").get("id") or model)
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
@@ -548,7 +567,7 @@ def chat():
 
         if _is_compact_command(content):
             if history:
-                history = _compact_history_with_ai(requester, model, history)
+                history = _compact_history_with_ai(requester, small_model, history)
                 write_json_atomic(history_file, history)
                 response_text = "历史记录已压缩。"
             else:
@@ -557,7 +576,7 @@ def chat():
 
         if _history_needs_compaction(history):
             try:
-                history = _compact_history_with_ai(requester, model, history)
+                history = _compact_history_with_ai(requester, small_model, history)
                 write_json_atomic(history_file, history)
             except Exception:
                 logger.exception("Failed to compact chat history automatically")
@@ -574,20 +593,34 @@ def chat():
         if room_id:
             system_prompt = (
                 f"{system_prompt}\n"
-                "房间快照中的 scene_manifest/global_manifest 是唯一索引；摘要不是事实。"
+                "房间快照中的 scene_manifest/global_manifest 是唯一索引；摘要不是事实。若 sequential=true，优先按 order 顺序加载模块。"
                 "仅在用户明确需要时按 ID 加载模块原文；转场先调用 room.activate_scenario_scene，再读模块。"
                 "不得创造剧本未写出的地点、设施、NPC、道具或触发器内容；未提供就明确说明。"
                 "剧本、房间快照、角色卡和工具返回值是唯一事实来源；不得把猜测写成既定事实。"
                 "不要因问候、摘要或关键词自动检定/揭示/记忆；工具完成后立即简短叙事回复。"
             )
 
+        prompt_history = _history_for_request(history)
+        scene_static = None
+        if isinstance(room_snapshot, dict):
+            scenario_data = room_snapshot.get("scenario")
+            if isinstance(scenario_data, dict):
+                active_scene = scenario_data.get("active_scene_id")
+                manifest = scenario_data.get("scene_manifest") if isinstance(scenario_data.get("scene_manifest"), list) else []
+                scene_static = next((item for item in manifest if isinstance(item, dict) and str(item.get("id")) == str(active_scene)), None)
+        prompt_layers = build_prompt_layers(
+            global_rules=system_prompt,
+            scenario=(room_snapshot or {}).get("scenario") if isinstance(room_snapshot, dict) else None,
+            scene=scene_static,
+            room_state=agent_context.room_state() if room_id else {},
+            history=prompt_history,
+            user_input=user_content,
+            rules_version="1",
+        )
+        if room_snapshot_message:
+            prompt_layers.messages.insert(3, {"role": "system", "content": room_snapshot_message})
         request_data = {
-            "messages": _build_messages(
-                system_prompt,
-                _history_for_request(history),
-                user_content,
-                room_snapshot_message=room_snapshot_message,
-            ),
+            "messages": prompt_layers.messages,
             "model": model,
             "temperature": 0.5,
             "top_p": 0.85,
@@ -598,6 +631,7 @@ def chat():
                 "session_id": _room_session_id(room_id, agent_profile.id),
                 "room_id": str(room_id),
                 "agent_id": agent_profile.id,
+                "cache_key": prompt_layers.cache_key,
             }
         if runtime_config.stream_output:
             request_data["stream"] = False
@@ -611,6 +645,7 @@ def chat():
             model=request_data["model"],
             content_length=len(content),
         )
+        started_at = time.perf_counter()
         result = run_agent_completion(
             requester=requester,
             base_payload=request_data,
@@ -618,8 +653,39 @@ def chat():
             registry=default_tool_registry(),
             context=agent_context,
         )
+        elapsed_ms = round((time.perf_counter() - started_at) * 1000, 2)
         if result.error:
             return error_response("AI agent request failed", 500, result.error)
+
+        prompt_tokens = result.prompt_token_count or 0
+        completion_tokens = result.completion_token_count or 0
+        total_tokens = result.token_count or (prompt_tokens + completion_tokens)
+        cached_tokens = result.cached_token_count or 0
+        cache_hit_rate = calculate_cache_hit_rate(prompt_tokens, cached_tokens)
+        scenario_info = (room_snapshot or {}).get("scenario") if isinstance(room_snapshot, dict) else {}
+        cache_key = build_provider_cache_key(
+            scenario_info.get("id") or "unknown",
+            scenario_info.get("version") or "1",
+            scenario_info.get("active_scene_id") or "unknown",
+            scenario_info.get("scene_version") or "1",
+            "1",
+        )
+        usage_record = record_ai_usage(
+            current_app.config.get("LOGS_DIR", LOGS_DIR),
+            {
+                "agent_id": agent_profile.id,
+                "provider": selected_platform,
+                "model": request_data["model"],
+                "room_id": str(room_id) if room_id else None,
+                "scene_id": scenario_info.get("active_scene_id") if isinstance(scenario_info, dict) else None,
+                "cache_key": cache_key,
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": total_tokens,
+                "cached_tokens": cached_tokens,
+                "elapsed_ms": elapsed_ms,
+            },
+        )
 
         direct_message = None
         if isinstance(result.response_data, dict):
@@ -628,7 +694,36 @@ def chat():
         if direct_message and not direct_messages:
             direct_messages = [direct_message]
 
-        ai_response, compact_requested_by_ai = _strip_compact_command(result.content)
+        structured = parse_kp_response(result.content)
+        validated_updates = {}
+        if structured:
+            ai_response = structured.narration
+            if room_id and structured.state_updates:
+                scenario_data = (room_snapshot or {}).get("scenario") if isinstance(room_snapshot, dict) else {}
+                validated_updates = validate_state_updates(
+                    structured.state_updates,
+                    agent_context.room_state(),
+                    scenario_data,
+                )
+                if validated_updates:
+                    apply_state_updates(agent_context.room_dir, validated_updates)
+                    append_room_event(
+                        agent_context.room_dir,
+                        {"kind": "state_update", "content": "AI validated state update", "metadata": validated_updates},
+                    )
+            if structured.next_scene and room_id and "active_scene_id" not in validated_updates:
+                scenario_data = (room_snapshot or {}).get("scenario") if isinstance(room_snapshot, dict) else {}
+                next_updates = validate_state_updates(
+                    {"active_scene_id": structured.next_scene},
+                    agent_context.room_state(),
+                    scenario_data,
+                )
+                if next_updates:
+                    apply_state_updates(agent_context.room_dir, next_updates)
+                    validated_updates.update(next_updates)
+        else:
+            ai_response, _ = _strip_compact_command(result.content)
+        _, compact_requested_by_ai = _strip_compact_command(result.content)
         token_count = result.token_count
         if not ai_response and compact_requested_by_ai:
             ai_response = "历史记录已压缩。"
@@ -651,6 +746,11 @@ def chat():
             model=request_data["model"],
             response_length=len(ai_response),
             token_count=token_count,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            cached_tokens=cached_tokens,
+            cache_hit_rate=cache_hit_rate,
+            elapsed_ms=elapsed_ms,
         )
 
         user_history_item = {"role": "user", "content": content}
@@ -660,7 +760,7 @@ def chat():
         _maybe_remember_important_action(content, agent_context)
         if compact_requested_by_ai:
             try:
-                history = _compact_history_with_ai(requester, model, history)
+                history = _compact_history_with_ai(requester, small_model, history)
                 write_json_atomic(history_file, history)
             except Exception:
                 logger.exception("Failed to compact chat history after AI request")
@@ -675,6 +775,22 @@ def chat():
             direct_message=direct_messages[0] if direct_messages else None,
             direct_messages=direct_messages,
             tool_messages=result.tool_messages or [],
+            prompt_tokens=usage_record["prompt_tokens"],
+            completion_tokens=usage_record["completion_tokens"],
+            cached_tokens=usage_record["cached_tokens"],
+            cache_hit_rate=usage_record["cache_hit_rate"],
+            elapsed_ms=usage_record["elapsed_ms"],
+            cache_key=cache_key,
+            structured_output=(
+                {
+                    "options": structured.options,
+                    "state_updates": validated_updates,
+                    "next_scene": structured.next_scene,
+                    "npc_actions": structured.npc_actions,
+                }
+                if structured
+                else None
+            ),
         )
     except requests.exceptions.Timeout:
         return error_response("AI platform request timeout", 504, "Request timeout")

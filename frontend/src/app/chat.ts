@@ -26,6 +26,12 @@ interface ChatApiResponse {
     direct_message?: ChatMessage;
     direct_messages?: ChatMessage[];
     tool_messages?: ChatMessage[];
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    cached_tokens?: number;
+    cache_hit_rate?: number;
+    elapsed_ms?: number;
+    cache_key?: string;
 }
 
 interface IncomingSocketMessage {
@@ -242,7 +248,7 @@ async function sendToAI(chatInput: HTMLInputElement, sendButton: HTMLButtonEleme
         if (toolMessages.length > 0) {
             moveThinkingMessageToEnd(thinkingMessageId);
         }
-        replaceThinkingMessage(thinkingMessageId, messageContent, processingTime, tokenCount);
+        replaceThinkingMessage(thinkingMessageId, messageContent, processingTime, tokenCount, data.cache_hit_rate ?? null);
         broadcastAIThinkingEnd(aiRequestId);
         clearPersistedThinkingState(aiRequestId);
 
@@ -252,6 +258,11 @@ async function sendToAI(chatInput: HTMLInputElement, sendButton: HTMLButtonEleme
             roleId: role.id,
             aiRequestId,
             senderName: role.name || "KP",
+            promptTokens: data.prompt_tokens,
+            completionTokens: data.completion_tokens,
+            cachedTokens: data.cached_tokens,
+            cacheHitRate: data.cache_hit_rate,
+            cacheKey: data.cache_key,
         });
         if (persisted) {
             persisted.sender_name = role.name || "KP";
@@ -591,6 +602,7 @@ function addMessage(
     isThinking = false,
     processingTime: number | null = null,
     tokenCount: number | null = null,
+    cacheHitRate: number | null = null,
     message: ChatMessage | null = null,
 ): string | number {
     const resolvedMessageId = messageId || Date.now();
@@ -618,16 +630,16 @@ function addMessage(
         sender,
         displayTime,
         contentHtml: renderedContent,
-        processingHtml: renderProcessingTime(type, processingTime, tokenCount),
+        processingHtml: renderProcessingTime(type, processingTime, tokenCount, cacheHitRate),
     });
     chatHistory.appendChild(messageDiv);
     chatHistory.scrollTop = chatHistory.scrollHeight;
     return resolvedMessageId;
 }
 
-function renderProcessingTime(type: string, processingTime: number | null, tokenCount: number | null): string {
+function renderProcessingTime(type: string, processingTime: number | null, tokenCount: number | null, cacheHitRate: number | null = null): string {
     if (processingTime === null || type !== "kp") return "";
-    return window.TrpgTemplates.render("chat-processing-time", { text: processingTimeText(processingTime, tokenCount) });
+    return window.TrpgTemplates.render("chat-processing-time", { text: processingTimeText(processingTime, tokenCount, cacheHitRate) });
 }
 
 function addThinkingMessage(messageId: string | number, roleName = "KP", startedAt = Date.now()): void {
@@ -640,13 +652,13 @@ function addThinkingMessage(messageId: string | number, roleName = "KP", started
     startThinkingElapsedTimer(String(messageId), startedAt);
 }
 
-function replaceThinkingMessage(messageId: string | number, newContent: string, processingTime: number, tokenCount: number | null): void {
+function replaceThinkingMessage(messageId: string | number, newContent: string, processingTime: number, tokenCount: number | null, cacheHitRate: number | null = null): void {
     stopThinkingElapsedTimer(String(messageId));
     const targetMessage = document.querySelector<HTMLElement>(`.message.thinking.kp-message[data-ai-request-id="${String(messageId)}"]`)
         || document.querySelector<HTMLElement>(`.message[data-id="${messageId}"]`);
 
     if (!targetMessage) {
-        addMessage("kp", "KP", newContent, null, false, processingTime, tokenCount);
+        addMessage("kp", "KP", newContent, null, false, processingTime, tokenCount, cacheHitRate);
         return;
     }
 
@@ -664,15 +676,16 @@ function replaceThinkingMessage(messageId: string | number, newContent: string, 
         targetMessage.querySelector(".message-content-container")?.appendChild(processingTimeDiv);
     }
 
-    processingTimeDiv.textContent = processingTimeText(processingTime, tokenCount);
+    processingTimeDiv.textContent = processingTimeText(processingTime, tokenCount, cacheHitRate);
 
     const chatHistory = document.getElementById("chatHistory");
     if (chatHistory) chatHistory.scrollTop = chatHistory.scrollHeight;
 }
 
-function processingTimeText(processingTime: number, tokenCount: number | null = null): string {
+function processingTimeText(processingTime: number, tokenCount: number | null = null, cacheHitRate: number | null = null): string {
     let displayText = `已耗时: ${processingTime}秒`;
     if (tokenCount !== null) displayText += ` 消耗Token：${tokenCount}`;
+    if (cacheHitRate !== null) displayText += ` 缓存命中率：${cacheHitRate}%`;
     return displayText;
 }
 
@@ -792,6 +805,11 @@ function renderChatMessages(messages: ChatMessage[]): void {
 
 function renderRoomMessage(message: ChatMessage | null): void {
     if (!message) return;
+    if (message.id) {
+        const duplicate = Array.from(document.querySelectorAll<HTMLElement>("#chatHistory .message[data-id]"))
+            .some((element) => element.dataset.id === String(message.id));
+        if (duplicate) return;
+    }
     const aiRequestId = typeof message.metadata?.aiRequestId === "string" ? message.metadata.aiRequestId : null;
     if (aiRequestId) clearThinkingMessage(aiRequestId);
     const isOwnPlayerMessage = message.type === "player" && message.sender_id === getCurrentUserId();
@@ -807,18 +825,19 @@ function renderRoomMessage(message: ChatMessage | null): void {
             }
         }
     }
-    if (message.type === "trigger" && metadata.asset_url && message.content && !message.content.includes(String(metadata.asset_url))) {
-        message = { ...message, content: `${message.content}\n\n[${metadata.asset_name || "附件"}](${metadata.asset_url})` };
-    }
+    const displayMessage = message.type === "trigger" && metadata.asset_url && message.content && !message.content.includes(String(metadata.asset_url))
+        ? { ...message, content: `${message.content}\n\n[${metadata.asset_name || "附件"}](${metadata.asset_url})` }
+        : message;
     addMessage(
         type,
-        message.sender_name || message.sender || defaultSenderName(type),
-        message.content,
-        message.id || null,
+        displayMessage.sender_name || displayMessage.sender || defaultSenderName(type),
+        displayMessage.content,
+        displayMessage.id || null,
         false,
         numericMetadata(metadata, "processingTime") ?? numericMetadata(metadata, "processing_time"),
         numericMetadata(metadata, "tokenCount") ?? numericMetadata(metadata, "token_count"),
-        message,
+        numericMetadata(metadata, "cacheHitRate") ?? numericMetadata(metadata, "cache_hit_rate"),
+        displayMessage,
     );
 }
 

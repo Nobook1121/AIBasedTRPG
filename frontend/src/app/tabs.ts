@@ -251,6 +251,7 @@ function initSettingsTabs(): void {
     });
 
     bindGeneralCheckboxSetting("streamOutput", "ai", "stream_output");
+    bindGeneralCheckboxSetting("scenarioImportStreamOutput", "scenario_import", "stream_output");
     bindGeneralCheckboxSetting("debugMode", "ai", "debug_mode");
     bindGeneralCheckboxSetting("showAIHints", "ai", "show_ai_hints");
     bindGeneralNumberSetting("autosaveInterval", "autosave", "interval", 30, 3600);
@@ -262,6 +263,25 @@ function initSettingsTabs(): void {
     document.getElementById("refreshUserManagement")?.addEventListener("click", () => {
         void loadUserManagement(true);
     });
+    document.getElementById("refreshAITokenDashboard")?.addEventListener("click", () => {
+        void loadAITokenDashboard();
+    });
+    void loadAITokenDashboard();
+}
+
+async function loadAITokenDashboard(): Promise<void> {
+    const body = document.getElementById("aiTokenDashboardBody");
+    const dateLabel = document.getElementById("aiTokenDashboardDate");
+    if (!body) return;
+    try {
+        const response = await TrpgApi.get<ApiResponse<{ day: string; roles: Record<string, { request_count?: number; prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; cache_hit_rate?: number }> }>>("/api/telemetry/ai/daily");
+        if (!response.success || !response.data) throw new Error(response.message || "无法加载 Token 用量");
+        if (dateLabel) dateLabel.textContent = `日期：${response.data.day}`;
+        const entries = Object.entries(response.data.roles || {});
+        body.innerHTML = entries.length ? entries.map(([role, usage]) => `<tr><td>${settingsEscapeHtml(role)}</td><td>${usage.request_count || 0}</td><td>${usage.prompt_tokens || 0}</td><td>${usage.completion_tokens || 0}</td><td>${usage.total_tokens || 0}</td><td>${usage.cache_hit_rate || 0}%</td></tr>`).join("") : '<tr><td colspan="6" class="text-muted">暂无用量记录</td></tr>';
+    } catch (error) {
+        body.innerHTML = `<tr><td colspan="6" class="text-danger">${settingsEscapeHtml(settingsErrorMessage(error))}</td></tr>`;
+    }
 }
 
 function bindGeneralCheckboxSetting(elementId: string, sectionName: string, key: string): void {
