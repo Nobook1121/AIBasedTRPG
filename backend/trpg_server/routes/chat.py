@@ -663,6 +663,8 @@ def chat():
         cached_tokens = result.cached_token_count or 0
         cache_hit_rate = calculate_cache_hit_rate(prompt_tokens, cached_tokens)
         scenario_info = (room_snapshot or {}).get("scenario") if isinstance(room_snapshot, dict) else {}
+        if not isinstance(scenario_info, dict):
+            scenario_info = {}
         cache_key = build_provider_cache_key(
             scenario_info.get("id") or "unknown",
             scenario_info.get("version") or "1",
