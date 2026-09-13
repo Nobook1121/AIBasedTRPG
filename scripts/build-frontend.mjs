@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -99,6 +99,13 @@ window.TrpgTemplates = TrpgTemplates;
   await writeFile(path.join(outputDir, "templates.ts"), generated, "utf8");
 }
 
+async function copyLocales() {
+  const source = path.join(root, "frontend", "src", "locales");
+  const destination = path.join(root, "dist", "public", "locales");
+  await mkdir(destination, { recursive: true });
+  await cp(source, destination, { recursive: true });
+}
+
 async function main() {
   const assetsOnly = process.argv.includes("--assets-only");
   if (!assetsOnly) {
@@ -113,6 +120,7 @@ async function main() {
     outputPath: "dist/public/index.html",
   });
   await generateTemplates();
+  await copyLocales();
 }
 
 await main();

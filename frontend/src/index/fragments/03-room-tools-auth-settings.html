@@ -204,60 +204,60 @@
                     <div class="auth-modal-content">
                         <div class="auth-modal-header">
                             <h2 data-i18n="auth.login.title">登录</h2>
-                            <button type="button" id="close-auth-modal" class="close-btn" aria-label="关闭认证弹窗">&times;</button>
+                            <button type="button" id="close-auth-modal" class="close-btn" aria-label="关闭认证弹窗" data-i18n-aria-label="auth.dialog.close">&times;</button>
                         </div>
                         <div class="auth-modal-body">
-                            <section id="login-view" class="auth-view active" aria-label="登录">
+                            <section id="login-view" class="auth-view active" aria-label="登录" data-i18n-aria-label="auth.login.title">
                                 <div class="auth-floating-field">
                                     <input type="text" class="auth-floating-input" id="loginUsername" name="username" autocomplete="username">
-                                    <label class="auth-floating-label" for="loginUsername">用户名或邮箱</label>
+                                    <label class="auth-floating-label" for="loginUsername" data-i18n="auth.label.username_or_email">用户名或邮箱</label>
                                 </div>
                                 <div class="auth-floating-field">
                                     <input type="password" class="auth-floating-input" id="loginPassword" name="password" autocomplete="current-password">
-                                    <label class="auth-floating-label" for="loginPassword">密码</label>
+                                    <label class="auth-floating-label" for="loginPassword" data-i18n="auth.label.password">密码</label>
                                 </div>
                                 <div class="auth-options">
                                     <div class="form-check">
                                         <input type="checkbox" class="auth-check-input" id="rememberMe">
-                                        <label class="form-check-label" for="rememberMe">记住用户名</label>
+                                        <label class="form-check-label" for="rememberMe" data-i18n="auth.option.remember_username">记住用户名</label>
                                     </div>
                                     <div class="form-check">
                                         <input type="checkbox" class="auth-check-input" id="autoLogin">
-                                        <label class="form-check-label" for="autoLogin">保持登录</label>
+                                        <label class="form-check-label" for="autoLogin" data-i18n="auth.option.stay_logged_in">保持登录</label>
                                     </div>
                                 </div>
                                 <input type="checkbox" id="stayLoggedIn" class="visually-hidden" checked>
-                                <button class="btn btn-primary mt-3 w-100" id="loginButton">登录</button>
+                                <button class="btn btn-primary mt-3 w-100" id="loginButton" data-i18n="auth.action.login">登录</button>
                                 <div class="login-message mt-2" id="loginMessage" aria-live="polite"></div>
-                                <div class="auth-switch-line">还没有账号？<button type="button" id="show-register-view">创建新账号</button></div>
+                                <div class="auth-switch-line"><span data-i18n="auth.prompt.no_account">还没有账号？</span><button type="button" id="show-register-view" data-i18n="auth.action.create_account">创建新账号</button></div>
                             </section>
 
-                            <section id="register-view" class="auth-view" aria-label="注册">
+                            <section id="register-view" class="auth-view" aria-label="注册" data-i18n-aria-label="auth.register.title">
                                 <div class="register-form-fields">
                                     <div class="auth-floating-field">
                                         <input type="text" class="auth-floating-input" id="registerUsername" name="username" autocomplete="username">
-                                        <label class="auth-floating-label" for="registerUsername">用户名</label>
+                                        <label class="auth-floating-label" for="registerUsername" data-i18n="auth.label.username">用户名</label>
                                     </div>
                                     <div class="auth-floating-field">
                                         <input type="email" class="auth-floating-input" id="registerEmail" name="email" autocomplete="email">
-                                        <label class="auth-floating-label" for="registerEmail">电子邮件</label>
+                                        <label class="auth-floating-label" for="registerEmail" data-i18n="auth.label.email">电子邮件</label>
                                     </div>
                                     <div class="auth-floating-field">
                                         <input type="password" class="auth-floating-input" id="registerPassword" name="new-password" autocomplete="new-password">
-                                        <label class="auth-floating-label" for="registerPassword">密码</label>
+                                        <label class="auth-floating-label" for="registerPassword" data-i18n="auth.label.password">密码</label>
                                     </div>
                                     <div class="auth-floating-field">
                                         <input type="password" class="auth-floating-input" id="registerConfirmPassword" name="confirm-password" autocomplete="new-password">
-                                        <label class="auth-floating-label" for="registerConfirmPassword">确认密码</label>
+                                        <label class="auth-floating-label" for="registerConfirmPassword" data-i18n="auth.label.confirm_password">确认密码</label>
                                     </div>
                                 </div>
                                 <div class="terms-row">
                                     <input type="checkbox" id="acceptTerms">
-                                    <label for="acceptTerms">我同意服务条款和隐私协议</label>
+                                    <label for="acceptTerms" data-i18n="auth.terms.accept">我同意服务条款和隐私协议</label>
                                 </div>
-                                <button class="btn btn-primary mt-3 w-100" id="registerButton">注册</button>
+                                <button class="btn btn-primary mt-3 w-100" id="registerButton" data-i18n="auth.action.register">注册</button>
                                 <div class="register-message mt-2" id="registerMessage" aria-live="polite"></div>
-                                <div class="auth-switch-line">已有账号？<button type="button" id="show-login-view">返回登录</button></div>
+                                <div class="auth-switch-line"><span data-i18n="auth.prompt.has_account">已有账号？</span><button type="button" id="show-login-view" data-i18n="auth.action.back_to_login">返回登录</button></div>
                             </section>
                         </div>
                     </div>
@@ -265,34 +265,45 @@
 
                 <div id="user-card-popover" class="user-card-popover" aria-hidden="true">
                     <div class="user-card-summary">
-                        <img id="userCardAvatar" src="/assets/avatars/default.jpg" alt="用户头像" width="48" height="48">
+                        <img id="userCardAvatar" src="/assets/avatars/default.jpg" alt="用户头像" data-i18n-alt="nav.user_avatar" width="48" height="48">
                         <div>
-                            <div id="userCardName" class="user-card-name">未登录</div>
+                            <div id="userCardName" class="user-card-name" data-i18n="auth.status.guest">未登录</div>
                             <div id="userCardRole" class="user-card-role">USER</div>
                         </div>
                     </div>
+                    <div id="userCardImpersonation" class="user-card-impersonation" hidden>
+                        <div class="user-card-impersonation-text" id="userCardImpersonationText" data-i18n="auth.status.impersonating">模拟登录中</div>
+                        <button type="button" class="user-card-menu-item danger" id="exitImpersonationButton">
+                            <span class="menu-icon"><i class="fa fa-sign-out" aria-hidden="true"></i></span>
+                            <span data-i18n="auth.user_card.exit_impersonation">退出模拟</span>
+                        </button>
+                    </div>
                     <div class="user-card-menu-section">
+                        <button type="button" class="user-card-menu-item" id="open-personal-home">
+                            <span class="menu-icon"><i class="fa fa-home" aria-hidden="true"></i></span>
+                            <span data-i18n="profile.page.title">个人主页</span>
+                        </button>
                         <button type="button" class="user-card-menu-item" id="open-profile-dialog">
-                            <span class="menu-icon"><i class="fa fa-user" aria-hidden="true"></i></span>
-                            <span>编辑个人资料</span>
+                            <span class="menu-icon"><i class="fa fa-cog" aria-hidden="true"></i></span>
+                            <span data-i18n="profile.dialog.title">用户设置</span>
                         </button>
                     </div>
                     <div class="user-card-menu-section">
                         <div class="presence-menu-item">
                             <button type="button" class="user-card-menu-item" id="presence-menu-button" aria-haspopup="menu" aria-expanded="false">
                                 <span class="menu-icon"><i class="fa fa-circle" aria-hidden="true"></i></span>
-                                <span class="presence-current-label">在线状态</span>
+                                <span class="presence-current-label" data-i18n="presence.status">在线状态</span>
                                 <i class="fa fa-chevron-right menu-chevron" aria-hidden="true"></i>
                             </button>
-                            <div class="presence-submenu" role="menu" aria-label="切换在线状态">
+                            <div class="presence-submenu" role="menu" aria-label="切换在线状态" data-i18n-aria-label="auth.user_card.presence_menu">
                                 <button type="button" class="presence-option" data-presence="online" role="menuitem">
-                                    <i class="fa fa-circle presence-dot online" aria-hidden="true"></i>在线
+                                    <i class="fa fa-circle presence-dot online" aria-hidden="true"></i><span data-i18n="presence.online">在线</span>
                                 </button>
                                 <button type="button" class="presence-option" data-presence="dnd" role="menuitem">
-                                    <i class="fa fa-minus-circle presence-dot dnd" aria-hidden="true"></i>请勿打扰
+                                    <i class="fa fa-minus-circle presence-dot dnd" aria-hidden="true"></i><span data-i18n="presence.dnd">请勿打扰</span>
                                 </button>
                                 <button type="button" class="presence-option" data-presence="invisible" role="menuitem">
-                                    <i class="fa fa-circle-o presence-dot invisible" aria-hidden="true"></i>隐身
+                                    <i class="fa fa-circle-o presence-dot invisible" aria-hidden="true"></i><span data-i18n="presence.invisible">隐身</span>
                                 </button>
                             </div>
                         </div>
@@ -300,11 +311,11 @@
                     <div class="user-card-menu-section">
                         <button type="button" class="user-card-menu-item" id="switchAccountButton">
                             <span class="menu-icon"><i class="fa fa-exchange" aria-hidden="true"></i></span>
-                            <span>切换账户</span>
+                            <span data-i18n="auth.user_card.switch_account">切换账户</span>
                         </button>
                         <button type="button" class="user-card-menu-item danger" id="logoutButton">
                             <span class="menu-icon"><i class="fa fa-sign-out" aria-hidden="true"></i></span>
-                            <span>登出</span>
+                            <span data-i18n="auth.user_card.logout">登出</span>
                         </button>
                     </div>
                 </div>
@@ -313,83 +324,109 @@
                     <div class="profile-dialog-surface">
                         <div class="profile-dialog-topbar">
                             <div>
-                                <div class="profile-dialog-eyebrow">User Settings</div>
-                                <h3>编辑个人资料</h3>
+                                <div class="profile-dialog-eyebrow" data-i18n="profile.dialog.eyebrow">User Settings</div>
+                                <h3 data-i18n="profile.dialog.title">用户设置</h3>
                             </div>
-                            <button type="button" id="close-settings-panel" class="profile-dialog-close" aria-label="关闭用户设置">
+                            <button type="button" id="close-settings-panel" class="profile-dialog-close" aria-label="关闭用户设置" data-i18n-aria-label="profile.dialog.close">
                                 <i class="fa fa-times" aria-hidden="true"></i>
                             </button>
                         </div>
                         <div class="profile-settings-sidebar">
-                            <div class="profile-settings-sidebar-title">用户设置</div>
+                            <div class="profile-settings-sidebar-title" data-i18n="profile.dialog.title">用户设置</div>
                             <details class="profile-nav-group" open>
-                                <summary><span><i class="fa fa-user-circle" aria-hidden="true"></i>账户</span><i class="fa fa-chevron-down" aria-hidden="true"></i></summary>
+                                <summary><span><i class="fa fa-user-circle" aria-hidden="true"></i><span data-i18n="profile.section.account">账户</span></span><i class="fa fa-chevron-down" aria-hidden="true"></i></summary>
                                 <div class="profile-subnav">
-                                    <button type="button" class="profile-section-tab active" data-profile-target="profile-account-info">账号信息</button>
-                                    <button type="button" class="profile-section-tab" data-profile-target="profile-password-management">密码管理</button>
+                                    <button type="button" class="profile-section-tab active" data-profile-target="profile-account-info" data-i18n="profile.section.account_info">账号信息</button>
+                                    <button type="button" class="profile-section-tab" data-profile-target="profile-password-management" data-i18n="profile.section.password_management">密码管理</button>
                                 </div>
                             </details>
                             <details class="profile-nav-group">
-                                <summary><span><i class="fa fa-id-card-o" aria-hidden="true"></i>个人说明</span><i class="fa fa-chevron-down" aria-hidden="true"></i></summary>
+                                <summary><span><i class="fa fa-id-card-o" aria-hidden="true"></i><span data-i18n="profile.section.public_info">个人说明</span></span><i class="fa fa-chevron-down" aria-hidden="true"></i></summary>
                                 <div class="profile-subnav">
-                                    <button type="button" class="profile-section-tab" data-profile-target="profile-public-info">资料展示</button>
+                                    <button type="button" class="profile-section-tab" data-profile-target="profile-public-info" data-i18n="profile.section.public_info_tab">资料展示</button>
                                 </div>
                             </details>
                             <details class="profile-nav-group">
-                                <summary><span><i class="fa fa-shield" aria-hidden="true"></i>隐私</span><i class="fa fa-chevron-down" aria-hidden="true"></i></summary>
+                                <summary><span><i class="fa fa-shield" aria-hidden="true"></i><span data-i18n="profile.section.privacy">隐私</span></span><i class="fa fa-chevron-down" aria-hidden="true"></i></summary>
                                 <div class="profile-subnav">
-                                    <button type="button" class="profile-section-tab" data-profile-target="profile-privacy">可见性</button>
+                                    <button type="button" class="profile-section-tab" data-profile-target="profile-privacy" data-i18n="profile.section.privacy_tab">可见性</button>
                                 </div>
                             </details>
                             <details class="profile-nav-group">
-                                <summary><span><i class="fa fa-bell-o" aria-hidden="true"></i>通知</span><i class="fa fa-chevron-down" aria-hidden="true"></i></summary>
+                                <summary><span><i class="fa fa-bell-o" aria-hidden="true"></i><span data-i18n="profile.section.notifications">通知</span></span><i class="fa fa-chevron-down" aria-hidden="true"></i></summary>
                                 <div class="profile-subnav">
-                                    <button type="button" class="profile-section-tab" data-profile-target="profile-notifications">提醒方式</button>
+                                    <button type="button" class="profile-section-tab" data-profile-target="profile-notifications" data-i18n="profile.section.notifications_tab">提醒方式</button>
+                                </div>
+                            </details>
+                            <details class="profile-nav-group">
+                                <summary><span><i class="fa fa-cog" aria-hidden="true"></i><span data-i18n="profile.section.website_settings">网站设置</span></span><i class="fa fa-chevron-down" aria-hidden="true"></i></summary>
+                                <div class="profile-subnav">
+                                    <button type="button" class="profile-section-tab" data-profile-target="profile-website-theme" data-i18n="profile.section.website_theme">外观偏好</button>
                                 </div>
                             </details>
                         </div>
                         <div class="profile-settings-content">
                             <section class="profile-panel-section" id="profile-account-info">
-                                <h4>账号信息</h4>
+                                <h4 data-i18n="profile.section.account_info">账号信息</h4>
                                 <div class="avatar-upload-container">
                                     <div class="avatar-preview">
-                                        <img id="avatarPreview" src="/assets/avatars/default.jpg" alt="用户头像" width="96" height="96">
+                                        <img id="avatarPreview" src="/assets/avatars/default.jpg" alt="用户头像" data-i18n-alt="nav.user_avatar" width="96" height="96">
                                     </div>
                                     <input type="file" id="avatarUpload" class="avatar-upload-input" accept="image/*">
-                                    <label for="avatarUpload" class="avatar-upload-label">更换头像</label>
+                                    <label for="avatarUpload" class="avatar-upload-label" data-i18n="profile.action.change_avatar">更换头像</label>
                                 </div>
-                                <label for="editUsername">用户名</label>
+                                <label for="editUsername" data-i18n="auth.label.username">用户名</label>
                                 <input type="text" class="form-control" id="editUsername" name="username" autocomplete="username">
-                                <label for="editEmail">电子邮件</label>
+                                <label for="editEmail" data-i18n="auth.label.email">电子邮件</label>
                                 <input type="email" class="form-control" id="editEmail" name="email" autocomplete="email">
-                                <label for="editNickname">昵称</label>
+                                <label for="editNickname" data-i18n="profile.field.nickname">昵称</label>
                                 <input type="text" class="form-control" id="editNickname" name="nickname" autocomplete="nickname">
                             </section>
                             <section class="profile-panel-section" id="profile-password-management">
-                                <h4>密码管理</h4>
-                                <p class="profile-placeholder">密码修改会在独立窗口中完成，以避免误保存个人资料时同时修改密码。</p>
+                                <h4 data-i18n="profile.section.password_management">密码管理</h4>
+                                <p class="profile-placeholder" data-i18n="profile.note.password_management">密码修改会在独立窗口中完成，以避免误保存个人资料时同时修改密码。</p>
                                 <button type="button" class="btn btn-secondary profile-inline-action" id="open-password-dialog">
-                                    <i class="fa fa-lock" aria-hidden="true"></i>修改密码
+                                    <i class="fa fa-lock" aria-hidden="true"></i><span data-i18n="profile.action.change_password">修改密码</span>
                                 </button>
-                                <div class="two-factor-disabled">双因素认证被管理员关闭</div>
+                                <div class="two-factor-disabled" data-i18n="profile.two_factor.disabled">双因素认证被管理员关闭</div>
                             </section>
                             <section class="profile-panel-section" id="profile-public-info">
-                                <h4>资料展示</h4>
-                                <p class="profile-placeholder">个人说明、公开身份和展示偏好将在后续版本开放。</p>
+                                <h4 data-i18n="profile.section.public_info_tab">资料展示</h4>
+                                <p class="profile-placeholder" data-i18n="profile.note.public_info">个人说明、公开身份和展示偏好将在后续版本开放。</p>
                             </section>
                             <section class="profile-panel-section" id="profile-privacy">
-                                <h4>可见性</h4>
-                                <p class="profile-placeholder">隐私控制、好友可见范围和房间展示规则将在后续版本开放。</p>
+                                <h4 data-i18n="profile.section.privacy_tab">可见性</h4>
+                                <p class="profile-placeholder" data-i18n="profile.note.privacy">隐私控制、好友可见范围和房间展示规则将在后续版本开放。</p>
                             </section>
                             <section class="profile-panel-section" id="profile-notifications">
-                                <h4>提醒方式</h4>
-                                <p class="profile-placeholder">消息提醒、房间邀请和系统通知设置将在后续版本开放。</p>
+                                <h4 data-i18n="profile.section.notifications_tab">提醒方式</h4>
+                                <p class="profile-placeholder" data-i18n="profile.note.notifications">消息提醒、房间邀请和系统通知设置将在后续版本开放。</p>
+                            </section>
+                            <section class="profile-panel-section" id="profile-website-theme">
+                                <h4 data-i18n="profile.section.website_settings">网站设置</h4>
+                                <label class="profile-setting-row" id="profileThemeSetting" for="profileThemeSelect">
+                                    <span data-i18n="profile.theme.label">网站主题切换：</span>
+                                    <select class="form-select" id="profileThemeSelect">
+                                        <option value="" data-i18n="profile.theme.follow_default">跟随默认主题</option>
+                                        <option value="light" data-i18n="profile.theme.light">浅色</option>
+                                        <option value="dark" data-i18n="profile.theme.dark">深色</option>
+                                        <option value="pattern_cyber_2" data-i18n="profile.theme.cyber">赛博档案</option>
+                                        <option value="system" data-i18n="profile.theme.system">跟随系统</option>
+                                    </select>
+                                </label>
                             </section>
                             <div class="profile-save-bar">
                                 <div class="settings-message" id="settingsMessage" aria-live="polite"></div>
                                 <button class="btn btn-primary" id="saveUserSettings">
-                                    <i class="fa fa-check" aria-hidden="true"></i>保存编辑
+                                    <i class="fa fa-check" aria-hidden="true"></i><span data-i18n="profile.action.save_edits">保存编辑</span>
                                 </button>
+                            </div>
+                            <div class="profile-pending-save-bar" id="profilePendingSaveBar" hidden>
+                                <span><strong id="profilePendingChangeCount">0</strong> <span data-i18n="profile.pending.unsaved">项更改未保存</span></span>
+                                <div>
+                                    <button type="button" class="btn btn-secondary" id="cancelProfilePendingChanges" data-i18n="common.cancel">取消</button>
+                                    <button type="button" class="btn btn-primary" id="saveProfilePendingChanges" data-i18n="common.save">保存</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -398,21 +435,21 @@
                 <div id="password-dialog" class="password-dialog" aria-hidden="true">
                     <div class="password-dialog-surface">
                         <div class="profile-dialog-header">
-                            <h3><i class="fa fa-lock" aria-hidden="true"></i>修改密码</h3>
-                            <button type="button" id="close-password-dialog" class="close-btn" aria-label="关闭密码修改窗口">&times;</button>
+                            <h3><i class="fa fa-lock" aria-hidden="true"></i><span data-i18n="password.dialog.title">修改密码</span></h3>
+                            <button type="button" id="close-password-dialog" class="close-btn" aria-label="关闭密码修改窗口" data-i18n-aria-label="password.dialog.close">&times;</button>
                         </div>
                         <div class="password-dialog-body">
-                            <label for="passwordCurrentPassword">当前密码</label>
+                            <label for="passwordCurrentPassword" data-i18n="password.field.current">当前密码</label>
                             <input type="password" class="form-control" id="passwordCurrentPassword" autocomplete="current-password">
-                            <label for="passwordNewPassword">新密码</label>
+                            <label for="passwordNewPassword" data-i18n="password.field.new">新密码</label>
                             <input type="password" class="form-control" id="passwordNewPassword" autocomplete="new-password">
-                            <label for="passwordConfirmPassword">确认新密码</label>
+                            <label for="passwordConfirmPassword" data-i18n="password.field.confirm">确认新密码</label>
                             <input type="password" class="form-control" id="passwordConfirmPassword" autocomplete="new-password">
                             <div class="password-message" id="passwordMessage" aria-live="polite"></div>
                         </div>
                         <div class="password-dialog-actions">
-                            <button type="button" class="btn btn-secondary" id="cancelPasswordDialog">取消</button>
-                            <button type="button" class="btn btn-primary" id="changePasswordButton">保存密码</button>
+                            <button type="button" class="btn btn-secondary" id="cancelPasswordDialog" data-i18n="common.cancel">取消</button>
+                            <button type="button" class="btn btn-primary" id="changePasswordButton" data-i18n="password.action.save">保存密码</button>
                         </div>
                     </div>
                 </div>
@@ -423,67 +460,83 @@
                         <header class="page-command-header" data-page-header="settings">
                             <div>
                                 <p class="page-kicker"><i class="fa fa-sliders" aria-hidden="true"></i> SYSTEM CONTROL PANEL</p>
-                                <h2>设置</h2>
-                                <p class="page-subtitle">配置主题、模型、网络、角色卡规则与应用运行偏好。</p>
+                                <h2 data-i18n="settings.page.title">设置</h2>
+                                <p class="page-subtitle" data-i18n="settings.page.subtitle">配置主题、模型、网络、角色卡规则与应用运行偏好。</p>
                             </div>
                         </header>
                         <!-- 设置子标签页 -->
                         <div class="settings-tabs mb-4">
-                            <button class="settings-tab active" data-settings="general">常规设置</button>
-                            <button class="settings-tab" data-settings="model">模型设置</button>
-                            <button class="settings-tab" data-settings="network">网络配置</button>
-                            <button class="settings-tab" data-settings="character">角色卡规则</button>
-                            <button class="settings-tab" data-settings="permissions">权限配置</button>
-                            <button class="settings-tab" data-settings="about">关于应用</button>
+                            <button class="settings-tab active" data-settings="general" data-i18n="settings.tab.general">常规设置</button>
+                            <button class="settings-tab" data-settings="model" data-i18n="settings.tab.model">模型设置</button>
+                            <button class="settings-tab" data-settings="network" data-i18n="settings.tab.network">网络配置</button>
+                            <button class="settings-tab" data-settings="character" data-i18n="settings.tab.character">角色卡规则</button>
+                            <button class="settings-tab" data-settings="users" data-admin-only="true" data-i18n="settings.tab.users">用户管理</button>
+                            <button class="settings-tab" data-settings="permissions" data-i18n="settings.tab.permissions">权限配置</button>
+                            <button class="settings-tab" data-settings="about" data-i18n="settings.tab.about">关于应用</button>
                         </div>
                         
                         <!-- 常规设置内容 -->
                         <div id="general-settings-content" class="settings-content active">
                             <div class="mb-4">
-                                <h4>界面设置</h4>
+                                <h4 data-i18n="settings.section.interface">界面设置</h4>
                                 <div class="form-group">
-                                    <label>主题</label>
+                                    <label data-i18n="settings.field.default_theme">默认主题</label>
                                     <select class="form-select" id="themeSelect">
-                                        <option value="light">浅色</option>
-                                        <option value="dark">深色</option>
-                                        <option value="pattern_cyber_2">赛博档案</option>
-                                        <option value="system">跟随系统</option>
+                                        <option value="light" data-i18n="profile.theme.light">浅色</option>
+                                        <option value="dark" data-i18n="profile.theme.dark">深色</option>
+                                        <option value="pattern_cyber_2" data-i18n="profile.theme.cyber">赛博档案</option>
+                                        <option value="system" data-i18n="profile.theme.system">跟随系统</option>
                                     </select>
                                 </div>
+                                <div class="settings-pending-save-bar" id="defaultThemePendingSaveBar" hidden>
+                                    <span><strong id="defaultThemePendingChangeCount">0</strong> <span data-i18n="settings.pending.default_theme">项默认主题更改未保存</span></span>
+                                    <div>
+                                        <button type="button" class="btn btn-secondary" id="cancelDefaultThemeChange" data-i18n="common.cancel">取消</button>
+                                        <button type="button" class="btn btn-primary" id="saveDefaultThemeChange" data-i18n="common.save">保存</button>
+                                    </div>
+                                </div>
                                 <div class="form-group mt-2">
-                                    <label>语言</label>
+                                    <label data-i18n="Language">语言</label>
                                     <select class="form-select" id="languageSelect">
-                                        <option value="zh-CN">简体中文</option>
-                                        <option value="en-US">English</option>
+                                        <option value="zh-CN" data-i18n="Simplified Chinese">简体中文</option>
+                                        <option value="en-US" data-i18n="English">English</option>
                                     </select>
                                 </div>
                             </div>
                             <div class="mb-4">
-                                <h4>通知设置</h4>
+                                <h4 data-i18n="settings.section.notifications">通知设置</h4>
                                 <div class="form-group">
                                     <div class="form-check">
                                         <input type="checkbox" class="form-check-input" id="enableSound">
-                                        <label class="form-check-label" for="enableSound">启用提示音</label>
+                                        <label class="form-check-label" for="enableSound" data-i18n="settings.notifications.sound">启用提示音</label>
                                     </div>
                                 </div>
                                 <div class="form-group mt-2">
                                     <div class="form-check">
                                         <input type="checkbox" class="form-check-input" id="enableNotification">
-                                        <label class="form-check-label" for="enableNotification">启用桌面通知</label>
+                                        <label class="form-check-label" for="enableNotification" data-i18n="settings.notifications.desktop">启用桌面通知</label>
                                     </div>
                                 </div>
                             </div>
                             <div class="mb-4">
-                                <h4>自动保存设置</h4>
+                                <h4 data-i18n="settings.section.autosave">自动保存设置</h4>
                                 <div class="form-group">
                                     <div class="form-check">
                                         <input type="checkbox" class="form-check-input" id="enableAutosave">
-                                        <label class="form-check-label" for="enableAutosave">启用自动保存</label>
+                                        <label class="form-check-label" for="enableAutosave" data-i18n="settings.autosave.enable">启用自动保存</label>
                                     </div>
                                 </div>
                                 <div class="form-group mt-2">
-                                    <label>自动保存间隔（秒）</label>
+                                    <label data-i18n="settings.autosave.interval">自动保存间隔（秒）</label>
                                     <input type="number" class="form-control" id="autosaveInterval" value="300" min="30" max="3600">
+                                </div>
+                                <div class="form-group mt-2">
+                                    <label data-i18n="settings.autosave.nodes">自动保存节点数量</label>
+                                    <input type="number" class="form-control" id="autosaveMaxNodes" value="3" min="1" max="50">
+                                </div>
+                                <div class="form-group mt-2">
+                                    <label data-i18n="settings.autosave.trigger_limit">剧本触发器附件上限（字节）</label>
+                                    <input type="number" class="form-control" id="triggerMaxFileSize" value="5242880" min="1024" max="52428800">
                                 </div>
                             </div>
                             <div class="mb-4">
@@ -498,6 +551,18 @@
                                     <div class="form-check">
                                         <input type="checkbox" class="form-check-input" id="streamOutput">
                                         <label class="form-check-label" for="streamOutput">启用 AI 流式输出</label>
+                                    </div>
+                                </div>
+                                <div class="form-group mt-2">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="scenarioImportStreamOutput" checked>
+                                        <label class="form-check-label" for="scenarioImportStreamOutput">剧本导入默认启用流式请求</label>
+                                    </div>
+                                </div>
+                                <div class="form-group mt-2">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="showAIHints" checked>
+                                        <label class="form-check-label" for="showAIHints">允许 KP 在回复中提供提示</label>
                                     </div>
                                 </div>
                                 <div class="form-group mt-2">
@@ -520,6 +585,22 @@
                         
                         <!-- 模型设置内容 -->
                         <div id="model-settings-content" class="settings-content">
+                            <section class="tool-panel mb-4" id="aiDebugSettings">
+                                <div class="tool-panel-header">
+                                    <h4>AI 调试模式</h4>
+                                    <span>仅保留工具调用相关提示词</span>
+                                </div>
+                                <div class="form-check mb-3">
+                                    <input type="checkbox" class="form-check-input" id="debugMode">
+                                    <label class="form-check-label" for="debugMode">启用 AI 调试模式</label>
+                                </div>
+                                <label class="form-label" for="debugKpPrompt">调试 KP 提示词</label>
+                                <textarea class="form-control" id="debugKpPrompt" rows="8" placeholder="输入仅用于测试 function calling 的 KP 提示词"></textarea>
+                                <button class="btn btn-primary mt-3" id="saveDebugKpPrompt" type="button">
+                                    <i class="fa fa-save" aria-hidden="true"></i> 保存调试提示词
+                                </button>
+                                <div class="settings-message" id="debugPromptMessage" aria-live="polite"></div>
+                            </section>
                             <div class="role-config-settings">
                                 <div class="role-config-header">
                                     <div>
@@ -596,15 +677,32 @@
                                 </div>
                                 <div class="form-group">
                                     <label for="maxCardsPerUser">普通用户角色卡数量上限</label>
-                                    <input type="number" class="form-control" id="maxCardsPerUser" min="1" max="999" value="5">
-                                    <small class="text-muted">默认 5 张。管理员和 OWNER 不受该数量限制。</small>
+                                    <input type="number" class="form-control" id="maxCardsPerUser" min="1" max="999" value="3">
+                                    <small class="text-muted">默认 3 张。管理员和 OWNER 不受该数量限制。</small>
                                 </div>
                                 <div class="form-group">
                                     <label for="weaponSlotCount">默认武器栏位数量</label>
                                     <input type="number" class="form-control" id="weaponSlotCount" min="1" max="20" value="5">
                                     <small class="text-muted">默认 5 个。新建或打开角色卡时会补足武器表格行数。</small>
                                 </div>
+                                <div class="form-group mt-2">
+                                    <label class="form-check-label" for="allowSkillBaseEdit">
+                                        <input type="checkbox" class="form-check-input me-2" id="allowSkillBaseEdit">
+                                        允许导入时保留技能基础值
+                                    </label>
+                                    <small class="text-muted">关闭后，技能基础值以职业文件和技能目录为准。</small>
+                                </div>
                             </div>
+                            <section class="tool-panel mb-4" id="aiTokenDashboard">
+                                <div class="tool-panel-header">
+                                    <h4>每日 AI Token 用量</h4>
+                                    <button class="btn btn-sm btn-secondary" type="button" id="refreshAITokenDashboard">刷新</button>
+                                </div>
+                                <p class="text-muted" id="aiTokenDashboardDate"></p>
+                                <div class="table-responsive">
+                                    <table class="table table-sm"><thead><tr><th>AI 角色</th><th>请求数</th><th>输入</th><th>输出</th><th>总计</th><th>缓存命中率</th></tr></thead><tbody id="aiTokenDashboardBody"><tr><td colspan="6" class="text-muted">加载中…</td></tr></tbody></table>
+                                </div>
+                            </section>
                             <div class="character-roll-settings-grid" aria-label="属性随机生成公式">
                                 <label>力量 STR<input type="text" class="form-control" id="attributeRollSTR" placeholder="3d6x5"></label>
                                 <label>敏捷 DEX<input type="text" class="form-control" id="attributeRollDEX" placeholder="3d6x5"></label>
@@ -635,6 +733,40 @@
                                 </div>
                                 <div class="permission-matrix" id="permissionMatrix" aria-live="polite"></div>
                                 <div class="settings-message" id="permissionConfigMessage" aria-live="polite"></div>
+                            </section>
+                        </div>
+
+                        <div id="users-settings-content" class="settings-content" data-admin-only="true">
+                            <section class="permission-settings-panel user-management-panel">
+                                <div class="permission-settings-header">
+                                    <div>
+                                        <h4>用户管理</h4>
+                                        <p class="text-muted">查看全站用户、在线状态与登录信息，并可直接模拟登录到指定账号。</p>
+                                    </div>
+                                    <button class="btn btn-primary" id="refreshUserManagement" type="button">
+                                        <i class="fa fa-refresh" aria-hidden="true"></i> 刷新列表
+                                    </button>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm align-middle user-management-table mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>用户名</th>
+                                                <th>邮箱</th>
+                                                <th>角色</th>
+                                                <th>状态</th>
+                                                <th>在线情况</th>
+                                                <th>注册时间</th>
+                                                <th>最近登录</th>
+                                                <th class="text-end">操作</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="userManagementList">
+                                            <tr><td colspan="8" class="text-muted">正在加载用户信息...</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="settings-message" id="userManagementMessage" aria-live="polite"></div>
                             </section>
                         </div>
                         

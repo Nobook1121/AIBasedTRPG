@@ -498,15 +498,18 @@ class UserService:
             rows = connection.execute(
                 """
                 SELECT
-                    id,
-                    username,
-                    email,
-                    role,
-                    status,
-                    created_at,
-                    last_login_at
+                    users.id AS id,
+                    users.username AS username,
+                    users.email AS email,
+                    users.role AS role,
+                    users.status AS status,
+                    COALESCE(user_profiles.presence, 'online') AS presence,
+                    users.created_at AS created_at,
+                    users.last_login_at AS last_login_at
                 FROM users
-                ORDER BY id
+                LEFT JOIN user_profiles
+                    ON user_profiles.user_id = users.id
+                ORDER BY users.id
                 """
             ).fetchall()
 
@@ -653,6 +656,7 @@ def _admin_user_payload(row: sqlite3.Row) -> dict[str, Any]:
         "email": row["email"],
         "role": row["role"],
         "status": row["status"],
+        "presence": row["presence"],
         "created_at": row["created_at"],
         "last_login": row["last_login_at"],
     }

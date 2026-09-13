@@ -6,6 +6,7 @@ interface ConfigManager {
     getSection(configName: string, section: string): TomlConfig | null;
     applyGeneralSettings(): void;
     initThemeSystem(): void;
+    getEffectiveTheme(): string;
     applyTheme(): void;
 }
 

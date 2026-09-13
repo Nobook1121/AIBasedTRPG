@@ -5,7 +5,18 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any
 
-SENSITIVE_KEYS = {"api_key", "auth_token", "token", "password", "secret", "secret_key"}
+SENSITIVE_KEYS = {
+    "api_key",
+    "api-key",
+    "authorization",
+    "cookie",
+    "set-cookie",
+    "auth_token",
+    "token",
+    "password",
+    "secret",
+    "secret_key",
+}
 MAX_LOG_VALUE_LENGTH = 200
 LEVEL_LABELS = {
     logging.WARNING: "WARN",
@@ -26,7 +37,7 @@ class CompactFormatter(logging.Formatter):
 def redact_sensitive(value: Any) -> Any:
     if isinstance(value, dict):
         return {
-            key: "***" if key.lower() in SENSITIVE_KEYS else redact_sensitive(item)
+            key: "***" if str(key).lower() in SENSITIVE_KEYS else redact_sensitive(item)
             for key, item in value.items()
         }
     if isinstance(value, list):
@@ -72,7 +83,7 @@ def configure_logging(log_dir: str | Path = "logs") -> None:
     started_at = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_path = Path(log_dir) / f"ai_trpg_{started_at}.log"
 
-    formatter = CompactFormatter("[%(asctime)s][%(levelname)s][%(name)s] %(message)s")
+    formatter = CompactFormatter("[%(asctime)s][%(levelname)s][%(threadName)s] %(message)s")
 
     file_handler = RotatingFileHandler(
         log_path,

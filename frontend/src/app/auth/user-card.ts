@@ -17,6 +17,17 @@ namespace AuthModule {
         popover?.setAttribute("aria-hidden", "true");
     }
 
+    export function closeUserCardOnOutsideClick(): void {
+        document.addEventListener("click", (event) => {
+            const target = event.target as Node | null;
+            const popover = document.getElementById("user-card-popover");
+            const trigger = document.getElementById("userInfo");
+            if (!target || !popover?.classList.contains("open")) return;
+            if (popover.contains(target) || trigger?.contains(target)) return;
+            closeUserCard();
+        });
+    }
+
     export async function logout(): Promise<void> {
         try {
             await TrpgApi.post<ApiResponse>("/api/auth/logout");
@@ -26,6 +37,7 @@ namespace AuthModule {
         window.disconnectSocket?.();
         window.clearCurrentRoom?.();
         window.clearChatMessages?.();
+        window.clearCharacterManagement?.();
         setCurrentUser(null);
         closeUserCard();
         closeProfileDialog();
@@ -36,5 +48,15 @@ namespace AuthModule {
 
     export async function switchAccount(): Promise<void> {
         await logout();
+    }
+
+    export async function stopImpersonation(): Promise<void> {
+        try {
+            await TrpgApi.post<ApiResponse>("/api/auth/impersonation/stop");
+            window.location.reload();
+        } catch (error) {
+            console.error("退出模拟失败:", error);
+            showNotification("退出模拟失败", "error");
+        }
     }
 }

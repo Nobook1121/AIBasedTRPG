@@ -208,6 +208,9 @@
 
 .settings-content.active {
     display: block;
+    max-height: calc(100vh - 210px);
+    overflow-y: auto;
+    padding-right: 8px;
 }
 
 /* 关于应用样式 */
@@ -304,9 +307,43 @@
 
 /* AI平台管理样式 */
 #model-settings-content.active {
-    max-height: calc(100vh - 150px);
-    overflow-y: auto;
+    max-height: calc(100vh - 210px);
     padding-right: 8px;
+}
+
+.settings-pending-save-bar {
+    position: sticky;
+    bottom: 12px;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background: var(--color-panel);
+    box-shadow: var(--shadow-md);
+}
+
+.settings-pending-save-bar[hidden] {
+    display: none;
+}
+
+.setting-dirty {
+    position: relative;
+}
+
+.setting-dirty::before {
+    content: "";
+    position: absolute;
+    left: -12px;
+    top: 0.7rem;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #f4c542;
 }
 
 .role-config-settings {
@@ -464,6 +501,40 @@
     color: var(--color-text);
 }
 
+.user-management-panel {
+    gap: 14px;
+}
+
+.user-management-table {
+    --bs-table-bg: transparent;
+    --bs-table-color: var(--color-text);
+    --bs-table-striped-bg: transparent;
+    --bs-table-hover-bg: color-mix(in srgb, var(--color-primary) 7%, transparent);
+    margin-bottom: 0;
+    color: var(--color-text);
+    background: var(--color-panel);
+    border-color: var(--border-subtle);
+}
+
+.user-management-table thead th {
+    color: var(--color-text);
+    background: var(--color-panel-muted);
+    border-color: var(--border-subtle);
+    white-space: nowrap;
+}
+
+.user-management-table tbody td {
+    color: var(--color-text);
+    border-color: var(--border-subtle);
+}
+
+.user-management-actions {
+    display: inline-flex;
+    gap: 8px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+}
+
 .permission-role-list {
     display: flex;
     flex-wrap: wrap;
@@ -483,6 +554,19 @@
     background: var(--color-panel-muted);
     font-size: 0.78rem;
     font-weight: 800;
+}
+
+.settings-message {
+    color: var(--color-text-muted);
+    font-size: 0.92rem;
+}
+
+.settings-message.success {
+    color: var(--color-success);
+}
+
+.settings-message.error {
+    color: var(--color-danger);
 }
 
 .ai-platforms-container {

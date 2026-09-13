@@ -1,3 +1,4 @@
+import secrets
 from functools import wraps
 from pathlib import Path, PurePosixPath
 from urllib.parse import quote
@@ -10,6 +11,9 @@ from trpg_server.responses import error_response
 
 ACTIVE_SESSION_REGISTRY_KEY = "ACTIVE_USER_SESSIONS"
 SESSION_TOKEN_KEY = "session_token"
+CSRF_SESSION_KEY = "csrf_token"
+IMPERSONATION_SESSION_PREFIX = "impersonation:"
+CSRF_EXEMPT_PATHS = {"/api/auth/login", "/api/auth/register"}
 WINDOWS_RESERVED_FILENAMES = {
     "CON",
     "PRN",
@@ -90,7 +94,14 @@ def clear_session_token(user_id, token):
         active_sessions.pop(user_key, None)
 
 
+def is_socket_user_online(user_id):
+    active_sockets = current_app.config.setdefault("ACTIVE_SOCKET_SESSIONS", {})
+    return str(user_id) in active_sockets
+
+
 def _is_session_current(manager, user_id, token):
+    if token and str(token).startswith(IMPERSONATION_SESSION_PREFIX):
+        return bool(session.get("impersonation_mode"))
     if hasattr(manager, "is_session_current"):
         return manager.is_session_current(user_id, token)
 
@@ -104,7 +115,7 @@ def register_session_guard(app):
     def _enforce_single_session():
         if not request.path.startswith("/api/"):
             return None
-        if request.path in {"/api/auth/login", "/api/auth/register"}:
+        if request.path in CSRF_EXEMPT_PATHS:
             return None
         if "user_id" not in session:
             return None
@@ -117,6 +128,13 @@ def register_session_guard(app):
         ):
             session.clear()
             return error_response("Session expired", 401, "Session expired")
+        _refresh_session_user_fields(manager)
+
+        if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+            csrf_token = session.get(CSRF_SESSION_KEY)
+            request_token = request.headers.get("X-CSRF-Token", "")
+            if not csrf_token or not request_token or not secrets.compare_digest(str(csrf_token), str(request_token)):
+                return error_response("CSRF validation failed", 403, "Invalid CSRF token")
 
         return None
 
@@ -136,6 +154,7 @@ def require_permission(required_role):
             ):
                 session.clear()
                 return error_response("Session expired", 401, "Session expired")
+            _refresh_session_user_fields(manager)
 
             if not manager.check_permission(session["user_id"], required_role):
                 return error_response("Permission denied", 403, "Permission denied")
@@ -159,8 +178,19 @@ def _validate_current_session():
     ):
         session.clear()
         return None, error_response("Session expired", 401, "Session expired")
+    _refresh_session_user_fields(manager)
 
     return manager, None
+
+
+def _refresh_session_user_fields(manager) -> None:
+    if "user_id" not in session or not hasattr(manager, "get_user_by_id"):
+        return
+    user = manager.get_user_by_id(session["user_id"])
+    if not user:
+        return
+    session["username"] = user.get("username", session.get("username"))
+    session["role"] = user.get("role", session.get("role", "USER"))
 
 
 def require_permission_node(node_id):

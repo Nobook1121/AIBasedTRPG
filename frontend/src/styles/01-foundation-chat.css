@@ -378,6 +378,33 @@ body, html {
     white-space: nowrap;
 }
 
+.room-binding-table {
+    --bs-table-bg: transparent;
+    --bs-table-color: var(--color-text);
+    --bs-table-striped-bg: transparent;
+    --bs-table-hover-bg: color-mix(in srgb, var(--color-primary) 7%, transparent);
+    margin-bottom: 0;
+    color: var(--color-text);
+    background: var(--color-panel);
+    border-color: var(--border-subtle);
+}
+
+.room-binding-table thead th {
+    color: var(--color-text);
+    background: var(--color-panel-muted);
+    border-color: var(--border-subtle);
+}
+
+.room-binding-table tbody td {
+    color: var(--color-text);
+    background: transparent;
+    border-color: var(--border-subtle);
+}
+
+.room-binding-table .room-character-preview {
+    text-decoration: none;
+}
+
 /* 预览消息样式 */
 .preview-messages {
     max-height: 600px;

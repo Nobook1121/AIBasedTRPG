@@ -24,6 +24,19 @@ def test_kp_profile_gets_default_tools_when_role_has_none(tmp_path):
     assert profile.wake_words == ["@KP"]
 
 
+def test_kp_profile_can_prefer_current_prompt_file(tmp_path):
+    prompt_file = tmp_path / "kp.md"
+    prompt_file.write_text("current kp rules", encoding="utf-8")
+
+    profile = resolve_agent_profile(
+        {"id": "kp", "name": "KP", "prompt": "stale embedded rules"},
+        prompt_file=prompt_file,
+        prefer_prompt_file=True,
+    )
+
+    assert profile.prompt == "current kp rules"
+
+
 def test_non_kp_profile_defaults_to_no_tools(tmp_path):
     prompt_file = tmp_path / "kp.md"
     prompt_file.write_text("你是KP。", encoding="utf-8")
@@ -67,3 +80,13 @@ def test_ai_runtime_config_reads_stream_flag(tmp_path):
     config = load_ai_runtime_config(config_dir)
 
     assert config.stream_output is True
+
+
+def test_ai_runtime_config_reads_debug_mode(tmp_path):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "general.toml").write_text("[ai]\ndebug_mode = true\n", encoding="utf-8")
+
+    config = load_ai_runtime_config(config_dir)
+
+    assert config.debug_mode is True

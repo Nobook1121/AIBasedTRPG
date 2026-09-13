@@ -1,4 +1,6 @@
 interface Window {
+    restoreThinkingState?: () => void;
+    resumePendingAIRequest?: () => void;
     TRPG?: TrpgNamespace;
     TrpgApi: TrpgApiClient;
     TrpgDom: TrpgDomClient;
@@ -7,6 +9,7 @@ interface Window {
     ScenarioView: ScenarioViewConstructor;
     ScenarioController: { new(): unknown };
     DiceTool: DiceToolConstructor;
+    CheckTool: CheckToolConstructor;
     ToolManager: ToolManagerConstructor;
     toolManager?: ToolManager;
     currentRoom?: Room | null;
@@ -14,6 +17,7 @@ interface Window {
     currentPlatform?: string;
     currentTestingPlatform?: string;
     loadAIRoles?: () => void;
+    reloadRoleConfigs?: () => Promise<void>;
     showNotification?: (message: string, type?: string) => void;
     recordCharacterChange?: (payload: Record<string, unknown>) => Promise<unknown>;
     TrpgCookies?: TrpgCookieClient;
@@ -25,13 +29,21 @@ interface Window {
     renderChatMessages?: (messages: ChatMessage[]) => void;
     getCurrentChatMessages?: () => ChatMessage[];
     clearChatMessages?: () => void;
+    setChatReadOnly?: (readOnly: boolean) => void;
     joinSocketRoom?: (roomId: string) => void;
     leaveSocketRoom?: (roomId: string) => void;
     reconnectSocket?: () => void;
     disconnectSocket?: () => void;
     initRoomManagement?: () => void;
+    loadRoomsList?: () => Promise<void>;
     autoLoadLastRoom?: () => Promise<void>;
     clearCurrentRoom?: () => void;
+    clearCharacterManagement?: () => void;
+    reloadCharacterManagement?: () => Promise<void>;
+    switchMainTab?: (tabId: string, options?: { clearNav?: boolean }) => void;
+    refreshAdminNavigation?: () => void;
+    refreshScenarioManagement?: () => void;
+    openCreateRoomWithScenario?: (scenarioId: number) => Promise<void>;
 }
 
 declare function showNotification(message: string, type?: string): void;

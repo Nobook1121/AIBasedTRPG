@@ -1,8 +1,11 @@
 import json
 import logging
 import re
+import secrets
+import string
 import time
 import tomllib
+from pathlib import Path
 
 from flask import Blueprint, current_app, request, session
 
@@ -11,12 +14,12 @@ from trpg_server.logging_config import log_user_action, user_action_text
 from trpg_server.permission_config import is_role_allowed, permission_config_path
 from trpg_server.responses import error_response, success_response
 from trpg_server.security import normalize_filename, safe_join
-from trpg_server.settings import CHARACTERS_DIR, CONFIG_DIR, OCCUPATIONS_DIR, ROOMS_DIR, WEAPONS_DIR
+from trpg_server.settings import CHARACTER_GALLERY_DIR, CHARACTERS_DIR, CONFIG_DIR, OCCUPATIONS_DIR, ROOMS_DIR, WEAPONS_DIR
 
 bp = Blueprint("characters", __name__)
 logger = logging.getLogger(__name__)
 
-DEFAULT_MAX_CARDS_PER_USER = 5
+DEFAULT_MAX_CARDS_PER_USER = 3
 SKILL_GROUP_CATEGORIES = {
     "special": "特殊",
     "explore": "探索",
@@ -44,6 +47,10 @@ STATUS_MENTAL_FIELDS = {
 
 def _get_characters_dir():
     return current_app.config.get("CHARACTERS_DIR", CHARACTERS_DIR)
+
+
+def _get_character_gallery_dir():
+    return current_app.config.get("CHARACTER_GALLERY_DIR", CHARACTER_GALLERY_DIR)
 
 
 def _get_config_dir():
@@ -74,6 +81,12 @@ def _is_elevated():
     return is_role_allowed(session.get("role", "USER"), "characters.manage_all", config_path)
 
 
+def _can_use_permission(node_id):
+    config_dir = current_app.config.get("CONFIG_DIR")
+    config_path = current_app.config.get("PERMISSION_CONFIG_FILE") or permission_config_path(config_dir)
+    return is_role_allowed(session.get("role", "USER"), node_id, config_path)
+
+
 def _current_player_ids():
     return {str(session.get("user_id", "")), str(session.get("username", ""))}
 
@@ -83,6 +96,13 @@ def _iter_character_files():
     if not characters_dir.exists():
         return []
     return sorted(characters_dir.glob("*.json"))
+
+
+def _iter_gallery_character_files():
+    gallery_dir = _get_character_gallery_dir()
+    if not gallery_dir.exists():
+        return []
+    return sorted(gallery_dir.glob("*.json"))
 
 
 def _as_dict(value):
@@ -195,18 +215,14 @@ def _skill_to_test_item(skill):
     interest_points = _as_int(skill.get("interestPoints"), 0)
     growth_points = _as_int(skill.get("growthPoints"), 0)
     name = _as_text(skill.get("name"), "未命名技能")
-    base_key = _as_text(skill.get("baseKey") or skill.get("skillKey") or skill.get("id") or _slug(name))
     item = {
         "name": name,
-        "baseKey": base_key,
+        "base": _as_int(skill.get("base"), 0),
         "job": occupation_points,
         "interest": interest_points,
         "growth": growth_points,
         "isProfessional": bool(skill.get("occupation") or skill.get("checked")),
     }
-    for key in ("id", "skillKey", "category", "value", "checked", "specialty", "specialtyKey", "rank"):
-        if key in skill:
-            item[key] = skill.get(key)
     return item
 
 
@@ -217,12 +233,12 @@ def _skill_from_test_item(item, group_key, index):
     growth_points = _as_int(item.get("growth"), 0)
     value = _as_int(item.get("value"), legacy_base + occupation_points + interest_points + growth_points)
     name = _as_text(item.get("name"), "未命名技能")
-    base_key = _as_text(item.get("baseKey") or item.get("skillKey") or item.get("id") or _slug(name))
+    skill_key = _skill_key_from_name(name, _as_text(item.get("skillKey") or item.get("id") or _slug(name)))
     skill = {
-        "id": _as_text(item.get("id") or item.get("skillKey") or f"{_slug(name)}-{index}"),
-        "skillKey": _as_text(item.get("skillKey") or item.get("id") or ""),
-        "baseKey": base_key,
+        "id": skill_key if index == 0 else f"{skill_key}__{index + 1}",
+        "skillKey": skill_key,
         "name": name,
+        "base": legacy_base,
         "value": value,
         "category": _as_text(item.get("category") or SKILL_GROUP_CATEGORIES.get(group_key, "其他")),
         "checked": bool(item.get("checked") if "checked" in item else item.get("isProfessional")),
@@ -231,9 +247,6 @@ def _skill_from_test_item(item, group_key, index):
         "interestPoints": interest_points,
         "growthPoints": growth_points,
     }
-    for key in ("specialty", "specialtyKey", "rank"):
-        if key in item:
-            skill[key] = item.get(key)
     return skill
 
 
@@ -249,16 +262,35 @@ def _skills_from_test_groups(groups):
     skills = []
     if not isinstance(groups, dict):
         return skills
+    occurrences = {}
     for group_key, items in groups.items():
-        for index, item in enumerate(_as_list(items)):
+        for item in _as_list(items):
             if isinstance(item, dict):
-                skills.append(_skill_from_test_item(item, group_key, index))
+                name = _as_text(item.get("name"))
+                skill_key = _skill_key_from_name(name, _as_text(item.get("skillKey") or item.get("id") or _slug(name)))
+                occurrence = occurrences.get(skill_key, 0)
+                occurrences[skill_key] = occurrence + 1
+                skills.append(_skill_from_test_item(item, group_key, occurrence))
     return skills
 
 
 def _weapon_to_test_item(weapon):
+    name = _as_text(weapon.get("name")).strip()
+    if not name or name in {"选择武器", "未选择武器", "未命名武器"}:
+        return {
+            "name": "",
+            "skill": "",
+            "damage": "",
+            "range": "",
+            "round": "",
+            "tho": "",
+            "num": "",
+            "err": "",
+            "weight": "",
+            "note": "",
+        }
     item = {
-        "name": _as_text(weapon.get("name")),
+        "name": name,
         "skill": _as_text(weapon.get("skill")),
         "damage": _as_text(weapon.get("damage")),
         "range": _as_text(weapon.get("range")),
@@ -269,24 +301,33 @@ def _weapon_to_test_item(weapon):
         "weight": _as_text(weapon.get("weight")),
         "note": _as_text(weapon.get("note")),
     }
-    for key in ("skillKey", "specialtyKey", "impale", "attacks", "ammo", "malfunction"):
-        if key in weapon:
-            item[key] = weapon.get(key)
     return item
 
 
 def _weapon_from_test_item(weapon):
+    name = _as_text(weapon.get("name"), "").strip()
+    if not name or name in {"选择武器", "未选择武器", "未命名武器"}:
+        return {
+            "name": "",
+            "skill": "",
+            "damage": "",
+            "range": "",
+            "attacks": "",
+            "ammo": "",
+            "malfunction": "",
+            "weight": "",
+            "note": "",
+        }
     return {
-        "name": _as_text(weapon.get("name"), "未命名武器"),
-        "skill": _as_text(weapon.get("skill"), "格斗(斗殴)"),
-        "skillKey": _as_text(weapon.get("skillKey")),
-        "specialtyKey": _as_text(weapon.get("specialtyKey")),
-        "damage": _as_text(weapon.get("damage"), "1D3"),
-        "range": _as_text(weapon.get("range"), "接触"),
-        "impale": weapon.get("impale") if isinstance(weapon.get("impale"), bool) else None,
-        "attacks": _as_text(weapon.get("attacks") or weapon.get("round"), "1"),
-        "ammo": _as_text(weapon.get("ammo") or weapon.get("num"), "N/A"),
-        "malfunction": _as_text(weapon.get("malfunction") or weapon.get("err"), "N/A"),
+        "name": name,
+        "skill": _as_text(weapon.get("skill"), ""),
+        "damage": _as_text(weapon.get("damage"), ""),
+        "range": _as_text(weapon.get("range"), ""),
+        "attacks": _as_text(weapon.get("attacks") or weapon.get("round"), ""),
+        "ammo": _as_text(weapon.get("ammo") or weapon.get("num"), ""),
+        "malfunction": _as_text(weapon.get("malfunction") or weapon.get("err"), ""),
+        "weight": _as_text(weapon.get("weight"), ""),
+        "note": _as_text(weapon.get("note"), ""),
     }
 
 
@@ -298,6 +339,9 @@ def _runtime_to_test_character(character):
     now_text = _as_text(character.get("updatedAt") or character.get("createdAt"))
     return {
         "id": _as_text(character.get("id")),
+        "public_id": _as_text(character.get("public_id")),
+        "publisher_id": character.get("publisher_id"),
+        "publisher_name": _as_text(character.get("publisher_name")),
         "name": _as_text(character.get("name")),
         "playerId": _as_text(character.get("playerId")),
         "playerName": _as_text(character.get("playerName")),
@@ -408,6 +452,9 @@ def _test_character_to_runtime(character, fallback_id=""):
     age = _as_int(character.get("age"), _as_int(attributes.get("age"), 25))
     return {
         "id": _as_text(character.get("id") or fallback_id),
+        "public_id": _as_text(character.get("public_id")),
+        "publisher_id": character.get("publisher_id"),
+        "publisher_name": _as_text(character.get("publisher_name")),
         "name": _as_text(character.get("name"), "未命名角色卡"),
         "playerId": _as_text(character.get("playerId") or character.get("playerName")),
         "playerName": _as_text(character.get("playerName")),
@@ -518,7 +565,27 @@ def _iter_builtin_weapon_files():
 
 
 def _skill_catalog_path():
-    return _get_config_dir() / "character_skills.json"
+    try:
+        config_dir = _get_config_dir()
+    except RuntimeError:
+        config_dir = CONFIG_DIR
+    return config_dir / "character_skills.json"
+
+
+def _skill_key_from_name(name, fallback=""):
+    catalog = read_json(_skill_catalog_path(), default={})
+    if not isinstance(catalog, dict):
+        return fallback
+    skills = catalog.get("skills")
+    if not isinstance(skills, list):
+        return fallback
+    locales = catalog.get("locales")
+    default_locale = _as_text(catalog.get("defaultLocale"), "zh-CN")
+    labels = locales.get(default_locale) if isinstance(locales, dict) else {}
+    if not isinstance(labels, dict):
+        labels = {}
+    lookup = {str(value): str(item.get("key") or "") for item in skills if isinstance(item, dict) for value in [labels.get(_as_text(item.get("labelKey"))), item.get("key")]}
+    return _as_text(lookup.get(str(name)), fallback)
 
 
 def _max_cards_per_user():
@@ -553,6 +620,47 @@ def _character_filename(character_id):
     return normalize_filename(f"{character_id or f'investigator-{int(time.time() * 1000)}'}.json")
 
 
+def _short_public_id(existing_ids):
+    alphabet = string.ascii_letters + string.digits
+    for _ in range(200):
+        value = "".join(secrets.choice(alphabet) for _ in range(6))
+        if value not in existing_ids:
+            return value
+    raise RuntimeError("Failed to generate unique public id")
+
+
+def _is_short_public_id(value):
+    return bool(re.fullmatch(r"[A-Za-z0-9]{6}", str(value or "")))
+
+
+def _gallery_public_ids(excluded_path=None):
+    ids = set()
+    for path in _iter_gallery_character_files():
+        if excluded_path and Path(path) == Path(excluded_path):
+            continue
+        data = read_json(path, default={})
+        if isinstance(data, dict) and data.get("public_id"):
+            ids.add(str(data["public_id"]))
+    return ids
+
+
+def _gallery_character_filename(public_id):
+    return normalize_filename(f"{public_id}.json")
+
+
+def _gallery_character_path(public_id):
+    return safe_join(_get_character_gallery_dir(), _gallery_character_filename(public_id))
+
+
+def _can_modify_gallery_character(character, permission_node):
+    if _is_elevated() or (
+        session.get("role") in {"ADMIN", "OWNER"}
+        and _can_use_permission(permission_node)
+    ):
+        return True
+    return str(character.get("publisher_id") or "") == str(session.get("user_id") or "")
+
+
 def _character_path(character_id):
     return safe_join(_get_characters_dir(), _character_filename(character_id))
 
@@ -568,7 +676,7 @@ def _can_access_character(character):
     if _is_elevated():
         return True
     player_id = str(character.get("playerId") or "")
-    return not player_id or player_id in _current_player_ids()
+    return bool(player_id) and player_id in _current_player_ids()
 
 
 def _normalize_character_payload(payload, existing=None):
@@ -646,6 +754,30 @@ def _sync_room_character_snapshots(character):
             write_json_atomic(info_path, info)
 
 
+def _unbind_deleted_character_from_rooms(character_id):
+    """Remove stale room snapshots when a character card is deleted."""
+    character_id = str(character_id or "")
+    if not character_id:
+        return
+    for info_path in _iter_room_info_files():
+        info = read_json(info_path, default={})
+        members = info.get("members") if isinstance(info, dict) else None
+        if not isinstance(members, list):
+            continue
+        changed = False
+        for member in members:
+            if not isinstance(member, dict):
+                continue
+            card = member.get("character_card")
+            if isinstance(card, dict) and str(card.get("id") or "") == character_id:
+                member.pop("character_card", None)
+                member.pop("character_state", None)
+                changed = True
+        if changed:
+            info["updated_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+            write_json_atomic(info_path, info)
+
+
 @bp.route("/api/character-catalogs/occupations", methods=["GET"])
 def list_builtin_occupations():
     login_error = _require_login()
@@ -711,6 +843,133 @@ def list_characters():
     return success_response(characters, "Characters loaded successfully")
 
 
+@bp.route("/api/character-gallery", methods=["GET"])
+def list_character_gallery():
+    login_error = _require_login()
+    if login_error:
+        return login_error
+
+    gallery = []
+    public_ids = set()
+    for path in _iter_gallery_character_files():
+        character = _character_from_storage(read_json(path, default=None), path.stem)
+        if character:
+            public_id = str(character.get("public_id") or "")
+            if not _is_short_public_id(public_id) or public_id in public_ids:
+                public_id = _short_public_id(public_ids)
+                character["id"] = public_id
+                character["public_id"] = public_id
+                stored = _runtime_to_test_character(character) | {
+                    "public_id": public_id,
+                    "publisher_id": character.get("publisher_id"),
+                    "publisher_name": character.get("publisher_name", ""),
+                }
+                write_json_atomic(path, stored)
+            else:
+                character["id"] = public_id
+            public_ids.add(public_id)
+            gallery.append(character)
+    gallery.sort(key=lambda item: item.get("updatedAt") or item.get("createdAt") or "", reverse=True)
+    return success_response(gallery, "Character gallery loaded successfully")
+
+
+@bp.route("/api/character-gallery", methods=["POST"])
+def publish_character_gallery():
+    login_error = _require_login()
+    if login_error:
+        return login_error
+    if not _can_use_permission("characters.gallery.publish"):
+        return error_response("Permission denied", 403, "Permission denied")
+
+    payload = request.get_json(silent=True) or {}
+    if _is_test_character_shape(payload):
+        payload = _test_character_to_runtime(payload)
+    character = _normalize_character_payload(payload)
+    if character is None:
+        return error_response("Invalid character card", 400, "Invalid character card")
+
+    now = time.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    public_id = _short_public_id(_gallery_public_ids())
+    character["id"] = public_id
+    character["public_id"] = public_id
+    character["publisher_id"] = session.get("user_id")
+    character["publisher_name"] = session.get("username")
+    character["createdAt"] = character.get("createdAt") or now
+    character["updatedAt"] = now
+
+    path = _gallery_character_path(public_id)
+    write_json_atomic(path, _runtime_to_test_character(character) | {
+        "public_id": public_id,
+        "publisher_id": character["publisher_id"],
+        "publisher_name": character["publisher_name"],
+    })
+    log_user_action(
+        logger,
+        user_action_text(session.get("username"), "发布了角色卡到广场"),
+        用户ID=session.get("user_id"),
+        角色卡ID=public_id,
+        角色名=character["name"],
+    )
+    return success_response(character, "Character published successfully", 201)
+
+
+@bp.route("/api/character-gallery/<public_id>", methods=["PUT"])
+def update_character_gallery(public_id):
+    login_error = _require_login()
+    if login_error:
+        return login_error
+    if not _can_use_permission("characters.gallery.edit"):
+        return error_response("Permission denied", 403, "Permission denied")
+
+    path = _gallery_character_path(public_id)
+    if not path.exists():
+        return error_response("Character gallery card not found", 404, "Not found")
+    existing = _character_from_storage(read_json(path, default={}), public_id)
+    if not existing or not _can_modify_gallery_character(existing, "characters.gallery.edit"):
+        return error_response("Permission denied", 403, "Permission denied")
+
+    payload = request.get_json(silent=True) or {}
+    if _is_test_character_shape(payload):
+        payload = _test_character_to_runtime(payload, public_id)
+    character = _normalize_character_payload(payload, existing=existing)
+    if character is None:
+        return error_response("Invalid character card", 400, "Invalid character card")
+
+    character["id"] = str(public_id)
+    character["public_id"] = str(public_id)
+    character["publisher_id"] = existing.get("publisher_id")
+    character["publisher_name"] = existing.get("publisher_name")
+    character["createdAt"] = existing.get("createdAt") or character.get("createdAt")
+    stored = _runtime_to_test_character(character) | {
+        "public_id": public_id,
+        "publisher_id": character["publisher_id"],
+        "publisher_name": character["publisher_name"],
+    }
+    write_json_atomic(path, stored)
+    log_user_action(logger, user_action_text(session.get("username"), "更新了角色卡广场内容"), 角色卡ID=public_id)
+    return success_response(character, "Character gallery card updated successfully")
+
+
+@bp.route("/api/character-gallery/<public_id>", methods=["DELETE"])
+def delete_character_gallery(public_id):
+    login_error = _require_login()
+    if login_error:
+        return login_error
+    if not _can_use_permission("characters.gallery.delete"):
+        return error_response("Permission denied", 403, "Permission denied")
+
+    path = _gallery_character_path(public_id)
+    if not path.exists():
+        return error_response("Character gallery card not found", 404, "Not found")
+    existing = _character_from_storage(read_json(path, default={}), public_id)
+    if not existing or not _can_modify_gallery_character(existing, "characters.gallery.delete"):
+        return error_response("Permission denied", 403, "Permission denied")
+
+    path.unlink()
+    log_user_action(logger, user_action_text(session.get("username"), "删除了角色卡广场内容"), 角色卡ID=public_id)
+    return success_response(message="Character gallery card deleted successfully")
+
+
 @bp.route("/api/characters/<character_id>", methods=["PUT"])
 def save_character(character_id):
     login_error = _require_login()
@@ -759,6 +1018,7 @@ def delete_character(character_id):
     character = _character_from_storage(read_json(path, default={}), character_id) or {}
     if character and not _can_access_character(character):
         return error_response("Permission denied", 403, "Permission denied")
+    _unbind_deleted_character_from_rooms(character_id)
     path.unlink()
     log_user_action(
         logger,

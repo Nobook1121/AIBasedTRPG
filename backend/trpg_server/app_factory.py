@@ -8,7 +8,7 @@ import sqlite3
 from trpg_server.logging_config import configure_logging
 from trpg_server.security import register_session_guard
 from trpg_server.socket_events import register_socket_events
-from trpg_server.settings import LOGS_DIR, SECRET_KEY, USERS_DIR, WEAPONS_DIR
+from trpg_server.settings import LOGS_DIR, SECRET_KEY, SESSION_COOKIE_SECURE, USERS_DIR, WEAPONS_DIR
 from trpg_server.users.database import UserDatabase
 from trpg_server.users.migrations import migrate_json_users
 from trpg_server.users.service import UserService
@@ -23,6 +23,7 @@ def create_app(config=None):
     app.config.update(
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
+        SESSION_COOKIE_SECURE=SESSION_COOKIE_SECURE,
         PERMANENT_SESSION_LIFETIME=timedelta(days=7),
         MAX_CONTENT_LENGTH=4 * 1024 * 1024,
         USER_DATABASE_FILE=USERS_DIR / "users.sqlite3",
@@ -33,7 +34,8 @@ def create_app(config=None):
     if config:
         app.config.update(config)
     configure_logging(app.config.get("LOGS_DIR", LOGS_DIR))
-    _configure_user_service(app)
+    if "USER_MANAGER" not in app.config:
+        _configure_user_service(app)
     CORS(app)
     socketio.init_app(app)
     register_session_guard(app)
@@ -65,6 +67,7 @@ def register_blueprints(app):
     from trpg_server.routes.pages import bp as pages_bp
     from trpg_server.routes.rooms import bp as rooms_bp
     from trpg_server.routes.scenarios import bp as scenarios_bp
+    from trpg_server.routes.telemetry import bp as telemetry_bp
     from trpg_server.routes.users import bp as users_bp
 
     app.register_blueprint(assets_bp)
@@ -77,3 +80,4 @@ def register_blueprints(app):
     app.register_blueprint(rooms_bp)
     app.register_blueprint(network_bp)
     app.register_blueprint(pages_bp)
+    app.register_blueprint(telemetry_bp)

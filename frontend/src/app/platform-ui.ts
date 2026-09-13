@@ -1,14 +1,20 @@
-interface RoleConfig {
+﻿interface RoleConfig {
     id: string;
     name: string;
+    avatar?: string;
     wake_words?: string[];
     provider?: string;
     prompt?: string;
+    description?: string;
 }
 
 interface RoleConfigResponse {
     roles: RoleConfig[];
     enabled_providers: Array<{ id: string; name: string }>;
+}
+
+interface DebugPromptResponse {
+    content: string;
 }
 
 async function initAIPlatforms(): Promise<void> {
@@ -17,7 +23,8 @@ async function initAIPlatforms(): Promise<void> {
         renderPlatforms(platforms);
         bindRoleConfigSettings();
         await loadRoleConfigs();
-        bindCustomProviderEvents();
+        await loadDebugPrompt();
+        bindDebugPromptSettings();
         bindAddModelEvents();
         bindAPITestEvents();
         console.log("AI 平台管理初始化完成");
@@ -63,6 +70,53 @@ async function loadRoleConfigs(): Promise<void> {
     }
 }
 
+window.reloadRoleConfigs = loadRoleConfigs;
+
+async function loadDebugPrompt(): Promise<void> {
+    const prompt = document.getElementById("debugKpPrompt") as HTMLTextAreaElement | null;
+    const mode = document.getElementById("debugMode") as HTMLInputElement | null;
+    if (!prompt || !mode) return;
+
+    try {
+        const response = await TrpgApi.get<ApiResponse<DebugPromptResponse>>("/api/config/debug-prompt");
+        if (response.success && response.data) prompt.value = response.data.content || "";
+        mode.checked = configManager.get<boolean>("general", "ai", "debug_mode", false);
+    } catch (error) {
+        console.error("Failed to load AI debug prompt:", error);
+        setDebugPromptMessage("调试提示词加载失败", true);
+    }
+}
+
+function bindDebugPromptSettings(): void {
+    const saveButton = document.getElementById("saveDebugKpPrompt");
+    if (!saveButton || saveButton.dataset.bound === "true") return;
+    saveButton.dataset.bound = "true";
+    saveButton.addEventListener("click", () => void saveDebugPrompt());
+}
+
+async function saveDebugPrompt(): Promise<void> {
+    const prompt = document.getElementById("debugKpPrompt") as HTMLTextAreaElement | null;
+    if (!prompt || !prompt.value.trim()) {
+        setDebugPromptMessage("调试提示词不能为空", true);
+        return;
+    }
+
+    try {
+        const response = await TrpgApi.post<ApiResponse>("/api/config/debug-prompt", { content: prompt.value });
+        if (!response.success) throw new Error(response.error || response.message || "保存调试提示词失败");
+        setDebugPromptMessage("调试提示词已保存");
+    } catch (error) {
+        setDebugPromptMessage(platformErrorMessage(error), true);
+    }
+}
+
+function setDebugPromptMessage(message: string, isError = false): void {
+    const element = document.getElementById("debugPromptMessage");
+    if (!element) return;
+    element.textContent = message;
+    element.className = `settings-message${isError ? " error" : " success"}`;
+}
+
 function renderRoleConfigCards(roles: RoleConfig[], providers: Array<{ id: string; name: string }>): void {
     const list = document.getElementById("roleConfigList");
     if (!list) return;
@@ -89,6 +143,12 @@ function renderRoleConfigCards(roles: RoleConfig[], providers: Array<{ id: strin
                         <i class="fa fa-floppy-o" aria-hidden="true"></i> 保存
                     </button>
                 </div>
+                <label class="form-label" for="roleDescription-${platformEscapeHtml(role.id)}">角色说明</label>
+                <input class="form-control role-description-input" id="roleDescription-${platformEscapeHtml(role.id)}" value="${platformEscapeHtml(role.description || "")}" placeholder="例如：模块摘要、调试 KP 或检定助手">
+                <label class="form-label" for="roleName-${platformEscapeHtml(role.id)}">角色名称</label>
+                <input class="form-control role-name-input" id="roleName-${platformEscapeHtml(role.id)}" value="${platformEscapeHtml(role.name)}" placeholder="KP">
+                <label class="form-label" for="roleAvatar-${platformEscapeHtml(role.id)}">头像 URL</label>
+                <input class="form-control role-avatar-input" id="roleAvatar-${platformEscapeHtml(role.id)}" value="${platformEscapeHtml(role.avatar || "")}" placeholder="/assets/avatars/default_kp.jpg">
                 <label class="form-label" for="roleWakeWords-${platformEscapeHtml(role.id)}">唤醒词</label>
                 <input class="form-control role-wake-input" id="roleWakeWords-${platformEscapeHtml(role.id)}" value="${platformEscapeHtml(wakeWords)}" placeholder="@KP, @Keeper">
                 <label class="form-label" for="roleProvider-${platformEscapeHtml(role.id)}">大模型提供商</label>
@@ -111,10 +171,15 @@ async function saveRoleConfig(roleId: string): Promise<void> {
         .filter(Boolean);
     const provider = card.querySelector<HTMLSelectElement>(".role-provider-select")?.value || "";
     const prompt = card.querySelector<HTMLTextAreaElement>(".role-config-prompt")?.value || "";
+    const name = card.querySelector<HTMLInputElement>(".role-name-input")?.value.trim() || roleId;
+    const avatar = card.querySelector<HTMLInputElement>(".role-avatar-input")?.value.trim() || "/assets/avatars/default_kp.jpg";
+    const description = card.querySelector<HTMLInputElement>(".role-description-input")?.value.trim() || "";
 
     try {
         const response = await TrpgApi.post<ApiResponse>(`/api/config/roles/${encodeURIComponent(roleId)}`, {
-            name: card.querySelector(".role-config-card-title")?.textContent || roleId,
+            name,
+            avatar,
+            description,
             wake_words: wakeWords,
             provider,
             prompt,
@@ -222,7 +287,7 @@ function buildPlatformConfigHTML(platform: AIPlatformConfig): string {
             <div class="form-group">
                 <label for="modal-api-key-${platformEscapeHtml(platform.platform)}">API Key ${helpIcon("填写服务商的访问令牌。AnythingLLM 可在实例的 API Key 设置中生成。")}</label>
                 <div class="password-input-group">
-                    <input type="password" class="form-control api-key-input" id="modal-api-key-${platformEscapeHtml(platform.platform)}" value="${platformEscapeHtml(platform.config.api_key || "")}" placeholder="填写服务商 API Key">
+                    <input type="password" class="form-control api-key-input" id="modal-api-key-${platformEscapeHtml(platform.platform)}" value="" autocomplete="new-password" placeholder="输入新密钥">
                     <span class="password-toggle" data-target="modal-api-key-${platformEscapeHtml(platform.platform)}"><i class="bi bi-eye"></i></span>
                 </div>
             </div>
@@ -382,14 +447,13 @@ function bindPlatformSave(platform: AIPlatformConfig): void {
         const timeout = document.getElementById(`modal-timeout-${platform.platform}`) as HTMLInputElement | null;
         if (!apiFormat || !apiKey || !baseUrl || !endpointUrl || !timeout) return;
 
-        platform.api_format = apiFormat.value as NonNullable<AIPlatformConfig["api_format"]>;
-        platform.config.api_key = apiKey.value.trim();
-        platform.config.base_url = baseUrl.value.trim();
-        if (endpointUrl.value.trim()) {
-            platform.config.endpoint_url = endpointUrl.value.trim();
+        const apiKeyValue = apiKey.value.trim();
+        if (apiKeyValue) {
+            platform.config.api_key = apiKeyValue;
         } else {
-            delete platform.config.endpoint_url;
+            delete platform.config.api_key;
         }
+        platform.config.base_url = normalizeChatCompletionsUrl(baseUrl.value);
         platform.config.timeout = Number.parseInt(timeout.value, 10);
         if (platform.api_format === "custom") {
             try {
@@ -839,3 +903,6 @@ function platformEscapeHtml(value: unknown): string {
 function platformErrorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
 }
+
+
+

@@ -8,6 +8,7 @@ interface RoomMember {
     permission_label?: string;
     character_card?: Partial<COC7CharacterCard>;
     character_state?: CharacterRuntimeState;
+    is_online?: boolean;
 }
 
 interface CharacterRuntimeRecord {
@@ -39,6 +40,7 @@ interface Room {
     owner_id?: string | number;
     scenario_id?: number;
     scenario_title?: string;
+    invisible_view?: boolean;
     members?: RoomMember[];
     messages?: ChatMessage[];
     saves?: Array<{ filename: string; title?: string; created_at?: string }>;

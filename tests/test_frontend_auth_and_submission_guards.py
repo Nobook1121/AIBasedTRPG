@@ -35,3 +35,12 @@ def test_room_write_actions_are_guarded_against_duplicate_clicks():
     assert 'return runRoomAction("join-room", "joinRoom", async () => {' in source
     assert 'return runRoomAction(`bind-character:${currentRoom.id}:${userId}`, "confirmRoomCharacterBind", async () => {' in source
     assert 'return runRoomAction("submit-character-record", "submitCharacterRecord", async () => {' in source
+
+
+def test_chat_input_supports_enter_to_send_message():
+    source = read_frontend_source("frontend/src/app/chat.ts")
+
+    assert 'activeChatInput.addEventListener("keydown"' in source
+    assert 'event.key === "Enter"' in source
+    assert "event.shiftKey" in source
+    assert "void sendMessage();" in source

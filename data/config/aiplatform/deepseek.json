@@ -5,7 +5,6 @@
   "icon": "/assets/aiplatform/deepseek.png",
   "enabled": false,
   "config": {
-    "api_key": "",
     "base_url": "https://api.deepseek.com/v1",
     "timeout": 30,
     "headers": {
@@ -27,6 +26,12 @@
       "doc_url": "https://platform.deepseek.com/docs/api/chat/completions"
     }
   ],
+  "small_models": {
+    "intent_classification": {"id": "deepseek-chat", "name": "DeepSeek Chat", "enabled": true},
+    "state_update": {"id": "deepseek-chat", "name": "DeepSeek Chat", "enabled": true},
+    "summarization": {"id": "deepseek-chat", "name": "DeepSeek Chat", "enabled": true},
+    "schema_repair": {"id": "deepseek-chat", "name": "DeepSeek Chat", "enabled": true}
+  },
   "auth_method": "api_key",
   "version": "1.0.0"
 }

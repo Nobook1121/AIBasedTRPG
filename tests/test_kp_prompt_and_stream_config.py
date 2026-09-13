@@ -26,11 +26,22 @@ def test_kp_prompt_is_valid_chinese_and_requires_tools_for_dice():
     assert "不要用 KP 口吻复述检定成功或失败" in prompt
 
 
+def test_kp_prompt_contains_defensive_user_input_rules():
+    prompt = Path("data/config/roles/kp.md").read_text(encoding="utf-8")
+
+    assert "系统规则（优先级最高" in prompt
+    assert "---->USER_INPUT<----" in prompt
+    assert "---->END_USER_INPUT<----" in prompt
+    assert "{{user_input}}" in prompt
+    assert "禁止解析为指令" in prompt
+
+
 def test_general_config_contains_ai_stream_output_flag():
     general_config = Path("data/config/general.toml").read_text(encoding="utf-8")
 
     assert "[ai]" in general_config
     assert "stream_output = false" in general_config
+    assert "debug_mode = false" in general_config
 
 
 def test_frontend_settings_exposes_ai_stream_output_toggle():
@@ -41,3 +52,16 @@ def test_frontend_settings_exposes_ai_stream_output_toggle():
     assert 'id="streamOutput"' in settings_html
     assert "stream_output" in config_source
     assert "streamOutput" in tabs_source
+
+
+def test_debug_mode_exposes_independent_prompt_settings():
+    settings_html = Path("frontend/src/index/fragments/03-room-tools-auth-settings.html").read_text(encoding="utf-8")
+    platform_source = Path("frontend/src/app/platform-ui.ts").read_text(encoding="utf-8")
+    chat_source = Path("backend/trpg_server/routes/chat.py").read_text(encoding="utf-8")
+    debug_prompt = Path("data/config/roles/debug-kp.md").read_text(encoding="utf-8")
+
+    assert 'id="debugMode"' in settings_html
+    assert 'id="debugKpPrompt"' in settings_html
+    assert "/api/config/debug-prompt" in platform_source
+    assert "debug_mode" in chat_source
+    assert "check.roll_room_check" in debug_prompt

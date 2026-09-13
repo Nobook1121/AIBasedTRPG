@@ -1,6 +1,5 @@
-type COC7CoreAttributeKey = "STR" | "DEX" | "SIZ" | "APP" | "CON" | "INT" | "POW" | "EDU" | "LUC";
+﻿type COC7CoreAttributeKey = "STR" | "DEX" | "SIZ" | "APP" | "CON" | "INT" | "POW" | "EDU" | "LUC";
 type COC7AttributeKey = COC7CoreAttributeKey | "AGE";
-type SkillRank = "新手" | "学习" | "熟修" | "主修";
 type SkillCategory = "特殊" | "探索" | "社交" | "战斗" | "医疗" | "运动" | "知识" | "技术" | "操纵" | "其他";
 type InvestigatorGender = "male" | "female" | "unknown";
 type NameRegion = "china" | "japan" | "korea" | "western" | "russia" | "india" | "france" | "germany" | "spain" | "italy";
@@ -25,23 +24,16 @@ interface LegacyAttributesInput extends Partial<COC7Attributes> {
 interface COC7Skill {
     id: string;
     skillKey?: string;
-    baseKey?: string;
     name: string;
     value: number;
     base: number;
     category: SkillCategory | string;
     checked: boolean;
     occupation?: boolean;
-    specialty?: string;
-    specialtyKey?: string;
+    isProfessional?: boolean;
     occupationPoints?: number;
     interestPoints?: number;
     growthPoints?: number;
-    rank?: SkillRank;
-}
-
-interface COC7SkillWithSource extends COC7Skill {
-    skillKey?: string;
 }
 
 interface SkillSpecialtyCatalogEntry {
@@ -97,6 +89,8 @@ interface COC7Weapon {
     attacks: string;
     ammo: string;
     malfunction: string;
+    weight?: string;
+    note?: string;
 }
 
 interface WeaponCatalogPayload {
@@ -208,6 +202,7 @@ interface CharacterRuleSettings {
     attributeRatioPercent: number;
     maxCardsPerUser: number;
     weaponSlotCount: number;
+    allowSkillBaseEdit: boolean;
     attributeRolls: AttributeRollFormulaMap;
 }
 
@@ -215,6 +210,7 @@ interface CharacterRuleSettingsInput {
     attributeRatioPercent?: unknown;
     maxCardsPerUser?: unknown;
     weaponSlotCount?: unknown;
+    allowSkillBaseEdit?: unknown;
     attributeRolls?: Partial<Record<COC7CoreAttributeKey, string>>;
 }
 
@@ -244,6 +240,9 @@ interface COC7SkillAllocationSummary {
 
 interface COC7CharacterCard {
     id: string;
+    public_id?: string;
+    publisher_id?: string | number | null;
+    publisher_name?: string;
     name: string;
     playerId: string;
     era: string;
@@ -286,6 +285,9 @@ interface COC7CharacterCard {
 type COC7CharacterCardInput = Partial<Omit<COC7CharacterCard, "attributes" | "gender">> & {
     attributes?: LegacyAttributesInput;
     gender?: string;
+    public_id?: string;
+    publisher_id?: string | number | null;
+    publisher_name?: string;
 };
 
 interface TestCharacterJson {
@@ -334,11 +336,11 @@ interface AttributeCheckResult {
 
 interface CharacterApi {
     ATTRIBUTE_KEYS: COC7CoreAttributeKey[];
-    SKILL_RANKS: SkillRank[];
     BASE_SKILLS: COC7Skill[];
     PRESET_OCCUPATIONS: COC7Occupation[];
     calculateHalfAndFifth: (value: number) => COC7HalfAndFifth;
     calculateAttributeDisplayValues: (value: number, ratioPercent?: number) => AttributeDisplayValues;
+    calculateAttributeBaseTotal: (attributes: COC7Attributes) => number;
     calculateMaxHp: (attributes: COC7Attributes) => number;
     calculateMaxSan: (attributes: COC7Attributes) => number;
     calculateMaxMp: (attributes: COC7Attributes) => number;
@@ -348,7 +350,6 @@ interface CharacterApi {
     calculateBuildAndDamageBonus: (attributes: Pick<COC7Attributes, "STR" | "SIZ">) => { build: number; damageBonus: string };
     calculateEquipmentLoad: (equipment: COC7EquipmentItem[]) => { totalWeight: number; totalVolume: number };
     groupSkillsByCategory: (skills: COC7Skill[]) => Record<string, number>;
-    countSkillsByRank: (skills: COC7Skill[]) => Record<SkillRank, number>;
     countSelectedOccupationSkills: (skills: COC7Skill[]) => number;
     validateOccupationSkillSelection: (card: COC7CharacterCard) => COC7SkillAllocationSummary;
     autoAllocateOccupationSkills: (card: COC7CharacterCard) => COC7CharacterCard;
@@ -362,6 +363,9 @@ interface CharacterApi {
     createCharacterCard: (input?: COC7CharacterCardInput) => COC7CharacterCard;
     listCharacterCards: () => COC7CharacterCard[];
     getCharacterCardSnapshot: (cardId: string) => Partial<COC7CharacterCard> | null;
+    renderCharacterDetail: (card: COC7CharacterCard) => string;
+    clearCharacterManagement: () => void;
+    reloadCharacterManagement: () => Promise<void>;
     initCharacterSheet: () => void;
 }
 
@@ -403,6 +407,7 @@ interface Window {
         attributeRatioPercent: 20,
         maxCardsPerUser: 5,
         weaponSlotCount: 5,
+        allowSkillBaseEdit: false,
         attributeRolls: DEFAULT_ATTRIBUTE_ROLLS
     };
     const STATUS_FIELD_IDS: Record<keyof CharacterStatusFlags, string> = {
@@ -439,7 +444,6 @@ interface Window {
         permanentInsanity: "永久疯狂",
         temporaryInsanity: "临时疯狂"
     };
-    const SKILL_RANKS: SkillRank[] = ["新手", "学习", "熟修", "主修"];
     const SKILL_FILTER_CATEGORIES: Array<SkillCategory | "全部技能"> = ["全部技能", "特殊", "探索", "社交", "战斗", "医疗", "运动", "知识", "技术", "操纵", "其他"];
     const REGIONAL_NAMES: Record<NameRegion, { family: string[]; male: string[]; female: string[]; neutral: string[]; westernOrder?: boolean }> = {
         china: {
@@ -617,30 +621,31 @@ interface Window {
 
     let SKILL_CATALOG: SkillCatalogEntry[] = [];
     let SKILL_LOCALE_MAP: Record<string, string> = {};
+    let SKILL_KEY_BY_LABEL: Record<string, string> = {};
     let BASE_SKILLS: COC7Skill[] = [
-        { id: "artCraft", skillKey: "artCraft", name: "技艺", base: 5, value: 5, category: "技术", checked: false, specialty: "写作", specialtyKey: "writing" },
+        { id: "artCraft", skillKey: "artCraft", name: "技艺", base: 5, value: 5, category: "技术", checked: false },
         { id: "history", skillKey: "history", name: "历史", base: 5, value: 5, category: "知识", checked: false },
         { id: "libraryUse", skillKey: "libraryUse", name: "图书馆使用", base: 20, value: 20, category: "探索", checked: false },
         { id: "naturalWorld", skillKey: "naturalWorld", name: "博物学", base: 10, value: 10, category: "知识", checked: false },
         { id: "occult", skillKey: "occult", name: "神秘学", base: 5, value: 5, category: "知识", checked: false },
-        { id: "languageOwn", skillKey: "languageOwn", name: "母语", base: 0, value: 0, category: "社交", checked: false, specialty: "汉语", specialtyKey: "chinese" },
-        { id: "languageOther", skillKey: "languageOther", name: "外语", base: 1, value: 1, category: "社交", checked: false, specialty: "英语", specialtyKey: "english" },
+        { id: "languageOwn", skillKey: "languageOwn", name: "母语", base: 0, value: 0, category: "社交", checked: false },
+        { id: "languageOther", skillKey: "languageOther", name: "外语", base: 1, value: 1, category: "社交", checked: false },
         { id: "psychology", skillKey: "psychology", name: "心理学", base: 10, value: 10, category: "社交", checked: false },
         { id: "creditRating", skillKey: "creditRating", name: "信用评级", base: 0, value: 0, category: "特殊", checked: false },
         { id: "cthulhuMythos", skillKey: "cthulhuMythos", name: "克苏鲁神话", base: 0, value: 0, category: "特殊", checked: false }
     ];
 
     let cards: COC7CharacterCard[] = [];
+    let galleryCards: COC7CharacterCard[] = [];
     let activeCardId = "";
-    let activeCharacterFilter = "all";
+    let activeGallerySearchTerm = "";
+    let activeGalleryEditId = "";
     let assignableUsers: CharacterAssignableUser[] = [];
     let modal: BootstrapModalInstance | null = null;
     let nameGeneratorModal: BootstrapModalInstance | null = null;
     let occupationTemplateModal: BootstrapModalInstance | null = null;
-    let skillSpecialtyModal: BootstrapModalInstance | null = null;
     let weaponPickerModal: BootstrapModalInstance | null = null;
     let pendingGeneratedName = "";
-    let pendingSkillSpecialtyTarget = "";
     let pendingWeaponPickerTarget = "";
     let activeSkillCategoryFilter = "全部技能";
     let editorSkills: COC7Skill[] = [];
@@ -697,6 +702,7 @@ interface Window {
             attributeRatioPercent: clampNumber(input?.attributeRatioPercent, 1, 100, DEFAULT_RULE_SETTINGS.attributeRatioPercent),
             maxCardsPerUser: clampNumber(input?.maxCardsPerUser, 1, 999, DEFAULT_RULE_SETTINGS.maxCardsPerUser),
             weaponSlotCount: clampNumber(input?.weaponSlotCount, 1, 20, DEFAULT_RULE_SETTINGS.weaponSlotCount),
+            allowSkillBaseEdit: Boolean(input?.allowSkillBaseEdit ?? DEFAULT_RULE_SETTINGS.allowSkillBaseEdit),
             attributeRolls
         };
     }
@@ -719,6 +725,7 @@ interface Window {
             attributeRatioPercent: localSettings?.attributeRatioPercent ?? configSection?.attribute_ratio_percent ?? DEFAULT_RULE_SETTINGS.attributeRatioPercent,
             maxCardsPerUser: configSection?.max_cards_per_user ?? localSettings?.maxCardsPerUser ?? DEFAULT_RULE_SETTINGS.maxCardsPerUser,
             weaponSlotCount: configSection?.weapon_slot_count ?? localSettings?.weaponSlotCount ?? DEFAULT_RULE_SETTINGS.weaponSlotCount,
+            allowSkillBaseEdit: configSection?.allow_skill_base_edit ?? localSettings?.allowSkillBaseEdit ?? DEFAULT_RULE_SETTINGS.allowSkillBaseEdit,
             attributeRolls: localSettings?.attributeRolls || configRolls
         });
     }
@@ -786,6 +793,10 @@ interface Window {
         };
     }
 
+    function calculateAttributeBaseTotal(attributes: COC7Attributes): number {
+        return ATTRIBUTE_KEYS.reduce((total, key) => total + clampNumber(attributes[key], 0, 99, 0), 0);
+    }
+
     function calculateOccupationSkillPoints(attributes: COC7Attributes, occupationId: string): number {
         const occupation = getOccupationById(occupationId);
         return occupation.pointsFormula.reduce((total, term) => {
@@ -836,20 +847,6 @@ interface Window {
         }, {} as Record<string, number>);
     }
 
-    function rankFromValue(value: number): SkillRank {
-        if (value >= 70) return "主修";
-        if (value >= 50) return "熟修";
-        if (value >= 25) return "学习";
-        return "新手";
-    }
-
-    function countSkillsByRank(skills: COC7Skill[]): Record<SkillRank, number> {
-        return SKILL_RANKS.reduce((summary, rank) => {
-            summary[rank] = skills.filter((skill) => (skill.rank || rankFromValue(skill.value)) === rank).length;
-            return summary;
-        }, {} as Record<SkillRank, number>);
-    }
-
     function countSelectedOccupationSkills(skills: COC7Skill[]): number {
         return skills.filter((skill) => skill.checked || skill.occupation).length;
     }
@@ -894,16 +891,16 @@ interface Window {
         const occupation = getOccupation(card);
         const bonusEntries = Object.entries(occupation.skillBonuses);
         const skills = card.skills.map((skill) => {
-            const occupationSkill = occupation.occupationSkills.includes(skill.id);
-            const bonusEntry = bonusEntries.find(([skillId]) => skillId === skill.id);
+            const skillKey = resolveSkillKey(skill);
+            const occupationSkill = occupation.occupationSkills.includes(skillKey);
+            const bonusEntry = bonusEntries.find(([skillId]) => skillId === skillKey);
             const bonus = bonusEntry ? bonusEntry[1] : 0;
             const value = clampNumber(skill.value + bonus, 0, 99, skill.value);
             return {
                 ...skill,
                 checked: skill.checked || occupationSkill,
                 occupation: skill.occupation || occupationSkill,
-                value,
-                rank: rankFromValue(value)
+                value
             };
         });
         return createCharacterCard({ ...card, skills });
@@ -967,6 +964,9 @@ interface Window {
         const now = new Date().toISOString();
         return {
             id: input.id || `investigator-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            public_id: input.public_id || "",
+            publisher_id: input.publisher_id ?? null,
+            publisher_name: input.publisher_name || "",
             name: input.name || generateInvestigatorName(normalizeNameGender(input.gender)),
             playerId: input.playerId || "",
             era: input.era || "1920s",
@@ -1015,32 +1015,27 @@ interface Window {
         const source = skills && skills.length ? mergeSkillCatalog(skills) : BASE_SKILLS;
         return source.map((skill) => {
             const skillKey = resolveSkillKey(skill);
-            const baseKey = resolveSkillBaseKey(skill);
-            const base = calculateSkillBase(skill, attributes, occupation);
+            const base = Object.prototype.hasOwnProperty.call(skill, "base")
+                ? clampNumber(skill.base, 0, 99, calculateSkillBase(skill, attributes, occupation))
+                : calculateSkillBase(skill, attributes, occupation);
             const occupationPoints = clampNumber(skill.occupationPoints, 0, 99, 0);
             const interestPoints = clampNumber(skill.interestPoints, 0, 99, 0);
             const growthPoints = clampNumber(skill.growthPoints, 0, 99, 0);
             const value = clampNumber(skill.value, 0, 99, base + occupationPoints + interestPoints + growthPoints);
-            const occupationSpecialtyKey = getOccupationSpecialtyKey(occupation, skillKey);
             const occupationSkill = occupation?.occupationSkills.includes(skillKey) || Boolean(skill.occupation);
-            const specialtyKey = skill.specialtyKey || occupationSpecialtyKey || "";
-            const specialty = skill.specialty || (specialtyKey ? localizeSkillSpecialty(skillKey, specialtyKey) : "");
             return {
                 id: skill.id || slugify(skill.name),
                 skillKey,
-                baseKey,
                 name: String(skill.name || "未命名技能").slice(0, 40),
                 base,
                 value,
                 category: skill.category || "知识",
                 checked: Boolean(skill.checked || occupationSkill),
                 occupation: occupationSkill,
-                specialty,
-                specialtyKey,
+                isProfessional: occupationSkill,
                 occupationPoints,
                 interestPoints,
-                growthPoints,
-                rank: skill.rank || rankFromValue(value)
+                growthPoints
             };
         });
     }
@@ -1054,12 +1049,19 @@ interface Window {
             index.set(skillKey, list);
             return index;
         }, new Map<string, COC7Skill[]>());
-        return BASE_SKILLS.map((base) => {
+        const merged = BASE_SKILLS.map((base) => {
             const skillKey = resolveSkillKey(base);
             const exact = byId.get(base.id);
             const fallback = byKey.get(skillKey)?.shift();
             return { ...base, ...(exact || fallback || {}) };
         });
+        // Keep imported repeatable/custom skills that do not have a matching
+        // catalog slot instead of silently dropping their numeric values.
+        const consumed = new Set(merged.map((skill) => skill.id));
+        for (const skill of skills) {
+            if (!consumed.has(skill.id)) merged.push(skill);
+        }
+        return merged;
     }
 
     function calculateSkillBase(skill: COC7Skill, attributes?: COC7Attributes, occupation?: COC7Occupation): number {
@@ -1075,8 +1077,8 @@ interface Window {
         return skill.skillKey || skill.id.split("__")[0] || skill.id;
     }
 
-    function resolveSkillBaseKey(skill: Pick<COC7Skill, "id" | "skillKey" | "baseKey">): string {
-        return skill.baseKey || skill.skillKey || skill.id.split("__")[0] || skill.id;
+    function resolveSkillBaseKey(skill: Pick<COC7Skill, "id" | "skillKey">): string {
+        return skill.skillKey || skill.id.split("__")[0] || skill.id;
     }
 
     function getOccupationSpecialtyKey(occupation: COC7Occupation | undefined, skillKey: string): string {
@@ -1085,18 +1087,24 @@ interface Window {
     }
 
     function normalizeWeapons(weapons?: COC7Weapon[]): COC7Weapon[] {
-        return (weapons || []).map((weapon) => ({
-            name: weapon.name || "未命名武器",
-            skill: weapon.skill || "格斗(斗殴)",
-            skillKey: weapon.skillKey || "",
-            specialtyKey: weapon.specialtyKey || "",
-            damage: weapon.damage || "1D3",
-            range: weapon.range || "接触",
-            impale: typeof weapon.impale === "boolean" ? weapon.impale : null,
-            attacks: String(weapon.attacks || "1"),
-            ammo: String(weapon.ammo || "N/A"),
-            malfunction: String(weapon.malfunction || "N/A")
-        }));
+        return (weapons || []).map((weapon) => {
+            const name = String(weapon.name || "").trim();
+            if (!name || ["选择武器", "未选择武器", "未命名武器"].includes(name)) return createEmptyWeapon();
+            return {
+                name,
+                skill: weapon.skill || "",
+                skillKey: weapon.skillKey || "",
+                specialtyKey: weapon.specialtyKey || "",
+                damage: weapon.damage || "",
+                range: weapon.range || "",
+                impale: typeof weapon.impale === "boolean" ? weapon.impale : null,
+                attacks: String(weapon.attacks || ""),
+                ammo: String(weapon.ammo || ""),
+                malfunction: String(weapon.malfunction || ""),
+                weight: String(weapon.weight || ""),
+                note: String(weapon.note || "")
+            };
+        });
     }
 
     function normalizeEquipment(equipment?: COC7EquipmentItem[]): COC7EquipmentItem[] {
@@ -1247,6 +1255,10 @@ interface Window {
         return cards.filter((card) => Boolean(card.playerId) && isBoundToCurrentPlayer(card.playerId));
     }
 
+    function visibleCharacterCards(): COC7CharacterCard[] {
+        return isCurrentUserElevated() ? cards : currentUserCharacterCards();
+    }
+
     function canCreateCharacterCard(): boolean {
         if (isCurrentUserElevated()) return true;
         const limit = loadRuleSettings().maxCardsPerUser;
@@ -1303,6 +1315,13 @@ interface Window {
             const payload = response.data;
             SKILL_CATALOG = normalizeSkillCatalog(payload.skills || []);
             SKILL_LOCALE_MAP = payload.locales?.[payload.defaultLocale || "zh-CN"] || payload.locales?.["zh-CN"] || {};
+            SKILL_KEY_BY_LABEL = SKILL_CATALOG.reduce((index, entry) => {
+                const sourceLabel = SKILL_LOCALE_MAP[entry.labelKey] || entry.labelKey.split(".").pop() || entry.key;
+                const label = localizeCatalogText(sourceLabel);
+                index[sourceLabel] = entry.key;
+                index[label] = entry.key;
+                return index;
+            }, {} as Record<string, string>);
             BASE_SKILLS = flattenSkillCatalog(SKILL_CATALOG, SKILL_LOCALE_MAP);
         } catch (error) {
             console.warn("加载技能目录失败:", error);
@@ -1366,7 +1385,7 @@ interface Window {
     function flattenSkillCatalog(entries: SkillCatalogEntry[], locales: Record<string, string>): COC7Skill[] {
         const flattened: COC7Skill[] = [];
         entries.forEach((entry) => {
-            const label = locales[entry.labelKey] || entry.labelKey.split(".").pop() || entry.key;
+            const label = localizeCatalogText(locales[entry.labelKey] || entry.labelKey.split(".").pop() || entry.key);
             const repeatCount = Math.max(1, entry.repeatable || 1);
             for (let index = 0; index < repeatCount; index += 1) {
                 const suffix = repeatCount > 1 ? index + 1 : 0;
@@ -1377,9 +1396,7 @@ interface Window {
                     base: entry.base,
                     value: entry.base,
                     category: entry.category,
-                    checked: false,
-                    specialty: "",
-                    specialtyKey: ""
+                    checked: false
                 });
             }
         });
@@ -1399,9 +1416,9 @@ interface Window {
 
     function occupationSkillEntryLabel(entry: OccupationSkillEntry): string {
         if (entry.skillKey) return formatSkillLabel(entry.skillKey, entry.specialtyKey);
-        if (entry.chooseOne) return entry.chooseOne.map(occupationSkillEntryLabel).join("或");
-        if (entry.freeChoice === "personalOrEraSpecialty") return "任意一项其他个人或时代特长";
-        return "自定义本职技能";
+        if (entry.chooseOne) return entry.chooseOne.map(occupationSkillEntryLabel).join(localizeCatalogText("或"));
+        if (entry.freeChoice === "personalOrEraSpecialty") return localizeCatalogText("任意一项其他个人或时代特长");
+        return localizeCatalogText("自定义本职技能");
     }
 
     function formatSkillLabel(skillKey: string, specialtyKey?: string): string {
@@ -1411,11 +1428,17 @@ interface Window {
     }
 
     function localizeSkillSpecialty(skillKey: string, specialtyKey: string): string {
-        return SKILL_LOCALE_MAP[`skillSpecialties.${skillKey}.${specialtyKey}`] || SKILL_SPECIALTY_LABELS[`${skillKey}.${specialtyKey}`] || specialtyKey;
+        const source = SKILL_LOCALE_MAP[`skillSpecialties.${skillKey}.${specialtyKey}`] || SKILL_SPECIALTY_LABELS[`${skillKey}.${specialtyKey}`] || specialtyKey;
+        return localizeCatalogText(source);
     }
 
     function localizeOccupationName(nameKey?: string, fallback?: string): string {
-        return nameKey ? OCCUPATION_LABELS[nameKey] || fallback || nameKey : fallback || "未命名职业";
+        const source = nameKey ? OCCUPATION_LABELS[nameKey] || fallback || nameKey : fallback || "未命名职业";
+        return localizeCatalogText(source);
+    }
+
+    function localizeCatalogText(value: string): string {
+        return window.TrpgI18n?.t("", value) || value;
     }
 
     async function loadCards(): Promise<void> {
@@ -1426,7 +1449,7 @@ interface Window {
                 cards = response.data.map((card) => createCharacterCard(card));
             }
         } catch (error) {
-            console.warn("???????:", error);
+            console.warn("加载角色卡失败：", error);
         }
 
         const storage = safeStorage();
@@ -1451,13 +1474,169 @@ interface Window {
         activeCardId = cards[0]?.id || "";
     }
 
+    async function loadCharacterGallery(): Promise<void> {
+        galleryCards = [];
+        try {
+            const response = await TrpgApi.get<ApiResponse<COC7CharacterCardInput[]>>("/api/character-gallery");
+            if (response.success && Array.isArray(response.data)) {
+                galleryCards = response.data.map((card) => createCharacterCard(card));
+            }
+        } catch (error) {
+            console.warn("加载角色卡广场失败:", error);
+        }
+        renderCharacterGallery();
+    }
+
+    function renderCharacterGallery(): void {
+        const list = byId("characterGalleryList");
+        if (!list) return;
+        if (!galleryCards.length) {
+            list.innerHTML = `<div class="character-empty-filter">角色卡广场暂无公开角色卡。</div>`;
+            return;
+        }
+        const visibleCards = filteredGalleryCards();
+        if (!visibleCards.length) {
+            list.innerHTML = `<div class="character-empty-filter">没有符合筛选条件的公开角色卡。</div>`;
+            return;
+        }
+        list.innerHTML = visibleCards.map((card) => `
+            <article class="character-card" data-gallery-character-id="${escapeHtml(card.id)}">
+                <div class="character-card-avatar">${card.avatar ? `<img src="${escapeHtml(card.avatar)}" alt="">` : `<i class="fa fa-id-card-o"></i>`}</div>
+                <h5>${escapeHtml(card.name)}</h5>
+                <p>${escapeHtml(getOccupation(card).name)} · ${escapeHtml(card.residence || "未知居住地")}</p>
+                <p class="character-card-summary">${escapeHtml(card.background.story || card.background.appearance || "暂无角色简介")}</p>
+                <div class="character-card-meta">
+                    <span>ID ${escapeHtml(card.public_id || card.id)}</span>
+                    <span>${escapeHtml(card.publisher_name ? `发布者 ${card.publisher_name}` : "公开角色卡")}</span>
+                </div>
+                <div class="character-card-actions">
+                    <button type="button" data-gallery-action="preview">预览</button>
+                    <button type="button" data-gallery-action="apply">应用</button>
+                    ${canModifyGalleryCard(card) ? `<button type="button" data-gallery-action="edit">编辑</button><button type="button" data-gallery-action="delete">删除</button>` : ""}
+                </div>
+            </article>
+        `).join("");
+    }
+
+    function filteredGalleryCards(): COC7CharacterCard[] {
+        const search = activeGallerySearchTerm.trim().toLowerCase();
+        return galleryCards.filter((card) => {
+            if (!search) return true;
+            return [card.name, getOccupation(card).name, card.residence, card.public_id || card.id, card.publisher_name || ""]
+                .some((value) => String(value || "").toLowerCase().includes(search));
+        });
+    }
+
+    function handleGallerySearchInput(event: Event): void {
+        activeGallerySearchTerm = (event.target as HTMLInputElement | null)?.value || "";
+        renderCharacterGallery();
+    }
+
+    function handleGalleryClick(event: Event): void {
+        const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-gallery-action]");
+        if (!button) return;
+        const card = button.closest<HTMLElement>("[data-gallery-character-id]");
+        const id = card?.dataset.galleryCharacterId;
+        if (!id) return;
+        if (button.dataset.galleryAction === "apply") applyGalleryCharacter(id);
+        if (button.dataset.galleryAction === "preview") previewGalleryCharacter(id);
+        if (button.dataset.galleryAction === "edit") editGalleryCharacter(id);
+        if (button.dataset.galleryAction === "delete") void deleteGalleryCharacter(id);
+    }
+
+    function canModifyGalleryCard(card: COC7CharacterCard): boolean {
+        const role = window.currentUser?.role || "USER";
+        return role === "ADMIN" || role === "OWNER" || String(card.publisher_id || "") === String(currentPlayerId());
+    }
+
+    function previewGalleryCharacter(id: string): void {
+        const card = galleryCards.find((item) => item.id === id);
+        if (!card) return;
+        const modalElement = document.createElement("div");
+        modalElement.className = "modal fade";
+        modalElement.innerHTML = `<div class="modal-dialog modal-xl"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">公开角色卡预览</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body">${renderCharacterDetail(card)}</div></div></div>`;
+        document.body.appendChild(modalElement);
+        const instance = new bootstrap.Modal(modalElement);
+        instance.show();
+        modalElement.addEventListener("hidden.bs.modal", () => modalElement.remove());
+    }
+
+    function editGalleryCharacter(id: string): void {
+        const card = galleryCards.find((item) => item.id === id);
+        if (card && canModifyGalleryCard(card)) {
+            activeGalleryEditId = id;
+            openEditor(card);
+        }
+    }
+
+    async function deleteGalleryCharacter(id: string): Promise<void> {
+        const card = galleryCards.find((item) => item.id === id);
+        if (!card || !canModifyGalleryCard(card) || !window.confirm("确定要删除这张公开角色卡吗？")) return;
+        const response = await TrpgApi.del<ApiResponse>(`/api/character-gallery/${encodeURIComponent(id)}`);
+        if (!response.success) {
+            notify(response.error || response.message || "删除公开角色卡失败", "error");
+            return;
+        }
+        galleryCards = galleryCards.filter((item) => item.id !== id);
+        renderCharacterGallery();
+    }
+
+    function applyGalleryCharacter(galleryCharacterId: string): void {
+        const source = galleryCards.find((card) => card.id === galleryCharacterId);
+        if (!source || !canCreateCharacterCard()) return;
+        const {
+            public_id: _publicId,
+            publisher_id: _publisherId,
+            publisher_name: _publisherName,
+            ...sourceCard
+        } = cloneCard(source);
+        openEditor(createCharacterCard({
+            ...sourceCard,
+            id: `gallery-${Date.now()}`,
+            playerId: currentPlayerId()
+        }));
+    }
+
+    function clearCharacterSheetState(): void {
+        cards = [];
+        galleryCards = [];
+        activeCardId = "";
+        activeGallerySearchTerm = "";
+        activeGalleryEditId = "";
+        editorSkills = [];
+        pendingGeneratedName = "";
+        pendingWeaponPickerTarget = "";
+        modal?.hide();
+        occupationTemplateModal?.hide();
+        weaponPickerModal?.hide();
+        render();
+    }
+
+    async function reloadCharacterSheet(): Promise<void> {
+        await loadCards();
+        await loadAssignableUsers();
+        render();
+    }
+
     async function saveCardToServer(card: COC7CharacterCard): Promise<COC7CharacterCard | null> {
         try {
             const response = await TrpgApi.put<ApiResponse<COC7CharacterCard>>(`/api/characters/${encodeURIComponent(card.id)}`, card);
             if (response.success && response.data) return createCharacterCard(response.data);
-            notify(response.message || response.error || "???????", "error");
+            notify(response.message || response.error || "保存角色卡失败", "error");
         } catch (error) {
-            notify(`???????: ${characterErrorMessage(error)}`, "error");
+            notify(`保存角色卡失败：${characterErrorMessage(error)}`, "error");
+        }
+        return null;
+    }
+
+    async function saveGalleryCardToServer(card: COC7CharacterCard): Promise<COC7CharacterCard | null> {
+        try {
+            const publicId = card.public_id || card.id;
+            const response = await TrpgApi.put<ApiResponse<COC7CharacterCard>>(`/api/character-gallery/${encodeURIComponent(publicId)}`, card);
+            if (response.success && response.data) return createCharacterCard(response.data);
+            notify(response.message || response.error || "保存广场角色卡失败", "error");
+        } catch (error) {
+            notify(`保存广场角色卡失败：${characterErrorMessage(error)}`, "error");
         }
         return null;
     }
@@ -1487,15 +1666,13 @@ interface Window {
         nameGeneratorModal = nameModalElement && typeof bootstrap !== "undefined" ? new bootstrap.Modal(nameModalElement) : null;
         const occupationModalElement = byId("occupationTemplateModal");
         occupationTemplateModal = occupationModalElement && typeof bootstrap !== "undefined" ? new bootstrap.Modal(occupationModalElement) : null;
-        const skillSpecialtyModalElement = byId("skillSpecialtyModal");
-        skillSpecialtyModal = skillSpecialtyModalElement && typeof bootstrap !== "undefined" ? new bootstrap.Modal(skillSpecialtyModalElement) : null;
         const weaponPickerModalElement = byId("characterWeaponPickerModal");
         weaponPickerModal = weaponPickerModalElement && typeof bootstrap !== "undefined" ? new bootstrap.Modal(weaponPickerModalElement) : null;
         hydrateOccupationSelect();
         bindEvents();
         void Promise.all([loadSkillCatalog(), loadOccupationCatalogs(), loadWeaponCatalog()]).then(() => {
             hydrateOccupationSelect();
-            void loadCards().then(render);
+            void Promise.all([loadCards(), loadCharacterGallery()]).then(render);
         });
         void loadAssignableUsers().then(render);
     }
@@ -1512,7 +1689,6 @@ interface Window {
         byId<HTMLInputElement>("importCharacterFile")?.addEventListener("change", importCharacterFiles);
         byId("exportCharacter")?.addEventListener("click", exportActiveCard);
         byId("backToCharacterList")?.addEventListener("click", showCharacterList);
-        byId("skillLevelFilters")?.addEventListener("click", handleCharacterFilterClick);
         byId("randomizeCharacterName")?.addEventListener("click", openNameGenerator);
         byId("regenerateName")?.addEventListener("click", regenerateNamePreview);
         byId("confirmGeneratedName")?.addEventListener("click", confirmGeneratedName);
@@ -1520,6 +1696,11 @@ interface Window {
         byId("nameRegionSelect")?.addEventListener("change", regenerateNamePreview);
         byId("nameGenderSelect")?.addEventListener("change", regenerateNamePreview);
         byId("openOccupationTemplatePicker")?.addEventListener("click", openOccupationTemplatePicker);
+        byId("createGalleryCharacter")?.addEventListener("click", () => {
+            if (canCreateCharacterCard()) openEditor();
+        });
+        byId("characterGallerySearch")?.addEventListener("input", handleGallerySearchInput);
+        byId("characterGalleryList")?.addEventListener("click", handleGalleryClick);
         byId("characterAvatarPreview")?.addEventListener("click", () => byId<HTMLInputElement>("characterAvatarUpload")?.click());
         byId("unbindCharacterPlayer")?.addEventListener("click", unbindCharacterPlayerFromEditor);
         byId("randomizeAttributes")?.addEventListener("click", () => {
@@ -1567,8 +1748,6 @@ interface Window {
         byId("characterSkillCategoryFilters")?.addEventListener("click", handleSkillCategoryFilterClick);
         byId("characterSkillTableBody")?.addEventListener("input", handleSkillTableInput);
         byId("characterSkillTableBody")?.addEventListener("change", handleSkillTableInput);
-        byId("characterSkillTableBody")?.addEventListener("click", handleSkillTableClick);
-        byId("skillSpecialtyOptions")?.addEventListener("click", handleSkillSpecialtyOptionClick);
         byId("characterWeaponTableBody")?.addEventListener("input", handleWeaponTableInput);
         byId("characterWeaponTableBody")?.addEventListener("change", handleWeaponTableInput);
         byId("characterWeaponTableBody")?.addEventListener("click", handleWeaponTableClick);
@@ -1626,7 +1805,7 @@ interface Window {
             const customNameInput = buildCustomSkillNameInput(skill, rowId);
             const displayName = isCustomSkill(skillKey) ? (skill.name || skillNameById(skillKey)) : skill.name;
             return `
-                <tr data-skill-row-id="${rowId}" data-skill-key="${escapeHtml(skillKey)}" data-skill-base-key="${escapeHtml(resolveSkillBaseKey(skill))}" data-skill-category="${category}" data-skill-occupation="${skill.occupation ? "1" : "0"}" data-specialty-key="${escapeHtml(skill.specialtyKey || "")}" data-specialty-label="${escapeHtml(skill.specialty || "")}" ${allowed ? "" : 'hidden="hidden"'}>
+                <tr data-skill-row-id="${rowId}" data-skill-key="${escapeHtml(skillKey)}" data-skill-category="${category}" data-skill-occupation="${skill.occupation ? "1" : "0"}" ${allowed ? "" : 'hidden="hidden"'}>
                     <td><input type="checkbox" class="form-check-input" data-skill-occupation-checkbox="${rowId}" ${skill.occupation ? "checked" : ""}></td>
                     <td>
                         <div class="character-skill-name-cell">
@@ -1663,11 +1842,8 @@ interface Window {
     }
 
     function buildSkillSpecialtyButton(skill: COC7Skill): string {
-        const skillKey = resolveSkillKey(skill);
-        const catalog = SKILL_CATALOG.find((entry) => entry.key === skillKey);
-        if (!catalog?.specialties?.length) return "";
-        const label = skill.specialty || "选择类型";
-        return `<button type="button" class="character-skill-type-button" data-skill-specialty-trigger="${escapeHtml(skill.id)}">${escapeHtml(label)}</button>`;
+        void skill;
+        return "";
     }
 
     function getSkillLimit(type: "occupation" | "other"): number {
@@ -1695,68 +1871,10 @@ interface Window {
         syncEditorCreditRating();
     }
 
-    function handleSkillTableClick(event: Event): void {
-        const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-skill-specialty-trigger]");
-        if (!button) return;
-        openSkillSpecialtyPicker(button.dataset.skillSpecialtyTrigger || "");
-    }
-
-    function openSkillSpecialtyPicker(rowId: string): void {
-        const row = findSkillRow(rowId);
-        const options = byId("skillSpecialtyOptions");
-        if (!row || !options) return;
-        const skillKey = row.dataset.skillKey || rowId.split("__")[0] || rowId;
-        const catalog = SKILL_CATALOG.find((entry) => entry.key === skillKey);
-        if (!catalog?.specialties?.length) return;
-        pendingSkillSpecialtyTarget = rowId;
-        setInputValue("skillSpecialtyTargetRow", rowId);
-        const used = selectedSpecialtyKeys(skillKey, rowId);
-        options.innerHTML = catalog.specialties.map((specialty) => {
-            const disabled = used.has(specialty.key);
-            return `
-                <button type="button" class="character-specialty-option" data-specialty-key="${escapeHtml(specialty.key)}" ${disabled ? "disabled" : ""}>
-                    ${escapeHtml(localizeSkillSpecialty(skillKey, specialty.key))}
-                </button>
-            `;
-        }).join("");
-        skillSpecialtyModal?.show();
-    }
-
-    function handleSkillSpecialtyOptionClick(event: Event): void {
-        const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-specialty-key]");
-        if (!button || button.disabled) return;
-        const rowId = pendingSkillSpecialtyTarget || getInputValue("skillSpecialtyTargetRow");
-        const row = findSkillRow(rowId);
-        if (!row) return;
-        const skillKey = row.dataset.skillKey || rowId.split("__")[0] || rowId;
-        const specialtyKey = button.dataset.specialtyKey || "";
-        if (selectedSpecialtyKeys(skillKey, rowId).has(specialtyKey)) {
-            notify("同一技能的类型不能重复选择。", "error");
-            return;
-        }
-        const label = localizeSkillSpecialty(skillKey, specialtyKey);
-        row.dataset.specialtyKey = specialtyKey;
-        row.dataset.specialtyLabel = label;
-        const trigger = row.querySelector<HTMLButtonElement>("[data-skill-specialty-trigger]");
-        if (trigger) trigger.textContent = label;
-        skillSpecialtyModal?.hide();
-    }
-
     function findSkillRow(rowId: string): HTMLTableRowElement | null {
         const body = byId("characterSkillTableBody");
         if (!body || !rowId) return null;
         return body.querySelector<HTMLTableRowElement>(`tr[data-skill-row-id="${CSS.escape(rowId)}"]`);
-    }
-
-    function selectedSpecialtyKeys(skillKey: string, excludedRowId = ""): Set<string> {
-        const body = byId("characterSkillTableBody");
-        const selected = new Set<string>();
-        if (!body) return selected;
-        body.querySelectorAll<HTMLTableRowElement>(`tr[data-skill-key="${CSS.escape(skillKey)}"]`).forEach((row) => {
-            if (row.dataset.skillRowId === excludedRowId) return;
-            if (row.dataset.specialtyKey) selected.add(row.dataset.specialtyKey);
-        });
-        return selected;
     }
 
     function hydrateWeaponTable(weapons: COC7Weapon[] = []): void {
@@ -1816,21 +1934,24 @@ interface Window {
 
     function createEmptyWeapon(): COC7Weapon {
         return {
-            name: "选择武器",
-            skill: "-",
+            name: "",
+            skill: "",
             skillKey: "",
             specialtyKey: "",
             damage: "",
             range: "",
             impale: null,
             attacks: "",
-            ammo: "N/A",
-            malfunction: "N/A"
+            ammo: "",
+            malfunction: "",
+            weight: "",
+            note: ""
         };
     }
 
     function formatWeaponNameForDisplay(name: string): string {
-        return escapeHtml(name).replace(/\s+/g, "<wbr>");
+        const text = name.trim() || "选择武器";
+        return escapeHtml(text).replace(/\s+/g, "<wbr>");
     }
 
     function weaponSkillOptions(selectedWeapon: COC7Weapon): string {
@@ -1886,7 +2007,7 @@ interface Window {
     }
 
     function formatWeaponSkillLabel(skill: COC7Skill): string {
-        return formatWeaponSkillChoiceLabel(resolveSkillKey(skill), skill.specialtyKey || "");
+        return formatWeaponSkillChoiceLabel(resolveSkillKey(skill), "");
     }
 
     function formatWeaponSkillChoiceLabel(skillKey: string, specialtyKey: string): string {
@@ -1963,7 +2084,9 @@ interface Window {
             impale: preset.impale,
             attacks: preset.attacks,
             ammo: preset.ammo,
-            malfunction: preset.malfunction
+            malfunction: preset.malfunction,
+            weight: "",
+            note: ""
         };
     }
 
@@ -2001,20 +2124,23 @@ interface Window {
         const body = byId("characterWeaponTableBody");
         if (!body) return [];
         return Array.from(body.querySelectorAll<HTMLTableRowElement>("tr[data-weapon-row-id]")).map((row) => {
-            const rowId = row.dataset.weaponRowId || "";
+            const name = String(row.querySelector<HTMLInputElement>("[data-weapon-name]")?.value || "").trim();
+            if (!name || ["选择武器", "未选择武器", "未命名武器"].includes(name)) return createEmptyWeapon();
             const select = row.querySelector<HTMLSelectElement>("[data-weapon-skill]");
             const selected = parseWeaponSkillSelectValue(select?.value || "");
             return {
-                name: String(row.querySelector<HTMLInputElement>("[data-weapon-name]")?.value || "未命名武器").trim() || "未命名武器",
-                skill: select?.selectedOptions[0]?.textContent?.trim() || "-",
+                name,
+                skill: select?.selectedOptions[0]?.textContent?.trim() || "",
                 skillKey: selected.skillKey,
                 specialtyKey: selected.specialtyKey,
-                damage: readWeaponField(row, "[data-weapon-damage]", "1D3"),
-                range: readWeaponField(row, "[data-weapon-range]", "接触"),
+                damage: readWeaponField(row, "[data-weapon-damage]", ""),
+                range: readWeaponField(row, "[data-weapon-range]", ""),
                 impale: readWeaponImpale(row),
                 attacks: readWeaponField(row, "[data-weapon-attacks]", ""),
-                ammo: readWeaponField(row, "[data-weapon-ammo]", "N/A"),
-                malfunction: readWeaponField(row, "[data-weapon-malfunction]", "N/A")
+                ammo: readWeaponField(row, "[data-weapon-ammo]", ""),
+                malfunction: readWeaponField(row, "[data-weapon-malfunction]", ""),
+                weight: "",
+                note: ""
             };
         });
     }
@@ -2056,11 +2182,11 @@ interface Window {
     function findSkillSuccessByWeaponSkill(weapon: Pick<COC7Weapon, "skill" | "skillKey" | "specialtyKey">): number | "" {
         if (!weapon.skillKey) return "";
         const skills = readChecklistSkills();
-        const exact = skills.find((skill) => resolveSkillKey(skill) === weapon.skillKey && (skill.specialtyKey || "") === (weapon.specialtyKey || ""));
+        const exact = skills.find((skill) => resolveSkillKey(skill) === weapon.skillKey);
         if (exact) return exact.value;
         const byLabel = skills.find((skill) => formatWeaponSkillLabel(skill) === weapon.skill || skill.name === weapon.skill);
         if (byLabel) return byLabel.value;
-        return weapon.skillKey && weapon.specialtyKey ? weaponSkillBaseFallback(weapon.skillKey) : 0;
+        return weapon.skillKey ? weaponSkillBaseFallback(weapon.skillKey) : 0;
     }
 
     function weaponSkillBaseFallback(skillKey: string): number {
@@ -2162,7 +2288,7 @@ interface Window {
         if (!container) return;
         container.innerHTML = PRESET_OCCUPATIONS.map((occupation) => `
             <button type="button" class="occupation-template-card" data-occupation-id="${escapeHtml(occupation.id)}">
-                <strong>${escapeHtml(occupation.name)}</strong>
+                <strong>${escapeHtml(localizeCatalogText(occupation.name))}</strong>
                 <span>信用评级 ${occupation.creditRating[0]}-${occupation.creditRating[1]}</span>
                 <small>职业点：${formatOccupationPointFormula(occupation.pointsFormula)}</small>
                 <small>本职技能：${(occupation.occupationSkillLabels || occupation.occupationSkills.map(skillNameById)).join("、")}</small>
@@ -2178,7 +2304,16 @@ interface Window {
         const occupation = getOccupationById(occupationId);
         setInputValue("characterOccupation", occupation.name);
         occupationSkillPointsManuallyEdited = false;
-        editorSkills = readChecklistSkills();
+        const currentSkills = readChecklistSkills().map((skill) => ({
+            ...skill,
+            checked: false,
+            occupation: false
+        }));
+        editorSkills = normalizeSkills(mergeSkillCatalog(currentSkills), readAttributes(), occupation);
+        activeSkillCategoryFilter = "全部技能";
+        document.querySelectorAll<HTMLElement>("#characterSkillCategoryFilters [data-skill-category]").forEach((item) => {
+            item.classList.toggle("is-active", item.dataset.skillCategory === activeSkillCategoryFilter);
+        });
         hydrateSkillChecklist(editorSkills);
         refreshEditorRuleSummary();
         syncEditorCreditRating();
@@ -2190,6 +2325,7 @@ interface Window {
         setInputValue("attributeRatioPercent", settings.attributeRatioPercent);
         setInputValue("maxCardsPerUser", settings.maxCardsPerUser);
         setInputValue("weaponSlotCount", settings.weaponSlotCount);
+        setCheckboxValue("allowSkillBaseEdit", settings.allowSkillBaseEdit);
         ATTRIBUTE_KEYS.forEach((key) => setInputValue(`attributeRoll${key}`, settings.attributeRolls[key]));
         setText("characterRuleSettingsMessage", "");
     }
@@ -2199,6 +2335,7 @@ interface Window {
             attributeRatioPercent: Number(getInputValue("attributeRatioPercent")),
             maxCardsPerUser: Number(getInputValue("maxCardsPerUser")),
             weaponSlotCount: Number(getInputValue("weaponSlotCount")),
+            allowSkillBaseEdit: getCheckboxValue("allowSkillBaseEdit"),
             attributeRolls: ATTRIBUTE_KEYS.reduce((rolls, key) => {
                 rolls[key] = getInputValue(`attributeRoll${key}`) || DEFAULT_ATTRIBUTE_ROLLS[key];
                 return rolls;
@@ -2211,6 +2348,7 @@ interface Window {
             attribute_ratio_percent: nextSettings.attributeRatioPercent,
             max_cards_per_user: nextSettings.maxCardsPerUser,
             weapon_slot_count: nextSettings.weaponSlotCount,
+            allow_skill_base_edit: nextSettings.allowSkillBaseEdit,
             ...ATTRIBUTE_KEYS.reduce((rolls, key) => {
                 rolls[`attribute_roll_${key.toLowerCase()}`] = nextSettings.attributeRolls[key];
                 return rolls;
@@ -2220,7 +2358,7 @@ interface Window {
             ...generalConfig,
             character_rules: characterRules
         });
-        setText("characterRuleSettingsMessage", saved === false ? "?????????" : "????????");
+        setText("characterRuleSettingsMessage", saved === false ? "角色卡规则保存失败" : "角色卡规则已保存");
         refreshEditorRuleSummary();
     }
 
@@ -2229,6 +2367,33 @@ interface Window {
         if (base) return base.name;
         const catalog = SKILL_CATALOG.find((entry) => entry.key === skillId);
         return catalog ? SKILL_LOCALE_MAP[catalog.labelKey] || skillId : skillId;
+    }
+
+    function skillKeyByName(name: string, fallback = ""): string {
+        const text = String(name || "").trim();
+        if (!text) return fallback;
+        const exact = SKILL_KEY_BY_LABEL[text];
+        if (exact) return exact;
+        // Legacy exports store specialties in the display name, e.g.
+        // "格斗(斗殴)" or "母语:汉语". Resolve those to the catalog's base key.
+        const baseName = text.replace(/[(:：].*$/, "").trim();
+        if (baseName && SKILL_KEY_BY_LABEL[baseName]) return SKILL_KEY_BY_LABEL[baseName];
+        const prefixMatch = Object.entries(SKILL_KEY_BY_LABEL).find(([label]) => Boolean(label) && (
+            text.startsWith(`${label}(`) || text.startsWith(`${label}:`) || text.startsWith(`${label}：`)
+        ));
+        return prefixMatch?.[1] || fallback || text;
+    }
+
+    function skillCategoryByKey(skillKey: string): SkillCategory {
+        const catalog = SKILL_CATALOG.find((entry) => entry.key === skillKey);
+        return catalog?.category || "其他";
+    }
+
+    function skillBaseByKey(skillKey: string, fallbackGroup = ""): number {
+        const catalog = SKILL_CATALOG.find((entry) => entry.key === skillKey);
+        if (catalog) return catalog.base;
+        const group = TEST_CHARACTER_SKILL_GROUPS[fallbackGroup];
+        return typeof group === "string" ? 0 : 0;
     }
 
     function formatOccupationPointFormula(formula: OccupationPointFormula): string {
@@ -2363,7 +2528,6 @@ interface Window {
         return rows.map((row) => {
             const rowId = row.dataset.skillRowId || "";
             const skillKey = row.dataset.skillKey || rowId.split("__")[0] || rowId;
-            const baseKey = row.dataset.skillBaseKey || skillKey;
             const baseSkill = BASE_SKILLS.find((skill) => skill.id === rowId) || BASE_SKILLS.find((skill) => (skill.skillKey || skill.id) === skillKey);
             const occupation = row.querySelector<HTMLInputElement>("[data-skill-occupation-checkbox]")?.checked || false;
             const base = readSkillRowNumber(row, "base", 0);
@@ -2376,19 +2540,16 @@ interface Window {
                 ...(baseSkill || {}),
                 id: rowId,
                 skillKey,
-                baseKey,
                 name,
                 base,
                 value,
                 category: row.dataset.skillCategory || baseSkill?.category || "其他",
                 checked: occupation,
                 occupation,
-                specialty: row.dataset.specialtyLabel || "",
-                specialtyKey: row.dataset.specialtyKey || "",
+                isProfessional: occupation,
                 occupationPoints,
                 interestPoints,
-                growthPoints,
-                rank: rankFromValue(value)
+                growthPoints
             };
         });
     }
@@ -2489,6 +2650,7 @@ interface Window {
 
     function refreshEditorRuleSummary(): void {
         const attributes = readAttributes();
+        setText("attributeBaseTotal", String(calculateAttributeBaseTotal(attributes)));
         syncAttributeDerivedFields(attributes);
         syncEditorResourceLimits(attributes);
         syncEditorCombatStats(attributes);
@@ -2581,7 +2743,7 @@ interface Window {
     async function saveFromEditor(): Promise<void> {
         if (characterSaveInFlight) return;
         const editingId = getInputValue("characterEditingId");
-        const existing = cards.find((card) => card.id === editingId);
+        const existing = cards.find((card) => card.id === editingId) || galleryCards.find((card) => card.id === editingId);
         const attributes = readAttributes();
         const maxHp = calculateMaxHp(attributes);
         const maxMp = calculateMaxMp(attributes);
@@ -2654,12 +2816,19 @@ interface Window {
         setButtonBusy("saveCharacter", true);
         let savedCard: COC7CharacterCard | null = null;
         try {
-            savedCard = await saveCardToServer(card);
+            savedCard = activeGalleryEditId ? await saveGalleryCardToServer(card) : await saveCardToServer(card);
         } finally {
             characterSaveInFlight = false;
             setButtonBusy("saveCharacter", false);
         }
         if (!savedCard) return;
+        if (activeGalleryEditId) {
+            galleryCards = galleryCards.map((item) => item.id === activeGalleryEditId ? savedCard as COC7CharacterCard : item);
+            activeGalleryEditId = "";
+            renderCharacterGallery();
+            modal?.hide();
+            return;
+        }
         cards = existing ? cards.map((item) => item.id === editingId ? savedCard : item) : [savedCard, ...cards];
         activeCardId = savedCard.id;
         renderList();
@@ -2669,31 +2838,14 @@ interface Window {
 
     function render(): void {
         renderList();
+        renderCharacterGallery();
         showCharacterList();
-    }
-
-    function handleCharacterFilterClick(event: Event): void {
-        const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-rank-filter]");
-        if (!button) return;
-        activeCharacterFilter = button.dataset.rankFilter || "all";
-        document.querySelectorAll<HTMLElement>("#skillLevelFilters [data-rank-filter]").forEach((item) => {
-            item.classList.toggle("active", item === button);
-        });
-        renderList();
-    }
-
-    function filteredCards(): COC7CharacterCard[] {
-        if (activeCharacterFilter === "mine") {
-            return cards.filter((card) => Boolean(card.playerId) && isBoundToCurrentPlayer(card.playerId));
-        }
-        if (activeCharacterFilter === "all") return cards;
-        return cards.filter((card) => card.skills.some((skill) => (skill.rank || rankFromValue(skill.value)) === activeCharacterFilter));
     }
 
     function renderList(): void {
         const list = byId("characterList");
         if (!list) return;
-        const visibleCards = filteredCards();
+        const visibleCards = visibleCharacterCards();
         if (visibleCards.length === 0) {
             list.innerHTML = `<div class="character-empty-filter">没有符合筛选条件的角色卡。</div>`;
             return;
@@ -2703,10 +2855,10 @@ interface Window {
             cardElement.addEventListener("click", (event) => {
                 const id = cardElement.dataset.characterId || "";
                 const action = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-action]")?.dataset.action || "detail";
-                const card = cards.find((item) => item.id === id);
+                const card = visibleCards.find((item) => item.id === id);
                 if (!card) return;
                 if (action === "edit") openEditor(card);
-                else if (action === "delete") deleteCard(id);
+                else if (action === "delete") void deleteCard(id);
                 else openCharacterDetail(id);
             });
         });
@@ -2733,7 +2885,8 @@ interface Window {
     }
 
     function openCharacterDetail(cardId: string): void {
-        const card = cards.find((item) => item.id === cardId) || cards[0];
+        const visibleCards = visibleCharacterCards();
+        const card = visibleCards.find((item) => item.id === cardId) || visibleCards[0];
         const listView = byId("character-list-view");
         const detailPage = byId("character-detail-page");
         const detail = byId("characterDetailView");
@@ -2773,7 +2926,13 @@ interface Window {
             <div class="character-detail-dashboard">
                 ${renderCharacterBasicInfo(card)}
                 <section class="character-detail-band">
-                    <h4>属性</h4>
+                    <div class="character-detail-band-head">
+                        <h4>属性</h4>
+                        <div class="character-attribute-summary character-attribute-summary-inline">
+                            <span>基础总和</span>
+                            <strong>${calculateAttributeBaseTotal(card.attributes)}</strong>
+                        </div>
+                    </div>
                     <div class="character-attribute-grid">${ATTRIBUTE_KEYS.map((key) => renderAttributeChip(key, card.attributes[key])).join("")}</div>
                 </section>
                 ${renderCharacterVitals(card)}
@@ -3010,12 +3169,22 @@ interface Window {
         return backgroundNote(item.name || "未命名模组", item.experience);
     }
 
-    function deleteCard(id: string): void {
-        if (cards.length <= 1) return;
-        cards = cards.filter((card) => card.id !== id);
-        activeCardId = cards[0]?.id || "";
-        persistCards();
-        render();
+    async function deleteCard(id: string): Promise<void> {
+        const card = cards.find((item) => item.id === id);
+        if (!card || !window.confirm(`确定要删除角色卡“${card.name || "未命名角色卡"}”吗？此操作不可恢复。`)) return;
+        try {
+            const response = await TrpgApi.del<ApiResponse>(`/api/characters/${encodeURIComponent(id)}`);
+            if (!response.success) {
+                notify(response.message || response.error || "删除角色卡失败", "error");
+                return;
+            }
+            cards = cards.filter((item) => item.id !== id);
+            activeCardId = cards[0]?.id || "";
+            render();
+            notify("角色卡已删除", "success");
+        } catch (error) {
+            notify(`删除角色卡失败：${characterErrorMessage(error)}`, "error");
+        }
     }
 
     function formatSkills(skills: COC7Skill[]): string {
@@ -3025,7 +3194,7 @@ interface Window {
     function parseSkills(raw: string): COC7Skill[] {
         return raw.split(/[;\n；]+/).map((line) => line.trim()).filter(Boolean).map((line) => {
             const [name, value, category] = line.split(/[:：]/).map((part) => part.trim());
-            return { id: slugify(name || ""), name: name || "未命名技能", base: 0, value: clampNumber(value, 0, 99, 0), category: category || "知识", checked: false, rank: rankFromValue(Number(value)) };
+            return { id: slugify(name || ""), name: name || "未命名技能", base: 0, value: clampNumber(value, 0, 99, 0), category: category || "知识", checked: false };
         });
     }
 
@@ -3226,20 +3395,12 @@ interface Window {
         card.skills.forEach((skill) => {
             const group = skillGroups[skillGroupKey(skill)] ?? skillGroups.other!;
             group.push({
-                id: skill.id,
-                skillKey: skill.skillKey,
-                baseKey: resolveSkillBaseKey(skill),
                 name: skill.name,
+                base: skill.base,
                 job: skill.occupationPoints || 0,
                 interest: skill.interestPoints || 0,
                 growth: skill.growthPoints || 0,
-                isProfessional: Boolean(skill.occupation || skill.checked),
-                value: skill.value,
-                category: skill.category,
-                checked: skill.checked,
-                specialty: skill.specialty,
-                specialtyKey: skill.specialtyKey,
-                rank: skill.rank
+                isProfessional: Boolean(skill.isProfessional ?? skill.occupation ?? skill.checked)
             });
         });
         return {
@@ -3292,22 +3453,16 @@ interface Window {
             proSkills: [],
             skillPoints: [],
             weapons: card.weapons.map((weapon) => ({
-                name: weapon.name,
-                skill: weapon.skill,
-                skillKey: weapon.skillKey,
-                specialtyKey: weapon.specialtyKey,
-                damage: weapon.damage,
-                range: weapon.range,
-                round: weapon.attacks,
+                name: weapon.name || "",
+                skill: weapon.skill || "",
+                damage: weapon.damage || "",
+                range: weapon.range || "",
+                round: weapon.attacks || "",
                 tho: "",
-                num: weapon.ammo,
-                err: weapon.malfunction,
-                weight: "",
-                note: "",
-                impale: weapon.impale,
-                attacks: weapon.attacks,
-                ammo: weapon.ammo,
-                malfunction: weapon.malfunction
+                num: "",
+                err: "",
+                weight: weapon.weight || "",
+                note: weapon.note || ""
             })),
             stories: {
                 app: card.background.appearance,
@@ -3350,36 +3505,36 @@ interface Window {
         const mentalStates = recordField(characterStatus.mentalStates);
         const stories = recordField(payload.stories);
         const assets = recordField(payload.assets);
+        const preserveSkillBase = Boolean(loadRuleSettings().allowSkillBaseEdit);
         const age = clampNumber(payload.age, 15, 99, 25);
+        const skillOccurrences = new Map<string, number>();
         const skills: COC7Skill[] = Object.entries(recordField(payload.skillGroups)).flatMap(([group, items]) => {
             if (!Array.isArray(items)) return [];
             return items.filter(isRecord).map((item, index) => {
-                const base = clampNumber(item.base, 0, 99, 0);
+                const importedBase = clampNumber(item.base, 0, 99, 0);
                 const occupationPoints = clampNumber(item.job, 0, 99, 0);
                 const interestPoints = clampNumber(item.interest, 0, 99, 0);
                 const growthPoints = clampNumber(item.growth, 0, 99, 0);
-                const value = clampNumber(item.value, 0, 99, base + occupationPoints + interestPoints + growthPoints);
                 const name = stringField(item.name, "未命名技能");
-                const baseKey = stringField(item.baseKey || item.skillKey || item.id || `${slugify(name)}-${index}`);
+                const skillKey = skillKeyByName(name, stringField(item.key || item.id || item.skillKey || `${slugify(name)}-${index}`));
+                const occurrence = (skillOccurrences.get(skillKey) || 0) + 1;
+                skillOccurrences.set(skillKey, occurrence);
+                const base = preserveSkillBase ? importedBase : clampNumber(item.base, 0, 99, skillBaseByKey(skillKey, group));
+                const value = clampNumber(item.value, 0, 99, base + occupationPoints + interestPoints + growthPoints);
                 const skill: COC7Skill = {
-                    id: stringField(item.id || item.skillKey || `${slugify(name)}-${index}`),
-                    skillKey: stringField(item.skillKey || item.id),
-                    baseKey,
+                    id: occurrence === 1 ? skillKey : `${skillKey}__${occurrence}`,
+                    skillKey,
                     name,
                     base,
                     value,
-                    category: stringField(item.category || TEST_CHARACTER_SKILL_GROUPS[group] || "其他"),
+                    category: stringField(item.category || TEST_CHARACTER_SKILL_GROUPS[group] || skillCategoryByKey(skillKey)),
                     checked: Boolean(item.checked ?? item.isProfessional),
                     occupation: Boolean(item.isProfessional),
-                    specialty: stringField(item.specialty),
-                    specialtyKey: stringField(item.specialtyKey),
+                    isProfessional: Boolean(item.isProfessional),
                     occupationPoints,
                     interestPoints,
                     growthPoints
                 };
-                if (SKILL_RANKS.includes(item.rank as SkillRank)) {
-                    skill.rank = item.rank as SkillRank;
-                }
                 return skill;
             });
         });
@@ -3426,16 +3581,18 @@ interface Window {
             },
             skills,
             weapons: (payload.weapons || []).filter(isRecord).map((weapon) => ({
-                name: stringField(weapon.name, "未命名武器"),
-                skill: stringField(weapon.skill, "格斗(斗殴)"),
-                skillKey: stringField(weapon.skillKey),
-                specialtyKey: stringField(weapon.specialtyKey),
-                damage: stringField(weapon.damage, "1D3"),
-                range: stringField(weapon.range, "接触"),
+                name: stringField(weapon.name),
+                skill: stringField(weapon.skill),
+                skillKey: skillKeyByName(stringField(weapon.skill), stringField(weapon.skillKey)),
+                specialtyKey: "",
+                damage: stringField(weapon.damage),
+                range: stringField(weapon.range),
                 impale: typeof weapon.impale === "boolean" ? weapon.impale : null,
-                attacks: stringField(weapon.attacks || weapon.round, "1"),
-                ammo: stringField(weapon.ammo || weapon.num, "N/A"),
-                malfunction: stringField(weapon.malfunction || weapon.err, "N/A")
+                attacks: stringField(weapon.attacks || weapon.round),
+                ammo: stringField(weapon.ammo || weapon.num),
+                malfunction: stringField(weapon.malfunction || weapon.err),
+                weight: stringField(weapon.weight),
+                note: stringField(weapon.note)
             })),
             equipment: parseEquipment(stringField(assets.items)),
             assets: {
@@ -3539,7 +3696,7 @@ interface Window {
     }
 
     function exportActiveCard(): void {
-        const card = cards.find((item) => item.id === activeCardId);
+        const card = visibleCharacterCards().find((item) => item.id === activeCardId);
         if (!card) return;
         const payload = JSON.stringify(convertCardToTestCharacterJson(card), null, 2);
         if (navigator.clipboard?.writeText) {
@@ -3551,14 +3708,11 @@ interface Window {
     }
 
     function listCharacterCards(): COC7CharacterCard[] {
-        const availableCards = isCurrentUserElevated()
-            ? cards
-            : currentUserCharacterCards();
-        return availableCards.map(cloneCard);
+        return visibleCharacterCards().map(cloneCard);
     }
 
     function getCharacterCardSnapshot(cardId: string): Partial<COC7CharacterCard> | null {
-        const card = cards.find((item) => item.id === cardId);
+        const card = visibleCharacterCards().find((item) => item.id === cardId);
         return card ? cloneCard(card) : null;
     }
 
@@ -3582,11 +3736,11 @@ interface Window {
 
     const api: CharacterApi = {
         ATTRIBUTE_KEYS,
-        SKILL_RANKS,
         BASE_SKILLS,
         PRESET_OCCUPATIONS,
         calculateHalfAndFifth,
         calculateAttributeDisplayValues,
+        calculateAttributeBaseTotal,
         calculateMaxHp,
         calculateMaxSan,
         calculateMaxMp,
@@ -3596,7 +3750,6 @@ interface Window {
         calculateBuildAndDamageBonus,
         calculateEquipmentLoad,
         groupSkillsByCategory,
-        countSkillsByRank,
         countSelectedOccupationSkills,
         validateOccupationSkillSelection,
         autoAllocateOccupationSkills,
@@ -3610,9 +3763,14 @@ interface Window {
         createCharacterCard,
         listCharacterCards,
         getCharacterCardSnapshot,
+        renderCharacterDetail,
+        clearCharacterManagement: clearCharacterSheetState,
+        reloadCharacterManagement: reloadCharacterSheet,
         initCharacterSheet
     };
 
     global.COC7CharacterSheet = api;
+    global.clearCharacterManagement = clearCharacterSheetState;
+    global.reloadCharacterManagement = reloadCharacterSheet;
 })(typeof window !== "undefined" ? window : globalThis as Window & typeof globalThis);
 

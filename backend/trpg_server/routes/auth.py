@@ -2,6 +2,7 @@ import inspect
 import logging
 import time
 import uuid
+import secrets
 from datetime import timedelta
 
 from flask import Blueprint, current_app, request, session
@@ -9,12 +10,14 @@ from flask import Blueprint, current_app, request, session
 from trpg_server.logging_config import log_user_action, user_action_text
 from trpg_server.responses import error_response, success_response
 from trpg_server.security import (
+    CSRF_SESSION_KEY,
     SESSION_TOKEN_KEY,
     build_public_asset_url,
     clear_session_token,
     is_allowed_upload,
     issue_session_token,
     normalize_filename,
+    require_permission_node,
     safe_join,
 )
 from trpg_server.settings import AVATARS_DIR
@@ -52,6 +55,8 @@ def _auth_settings():
 
 
 def _user_payload(user):
+    if CSRF_SESSION_KEY not in session:
+        session[CSRF_SESSION_KEY] = secrets.token_urlsafe(32)
     return {
         "user_id": user.get("id", user.get("user_id")),
         "username": user.get("username", ""),
@@ -61,6 +66,7 @@ def _user_payload(user):
         "nickname": user.get("nickname") or user.get("username", ""),
         "presence": user.get("presence", "online"),
         "two_factor_enabled": user.get("two_factor_enabled", False),
+        "csrf_token": session.get(CSRF_SESSION_KEY),
     }
 
 
@@ -174,6 +180,7 @@ def login():
         session["username"] = user["username"]
         session["role"] = user["role"]
         session[SESSION_TOKEN_KEY] = manager_session_token or issue_session_token(user["id"])
+        session[CSRF_SESSION_KEY] = secrets.token_urlsafe(32)
         session.permanent = True
         current_app.permanent_session_lifetime = timedelta(days=7)
 
@@ -234,6 +241,8 @@ def get_auth_status():
         user = _get_user_manager().get_user_by_id(session["user_id"])
         if not user:
             return error_response("User not found", 404, "User not found")
+        session["username"] = user.get("username", session.get("username"))
+        session["role"] = user.get("role", session.get("role", "USER"))
 
         logger.debug(
             "Auth status user_id=%s username=%s ip=%s",
@@ -241,10 +250,115 @@ def get_auth_status():
             session["username"],
             request.remote_addr,
         )
-        return success_response(_user_payload(user), "Logged in")
+        payload = _user_payload(user)
+        if session.get("impersonation_mode"):
+            payload["impersonation_mode"] = True
+            payload["impersonated_by"] = session.get("impersonation_original_user_id")
+            payload["impersonated_by_username"] = session.get("impersonation_original_username")
+        return success_response(payload, "Logged in")
     except Exception as exc:
         logger.exception("Failed to get auth status")
         return error_response("Failed to get auth status", 500, str(exc))
+
+
+@bp.route("/api/auth/impersonation/start", methods=["POST"])
+@require_permission_node("accounts.manage_users")
+def start_impersonation():
+    try:
+        if session.get("impersonation_mode"):
+            return error_response("Already impersonating a user", 400, "Already impersonating")
+
+        request_data = request.get_json(silent=True) or {}
+        target_user_id = request_data.get("user_id")
+        if target_user_id is None:
+            return error_response("Please provide user_id", 400, "No user_id")
+        try:
+            target_user_id = int(target_user_id)
+        except (TypeError, ValueError):
+            return error_response("Invalid user_id", 400, "Invalid user_id")
+
+        manager = _get_user_manager()
+        target_user = manager.get_user_by_id(target_user_id)
+        if not target_user:
+            return error_response("User not found", 404, "User not found")
+        if target_user.get("status") != "active":
+            return error_response("Only active users can be impersonated", 400, "User is not active")
+
+        original_user = {
+            "user_id": session.get("user_id"),
+            "username": session.get("username", ""),
+            "role": session.get("role", "USER"),
+            "session_token": session.get(SESSION_TOKEN_KEY),
+            "csrf_token": session.get(CSRF_SESSION_KEY),
+        }
+
+        session["impersonation_mode"] = True
+        session["impersonation_original_user_id"] = original_user["user_id"]
+        session["impersonation_original_username"] = original_user["username"]
+        session["impersonation_original_role"] = original_user["role"]
+        session["impersonation_original_session_token"] = original_user["session_token"]
+        session["impersonation_original_csrf_token"] = original_user["csrf_token"]
+        session["user_id"] = target_user["id"]
+        session["username"] = target_user["username"]
+        session["role"] = target_user["role"]
+        session[SESSION_TOKEN_KEY] = f"impersonation:{uuid.uuid4().hex}"
+        session[CSRF_SESSION_KEY] = secrets.token_urlsafe(32)
+        session.permanent = True
+        current_app.permanent_session_lifetime = timedelta(days=7)
+
+        log_user_action(
+            logger,
+            user_action_text(original_user["username"], "模拟登录了用户"),
+            操作者ID=original_user["user_id"],
+            目标用户ID=target_user["id"],
+            目标用户名=target_user["username"],
+        )
+        payload = _user_payload(target_user)
+        payload["impersonation_mode"] = True
+        payload["impersonated_by"] = original_user["user_id"]
+        payload["impersonated_by_username"] = original_user["username"]
+        return success_response(payload, "Impersonation started")
+    except Exception as exc:
+        logger.exception("Failed to start impersonation")
+        return error_response("Failed to start impersonation", 500, str(exc))
+
+
+@bp.route("/api/auth/impersonation/stop", methods=["POST"])
+def stop_impersonation():
+    try:
+        if not session.get("impersonation_mode"):
+            return error_response("Not impersonating a user", 400, "Not impersonating")
+
+        original_user_id = session.get("impersonation_original_user_id")
+        original_username = session.get("impersonation_original_username", "")
+        original_role = session.get("impersonation_original_role", "USER")
+        original_token = session.get("impersonation_original_session_token")
+        original_csrf_token = session.get("impersonation_original_csrf_token")
+        if original_user_id is None or not original_token:
+            return error_response("Impersonation session is incomplete", 400, "Impersonation data missing")
+
+        session.clear()
+        session["user_id"] = original_user_id
+        session["username"] = original_username
+        session["role"] = original_role
+        session[SESSION_TOKEN_KEY] = original_token
+        session[CSRF_SESSION_KEY] = original_csrf_token or secrets.token_urlsafe(32)
+        session.permanent = True
+        current_app.permanent_session_lifetime = timedelta(days=7)
+
+        user = _get_user_manager().get_user_by_id(original_user_id)
+        if not user:
+            return error_response("User not found", 404, "User not found")
+
+        log_user_action(
+            logger,
+            user_action_text(original_username, "退出了模拟登录"),
+            用户ID=original_user_id,
+        )
+        return success_response(_user_payload(user), "Impersonation stopped")
+    except Exception as exc:
+        logger.exception("Failed to stop impersonation")
+        return error_response("Failed to stop impersonation", 500, str(exc))
 
 
 @bp.route("/api/auth/update", methods=["POST"])

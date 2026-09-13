@@ -5,7 +5,6 @@
   "icon": "/assets/aiplatform/siliconflow.png",
   "enabled": false,
   "config": {
-    "api_key": "",
     "base_url": "https://api.siliconflow.cn/v1",
     "timeout": 30,
     "headers": {

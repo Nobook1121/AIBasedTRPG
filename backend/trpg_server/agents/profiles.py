@@ -6,11 +6,18 @@ from typing import Any
 DEFAULT_KP_TOOLS = [
     "room.get_room_snapshot",
     "room.get_scenario_context",
+    "room.get_scenario_module",
+    "room.activate_scenario_scene",
     "room.get_character_cards",
     "room.get_memory",
     "room.remember_fact",
     "dice.roll_coc_check",
+    "dice.roll",
+    "dice.roll_dice",
     "check.roll_room_check",
+    "san.roll_sanity_check",
+    "sanity.roll_sanity_check",
+    "trigger.reveal_scenario_trigger",
 ]
 
 
@@ -25,10 +32,15 @@ class AgentProfile:
     context_providers: list[str] = field(default_factory=list)
 
 
-def resolve_agent_profile(role: dict[str, Any], prompt_file: Path) -> AgentProfile:
+def resolve_agent_profile(
+    role: dict[str, Any],
+    prompt_file: Path,
+    *,
+    prefer_prompt_file: bool = False,
+) -> AgentProfile:
     role_id = str(role.get("id") or "kp")
     prompt = str(role.get("prompt") or "")
-    if role_id == "kp" and not prompt and prompt_file.exists():
+    if role_id == "kp" and prompt_file.exists() and (prefer_prompt_file or not prompt):
         prompt = prompt_file.read_text(encoding="utf-8")
 
     configured_tools = role.get("tools")

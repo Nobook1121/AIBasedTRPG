@@ -35,10 +35,60 @@
     margin-bottom: 10px;
 }
 
+.scenario-card-meta {
+    display: grid;
+    gap: 4px;
+    color: var(--color-text-muted);
+    font-size: 0.88rem;
+}
+
+.scenario-card-meta p {
+    margin: 0;
+}
+
 .scenario-card-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 10px;
     margin-top: 10px;
+}
+
+.scenario-id-chip {
+    margin-top: 10px;
+    color: var(--color-text-muted);
+    font-size: 0.78rem;
+    text-align: right;
+}
+
+.long-press-confirm {
+    position: relative;
+    overflow: hidden;
+}
+
+.long-press-confirm::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    width: 0;
+    background: rgba(180, 180, 180, 0.24);
+    pointer-events: none;
+}
+
+.long-press-confirm.holding::before {
+    width: 100%;
+    transition: width 1.2s linear;
+}
+
+.personal-home-panel {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 0;
+}
+
+.personal-home-panel img {
+    border-radius: 50%;
+    border: 1px solid var(--border-subtle);
 }
 
 .scenario-preview {
@@ -80,10 +130,375 @@
     margin: 0 0 8px;
 }
 
+.scenario-preview-meta {
+    display: grid;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.scenario-preview-notes {
+    margin-bottom: 10px;
+}
+
 .scenario-preview-section,
 .scenario-preview-segment {
     margin: 0 0 8px;
     padding: 0;
+}
+
+.scenario-basic-layout {
+    display: grid;
+    grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+}
+
+.scenario-basic-main {
+    display: grid;
+    gap: 12px;
+}
+
+.scenario-basic-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.scenario-basic-grid .form-group,
+.scenario-module-field {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+}
+
+.scenario-module-field-head {
+    display: flex;
+    gap: 8px;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.scenario-basic-grid span,
+.scenario-module-field span {
+    color: var(--color-text);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.scenario-basic-layout > .scenario-cover-field {
+    grid-column: auto;
+}
+
+.scenario-basic-layout > .scenario-notes-field {
+    grid-column: auto;
+}
+
+.scenario-cover-field .cover-upload-container {
+    display: grid;
+    gap: 10px;
+    justify-items: start;
+}
+
+.scenario-cover-field .cover-preview {
+    width: 100%;
+    max-width: 260px;
+}
+
+.scenario-cover-field .cover-preview img {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 2 / 3;
+    object-fit: cover;
+}
+
+.scenario-module-toolbar {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: center;
+    margin-top: 18px;
+    padding: 14px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--color-panel);
+}
+
+.scenario-module-toolbar h6 {
+    margin: 0 0 4px;
+}
+
+.scenario-module-toolbar > div:first-child {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.scenario-module-toolbar-actions {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    align-items: center;
+    margin-left: auto;
+}
+
+.scenario-module-toolbar-actions .form-select {
+    min-width: 220px;
+    flex: 1 1 220px;
+}
+
+.scenario-module-toolbar-actions .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+.scenario-open-ending-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 14px;
+    color: var(--color-text);
+    font-weight: 700;
+}
+
+.scenario-module-list {
+    display: grid;
+    gap: 16px;
+    margin-top: 16px;
+}
+
+.scenario-module-item {
+    display: grid;
+    gap: 14px;
+    padding: 16px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--color-panel);
+    box-shadow: var(--shadow-sm);
+}
+
+.scenario-module-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+.scenario-module-index {
+    margin: 0 0 4px;
+    color: var(--color-primary);
+    font-size: 0.82rem;
+    font-weight: 800;
+}
+
+.scenario-module-description {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: 0.86rem;
+}
+
+.scenario-module-header-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.scenario-module-order-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.scenario-module-icon-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background: var(--color-panel-muted);
+    color: var(--color-text);
+}
+
+.scenario-module-icon-button:hover:not(:disabled) {
+    background: var(--color-panel);
+    color: var(--color-primary);
+}
+
+.scenario-module-icon-button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.scenario-module-summary-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+
+.scenario-module-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.scenario-module-toggle {
+    align-content: end;
+}
+
+.scenario-module-toggle input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--color-primary);
+}
+
+.scenario-module-content-panel,
+.scenario-module-extra {
+    display: grid;
+    gap: 12px;
+}
+
+.scenario-module-extra[hidden],
+.scenario-module-content-panel[hidden] {
+    display: none !important;
+}
+
+.scenario-module-timeline-grid {
+    display: grid;
+    gap: 10px;
+}
+
+.scenario-module-timeline-row {
+    display: grid;
+    grid-template-columns: minmax(180px, 0.9fr) minmax(0, 1.6fr) auto;
+    gap: 10px;
+    align-items: start;
+    padding: 12px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background: var(--color-panel-muted);
+}
+
+.scenario-preview-timeline {
+    display: grid;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.scenario-module-panel-title,
+.scenario-module-section-title {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    align-items: center;
+}
+
+.scenario-module-section-title {
+    margin-top: 4px;
+    color: var(--color-text);
+    font-weight: 800;
+}
+
+.scenario-module-triggers,
+.scenario-module-custom-inputs,
+.scenario-module-list[data-skill-list],
+.scenario-module-list[data-weapon-list] {
+    display: grid;
+    gap: 10px;
+}
+
+.scenario-trigger-item,
+.scenario-module-custom-row,
+.scenario-module-stat-row,
+.scenario-module-weapon-row {
+    display: grid;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background: var(--color-panel-muted);
+}
+
+.scenario-trigger-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+    gap: 8px;
+    align-items: end;
+}
+
+.scenario-trigger-upload {
+    display: grid;
+    gap: 8px;
+}
+
+.scenario-trigger-preview {
+    color: var(--color-muted);
+    font-size: 0.82rem;
+    overflow-wrap: anywhere;
+}
+
+.scenario-trigger-preview img {
+    display: block;
+    max-width: min(100%, 420px);
+    max-height: 240px;
+    object-fit: contain;
+    border-radius: 6px;
+}
+
+.scenario-module-entity-top {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.scenario-module-attribute-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.scenario-attribute-grid {
+    display: grid;
+    gap: 10px;
+}
+
+.scenario-module-attribute,
+.scenario-module-battle-field {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+}
+
+.scenario-module-attribute span,
+.scenario-module-battle-field span {
+    color: var(--color-text);
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.scenario-module-battle-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.scenario-module-stat-row {
+    grid-template-columns: minmax(180px, 1.1fr) 120px auto;
+    align-items: center;
+}
+
+.scenario-module-weapon-row {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) repeat(4, minmax(92px, 1fr)) auto;
+    align-items: center;
+}
+
+.scenario-module-custom-row {
+    grid-template-columns: minmax(160px, 0.8fr) minmax(0, 1.4fr) auto auto;
+    align-items: start;
 }
 
 /* COC7 角色卡管理样式 */
@@ -148,6 +563,12 @@
 
 .chat-command-header {
     margin: 18px 24px 10px;
+}
+
+.home-room-meta {
+    margin: 6px 0 0;
+    color: var(--color-muted);
+    font-size: 0.95rem;
 }
 
 .character-kicker {
@@ -250,6 +671,38 @@
     gap: 18px;
 }
 
+.character-gallery-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    margin-bottom: 16px;
+}
+
+.character-gallery-toolbar .skill-filter-strip {
+    margin-bottom: 0;
+}
+
+.character-gallery-search {
+    position: relative;
+    display: block;
+    width: min(360px, 100%);
+    margin: 0;
+}
+
+.character-gallery-search .fa {
+    position: absolute;
+    top: 50%;
+    left: 12px;
+    color: var(--color-muted);
+    transform: translateY(-50%);
+    pointer-events: none;
+}
+
+.character-gallery-search .form-control {
+    padding-left: 34px;
+}
+
 .character-empty-filter {
     grid-column: 1 / -1;
     padding: 24px;
@@ -263,8 +716,9 @@
 .character-card {
     display: flex;
     flex-direction: column;
+    position: relative;
     min-height: 210px;
-    padding: 15px;
+    padding: 15px 84px 15px 15px;
     color: var(--color-text);
     cursor: pointer;
     transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
@@ -284,6 +738,35 @@
     margin: 6px 0;
     color: var(--color-muted);
     font-size: 0.86rem;
+}
+
+.character-card-avatar {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    overflow: hidden;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--color-primary);
+    background: var(--color-panel-muted);
+}
+
+.character-card-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.character-card-meta {
+    display: grid;
+    gap: 4px;
+    margin: 0 0 10px;
+    color: var(--color-muted);
+    font-size: 0.76rem;
 }
 
 .character-card-metrics,
@@ -452,6 +935,45 @@
     margin: 0 0 10px;
     color: var(--color-text);
     font-size: 1rem;
+}
+
+.character-detail-band-head {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.character-detail-band-head h4 {
+    margin: 0;
+}
+
+.character-attribute-summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    width: fit-content;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-text);
+    font-size: 0.9rem;
+}
+
+.character-attribute-summary span {
+    color: var(--color-muted);
+    font-weight: 600;
+}
+
+.character-attribute-summary strong {
+    margin-left: auto;
+    font-variant-numeric: tabular-nums;
+}
+
+.character-attribute-summary-inline {
+    margin-bottom: 0;
+    align-self: flex-end;
 }
 
 .character-detail-band-vitals .character-vital-grid {
@@ -1470,6 +1992,28 @@
         flex-direction: column;
     }
 
+    .scenario-basic-layout,
+    .scenario-basic-grid,
+    .scenario-module-grid,
+    .scenario-module-entity-top,
+    .scenario-module-battle-grid,
+    .scenario-trigger-grid,
+    .scenario-module-timeline-row,
+    .scenario-module-stat-row,
+    .scenario-module-weapon-row,
+    .scenario-module-custom-row {
+        grid-template-columns: 1fr;
+    }
+
+    .character-gallery-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .character-gallery-search {
+        width: 100%;
+    }
+
     .character-vital-grid,
     .character-attribute-grid,
     .background-grid,
@@ -1485,6 +2029,29 @@
     .character-basic-info-layout,
     .character-basic-row {
         grid-template-columns: 1fr;
+    }
+
+    .scenario-module-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .scenario-module-toolbar-actions {
+        width: 100%;
+    }
+
+    .scenario-module-toolbar-actions .form-select,
+    .scenario-module-toolbar-actions .btn {
+        width: 100%;
+    }
+
+    .scenario-module-header {
+        flex-direction: column;
+    }
+
+    .scenario-module-header-actions {
+        width: 100%;
+        justify-content: space-between;
     }
 }
 

@@ -1,0 +1,27 @@
+{
+  "platform": "openai",
+  "name": "OpenAI",
+  "description": "OpenAI兼容聊天完成接口",
+  "enabled": false,
+  "config": {
+    "base_url": "https://api.openai.com/v1/chat/completions",
+    "timeout": 30,
+    "headers": {"Content-Type": "application/json"}
+  },
+  "models": [
+    {
+      "id": "gpt-4o",
+      "name": "GPT-4o",
+      "enabled": true,
+      "params": {"context_window": 128000, "temperature": 0.7, "max_tokens": 4096}
+    }
+  ],
+  "small_models": {
+    "intent_classification": {"id": "gpt-4o-mini", "name": "GPT-4o mini", "enabled": true},
+    "state_update": {"id": "gpt-4o-mini", "name": "GPT-4o mini", "enabled": true},
+    "summarization": {"id": "gpt-4o-mini", "name": "GPT-4o mini", "enabled": true},
+    "schema_repair": {"id": "gpt-4o-mini", "name": "GPT-4o mini", "enabled": true}
+  },
+  "auth_method": "api_key",
+  "version": "1.0.0"
+}

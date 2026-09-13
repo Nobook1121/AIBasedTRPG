@@ -141,6 +141,49 @@ class ScenarioModel {
         return this.createScenario(input);
     }
 
+    /** Convert source text on the server without creating a scenario. */
+    async convertScript(text: string, title = "Imported scenario"): Promise<ScenarioInput> {
+        const { response, data } = await TrpgApi.requestWithResponse<ApiResponse<ScenarioInput>>(
+            `${this.apiBaseUrl}/scenarios/import`,
+            { method: "POST", body: { text, title } },
+        );
+        if (!response.ok || !data.success || !data.data) {
+            throw new Error(data.message || data.error || `Script import failed: ${response.status}`);
+        }
+        return data.data;
+    }
+
+    async convertScriptFile(file: File, title = "Imported scenario"): Promise<ScenarioInput> {
+        const formData = new FormData();
+        formData.append("file", file, file.name);
+        formData.append("title", title);
+        const { response, data } = await TrpgApi.requestWithResponse<ApiResponse<ScenarioInput>>(
+            `${this.apiBaseUrl}/scenarios/import`,
+            { method: "POST", body: formData },
+        );
+        if (!response.ok || !data.success || !data.data) {
+            throw new Error(data.message || data.error || `Script import failed: ${response.status}`);
+        }
+        return data.data;
+    }
+
+    async loadDraft(): Promise<ScenarioInput | null> {
+        const { response, data } = await TrpgApi.requestWithResponse<ApiResponse<ScenarioInput | null>>(`${this.apiBaseUrl}/scenarios/draft`);
+        if (!response.ok || !data.success) throw new Error(data.message || data.error || "加载草稿失败");
+        return data.data || null;
+    }
+
+    async saveDraft(scenarioData: ScenarioInput): Promise<ScenarioInput> {
+        const { response, data } = await TrpgApi.requestWithResponse<ApiResponse<ScenarioInput>>(`${this.apiBaseUrl}/scenarios/draft`, { method: "POST", body: scenarioData });
+        if (!response.ok || !data.success || !data.data) throw new Error(data.message || data.error || "保存草稿失败");
+        return data.data;
+    }
+
+    async discardDraft(): Promise<void> {
+        const { response, data } = await TrpgApi.requestWithResponse<ApiResponse>(`${this.apiBaseUrl}/scenarios/draft`, { method: "DELETE" });
+        if (!response.ok || !data.success) throw new Error(data.message || data.error || "舍弃草稿失败");
+    }
+
     validateScenarioData(data: unknown): data is ScenarioInput {
         return isScenarioInput(data);
     }
@@ -163,16 +206,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null;
 }
 
-function isScenarioSegment(value: unknown): value is ScenarioSegment {
+function isScenarioModule(value: unknown): value is ScenarioModule {
     if (!isRecord(value)) return false;
-    return typeof value.id === "number"
-        && typeof value.content === "string"
-        && typeof value.marker === "string";
+    return typeof value.id === "string"
+        && typeof value.module_type === "string"
+        && typeof value.title === "string"
+        && typeof value.summary === "string";
 }
 
-function normalizeSegmentList(value: unknown): ScenarioSegment[] {
+function normalizeModuleList(value: unknown): ScenarioModule[] {
     if (!Array.isArray(value)) return [];
-    return value.filter(isScenarioSegment);
+    return value.filter(isScenarioModule);
 }
 
 function isScenarioInput(data: unknown): data is ScenarioInput {
@@ -183,8 +227,7 @@ function isScenarioInput(data: unknown): data is ScenarioInput {
     const playerCount = data.playerCount;
     if (typeof playerCount !== "number" || !Number.isFinite(playerCount)) return false;
 
-    if (data.scenes !== undefined && !Array.isArray(data.scenes)) return false;
-    if (data.endings !== undefined && !Array.isArray(data.endings)) return false;
+    if (data.modules !== undefined && !Array.isArray(data.modules)) return false;
     return true;
 }
 
@@ -192,12 +235,8 @@ function isScenario(data: unknown): data is Scenario {
     if (!isScenarioInput(data) || !isRecord(data)) return false;
     if (typeof data.id !== "number") return false;
 
-    const scenes = normalizeSegmentList(data.scenes);
-    const endings = normalizeSegmentList(data.endings);
-    if ((Array.isArray(data.scenes) && scenes.length !== data.scenes.length)
-        || (Array.isArray(data.endings) && endings.length !== data.endings.length)) {
-        return false;
-    }
+    const modules = normalizeModuleList(data.modules);
+    if (Array.isArray(data.modules) && modules.length !== data.modules.length) return false;
     return true;
 }
 

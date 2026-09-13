@@ -2,6 +2,7 @@ interface ChatRoleConfig {
     id: string;
     name: string;
     wake_words?: string[];
+    avatar?: string;
 }
 
 interface PendingAIMessage {
@@ -22,7 +23,15 @@ interface ChatApiResponse {
     error?: string;
     message?: string;
     token_count?: number;
+    direct_message?: ChatMessage;
+    direct_messages?: ChatMessage[];
     tool_messages?: ChatMessage[];
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    cached_tokens?: number;
+    cache_hit_rate?: number;
+    elapsed_ms?: number;
+    cache_key?: string;
 }
 
 interface IncomingSocketMessage {
@@ -36,17 +45,22 @@ interface IncomingSocketMessage {
 }
 
 let isAIThinking = false;
+let chatReadOnly = false;
 let messageTimestamps: number[] = [];
 let pendingMessages: PendingAIMessage[] = [];
 let aiName = "KP";
+let aiAvatar = "/assets/avatars/default_kp.jpg";
 let aiRoles: ChatRoleConfig[] = [{ id: "kp", name: "KP", wake_words: ["@KP"] }];
 let socket: SocketLike | null = null;
 const thinkingTimers = new Map<string, number>();
+const THINKING_STORAGE_KEY = "trpg_ai_thinking";
 
 const COMMAND_DEFINITIONS: CommandDefinition[] = [
     { name: "/dice", usage: "/dice {dice}", description: "掷骰" },
     { name: "/check", usage: "/check {*玩家名} {*技能/属性名} {困难/极难} {调整值}", description: "属性或技能鉴定" },
+    { name: "/sc", usage: "/sc {玩家名} {成功变化/失败变化}", description: "理智检定并结算 SAN" },
     { name: "/record", usage: "/record {damage/san} {username} {int} {reason?}", description: "管理员记录房间角色伤害或 San 损失" },
+    { name: "/trigger", usage: "/trigger {触发器编号}", description: "触发场景触发器" },
 ];
 
 function getCurrentUsername(): string {
@@ -73,13 +87,19 @@ function initChat(): void {
     const activeSendButton = sendButton;
 
     updateAIHint();
+    updateInputState(activeChatInput, activeSendButton);
     void loadAIRoles();
     initWebSocket();
     initCommandPalette(activeChatInput);
+    restoreThinkingState();
 
     async function sendMessage(): Promise<void> {
         const rawMessage = activeChatInput.value.trim();
         if (!rawMessage) return;
+        if (chatReadOnly) {
+            showNotification("隐身查看时不能发送消息", "error");
+            return;
+        }
         if (!window.currentUser) {
             showNotification("请先登录后再发送消息", "error");
             showAuthModal?.();
@@ -119,13 +139,24 @@ function initChat(): void {
             return;
         }
 
-        const commandResult = await window.toolManager?.handleCommand(message) || null;
+        if (message.toLowerCase().startsWith("/trigger")) {
+            activeChatInput.value = "";
+            await sendVisibleMessage("player", message);
+            const triggerResult = await handleTriggerCommand(message);
+            if (triggerResult) {
+                renderRoomMessage(triggerResult);
+                broadcastMessage(triggerResult);
+            }
+            return;
+        }
+
+        const commandResult = window.toolManager?.handleCommand(message) || null;
         activeChatInput.value = "";
 
         if (commandResult) {
             await sendVisibleMessage("player", message);
             const lowerMessage = message.toLowerCase();
-            const commandType = lowerMessage.startsWith("/dice") || lowerMessage.startsWith("/check") ? "dice" : "system";
+            const commandType = lowerMessage.startsWith("/dice") || lowerMessage.startsWith("/check") || lowerMessage.startsWith("/sc") ? "dice" : "system";
             window.setTimeout(() => {
                 void sendVisibleMessage(commandType, commandResult);
             }, 300);
@@ -153,8 +184,11 @@ function initChat(): void {
     activeSendButton.addEventListener("click", () => {
         void sendMessage();
     });
-    activeChatInput.addEventListener("keypress", (event) => {
-        if (event.key === "Enter") void sendMessage();
+    activeChatInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault();
+            void sendMessage();
+        }
     });
 }
 
@@ -168,6 +202,7 @@ function isRateLimited(rateLimit: number): boolean {
 
 async function sendToAI(chatInput: HTMLInputElement, sendButton: HTMLButtonElement): Promise<void> {
     if (pendingMessages.length === 0) return;
+    const requestMessages = pendingMessages.slice();
 
     isAIThinking = true;
     updateInputState(chatInput, sendButton);
@@ -177,14 +212,15 @@ async function sendToAI(chatInput: HTMLInputElement, sendButton: HTMLButtonEleme
     const startTime = Date.now();
     const role = pendingMessages[0]?.role || aiRoles[0] || { id: "kp", name: "KP" };
     addThinkingMessage(thinkingMessageId, role.name || "KP", startTime);
+    persistThinkingState({ id: thinkingMessageId, roomId: getCurrentRoom()?.id || null, roleName: role.name || "KP", roleId: role.id || "kp", content: pendingMessages.map((message) => message.content).join("\n"), startedAt: startTime });
     broadcastAIThinkingStart(aiRequestId, role.name || "KP", startTime);
 
     try {
         const { response, data } = await TrpgApi.requestWithResponse<ChatApiResponse>("/api/chat", {
             method: "POST",
             body: {
-                content: pendingMessages.map((message) => message.content).join("\n"),
-                messages: pendingMessages,
+                content: requestMessages.map((message) => message.content).join("\n"),
+                messages: requestMessages,
                 role_id: role.id || "kp",
                 user_id: getCurrentUserId(),
                 room_id: getCurrentRoom()?.id || null,
@@ -199,8 +235,23 @@ async function sendToAI(chatInput: HTMLInputElement, sendButton: HTMLButtonEleme
         const messageContent = data.content || data.error || "AI 回复失败: 未知错误";
         const toolMessages = data.tool_messages || [];
 
-        pendingMessages = [];
+        pendingMessages = pendingMessages.slice(requestMessages.length);
+        const toolMessages = data.tool_messages || [];
+        const directMessages = data.direct_messages
+            || (data.direct_message ? [data.direct_message] : []);
+        for (const toolMessage of toolMessages) {
+            const visibleMessage = await persistDirectRoomMessage(toolMessage);
+            if (visibleMessage) {
+                renderRoomMessage(visibleMessage);
+                broadcastMessage(visibleMessage);
+            }
+        }
+        if (toolMessages.length > 0) {
+            moveThinkingMessageToEnd(thinkingMessageId);
+        }
+        replaceThinkingMessage(thinkingMessageId, messageContent, processingTime, tokenCount, data.cache_hit_rate ?? null);
         broadcastAIThinkingEnd(aiRequestId);
+        clearPersistedThinkingState(aiRequestId);
 
         if (toolMessages.length > 0) {
             clearThinkingMessage(thinkingMessageId);
@@ -219,6 +270,11 @@ async function sendToAI(chatInput: HTMLInputElement, sendButton: HTMLButtonEleme
             roleId: role.id,
             aiRequestId,
             senderName: role.name || "KP",
+            promptTokens: data.prompt_tokens,
+            completionTokens: data.completion_tokens,
+            cachedTokens: data.cached_tokens,
+            cacheHitRate: data.cache_hit_rate,
+            cacheKey: data.cache_key,
         });
         if (persisted) {
             persisted.sender_name = role.name || "KP";
@@ -227,24 +283,89 @@ async function sendToAI(chatInput: HTMLInputElement, sendButton: HTMLButtonEleme
             }
             broadcastMessage(persisted);
         }
+
+        for (const directMessage of directMessages) {
+            const persistedDirectMessage = await persistDirectRoomMessage(directMessage);
+            if (persistedDirectMessage) {
+                renderRoomMessage(persistedDirectMessage);
+                broadcastMessage(persistedDirectMessage);
+            }
+        }
+
     } catch (error) {
         const processingTime = Math.round((Date.now() - startTime) / 1000);
         replaceThinkingMessage(thinkingMessageId, `AI 回复失败: ${chatErrorMessage(error)}`, processingTime, null);
         broadcastAIThinkingEnd(aiRequestId);
+        clearPersistedThinkingState(aiRequestId);
         pendingMessages = [];
     } finally {
         isAIThinking = false;
         updateInputState(chatInput, sendButton);
+        if (pendingMessages.length > 0) {
+            void sendToAI(chatInput, sendButton);
+        }
     }
 }
 
 function updateInputState(chatInput: HTMLInputElement, sendButton: HTMLButtonElement): void {
-    chatInput.disabled = isAIThinking;
-    sendButton.disabled = isAIThinking;
+    const lockInput = document.getElementById("enableAIResponseLock") as HTMLInputElement | null;
+    const locked = isAIThinking && Boolean(lockInput?.checked);
+    chatInput.disabled = chatReadOnly || locked;
+    sendButton.disabled = chatReadOnly || locked;
+}
+
+function setChatReadOnly(readOnly: boolean): void {
+    chatReadOnly = readOnly;
+    const chatInput = document.getElementById("chatInput") as HTMLInputElement | null;
+    const sendButton = document.getElementById("sendButton") as HTMLButtonElement | null;
+    if (chatInput && sendButton) updateInputState(chatInput, sendButton);
 }
 
 function isCurrentUserAdmin(): boolean {
     return ["ADMIN", "OWNER"].includes(window.currentUser?.role || "");
+}
+
+function canManageCurrentRoom(): boolean {
+    if (isCurrentUserAdmin()) return true;
+    const room = getCurrentRoom();
+    if (!room) return false;
+    if (String(room.creator_id ?? room.owner_id ?? "") === String(getCurrentUserId() ?? "")) return true;
+    const member = room.members?.find((item) => String(item.user_id) === String(getCurrentUserId() ?? ""));
+    return member?.room_role === "owner" || member?.room_role === "admin";
+}
+
+async function handleTriggerCommand(command: string): Promise<ChatMessage | null> {
+    if (!canManageCurrentRoom()) {
+        showNotification("只有房主或房间管理员可以触发场景内容", "error");
+        return null;
+    }
+
+    const room = getCurrentRoom();
+    if (!room?.id) {
+        showNotification("请先进入房间", "error");
+        return null;
+    }
+
+    const parts = command.trim().split(/\s+/);
+    const triggerId = Number.parseInt(parts[1] || "", 10);
+    if (!Number.isInteger(triggerId) || triggerId < 1 || parts[1] !== String(triggerId)) {
+        showNotification("用法：/trigger {正整数触发器编号}", "error");
+        return null;
+    }
+
+    try {
+        const response = await TrpgApi.post<ApiResponse<ChatMessage>>(`/api/rooms/${encodeURIComponent(room.id)}/triggers`, {
+            trigger_id: triggerId,
+        });
+        if (!response.success || !response.data) {
+            showNotification(response.error || response.message || "触发器执行失败", "error");
+            return null;
+        }
+        return response.data;
+    } catch (error) {
+        showNotification(`触发器执行失败：${chatErrorMessage(error)}`, "error");
+        return null;
+    }
 }
 
 async function handleRecordCommand(command: string): Promise<string> {
@@ -349,10 +470,15 @@ function showCommandPalette(chatInput: HTMLInputElement, palette: HTMLElement): 
     palette.style.display = "block";
 }
 
-async function sendVisibleMessage(type: string, content: string): Promise<ChatMessage | null> {
+async function sendVisibleMessage(
+    type: string,
+    content: string,
+    metadata: Record<string, unknown> = {},
+): Promise<ChatMessage | null> {
     const room = getCurrentRoom();
     if (room) {
-        const message = await persistRoomMessage(type, content);
+        if (room.invisible_view) return null;
+        const message = await persistRoomMessage(type, content, metadata);
         if (message) {
             renderRoomMessage(message);
             broadcastMessage(message);
@@ -371,9 +497,25 @@ async function sendVisibleMessage(type: string, content: string): Promise<ChatMe
     return null;
 }
 
+async function persistDirectRoomMessage(message: ChatMessage): Promise<ChatMessage | null> {
+    if (!message.content) return null;
+    const room = getCurrentRoom();
+    if (!room) return message;
+    if (room.invisible_view) return null;
+    const response = await TrpgApi.post<ApiResponse<ChatMessage>>(`/api/rooms/${room.id}/messages`, {
+        type: message.type || "trigger",
+        content: message.content,
+        sender_name: message.sender_name || message.sender || "触发器",
+        avatar: message.avatar,
+        metadata: message.metadata || {},
+    });
+    if (!response.success) throw new Error(response.message || "保存直接消息失败");
+    return response.data || null;
+}
+
 async function persistRoomMessage(type: string, content: string, metadata: Record<string, unknown> = {}): Promise<ChatMessage | null> {
     const room = getCurrentRoom();
-    if (!room) return null;
+    if (!room || room.invisible_view) return null;
 
     const payload: ChatMessage = {
         type,
@@ -399,6 +541,7 @@ async function loadAIRoles(): Promise<void> {
         if (response.success && response.data?.roles?.length) {
             aiRoles = response.data.roles;
             aiName = aiRoles[0]?.name || "KP";
+            aiAvatar = aiRoles[0]?.avatar || "/assets/avatars/default_kp.jpg";
             updateAIHint();
         }
     } catch (error) {
@@ -474,6 +617,7 @@ function addMessage(
     isThinking = false,
     processingTime: number | null = null,
     tokenCount: number | null = null,
+    cacheHitRate: number | null = null,
     message: ChatMessage | null = null,
 ): string | number {
     const resolvedMessageId = messageId || Date.now();
@@ -501,16 +645,16 @@ function addMessage(
         sender,
         displayTime,
         contentHtml: renderedContent,
-        processingHtml: renderProcessingTime(type, processingTime, tokenCount),
+        processingHtml: renderProcessingTime(type, processingTime, tokenCount, cacheHitRate),
     });
     chatHistory.appendChild(messageDiv);
     chatHistory.scrollTop = chatHistory.scrollHeight;
     return resolvedMessageId;
 }
 
-function renderProcessingTime(type: string, processingTime: number | null, tokenCount: number | null): string {
+function renderProcessingTime(type: string, processingTime: number | null, tokenCount: number | null, cacheHitRate: number | null = null): string {
     if (processingTime === null || type !== "kp") return "";
-    return window.TrpgTemplates.render("chat-processing-time", { text: processingTimeText(processingTime, tokenCount) });
+    return window.TrpgTemplates.render("chat-processing-time", { text: processingTimeText(processingTime, tokenCount, cacheHitRate) });
 }
 
 function addThinkingMessage(messageId: string | number, roleName = "KP", startedAt = Date.now()): void {
@@ -523,13 +667,13 @@ function addThinkingMessage(messageId: string | number, roleName = "KP", started
     startThinkingElapsedTimer(String(messageId), startedAt);
 }
 
-function replaceThinkingMessage(messageId: string | number, newContent: string, processingTime: number, tokenCount: number | null): void {
+function replaceThinkingMessage(messageId: string | number, newContent: string, processingTime: number, tokenCount: number | null, cacheHitRate: number | null = null): void {
     stopThinkingElapsedTimer(String(messageId));
     const targetMessage = document.querySelector<HTMLElement>(`.message.thinking.kp-message[data-ai-request-id="${String(messageId)}"]`)
         || document.querySelector<HTMLElement>(`.message[data-id="${messageId}"]`);
 
     if (!targetMessage) {
-        addMessage("kp", "KP", newContent, null, false, processingTime, tokenCount);
+        addMessage("kp", "KP", newContent, null, false, processingTime, tokenCount, cacheHitRate);
         return;
     }
 
@@ -547,15 +691,16 @@ function replaceThinkingMessage(messageId: string | number, newContent: string, 
         targetMessage.querySelector(".message-content-container")?.appendChild(processingTimeDiv);
     }
 
-    processingTimeDiv.textContent = processingTimeText(processingTime, tokenCount);
+    processingTimeDiv.textContent = processingTimeText(processingTime, tokenCount, cacheHitRate);
 
     const chatHistory = document.getElementById("chatHistory");
     if (chatHistory) chatHistory.scrollTop = chatHistory.scrollHeight;
 }
 
-function processingTimeText(processingTime: number, tokenCount: number | null = null): string {
+function processingTimeText(processingTime: number, tokenCount: number | null = null, cacheHitRate: number | null = null): string {
     let displayText = `已耗时: ${processingTime}秒`;
     if (tokenCount !== null) displayText += ` 消耗Token：${tokenCount}`;
+    if (cacheHitRate !== null) displayText += ` 缓存命中率：${cacheHitRate}%`;
     return displayText;
 }
 
@@ -593,6 +738,50 @@ function updateThinkingElapsed(aiRequestId: string, startedAt: number): void {
 function clearThinkingMessage(aiRequestId: string): void {
     stopThinkingElapsedTimer(aiRequestId);
     document.querySelector<HTMLElement>(`.message.thinking.kp-message[data-ai-request-id="${aiRequestId}"]`)?.remove();
+    clearPersistedThinkingState(aiRequestId);
+}
+
+function persistThinkingState(state: { id: string; roomId: string | null; roleName: string; roleId?: string; content?: string; startedAt: number }): void {
+    try { localStorage.setItem(THINKING_STORAGE_KEY, JSON.stringify(state)); } catch { /* storage may be unavailable */ }
+}
+
+function clearPersistedThinkingState(id?: string): void {
+    try {
+        const raw = localStorage.getItem(THINKING_STORAGE_KEY);
+        if (!id || !raw || JSON.parse(raw)?.id === id) localStorage.removeItem(THINKING_STORAGE_KEY);
+    } catch { localStorage.removeItem(THINKING_STORAGE_KEY); }
+}
+
+function restoreThinkingState(): void {
+    try {
+        const state = JSON.parse(localStorage.getItem(THINKING_STORAGE_KEY) || "null");
+        const roomId = getCurrentRoom()?.id || null;
+        if (!state?.id || state.roomId !== roomId) return;
+        if (state.content && pendingMessages.length === 0) {
+            const role = aiRoles.find((item) => item.id === state.roleId) || aiRoles[0] || { id: state.roleId || "kp", name: state.roleName || "KP" };
+            pendingMessages.push({ sender: getCurrentUsername(), content: String(state.content), role, time: new Date().toLocaleTimeString() });
+        }
+        addThinkingMessage(state.id, state.roleName || "KP", Number(state.startedAt) || Date.now());
+    } catch { /* ignore malformed persisted state */ }
+}
+
+function resumePendingAIRequest(): void {
+    if (isAIThinking || pendingMessages.length === 0) return;
+    try {
+        const state = JSON.parse(localStorage.getItem(THINKING_STORAGE_KEY) || "null");
+        if (state?.id) clearThinkingMessage(String(state.id));
+    } catch { /* ignore */ }
+    const chatInput = document.getElementById("chatInput") as HTMLInputElement | null;
+    const sendButton = document.getElementById("sendButton") as HTMLButtonElement | null;
+    if (chatInput && sendButton && getCurrentRoom()) void sendToAI(chatInput, sendButton);
+}
+
+function moveThinkingMessageToEnd(messageId: string | number): void {
+    const chatHistory = document.getElementById("chatHistory");
+    const targetMessage = document.querySelector<HTMLElement>(`.message.thinking.kp-message[data-ai-request-id="${String(messageId)}"]`);
+    if (!chatHistory || !targetMessage || targetMessage.parentElement !== chatHistory) return;
+    chatHistory.appendChild(targetMessage);
+    chatHistory.scrollTop = chatHistory.scrollHeight;
 }
 
 function getCurrentChatMessages(): ChatMessage[] {
@@ -631,20 +820,39 @@ function renderChatMessages(messages: ChatMessage[]): void {
 
 function renderRoomMessage(message: ChatMessage | null): void {
     if (!message) return;
+    if (message.id) {
+        const duplicate = Array.from(document.querySelectorAll<HTMLElement>("#chatHistory .message[data-id]"))
+            .some((element) => element.dataset.id === String(message.id));
+        if (duplicate) return;
+    }
     const aiRequestId = typeof message.metadata?.aiRequestId === "string" ? message.metadata.aiRequestId : null;
     if (aiRequestId) clearThinkingMessage(aiRequestId);
     const isOwnPlayerMessage = message.type === "player" && message.sender_id === getCurrentUserId();
     const type = message.type === "player" && !isOwnPlayerMessage ? "other" : message.type || "other";
     const metadata = message.metadata || {};
+    if (metadata.check_type === "sanity" && metadata.player_name && window.currentRoom?.members) {
+        const member = window.currentRoom.members.find((item) => String(item.username || "").toLocaleLowerCase() === String(metadata.player_name).toLocaleLowerCase());
+        if (member) {
+            member.character_state = { ...(member.character_state || {}), current_san: Number(metadata.current_san), max_san: Number(metadata.max_san) };
+            if (member.character_card) {
+                member.character_card.currentSan = Number(metadata.current_san);
+                (member.character_card as Partial<COC7CharacterCard> & { current_san?: number }).current_san = Number(metadata.current_san);
+            }
+        }
+    }
+    const displayMessage = message.type === "trigger" && metadata.asset_url && message.content && !message.content.includes(String(metadata.asset_url))
+        ? { ...message, content: `${message.content}\n\n[${metadata.asset_name || "附件"}](${metadata.asset_url})` }
+        : message;
     addMessage(
         type,
-        message.sender_name || message.sender || defaultSenderName(type),
-        message.content,
-        message.id || null,
+        displayMessage.sender_name || displayMessage.sender || defaultSenderName(type),
+        displayMessage.content,
+        displayMessage.id || null,
         false,
         numericMetadata(metadata, "processingTime") ?? numericMetadata(metadata, "processing_time"),
         numericMetadata(metadata, "tokenCount") ?? numericMetadata(metadata, "token_count"),
-        message,
+        numericMetadata(metadata, "cacheHitRate") ?? numericMetadata(metadata, "cache_hit_rate"),
+        displayMessage,
     );
 }
 
@@ -666,7 +874,7 @@ function initWebSocket(): void {
         socket = io();
         socket.on("connect", () => {
             const room = getCurrentRoom();
-            if (room) socket?.emit("join_room", { room_id: room.id });
+            if (room && !room.invisible_view) socket?.emit("join_room", { room_id: room.id });
         });
         socket.on("session_expired", () => {
             showNotification("当前账号已在其他会话登录，请重新登录。", "error");
@@ -695,7 +903,7 @@ function disconnectSocket(): void {
 }
 
 function joinSocketRoom(roomId: string): void {
-    if (socket?.connected && roomId) socket.emit("join_room", { room_id: roomId });
+    if (socket?.connected && roomId && !getCurrentRoom()?.invisible_view) socket.emit("join_room", { room_id: roomId });
 }
 
 function leaveSocketRoom(roomId: string): void {
@@ -755,7 +963,11 @@ function handleAIThinkingEvent(incoming: IncomingSocketMessage): void {
         clearThinkingMessage(aiRequestId);
         return;
     }
-    addThinkingMessage(aiRequestId, incoming.roleName || "KP", incoming.startedAt || Date.now());
+    const selector = `.message.thinking.kp-message[data-ai-request-id="${aiRequestId}"]`;
+    if (document.querySelector(selector)) return;
+    // Use the receiving browser's clock. Sender clocks can differ and produce
+    // negative or wildly inflated elapsed times for other players.
+    addThinkingMessage(aiRequestId, incoming.roleName || "KP", Date.now());
 }
 
 function normalizeIncomingMessage(data: unknown): IncomingSocketMessage | null {
@@ -784,8 +996,11 @@ function chatErrorMessage(error: unknown): string {
 window.renderChatMessages = renderChatMessages;
 window.getCurrentChatMessages = getCurrentChatMessages;
 window.clearChatMessages = clearChatMessages;
+window.setChatReadOnly = setChatReadOnly;
 window.joinSocketRoom = joinSocketRoom;
 window.leaveSocketRoom = leaveSocketRoom;
 window.reconnectSocket = reconnectSocket;
 window.disconnectSocket = disconnectSocket;
 window.loadAIRoles = loadAIRoles;
+window.restoreThinkingState = restoreThinkingState;
+window.resumePendingAIRequest = resumePendingAIRequest;
