@@ -951,3 +951,6 @@
     background: var(--theme-scrollbar-thumb-hover);
 }
 
+.ai-usage-chart{display:flex;align-items:flex-end;gap:4px;height:180px;padding:12px 4px;border-bottom:1px solid var(--theme-border,#d9dee5);overflow-x:auto}
+.ai-usage-bar-group{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-width:22px;height:100%;gap:4px}.ai-usage-bar{display:flex;flex-direction:column-reverse;width:16px;min-height:4px;border-radius:3px 3px 0 0;overflow:hidden}.ai-usage-bar span{display:block;width:100%;min-height:1px}.ai-usage-bar-group small{font-size:9px;color:var(--theme-text-secondary,#6b7280);writing-mode:vertical-rl;transform:rotate(180deg)}
+.ai-usage-legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;font-size:12px}.ai-usage-legend span{display:inline-flex;align-items:center;gap:4px}.ai-usage-legend i{display:inline-block;width:10px;height:10px;border-radius:2px}.ai-usage-heatmap{display:flex;flex-wrap:wrap;gap:4px;margin-top:14px}.ai-usage-heatmap span{width:13px;height:13px;border-radius:2px;background:#ebedf0}.ai-usage-heatmap .heat-1{background:#c6e48b}.ai-usage-heatmap .heat-2{background:#7bc96f}.ai-usage-heatmap .heat-3{background:#239a3b}.ai-usage-heatmap .heat-4{background:#196127}

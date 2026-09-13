@@ -97,7 +97,10 @@ class ScenarioController {
             this.view.updateConversionProgress(0, "complete");
             this.view.updateConversionProgress(1, "active");
             const title = file.name.replace(/\.[^.]+$/, "") || "Imported scenario";
-            const converted = await this.model.convertScriptFile(file, title);
+            const estimatedRounds = Math.max(1, Math.ceil(file.size / 24000));
+            const useAI = await this.view.showAIImportPrompt(estimatedRounds);
+            this.view.updateConversionProgress(1, "active", useAI ? "已启用 AI，按分段分轮请求" : "已跳过 AI，使用本地结果");
+            const converted = await this.model.convertScriptFile(file, title, useAI);
             this.view.updateConversionProgress(1, "complete");
             this.view.updateConversionProgress(2, "active");
             await new Promise((resolve) => window.setTimeout(resolve, 120));
@@ -110,9 +113,14 @@ class ScenarioController {
             await this.view.openCreateModal();
             this.view.fillDraftData(converted);
             const conversionStatus = (converted as ScenarioInput & { conversion?: { ai?: { status?: string } } }).conversion?.ai?.status;
+            const aiInfo = (converted as ScenarioInput & { conversion?: { ai?: { request_count?: number; total_token_count?: number } } }).conversion?.ai;
+            const requestCount = Number(aiInfo?.request_count || 0);
+            const totalTokens = Number(aiInfo?.total_token_count || 0);
+            const rounds = requestCount > 0 ? `（AI 共 ${requestCount} 轮请求）` : "";
+            const tokenUsage = totalTokens > 0 ? `，本次消耗 ${totalTokens.toLocaleString()} tokens` : "";
             this.view.showMessage(conversionStatus === "fallback"
-                ? "AI 转换暂时超时，已使用本地结构化结果填入创建剧本窗口，请检查后发布"
-                : "文档转换完成，已填入创建剧本窗口，请检查后发布");
+                ? `AI 转换暂时超时，已使用本地结构化结果填入创建剧本窗口，请检查后发布${rounds}${tokenUsage}`
+                : `文档转换完成，已填入创建剧本窗口，请检查后发布${rounds}${tokenUsage}`);
         } catch (error) {
             this.view.updateConversionProgress(1, "error", scenarioErrorMessage(error));
             await new Promise((resolve) => window.setTimeout(resolve, 500));

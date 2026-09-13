@@ -23,3 +23,17 @@ user promote alice
 user promote alice ADMIN
 user promote 1 OWNER
 ```
+
+## 安全退出
+
+在服务器监听窗口输入以下任一命令即可请求安全关闭：
+
+```text
+shutdown
+stop
+server shutdown
+```
+
+命令通过仅允许本机访问、带随机令牌的内部接口触发 Flask-SocketIO 的停止钩子；
+正在处理的请求会先完成，控制台命令线程随后退出。若服务尚未启动或接口不可达，
+命令会返回错误而不会强制结束 Python 进程。

@@ -1,18 +1,78 @@
 # 已确认问题
-1. 别的玩家在发送消息后，我方这边显示的“AI正在思考”下方的已耗时计时错误
-2. 查询最近的两次日志，发现在ai的回复内容有如下内容：“用户明确表达了要前往5号车厢的行动意图。根据系统规则，当玩家明确进入、离开或转换场景时，我应该调用 `room.activate_scenario_scene`。虽然之前调用失败了（可能是因为系统需要更明确的转换确认），但用户的行动描述非常清晰：\"和咪咕一起跑到五号车厢\"。\n\n让我再次尝试激活场景3（5号车厢），然后读取该场景的详细内容来描述环境。",”应该是正确的思考，但是发现ai在思考完这个之后直接没有后文了，并且也没有在聊天框返回消息
-3. 发现在ai思考的时候刷新网页会导致ai思考失败
-4. 在log文件中发现这个日志，可能是报错？，请分析解释，如果是错误就修复\"scene transition requires an explicit player transition\
-5. ai在多个回合的思考后会导致被打断导致ai不回复内容
-6. 每次开启时候ai像开盲盒一样一会聪明一会笨的，请规范kp的回复格式，并且现在发现ai在回复时候的提示过多，请在设置中增加一个开关，控制aikp是否会回复提示。
-7. 查看最近log，发现ai又开始篡改剧情，乘务员没有钥匙，但是在ai的描述中直接说有钥匙并且给了我们。请修复。
-8.  AI API response payload: {"choices": [{"message": {"content": "", "reasoning_content": "用户决定前往2号车厢。根据剧本模块内容：\n1. 2号车厢内有Clicker怪物\n2. 看到Clicker会造成SAN 1/1d6损失（已检定）\n3. 需要潜行通过或者制造声响引开Clicker\n4. 触发器1需要侦察检定成功后才能触发\n\n现在两位玩家的侦察检定都成功了，可以触发触发器1。\n\n让我先描述场景，然后触发触发器。", "role": "assistant", "tool_calls": [{"function": {"arguments": "{\"trigger_id\": 1, \"condition_met\": true, \"check_name\": \"侦察\"}", "name": "trigger.reveal_scenario_trigger"}, "id": "call_ea47d6a6a65d40929d18c623", "index": 0, "type": "function"}]}, "finish_reason": "tool_calls", "index": 0, "logprobs": null}], "object": "chat.completion", "usage": {"prompt_tokens": 9265, "completion_tokens": 158, "total_tokens": 9423, "completion_tokens_details": {"reasoning_tokens": 97, "text_tokens": 158}, "prompt_tokens_details": {"text_tokens": 9265}}, "created": 1788707687, "system_fingerprint": null, "model": "qwen3.5-plus", "id": "chatcmpl-07a5ac27-b235-9f1b-b906-8670207385d3"}
-AI API response payload: {"choices": [{"message": {"content": "", "reasoning_content": "无书的侦察检定成功了（65/85），现在可以触发触发器1了。", "role": "assistant", "tool_calls": [{"function": {"arguments": "{\"trigger_id\": 1, \"condition_met\": true, \"check_name\": \"侦察\"}", "name": "trigger.reveal_scenario_trigger"}, "id": "call_8f3b2c635b2042f482bb5ab2", "index": 0, "type": "function"}]}, "finish_reason": "tool_calls", "index": 0, "logprobs": null}], "object": "chat.completion", "usage": {"prompt_tokens": 9772, "completion_tokens": 81, "total_tokens": 9853, "completion_tokens_details": {"reasoning_tokens": 20, "text_tokens": 81}, "prompt_tokens_details": {"text_tokens": 9772}}, "created": 1788707847, "system_fingerprint": null, "model": "qwen3.5-plus", "id": "chatcmpl-0050c719-de80-9f3a-9197-61db8bd393a6"} 
-这些是两段ai的对话记录发现ai在调用触发器后直接触发失败，并且什么回复都没有，日志里面也什么都不显示，请修复（补充信息：触发器1是一个需要发送图片的触发器，可能和这个有关）
-9. ai检定有时候会不调用骰娘，或者没有通过骰娘发出判定结果
-10. san减少没有在角色卡上做出反应
-11. 可以尝试如果玩家在某些场景做出了一些比较重要的决定（如最近的一个log中的剧本，带上了乘务员，可以进行一个记忆）
-12. 触发器在抛出文件时候可能有问题，并且在剧本编辑和预览中的含有文件的触发器没有文件预览。
+1. 发现在使用剧本自动转化时候的ai提示词有乱码（举例：“姣忎釜杞﹀帰銆佹埧闂村繀椤荤嫭绔嬶紱涓嶈杈撳嚭”）
+2. [2026-09-11 23:29:53,673][ERROR][Thread-86 (process_request_thread)] scenario_import.ai_http_transport_error elapsed_seconds=120.094
+Traceback (most recent call last):
+  File "C:\Users\Nobook1121\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\urllib3\connectionpool.py", line 534, in _make_request
+    response = conn.getresponse()
+               ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Nobook1121\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\urllib3\connection.py", line 571, in getresponse
+    httplib_response = super().getresponse()
+                       ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\Lib\http\client.py", line 1395, in getresponse
+    response.begin()
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\Lib\http\client.py", line 325, in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\Lib\http\client.py", line 286, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\Lib\socket.py", line 706, in readinto
+    return self._sock.recv_into(b)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\Lib\ssl.py", line 1314, in recv_into
+    return self.read(nbytes, buffer)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\Lib\ssl.py", line 1166, in read
+    return self._sslobj.read(len, buffer)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TimeoutError: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\Nobook1121\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\requests\adapters.py", line 667, in send
+    resp = conn.urlopen(
+           ^^^^^^^^^^^^^
+  File "C:\Users\Nobook1121\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\urllib3\connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+              ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Nobook1121\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\urllib3\util\retry.py", line 490, in increment
+    raise reraise(type(error), error, _stacktrace)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Nobook1121\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\urllib3\util\util.py", line 39, in reraise
+    raise value
+  File "C:\Users\Nobook1121\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\urllib3\connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Nobook1121\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\urllib3\connectionpool.py", line 536, in _make_request
+    self._raise_timeout(err=e, url=url, timeout_value=read_timeout)
+  File "C:\Users\Nobook1121\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\urllib3\connectionpool.py", line 367, in _raise_timeout
+    raise ReadTimeoutError(
+urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='dashscope.aliyuncs.com', port=443): Read timed out. (read timeout=120)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Mine\AIbased TRPG\backend\trpg_server\routes\scenarios.py", line 503, in request_ai
+    response = requests.post(base_url, headers=headers, json=ai_payload, timeout=timeout)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Nobook1121\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\requests\api.py", line 115, in post
+    return request("post", url, data=data, json=json, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Nobook1121\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\requests\api.py", line 59, in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Nobook1121\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\requests\sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Nobook1121\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\requests\sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Nobook1121\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\requests\adapters.py", line 713, in send
+    raise ReadTimeout(e, request=request)
+requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='dashscope.aliyuncs.com', port=443): Read timed out. (read timeout=120)
+[2026-09-11 23:29:53,687][WARN][Thread-86 (process_request_thread)] scenario_import.ai_failed_fallback error_type=ReadTimeout error=HTTPSConnectionPool(host='dashscope.aliyuncs.com', port=443): Read timed out. (read timeout=120)
+在我使用剧本转换工具导入时，发现这个报错，并且剧本没有成功的导入。观察发现可能的原因是请求ai超时。尝试让请求体添加流式传输（将流式传输开关放入设置并且默认打开），增长timeout时间（将timeout时间放入设置并且默认时间增长）。最后发现可能是同时发送请求过多，带宽不够。请尝试将剧本分为多个步骤多个部分分轮次请求，先本地预处理分成多个部分，再分部分请求。并且导入过程中，反馈给用户预处理结果（告诉用户需要几轮请求，并且弹出弹窗询问是否开启请求）。最后完善ai无法返回时候的回滚操作，默认将word文档中“#场景名字”开始的标题作为一个场景（“--#号后的场景名字为该场景的名字”），“#背景”作为背景的标记，“#结局 结局名字”，作为结局的标记，“结局名字”为该结局的名字。分析并且按照要求完善这个报错。
 
 
 **请分步解决以上这些问题，并且确保问题被解决，允许激进修改，但是不要让代码坏掉或者偏离原本的功能**

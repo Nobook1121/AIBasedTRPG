@@ -18,5 +18,15 @@ python scripts/convert_scenario.py docs/样本/模组.docx -o scenario.json --ti
 清单。房间创建时自动锁定第一个场景，后续状态写入 `info.json`。因此不会因摘要遗漏而
 凭空产生“驾驶室”等剧本外设施。
 
+导入较长文档时，服务端会先在本地识别章节边界，再按最多 8 个章节或约 24000 字分轮
+请求 AI；每轮都保留原文，任一轮超时都会回退到本地结构化结果。导入弹窗会显示预计
+请求轮数并询问是否启用 AI。相关配置位于 `data/config/general.toml`：
+
+```toml
+[scenario_import]
+timeout = 300
+stream_output = true
+```
+
 运行时通过精简房间快照、只注入最近历史、摘要与正文分离来降低输入 token；不对 KP
 单轮输出设置人为上限。模块摘要接口使用低温度并按需调用，避免每轮重复发送长文本。

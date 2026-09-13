@@ -57,6 +57,9 @@ function initRoomManagement(): void {
     document.getElementById("createSaveNode")?.addEventListener("click", () => {
         void createRoomNode();
     });
+    document.getElementById("startRoomGame")?.addEventListener("click", () => {
+        void startCurrentRoomGame();
+    });
     document.getElementById("loadNodeFromPreviewBtn")?.addEventListener("click", () => {
         if (!previewNodeFilename) return;
         bootstrap.Modal.getInstance(document.getElementById("saveNodePreviewModal"))?.hide();
@@ -362,10 +365,14 @@ function renderRoomsList(rooms: Room[]): void {
             if (roomId) await openRoomDetail(roomId);
         });
     });
+    roomListContainer.querySelectorAll<HTMLButtonElement>(".leave-room-btn").forEach((button) => {
+        button.addEventListener("click", () => void leaveRoom(button.dataset.roomId || ""));
+    });
 }
 
 function renderRoomCard(room: Room): string {
     const isActive = currentRoom?.id === room.id;
+    const isCurrentMember = activeRoomMembers(room).some((member) => String(member.user_id) === String(window.currentUser?.user_id || ""));
     const members = activeRoomMembers(room).map((member) => member.username).join(", ") || "-";
     return window.TrpgTemplates.render("room-card", {
         roomId: room.id,
@@ -376,7 +383,33 @@ function renderRoomCard(room: Room): string {
         scenarioTitle: room.scenario_title || "未知",
         members,
         actionLabel: isActive ? "管理房间" : "进入房间",
+        leaveButtonHtml: isCurrentMember && room.invisible_view !== true
+            ? window.TrpgTemplates.render("room-leave-button", { roomId: room.id })
+            : "",
     });
+}
+
+async function leaveRoom(roomId: string): Promise<void> {
+    if (!roomId) return;
+    if (!window.confirm("确定退出这个房间吗？")) return;
+    try {
+        const response = await TrpgApi.post<ApiResponse<Room>>(`/api/rooms/${encodeURIComponent(roomId)}/leave`, {});
+        if (!response.success) {
+            showNotification(response.message || response.error || "退出房间失败", "error");
+            return;
+        }
+        if (currentRoom?.id === roomId) {
+            window.leaveSocketRoom?.(roomId);
+            currentRoom = null;
+            window.currentRoom = null;
+            TrpgCookies.remove(getLastRoomStorageKey());
+            showRoomListView();
+        }
+        await loadRoomsList();
+        showNotification("已退出房间", "success");
+    } catch (error) {
+        showNotification(`退出房间失败：${roomErrorMessage(error)}`, "error");
+    }
 }
 
 async function openRoomDetail(roomId: string): Promise<void> {
@@ -511,9 +544,40 @@ function updateRoomDetail(room: Room): void {
     setText("saveScenarioTitle", room.scenario_title || "-");
     setText("saveParticipants", activeRoomMembers(room).map((member) => member.username).join(", ") || "-");
     setText("roomDetailCode", room.room_code || room.code || "-");
+    setText("roomDetailTokens", Number(room.token_usage?.total_tokens || 0).toLocaleString());
     setInput("recordRoomName", room.name);
     setText("homeRoomOnlineCount", formatRoomOnlineCount(room));
     renderRoomCharacterBindings(room);
+    updateStartGameButton(room);
+}
+
+function updateStartGameButton(room: Room): void {
+    const button = document.getElementById("startRoomGame") as HTMLButtonElement | null;
+    if (!button) return;
+    const isOwner = String(room.creator_id || room.owner_id || "") === String(window.currentUser?.user_id || "");
+    button.hidden = room.invisible_view === true || room.started === true || !isOwner;
+}
+
+async function startCurrentRoomGame(): Promise<void> {
+    if (!currentRoom?.id) return;
+    const button = document.getElementById("startRoomGame") as HTMLButtonElement | null;
+    if (button) button.disabled = true;
+    try {
+        const data = await TrpgApi.post<ApiResponse<{ room: Room; messages: ChatMessage[] }>>(`/api/rooms/${encodeURIComponent(currentRoom.id)}/start`);
+        if (!data.success || !data.data) {
+            showNotification(data.message || data.error || "开始游戏失败", "error");
+            return;
+        }
+        currentRoom = { ...currentRoom, ...data.data.room, messages: data.data.messages };
+        window.currentRoom = currentRoom;
+        updateRoomDetail(currentRoom);
+        window.renderChatMessages?.(data.data.messages || []);
+        showNotification("游戏已开始", "success");
+    } catch (error) {
+        showNotification(`开始游戏失败：${roomErrorMessage(error)}`, "error");
+    } finally {
+        if (button) button.disabled = false;
+    }
 }
 
 function renderRoomCharacterBindings(room: Room): void {
@@ -909,6 +973,8 @@ function clearCurrentRoom(): void {
     window.setChatReadOnly?.(false);
     applyInvisibleRoomView(false);
     setDisplay("saveStatusBar", "none");
+    const startButton = document.getElementById("startRoomGame") as HTMLButtonElement | null;
+    if (startButton) startButton.hidden = true;
     setText("homeRoomTitle", "未加入房间");
     setText("homeRoomOnlineCount", "在线玩家 0/0");
     showRoomListView();

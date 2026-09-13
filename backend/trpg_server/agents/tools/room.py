@@ -101,7 +101,7 @@ def _scene_manifest(scenario: dict[str, Any]) -> list[dict[str, Any]]:
     """Return a small deterministic index; full text is never included here."""
     manifest = []
     for order, module in enumerate(_scenario_modules(scenario), 1):
-        if _module_type(module) not in {"scene", "ending"}:
+        if _module_type(module) not in {"scene", "trigger", "ending"}:
             continue
         summary = str(module.get("summary") or module.get("marker") or "").strip()
         manifest.append({
@@ -177,6 +177,7 @@ def get_room_scenario_context(arguments: dict[str, Any], context: Any) -> dict[s
             "title": scenario.get("title"),
             "description": scenario.get("description") or scenario.get("notes"),
             "allow_open_ending": scenario.get("allow_open_ending", False),
+            "sequential": bool(scenario.get("sequential", False)),
             "module_count": len(_scenario_modules(scenario)),
             "available_sections": _collect_available_sections(scenario),
             "active_scene_id": info.get("active_scene_id"),
@@ -274,6 +275,8 @@ def _summarize_scenario(scenario: dict[str, Any] | None, room_info: dict[str, An
             "available_sections": {},
         }
 
+    opening = next((module for module in _scenario_modules(scenario) if _module_type(module) == "opening"), None)
+    opening_summary = _summarize_module(opening, include_content=True) if opening else None
     return {
         "id": scenario.get("id"),
         "title": scenario.get("title"),
@@ -281,11 +284,13 @@ def _summarize_scenario(scenario: dict[str, Any] | None, room_info: dict[str, An
         "found": True,
         "available_sections": _collect_available_sections(scenario),
         "allow_open_ending": scenario.get("allow_open_ending", False),
+        "sequential": bool(scenario.get("sequential", False)),
         "module_count": len(_scenario_modules(scenario)),
         "trigger_count": len(iter_scenario_trigger_catalog(scenario)),
         "active_scene_id": room_info.get("active_scene_id"),
         "scene_manifest": _scene_manifest(scenario),
         "global_manifest": _global_manifest(scenario),
+        "opening": opening_summary,
     }
 
 
@@ -346,6 +351,8 @@ def get_room_snapshot(arguments: dict[str, Any], context: Any) -> dict[str, Any]
             "scenario_title": info.get("scenario_title"),
             "active_scene_id": info.get("active_scene_id"),
             "active_scene_title": info.get("active_scene_title"),
+            "started": bool(info.get("started", False)),
+            "started_at": info.get("started_at"),
         },
         "scenario": _summarize_scenario(scenario, info),
         "members": _summarize_members(characters["members"]),

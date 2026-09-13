@@ -470,6 +470,7 @@
                             <button class="settings-tab" data-settings="model" data-i18n="settings.tab.model">模型设置</button>
                             <button class="settings-tab" data-settings="network" data-i18n="settings.tab.network">网络配置</button>
                             <button class="settings-tab" data-settings="character" data-i18n="settings.tab.character">角色卡规则</button>
+                            <button class="settings-tab" data-settings="usage">AI 用量</button>
                             <button class="settings-tab" data-settings="users" data-admin-only="true" data-i18n="settings.tab.users">用户管理</button>
                             <button class="settings-tab" data-settings="permissions" data-i18n="settings.tab.permissions">权限配置</button>
                             <button class="settings-tab" data-settings="about" data-i18n="settings.tab.about">关于应用</button>
@@ -688,16 +689,6 @@
                                     <small class="text-muted">关闭后，技能基础值以职业文件和技能目录为准。</small>
                                 </div>
                             </div>
-                            <section class="tool-panel mb-4" id="aiTokenDashboard">
-                                <div class="tool-panel-header">
-                                    <h4>每日 AI Token 用量</h4>
-                                    <button class="btn btn-sm btn-secondary" type="button" id="refreshAITokenDashboard">刷新</button>
-                                </div>
-                                <p class="text-muted" id="aiTokenDashboardDate"></p>
-                                <div class="table-responsive">
-                                    <table class="table table-sm"><thead><tr><th>AI 角色</th><th>请求数</th><th>输入</th><th>输出</th><th>总计</th><th>缓存命中率</th></tr></thead><tbody id="aiTokenDashboardBody"><tr><td colspan="6" class="text-muted">加载中…</td></tr></tbody></table>
-                                </div>
-                            </section>
                             <div class="character-roll-settings-grid" aria-label="属性随机生成公式">
                                 <label>力量 STR<input type="text" class="form-control" id="attributeRollSTR" placeholder="3d6x5"></label>
                                 <label>敏捷 DEX<input type="text" class="form-control" id="attributeRollDEX" placeholder="3d6x5"></label>
@@ -728,6 +719,17 @@
                                 </div>
                                 <div class="permission-matrix" id="permissionMatrix" aria-live="polite"></div>
                                 <div class="settings-message" id="permissionConfigMessage" aria-live="polite"></div>
+                            </section>
+                        </div>
+
+                        <div id="usage-settings-content" class="settings-content">
+                            <section class="tool-panel mb-4" id="aiTokenDashboard">
+                                <div class="tool-panel-header d-flex justify-content-between align-items-center"><div><h4 class="mb-1">AI Token 用量</h4><p class="text-muted mb-0">按天查看各 AI 角色的累计消耗。</p></div><button class="btn btn-sm btn-secondary" type="button" id="refreshAITokenDashboard">刷新</button></div>
+                                <p class="text-muted" id="aiTokenDashboardDate"></p>
+                                <div id="aiUsageChart" class="ai-usage-chart" aria-label="AI Token 柱状图"></div>
+                                <div id="aiUsageLegend" class="ai-usage-legend"></div>
+                                <div id="aiUsageHeatmap" class="ai-usage-heatmap" aria-label="AI Token 热力图"></div>
+                                <div class="table-responsive mt-3"><table class="table table-sm"><thead><tr><th>AI 角色</th><th>请求数</th><th>输入</th><th>输出</th><th>总计</th><th>缓存命中率</th><th>前缀缓存命中率</th></tr></thead><tbody id="aiTokenDashboardBody"><tr><td colspan="7" class="text-muted">加载中…</td></tr></tbody></table></div>
                             </section>
                         </div>
 

@@ -35,6 +35,7 @@
     "scenario.module.type.preparation": "游戏准备",
     "scenario.module.type.timeline": "时间线",
     "scenario.module.type.scene": "场景",
+    "scenario.module.type.opening": "导入模块",
     "scenario.module.type.ending": "结局",
     "scenario.module.type.monster": "怪物信息",
     "scenario.module.type.npc": "NPC信息",

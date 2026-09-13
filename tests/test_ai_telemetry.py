@@ -4,6 +4,7 @@ from trpg_server.agents.telemetry import (
     build_provider_cache_key,
     calculate_cache_hit_rate,
     load_daily_ai_usage,
+    load_room_ai_usage,
     record_ai_usage,
 )
 
@@ -31,3 +32,21 @@ def test_daily_usage_aggregates_arbitrary_agent_roles(tmp_path):
     assert report["roles"]["future_role"]["total_tokens"] == 7
     first_line = (tmp_path / "ai_usage.jsonl").read_text(encoding="utf-8").splitlines()[0]
     assert json.loads(first_line)["agent_id"] == "kp"
+
+
+def test_daily_usage_reports_local_prefix_cache_hits(tmp_path):
+    record_ai_usage(tmp_path, {"agent_id": "kp", "prompt_tokens": 10, "completion_tokens": 2, "prefix_cache_hit": True})
+    record_ai_usage(tmp_path, {"agent_id": "kp", "prompt_tokens": 10, "completion_tokens": 2, "prefix_cache_hit": False})
+
+    report = load_daily_ai_usage(tmp_path)
+    assert report["prefix_cache_hits"] == 1
+    assert report["prefix_cache_hit_rate"] == 50.0
+    assert report["roles"]["kp"]["prefix_cache_hits"] == 1
+
+
+def test_room_usage_aggregates_only_matching_room(tmp_path):
+    record_ai_usage(tmp_path, {"agent_id": "kp", "room_id": "room-a", "total_tokens": 10})
+    record_ai_usage(tmp_path, {"agent_id": "npc", "room_id": "room-a", "total_tokens": 7})
+    record_ai_usage(tmp_path, {"agent_id": "kp", "room_id": "room-b", "total_tokens": 99})
+    assert load_room_ai_usage(tmp_path, "room-a")["total_tokens"] == 17
+    assert load_room_ai_usage(tmp_path, "room-a")["request_count"] == 2

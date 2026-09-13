@@ -56,11 +56,13 @@
                                 <span data-i18n="scenario.module.add">添加模块</span>
                             </button>
                             <select class="form-select" id="scenarioModuleType">
+                                <option value="opening" data-i18n="scenario.module.type.opening">导入模块</option>
                                 <option value="background" data-i18n="scenario.module.type.background">背景</option>
                                 <option value="public_info" data-i18n="scenario.module.type.public_info">公开信息</option>
                                 <option value="preparation" data-i18n="scenario.module.type.preparation">游戏准备</option>
                                 <option value="timeline" data-i18n="scenario.module.type.timeline">时间线</option>
                                 <option value="scene" selected data-i18n="scenario.module.type.scene">场景</option>
+                                <option value="trigger">触发器</option>
                                 <option value="ending" data-i18n="scenario.module.type.ending">结局</option>
                                 <option value="monster" data-i18n="scenario.module.type.monster">怪物信息</option>
                                 <option value="npc" data-i18n="scenario.module.type.npc">NPC信息</option>
@@ -73,6 +75,10 @@
                         <input type="checkbox" id="scenarioAllowOpenEnding">
                         <span data-i18n="scenario.open_ending">开放结局</span>
                     </label>
+                    <label class="scenario-open-ending-toggle">
+                        <input type="checkbox" id="scenarioSequential">
+                        <span>顺序剧本（AI 优先按模块顺序加载）</span>
+                    </label>
 
                     <div id="scenarioModules" class="scenario-module-list">
                         <!-- 模块将在这里动态生成 -->
@@ -80,6 +86,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-outline-primary" id="previewScenarioDraft">预览当前剧本</button>
                     <button type="button" class="btn btn-outline-secondary" id="saveScenarioDraft">保存草稿</button>
                     <button type="button" class="btn btn-primary" id="saveScenario">保存并发布</button>
                 </div>

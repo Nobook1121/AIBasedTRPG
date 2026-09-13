@@ -33,6 +33,11 @@ python server.py
 python server.py 8090
 ```
 
+在 Windows 上也可以直接双击项目根目录的 `启动服务器.bat`（或
+`start_server.bat`）启动服务，无需手动打开命令提示符。批处理文件会自动切换到
+项目目录并把额外参数转交给 `server.py`，例如将快捷方式目标设置为
+`启动服务器.bat 8090` 即可指定端口。
+
 如果目标端口已被占用，服务会尝试寻找附近可用端口，并在日志中输出监听地址，例如 `listening on http://127.0.0.1:8086`、局域网地址和 ZeroTier/Tailscale 等虚拟网卡地址。
 
 ## 验证

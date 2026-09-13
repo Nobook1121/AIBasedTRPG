@@ -40,10 +40,14 @@ interface Room {
     owner_id?: string | number;
     scenario_id?: number;
     scenario_title?: string;
+    started?: boolean;
+    started_at?: string;
+    opening_message_id?: string;
     invisible_view?: boolean;
     members?: RoomMember[];
     messages?: ChatMessage[];
     saves?: Array<{ filename: string; title?: string; created_at?: string }>;
+    token_usage?: { request_count?: number; prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; cached_tokens?: number; cache_hit_rate?: number };
 }
 
 interface ChatMessage {

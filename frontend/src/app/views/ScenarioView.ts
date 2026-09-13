@@ -6,6 +6,7 @@ class ScenarioView {
     private isCreating = false;
     private conversionProgressModal: HTMLElement | null = null;
     private conversionProgressTimer: number | null = null;
+    private moduleDragScrollTimer: number | null = null;
 
     constructor() {
         const scenarioList = document.getElementById("scenarioList");
@@ -57,7 +58,7 @@ class ScenarioView {
     }
 
     fillDraftData(draft: ScenarioInput): void {
-        this.fillScenarioForm({ id: 0, title: draft.title || "", author: draft.author || "", playerCount: draft.playerCount || 0, notes: draft.notes || "", ...(draft.allow_open_ending === undefined ? {} : { allow_open_ending: draft.allow_open_ending }), modules: draft.modules || [], cover: draft.cover || "" });
+        this.fillScenarioForm({ id: 0, title: draft.title || "", author: draft.author || "", playerCount: draft.playerCount || 0, notes: draft.notes || "", ...(draft.allow_open_ending === undefined ? {} : { allow_open_ending: draft.allow_open_ending }), ...(draft.sequential === undefined ? {} : { sequential: draft.sequential }), modules: draft.modules || [], cover: draft.cover || "" });
         updateScenarioModalTitle("scenario.modal.create", "创建剧本");
     }
 
@@ -101,6 +102,30 @@ class ScenarioView {
                 modal.remove();
                 if (!settled) resolve("cancel");
             });
+            instance.show();
+        });
+    }
+
+    showAIImportPrompt(estimatedRounds: number): Promise<boolean> {
+        return new Promise((resolve) => {
+            const modal = document.createElement("div");
+            modal.className = "modal fade";
+            modal.tabIndex = -1;
+            modal.setAttribute("data-bs-backdrop", "static");
+            modal.setAttribute("data-bs-keyboard", "false");
+            modal.setAttribute("aria-labelledby", "scenarioAiImportPromptLabel");
+            modal.innerHTML = `<div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title" id="scenarioAiImportPromptLabel">启用 AI 剧本整理？</h5><button type="button" class="btn-close" data-ai-import-action="cancel" aria-label="关闭"></button></div>
+                <div class="modal-body"><p>本地已完成章节边界分析。AI 将按场景分轮整理，预计至少 ${Math.max(1, estimatedRounds)} 轮请求。</p><p class="text-muted small mb-0">原文会始终保留；请求超时或分类不完整时将自动回退到本地结果。</p></div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-ai-import-action="no">仅使用本地结果</button><button type="button" class="btn btn-primary" data-ai-import-action="yes">启用 AI 整理</button></div>
+            </div></div>`;
+            document.body.appendChild(modal);
+            window.TrpgI18n?.apply(modal);
+            const instance = new bootstrap.Modal(modal, { backdrop: "static" });
+            let settled = false;
+            const finish = (useAI: boolean) => { if (settled) return; settled = true; instance.hide(); resolve(useAI); };
+            modal.querySelectorAll<HTMLElement>("[data-ai-import-action]").forEach((button) => button.addEventListener("click", () => finish(button.dataset.aiImportAction === "yes")));
+            modal.addEventListener("hidden.bs.modal", () => { modal.remove(); if (!settled) resolve(false); });
             instance.show();
         });
     }
@@ -152,13 +177,14 @@ class ScenarioView {
             playerCount,
             notes: textarea("scenarioNotes").value.trim(),
             allow_open_ending: checkbox("scenarioAllowOpenEnding").checked,
+            sequential: checkbox("scenarioSequential").checked,
             modules,
             cover: input("scenarioCoverUrl").value,
         };
     }
 
     getDraftData(): ScenarioInput {
-        return { title: input("scenarioTitle").value.trim(), author: input("scenarioAuthor").value.trim(), playerCount: Number.parseInt(input("scenarioPlayerCount").value, 10) || 0, notes: textarea("scenarioNotes").value.trim(), allow_open_ending: checkbox("scenarioAllowOpenEnding").checked, modules: collectScenarioModules(), cover: input("scenarioCoverUrl").value };
+        return { title: input("scenarioTitle").value.trim(), author: input("scenarioAuthor").value.trim(), playerCount: Number.parseInt(input("scenarioPlayerCount").value, 10) || 0, notes: textarea("scenarioNotes").value.trim(), allow_open_ending: checkbox("scenarioAllowOpenEnding").checked, sequential: checkbox("scenarioSequential").checked, modules: collectScenarioModules(), cover: input("scenarioCoverUrl").value };
     }
 
     showMessage(message: string, isError = false): void {
@@ -203,11 +229,72 @@ class ScenarioView {
         });
 
         document.getElementById("saveScenario")?.addEventListener("click", this.saveScenarioHandler);
+        document.getElementById("previewScenarioDraft")?.addEventListener("click", () => {
+            try {
+                const data = this.getDraftData();
+                this.previewScenario({ ...(data as Scenario), id: 0, title: data.title || "未命名剧本", author: data.author || "", playerCount: data.playerCount || 0 });
+            } catch (error) {
+                this.showMessage(scenarioViewErrorMessage(error), true);
+            }
+        });
         document.getElementById("saveScenarioDraft")?.addEventListener("click", async () => { await this.handlers?.onSaveDraft(); });
         document.getElementById("scenarioModal")?.addEventListener("keydown", (event) => { if ((event as KeyboardEvent).ctrlKey && (event as KeyboardEvent).key.toLowerCase() === "s") { event.preventDefault(); void this.handlers?.onSaveDraft(); } });
         document.getElementById("addModule")?.addEventListener("click", () => this.addModule());
         document.getElementById("scenarioModal")?.addEventListener("click", (event) => this.handleScenarioEditorClick(event));
         document.getElementById("scenarioModal")?.addEventListener("change", (event) => this.handleScenarioEditorChange(event));
+        document.getElementById("scenarioModal")?.addEventListener("dragstart", (event) => {
+            const card = (event.target as HTMLElement).closest<HTMLElement>(".scenario-module-item");
+            if (!card) return;
+            card.classList.add("scenario-module-dragging");
+            const transfer = (event as DragEvent).dataTransfer;
+            if (transfer) { transfer.effectAllowed = "move"; transfer.setData("text/plain", card.dataset.moduleId || "module"); }
+            const placeholder = document.createElement("div");
+            placeholder.className = "scenario-module-drop-indicator";
+            placeholder.dataset.moduleDropPlaceholder = "true";
+            card.parentElement?.insertBefore(placeholder, card);
+            this.moduleDragScrollTimer = window.setInterval(() => {
+                const current = document.querySelector<HTMLElement>(".scenario-module-dragging");
+                const container = document.querySelector<HTMLElement>("#scenarioModal .modal-body");
+                if (!current || !container) return;
+                const point = Number(current.dataset.dragClientY || 0);
+                const bounds = container.getBoundingClientRect();
+                if (point && point < bounds.top + 80) container.scrollTop -= 12;
+                else if (point && point > bounds.bottom - 80) container.scrollTop += 12;
+            }, 40);
+        });
+        document.getElementById("scenarioModal")?.addEventListener("dragend", (event) => {
+            (event.target as HTMLElement).closest<HTMLElement>(".scenario-module-item")?.classList.remove("scenario-module-dragging");
+            document.querySelector<HTMLElement>("[data-module-drop-placeholder]")?.remove();
+            if (this.moduleDragScrollTimer !== null) window.clearInterval(this.moduleDragScrollTimer);
+            this.moduleDragScrollTimer = null;
+            this.updateModuleNumbers();
+        });
+        document.getElementById("scenarioModal")?.addEventListener("drop", (event) => {
+            const dragging = document.querySelector<HTMLElement>(".scenario-module-dragging");
+            const placeholder = document.querySelector<HTMLElement>("[data-module-drop-placeholder]");
+            if (!dragging || !placeholder) return;
+            event.preventDefault();
+            placeholder.parentElement?.insertBefore(dragging, placeholder);
+            placeholder.remove();
+        });
+        document.getElementById("scenarioModal")?.addEventListener("dragover", (event) => {
+            const target = (event.target as HTMLElement).closest<HTMLElement>(".scenario-module-item");
+            const dragging = document.querySelector<HTMLElement>(".scenario-module-dragging");
+            if (!target || !dragging || target === dragging) return;
+            event.preventDefault();
+            dragging.dataset.dragClientY = String(event.clientY);
+            const placeholder = document.querySelector<HTMLElement>("[data-module-drop-placeholder]");
+            if (!placeholder) return;
+            const rect = target.getBoundingClientRect();
+            target.parentElement?.insertBefore(placeholder, event.clientY < rect.top + rect.height / 2 ? target : target.nextSibling);
+            const scrollContainer = document.querySelector<HTMLElement>("#scenarioModal .modal-body");
+            if (scrollContainer) {
+                const bounds = scrollContainer.getBoundingClientRect();
+                const edge = 72;
+                if (event.clientY < bounds.top + edge) scrollContainer.scrollTop -= 14;
+                else if (event.clientY > bounds.bottom - edge) scrollContainer.scrollTop += 14;
+            }
+        });
         const modal = document.getElementById("scenarioModal");
         modal?.addEventListener("shown.bs.modal", () => {
             if (!this.isCreating) return;
@@ -334,9 +421,11 @@ class ScenarioView {
         input("scenarioPlayerCount").value = "0";
         textarea("scenarioNotes").value = "";
         checkbox("scenarioAllowOpenEnding").checked = false;
+        checkbox("scenarioSequential").checked = false;
         input("scenarioCoverUrl").value = "";
         image("coverPreview").src = DEFAULT_SCENARIO_COVER;
         renderModuleList(requiredElement("scenarioModules"), [
+            createModule("opening", 1),
             createModule("scene", 1),
             createModule("ending", 1),
         ]);
@@ -351,6 +440,7 @@ class ScenarioView {
         input("scenarioPlayerCount").value = String(scenario.playerCount);
         textarea("scenarioNotes").value = scenario.notes || "";
         checkbox("scenarioAllowOpenEnding").checked = Boolean(scenario.allow_open_ending);
+        checkbox("scenarioSequential").checked = Boolean(scenario.sequential);
         input("scenarioCoverUrl").value = scenario.cover || "";
         image("coverPreview").src = safeScenarioCover(scenario.cover);
 
@@ -535,6 +625,7 @@ function createModule(type: ScenarioModuleType, index: number, existing?: Scenar
         notes: patch.notes || "",
         visibility: patch.visibility || moduleDefaultVisibility(type),
         send_to_ai: patch.send_to_ai !== undefined ? patch.send_to_ai : type !== "custom",
+        fixed_opening: type === "opening" ? Boolean(patch.fixed_opening) : undefined,
         code: patch.code || "",
         scene_id: patch.scene_id,
         ending_id: patch.ending_id,
@@ -546,6 +637,7 @@ function createModule(type: ScenarioModuleType, index: number, existing?: Scenar
         skills: patch.skills || [],
         weapons: patch.weapons || [],
         triggers: patch.triggers || [],
+        target_module_id: patch.target_module_id,
     };
 
     if (type === "scene") {
@@ -603,6 +695,7 @@ function cloneModule(module: ScenarioModule, index: number, titleIndex = index):
         notes: module.notes || "",
         visibility: module.visibility || moduleDefaultVisibility(module.module_type),
         send_to_ai: module.send_to_ai !== false,
+        fixed_opening: module.module_type === "opening" ? Boolean(module.fixed_opening) : undefined,
         code: module.code || "",
         scene_id: module.scene_id,
         ending_id: module.ending_id,
@@ -614,6 +707,7 @@ function cloneModule(module: ScenarioModule, index: number, titleIndex = index):
         skills: module.skills || [],
         weapons: module.weapons || [],
         triggers: module.triggers || [],
+        target_module_id: module.target_module_id,
     };
 }
 
@@ -638,6 +732,8 @@ function escapeRegExp(value: string): string {
 
 function moduleTypeLabel(type: ScenarioModuleType): string {
     switch (type) {
+        case "opening":
+            return scenarioT("scenario.module.type.opening", "导入模块");
         case "background":
             return scenarioT("scenario.module.type.background", "\u80cc\u666f");
         case "public_info":
@@ -648,6 +744,8 @@ function moduleTypeLabel(type: ScenarioModuleType): string {
             return scenarioT("scenario.module.type.timeline", "\u65f6\u95f4\u7ebf");
         case "scene":
             return scenarioT("scenario.module.type.scene", "\u573a\u666f");
+        case "trigger":
+            return scenarioT("scenario.module.type.trigger", "\u89e6\u53d1\u5668");
         case "ending":
             return scenarioT("scenario.module.type.ending", "\u7ed3\u5c40");
         case "monster":
@@ -663,6 +761,8 @@ function moduleTypeLabel(type: ScenarioModuleType): string {
 
 function moduleDescription(type: ScenarioModuleType): string {
     switch (type) {
+        case "opening":
+            return scenarioT("scenario.module.description.opening", "剧本开始时提供给 AI 的导入内容；开启固定开局后将由 KP 原样发送。");
         case "background":
             return scenarioT("scenario.module.description.background", "\u4ec5\u5b88\u79d8\u4eba\u53ef\u89c1\u7684\u80cc\u666f\u4fe1\u606f\uff0c\u542f\u52a8\u65f6\u53d1\u9001\u7ed9 AI\u3002");
         case "public_info":
@@ -673,6 +773,8 @@ function moduleDescription(type: ScenarioModuleType): string {
             return scenarioT("scenario.module.description.timeline", "\u4e8b\u4ef6\u65f6\u95f4\u7ebf\u4e0e\u63a8\u8fdb\u63d0\u793a\u3002");
         case "scene":
             return scenarioT("scenario.module.description.scene", "\u573a\u666f\u6b63\u6587\u3001\u6458\u8981\u3001\u89e6\u53d1\u5668\u4e0e\u5907\u6ce8\u3002");
+        case "trigger":
+            return scenarioT("scenario.module.description.trigger", "\u53ef\u8fde\u63a5\u5230\u4efb\u610f\u975e NPC/\u602a\u7269\u6a21\u5757\u7684\u72ec\u7acb\u89e6\u53d1\u5668\u3002");
         case "ending":
             return scenarioT("scenario.module.description.ending", "\u5267\u672c\u7ed3\u5c40\u6a21\u5757\u3002");
         case "monster":
@@ -687,7 +789,7 @@ function moduleDescription(type: ScenarioModuleType): string {
 }
 
 function moduleDefaultVisibility(type: ScenarioModuleType): "public" | "kp" {
-    return type === "background" ? "kp" : "public";
+    return type === "background" || type === "opening" ? "kp" : "public";
 }
 
 function createModuleId(type: ScenarioModuleType, index: number): string {
@@ -811,11 +913,13 @@ function renderModuleList(container: HTMLElement, modules: ScenarioModule[]): vo
 
 function renderModuleEditor(module: ScenarioModule, index: number, typeIndex: number): string {
     const typeOptions = ([
+        "opening",
         "background",
         "public_info",
         "preparation",
         "timeline",
         "scene",
+        "trigger",
         "ending",
         "monster",
         "npc",
@@ -825,7 +929,7 @@ function renderModuleEditor(module: ScenarioModule, index: number, typeIndex: nu
     const titleValue = module.title || defaultTitle;
 
     return `
-        <section class="scenario-module-item" data-module-item data-module-id="${scenarioEscapeHtml(module.id)}" data-module-default-title="${scenarioEscapeHtml(defaultTitle)}">
+        <section class="scenario-module-item" draggable="true" data-module-item data-module-id="${scenarioEscapeHtml(module.id)}" data-module-default-title="${scenarioEscapeHtml(defaultTitle)}">
                 <div class="scenario-module-header">
                     <div class="scenario-module-headline">
                 <div class="scenario-module-index"><strong data-module-number>${scenarioEscapeHtml(defaultModuleTitle(module.module_type, typeIndex))}</strong></div>
@@ -866,6 +970,7 @@ function renderModuleEditor(module: ScenarioModule, index: number, typeIndex: nu
                     <span>${scenarioT("scenario.module.send_to_ai", "初始化时发送给 AI")}</span>
                     <input type="checkbox" data-module-send-to-ai ${module.send_to_ai !== false ? "checked" : ""}>
                 </label>
+                <label class="scenario-module-field scenario-module-toggle" data-fixed-opening-field><span>固定开局</span><input type="checkbox" data-fixed-opening ${module.fixed_opening ? "checked" : ""}></label>
             </div>
             <div class="scenario-module-content-panel" data-module-text-panel>
                 <label class="scenario-module-field">
@@ -882,6 +987,10 @@ function renderModuleEditor(module: ScenarioModule, index: number, typeIndex: nu
                     <strong>${scenarioT("scenario.module.scene.title", "场景")}</strong>
                     <button type="button" class="btn btn-sm btn-secondary" data-add-trigger>${scenarioT("scenario.module.scene.add_trigger", "添加触发器")}</button>
                 </div>
+                <label class="scenario-module-field" data-trigger-target-field>
+                    <span>连接模块 ID（可选）</span>
+                    <input class="form-control" data-trigger-target value="${scenarioEscapeHtml(module.target_module_id || "")}" placeholder="留空表示由当前模块承载">
+                </label>
                 <div class="scenario-module-triggers" data-trigger-list>
                     ${renderTriggerList(module.triggers || [])}
                 </div>
@@ -944,13 +1053,13 @@ function renderPreviewModules(modules: ScenarioModule[]): string {
     return modules.map((module, index) => `
         <div class="scenario-preview-segment">
             <h5>${scenarioEscapeHtml(module.title || defaultModuleTitle(module.module_type, index + 1))}</h5>
-            <p data-user-content="true"><strong>${scenarioEscapeHtml(module.title)}</strong></p>
-            <p data-user-content="true">${scenarioEscapeHtml(module.summary || module.content || "")}</p>
+            <p class="text-muted small">${scenarioEscapeHtml(moduleTypeLabel(module.module_type))}${module.send_to_ai === false ? " · 不发送给 AI" : ""}${module.visibility === "kp" ? " · KP 可见" : ""}</p>
+            ${module.summary ? `<p data-user-content="true"><strong>摘要：</strong>${scenarioEscapeHtml(module.summary)}</p>` : ""}
             ${module.code ? `<p><strong>${scenarioT("scenario.preview.code", "编号")}：</strong>${scenarioEscapeHtml(module.code)}</p>` : ""}
             ${module.open_ending ? `<p><strong>${scenarioT("scenario.preview.open_ending", "开放结局")}：</strong>${scenarioT("scenario.preview.yes", "是")}</p>` : ""}
-            ${module.module_type === "scene" ? `<div class="scenario-preview-triggers"><p><strong>${scenarioT("scenario.preview.triggers", "触发器")}：</strong>${(module.triggers || []).map((trigger) => scenarioEscapeHtml(trigger.display_name || `触发器${trigger.id}`)).join(" / ") || scenarioT("scenario.preview.none", "无")}</p>${(module.triggers || []).map((trigger) => {
-                const url = trigger.asset_url || "";
-                if (!url) return "";
+            ${["scene", "trigger"].includes(module.module_type) ? `<div class="scenario-preview-triggers"><p><strong>${scenarioT("scenario.preview.triggers", "触发器")}：</strong>${(module.triggers || []).map((trigger) => scenarioEscapeHtml(trigger.display_name || `触发器${trigger.id}`)).join(" / ") || scenarioT("scenario.preview.none", "无")}</p>${(module.triggers || []).map((trigger) => {
+                const url = trigger.asset_url || trigger.asset_data_url || "";
+                if (!url) return trigger.content ? `<div class="scenario-trigger-preview-content" data-user-content="true">${scenarioEscapeHtml(trigger.content)}</div>` : "";
                 const label = scenarioEscapeHtml(trigger.display_name || trigger.asset_name || `触发器${trigger.id}`);
                 return trigger.content_mode === "image"
                     ? `<figure class="scenario-trigger-preview"><img src="${scenarioEscapeHtml(url)}" alt="${label}" loading="lazy"><figcaption>${label}</figcaption></figure>`
@@ -958,7 +1067,10 @@ function renderPreviewModules(modules: ScenarioModule[]): string {
             }).join("")}</div>` : ""}
              ${module.module_type === "timeline" && module.timeline_entries?.length ? `<div class="scenario-preview-timeline" data-user-content="true">${module.timeline_entries.map((entry) => `<p><strong>${scenarioEscapeHtml(entry.time_point)}</strong> ${scenarioEscapeHtml(entry.event)}</p>`).join("")}</div>` : ""}
             ${module.module_type === "npc" && module.skills?.length ? `<p><strong>${scenarioT("scenario.preview.skills", "技能")}：</strong>${(module.skills || []).map((skill) => `${scenarioEscapeHtml(skill.name)} ${scenarioEscapeHtml(skill.base)}`).join(" / ")}</p>` : ""}
-             ${module.content ? `<p data-user-content="true">${scenarioEscapeHtml(module.content)}</p>` : ""}
+             ${module.content ? `<div class="scenario-preview-content" data-user-content="true">${scenarioEscapeHtml(module.content).replace(/\n/g, "<br>")}</div>` : ""}
+             ${module.notes ? `<p class="text-muted"><strong>备注：</strong>${scenarioEscapeHtml(module.notes)}</p>` : ""}
+             ${module.module_type === "custom" && module.inputs?.length ? `<div><strong>输入项：</strong>${module.inputs.map((item) => `<p>${scenarioEscapeHtml(item.label)}：${scenarioEscapeHtml(item.value)}${item.send_to_ai ? "（发送给 AI）" : ""}</p>`).join("")}</div>` : ""}
+             ${["npc", "monster"].includes(module.module_type) ? `<div class="scenario-preview-entity"><p><strong>${module.module_type === "npc" ? "NPC" : "怪物"} 属性</strong></p><p>${Object.entries(module.attributes || {}).map(([k,v]) => `${scenarioEscapeHtml(k)}: ${scenarioEscapeHtml(v)}`).join(" / ")}</p><p>${Object.entries(module.battle || {}).map(([k,v]) => `${scenarioEscapeHtml(k)}: ${scenarioEscapeHtml(v)}`).join(" / ")}</p>${module.weapons?.length ? `<p>武器：${module.weapons.map((w) => scenarioEscapeHtml(w.name)).join(" / ")}</p>` : ""}${module.skills?.length ? `<p>技能：${module.skills.map((s) => `${scenarioEscapeHtml(s.name)} ${scenarioEscapeHtml(s.base)}`).join(" / ")}</p>` : ""}</div>` : ""}
         </div>
     `).join("");
 }
@@ -1080,7 +1192,12 @@ function readTriggerFile(inputElement: HTMLInputElement): Promise<void> {
             inputElement.dataset.assetMime = file.type || "application/octet-stream";
             inputElement.dataset.assetSize = String(file.size);
             const preview = inputElement.closest("[data-trigger-item]")?.querySelector<HTMLElement>(".scenario-trigger-preview");
-            if (preview) preview.textContent = file.name;
+            if (preview) {
+                const dataUrl = String(reader.result || "");
+                preview.innerHTML = file.type.startsWith("image/")
+                    ? `<a href="${scenarioEscapeHtml(dataUrl)}" target="_blank" rel="noopener"><img src="${scenarioEscapeHtml(dataUrl)}" alt="${scenarioEscapeHtml(file.name)}" loading="lazy"></a><small>${scenarioEscapeHtml(file.name)}</small>`
+                    : `<a href="${scenarioEscapeHtml(dataUrl)}" download="${scenarioEscapeHtml(file.name)}">${scenarioEscapeHtml(file.name)}</a>`;
+            }
             resolve();
         };
         reader.onerror = () => reject(reader.error || new Error("读取触发器文件失败"));
@@ -1122,15 +1239,19 @@ function refreshModuleCard(card: HTMLElement): void {
     const timelinePanel = card.querySelector<HTMLElement>("[data-module-timeline-panel]");
     const entityPanel = card.querySelector<HTMLElement>("[data-module-entity-panel]");
     const customPanel = card.querySelector<HTMLElement>("[data-module-custom-panel]");
+    const triggerTargetField = card.querySelector<HTMLElement>("[data-trigger-target-field]");
+    const fixedOpeningField = card.querySelector<HTMLElement>("[data-fixed-opening-field]");
     const entityNameLabel = card.querySelector<HTMLElement>("[data-entity-name]")?.closest(".scenario-module-field")?.querySelector("span");
     const entityCodeLabel = card.querySelector<HTMLElement>("[data-entity-code]")?.closest(".scenario-module-field")?.querySelector("span");
     const entitySummaryLabel = card.querySelector<HTMLElement>("[data-entity-summary]")?.closest(".scenario-module-field")?.querySelector("span");
 
-    textPanel?.toggleAttribute("hidden", !["background", "public_info", "preparation", "scene", "ending", "custom"].includes(type));
-    scenePanel?.toggleAttribute("hidden", type !== "scene");
+    textPanel?.toggleAttribute("hidden", !["opening", "background", "public_info", "preparation", "scene", "trigger", "ending", "custom"].includes(type));
+    scenePanel?.toggleAttribute("hidden", !["scene", "trigger"].includes(type));
     timelinePanel?.toggleAttribute("hidden", type !== "timeline");
     entityPanel?.toggleAttribute("hidden", !["monster", "npc"].includes(type));
     customPanel?.toggleAttribute("hidden", type !== "custom");
+    triggerTargetField?.toggleAttribute("hidden", type !== "trigger");
+    fixedOpeningField?.toggleAttribute("hidden", type !== "opening");
 
     if (entityNameLabel) entityNameLabel.textContent = type === "monster" ? "怪物名称" : "NPC 名称";
     if (entityCodeLabel) entityCodeLabel.textContent = type === "monster" ? "怪物编号" : "NPC 编号";
@@ -1155,7 +1276,7 @@ function collectScenarioModules(): ScenarioModule[] {
     let endingIndex = 0;
     const typeCounts = new Map<ScenarioModuleType, number>();
 
-    return cards.map((card, index) => {
+    const modules = cards.map((card, index) => {
         const type = (card.querySelector<HTMLSelectElement>("[data-module-type]")?.value || "scene") as ScenarioModuleType;
         const typeIndex = (typeCounts.get(type) || 0) + 1;
         typeCounts.set(type, typeIndex);
@@ -1168,6 +1289,7 @@ function collectScenarioModules(): ScenarioModule[] {
             notes: card.querySelector<HTMLTextAreaElement>("[data-module-notes]")?.value || "",
             visibility: moduleDefaultVisibility(type),
             send_to_ai: card.querySelector<HTMLInputElement>("[data-module-send-to-ai]")?.checked !== false,
+            fixed_opening: type === "opening" ? Boolean(card.querySelector<HTMLInputElement>("[data-fixed-opening]")?.checked) : undefined,
             code: card.querySelector<HTMLInputElement>("[data-entity-code]")?.value.trim() || "",
             scene_id: undefined,
             ending_id: undefined,
@@ -1179,12 +1301,17 @@ function collectScenarioModules(): ScenarioModule[] {
             skills: [],
             weapons: [],
             triggers: [],
+            target_module_id: undefined,
         };
 
         if (type === "scene") {
             sceneIndex += 1;
             module.scene_id = sceneIndex;
             module.triggers = collectTriggers(card);
+            if (!module.summary) module.summary = (module.content || "").slice(0, 120);
+        } else if (type === "trigger") {
+            module.triggers = collectTriggers(card);
+            module.target_module_id = card.querySelector<HTMLInputElement>("[data-trigger-target]")?.value.trim() || undefined;
             if (!module.summary) module.summary = (module.content || "").slice(0, 120);
         } else if (type === "ending") {
             endingIndex += 1;
@@ -1209,6 +1336,7 @@ function collectScenarioModules(): ScenarioModule[] {
 
         return module;
     });
+    return modules;
 }
 
 function collectTriggers(card: HTMLElement): ScenarioTrigger[] {

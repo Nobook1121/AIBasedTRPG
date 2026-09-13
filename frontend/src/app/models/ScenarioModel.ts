@@ -142,10 +142,10 @@ class ScenarioModel {
     }
 
     /** Convert source text on the server without creating a scenario. */
-    async convertScript(text: string, title = "Imported scenario"): Promise<ScenarioInput> {
+    async convertScript(text: string, title = "Imported scenario", useAI = true): Promise<ScenarioInput> {
         const { response, data } = await TrpgApi.requestWithResponse<ApiResponse<ScenarioInput>>(
             `${this.apiBaseUrl}/scenarios/import`,
-            { method: "POST", body: { text, title } },
+            { method: "POST", body: { text, title, use_ai: useAI } },
         );
         if (!response.ok || !data.success || !data.data) {
             throw new Error(data.message || data.error || `Script import failed: ${response.status}`);
@@ -153,10 +153,11 @@ class ScenarioModel {
         return data.data;
     }
 
-    async convertScriptFile(file: File, title = "Imported scenario"): Promise<ScenarioInput> {
+    async convertScriptFile(file: File, title = "Imported scenario", useAI = true): Promise<ScenarioInput> {
         const formData = new FormData();
         formData.append("file", file, file.name);
         formData.append("title", title);
+        formData.append("use_ai", String(useAI));
         const { response, data } = await TrpgApi.requestWithResponse<ApiResponse<ScenarioInput>>(
             `${this.apiBaseUrl}/scenarios/import`,
             { method: "POST", body: formData },

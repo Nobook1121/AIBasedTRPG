@@ -17,11 +17,13 @@ except ImportError:  # pragma: no cover
 
 logger = logging.getLogger(__name__)
 _HEADING_RE = re.compile(r"^\s{0,3}(?:#{1,6}\s+|第\s*[一二三四五六七八九十百0-9]+\s*[章节幕场景、:.：]|[0-9]+[、.．]\s*)(.*?)\s*$", re.I)
+_HASH_HEADING_RE = re.compile(r"^\s*-?\s*#{1,6}\s*(.+?)\s*$")
 _ANGLE_HEADING_RE = re.compile(r"^\s*[<《【].{1,80}[>》】].*$")
 _NAMED_HEADING_RE = re.compile(r"^(?:概要|导入|背景|前言|准备|游戏准备|公开信息|时间线|幕后黑手|角色数据|NPC|人物|怪物|敌人|结局|Ending|True End|Bad End|Crazy End)\s*[：:：]?\s*[A-Za-z0-9一二三四五六七八九十百]*$", re.I)
-_LOCATION_RE = re.compile(r"(?:车厢|房间|场景|地点|驾驶室|终点站|地下室|大厅)", re.I)
-_SCENE_WORDS = ("场景", "scene", "地点", "房间", "车厢", "車廂", "驾驶室", "駕駛室", "大厅", "大廳")
+_LOCATION_RE = re.compile(r"(?:车厢|房间|场景|地点|驾驶室|终点站|地下室|大厅|光幕|吊灯|客厅|卧室|走廊|厨房|书房|庭院|仓库)", re.I)
+_SCENE_WORDS = ("场景", "scene", "地点", "房间", "车厢", "車廂", "驾驶室", "駕駛室", "大厅", "大廳", "光幕", "吊灯", "客厅", "卧室", "走廊", "厨房", "书房", "庭院", "仓库")
 _ENDING_WORDS = ("结局", "ending", "true end", "bad end", "crazy end", "happy end", "normal end")
+_PREPARATION_WORDS = ("准备", "游戏准备", "角色创建", "人物创建", "推荐技能", "推荐职业", "人数", "时长", "难度", "道具限制")
 _SECTION_TYPES = {
     "导入模块": "opening", "导入": "opening", "开场": "opening", "opening": "opening",
     "背景": "background", "概要": "background", "导入": "background", "前言": "background", "幕后黑手": "background", "background": "background",
@@ -32,6 +34,14 @@ _SECTION_TYPES = {
     "npc": "npc", "人物": "npc", "角色数据": "npc", "怪物": "monster", "敌人": "monster", "monster": "monster",
 }
 
+_SECTION_TYPES.update({
+    "导入模块": "opening", "导入": "opening", "开场": "opening",
+    "背景": "background", "概览": "background", "前言": "background",
+    "公开信息": "public_info", "公开资料": "public_info",
+    "游戏准备": "preparation", "准备": "preparation", "时间线": "timeline",
+    "结局": "ending", "True End": "ending", "Bad End": "ending", "Crazy End": "ending",
+    "NPC": "npc", "人物": "npc", "角色数据": "npc", "怪物": "monster", "敌人": "monster",
+})
 
 def _clean_doc_text(text: str) -> str:
     text = text.replace("\x00", "").replace("\r\n", "\n").replace("\r", "\n")
@@ -95,27 +105,47 @@ def _summary(text: str, limit: int = 180) -> str:
 
 def _heading_title(line: str) -> str:
     value = line.strip().replace("車廂", "车厢").replace("車頭", "车头").replace("駕駛室", "驾驶室").replace("號", "号")
+    hash_match = _HASH_HEADING_RE.match(value)
+    if hash_match:
+        value = hash_match.group(1).strip()
     match = _HEADING_RE.match(value)
     if match: return match.group(1).strip()
     if _ANGLE_HEADING_RE.match(value):
         value = re.sub(r"^[<《【]\s*", "", value)
         value = re.sub(r"[>》】].*$", "", value)
         return value.strip()
-    return re.sub(r"^[#\s]+", "", value).strip()
+    value = re.sub(r"^[#\s]+", "", value).strip()
+    # In Word exports endings are commonly written as "结局 结局名".  The
+    # marker identifies the module type; the remainder is the user-facing
+    # ending title.
+    ending_name = re.match(r"^(?:结局|Ending)\s+(.+)$", value, re.I)
+    return ending_name.group(1).strip() if ending_name else value
 
 
 def _looks_like_heading(line: str) -> bool:
     plain = line.strip().replace("車廂", "车厢").replace("車頭", "车头").replace("駕駛室", "驾驶室").replace("號", "号")
     if not plain or len(plain) > 80: return False
+    if _HASH_HEADING_RE.match(plain): return True
     if plain in {"侦查", "偵查", "灵感", "靈感", "医学", "醫學", "急救", "话术", "話術", "潜行", "潛行", "敏捷", "力量", "体质", "體質", "幸运", "幸運"}: return False
     # A check/result line such as “《侦查》成功……” is prose, not a
     # section boundary.  Only accept bracket headings when the complete line
     # is the heading (optionally followed by “开始地点”).
     if re.search(r"(?:SC|检定|成功|失败|对抗|的话|则|可以|1d\d)", plain, re.I): return False
     if _HEADING_RE.match(plain) or _NAMED_HEADING_RE.match(plain): return True
+    if re.match(r"^(?:准备|游戏准备|角色创建|人物创建|推荐技能|推荐职业|人数|时长|难度|道具限制)(?:\s*[：:]?\s*.*)?$", plain, re.I): return True
     if re.match(r"^[<《【].{1,40}[>》】]\s*(?:开始地点|起始地点)?\s*$", plain): return True
+    # Standalone location labels exported from Word (e.g. “房间”, “大厅”)
+    # are scene boundaries even without brackets or Markdown markers.
+    if _LOCATION_RE.fullmatch(plain): return True
     if re.match(r"^(?:第\s*)?[0-9一二三四五六七八九十百]+\s*(?:号|號)?\s*(?:车厢|車廂)(?:开始地点|開始地點)?\s*$", plain): return True
-    if re.match(r"^(?:结局|Ending)\s*[A-C一二三0-9]?\s*$", plain, re.I): return True
+    if re.match(r"^(?:结局|Ending)(?:\s+.+)?$", plain, re.I): return True
+    # A trailing Chinese full stop usually marks prose (for example
+    # "7号车厢。"), not a section heading. Only trim heading colons here.
+    canonical = plain.strip().rstrip(":：")
+    if canonical in {"导入模块", "导入", "开场", "背景", "概览", "前言", "公开信息", "公开资料", "游戏准备", "准备", "时间线", "结局", "Ending", "True End", "Bad End", "Crazy End", "NPC", "人物", "角色数据", "怪物", "敌人"}:
+        return True
+    if re.match(r"^(?:第\s*)?[0-9一二三四五六七八九十百]+\s*号?车厢(?:开始地点|起始地点)?$", canonical) or canonical in {"车头车厢", "驾驶室", "站台", "大厅", "地下室"}:
+        return True
     return False
 
 
@@ -123,6 +153,7 @@ def _module_type(title: str) -> str:
     normalized = re.sub(r"[：:（）()<>《》【】]", " ", title.replace("車廂", "车厢").replace("號", "号").casefold()).strip()
     for key, value in _SECTION_TYPES.items():
         if normalized == key.casefold() or normalized.startswith(key.casefold() + " "): return value
+    if any(word.casefold() in normalized for word in _PREPARATION_WORDS): return "preparation"
     if any(word in normalized for word in _ENDING_WORDS): return "ending"
     if any(word in normalized for word in ("npc", "人物", "角色")): return "npc"
     if any(word in normalized for word in ("怪物", "敌人", "monster")): return "monster"
@@ -172,89 +203,130 @@ def convert_script_to_scenario(text: str, metadata: dict[str, Any] | None = None
     analysis = analyze_script_structure(source)
     sections = _split_sections(source)
     modules = [_empty_module(f"{_module_type(title)}-{index}", _module_type(title), title, content, index) for index, (title, content) in enumerate(sections, 1)]
-    if not any(item["module_type"] == "scene" for item in modules): modules.insert(0, _empty_module("scene-1", "scene", "场景 1", source, 1))
+    # An explicit 导入/开场 heading is always the first runtime module. If a
+    # document starts with a short unheaded prologue before its first scene,
+    # keep it as opening instead of burying it in background.
+    opening_indexes = [i for i, item in enumerate(modules) if item["module_type"] == "opening"]
+    if opening_indexes:
+        first = opening_indexes[0]
+        opening = modules.pop(first)
+        modules.insert(0, opening)
+    elif modules and modules[0]["module_type"] == "background":
+        first_title, first_content = sections[0]
+        later_scene = any(item["module_type"] == "scene" for item in modules[1:])
+        if later_scene and not _looks_like_heading(first_title) and len(first_content) <= 4000:
+            modules[0] = _empty_module("opening-1", "opening", "导入模块", first_content, 1)
+    if not any(item["module_type"] == "scene" for item in modules):
+        if modules and len(modules) > 1:
+            modules[0]["module_type"] = "scene"
+            modules[0]["scene_id"] = 1
+        else:
+            modules.insert(0, _empty_module("scene-1", "scene", "场景 1", source, 1))
     if not any(item["module_type"] == "ending" for item in modules): modules.append(_empty_module(f"ending-{len(modules) + 1}", "ending", "结局", "", len(modules) + 1))
     result["modules"] = modules; result["conversion"] = {"version": 3, "source_preserved": True, "module_count": len(modules), "warnings": analysis["warnings"], "analysis": analysis, "stages": ["extract", "analyze", "classify", "build_modules", "validate"]}
     return result
 
 
-def build_ai_conversion_prompt(text: str, sections: list[tuple[str, str]] | None = None) -> str:
+def build_ai_conversion_prompt(text: str, sections: list[tuple[str, str]] | None = None, source_order_start: int = 1) -> str:
     source_sections = sections or _split_sections(text)
-    blocks = "\n\n".join(f"--- SOURCE_SECTION {i} ---\nTITLE: {title}\nCONTENT:\n{content}" for i, (title, content) in enumerate(source_sections, 1))
-    return f"""你是“剧本广场”的 TRPG 剧本文档结构化转换器。你的任务是忠实整理原文，不是续写、摘要改写或设计新剧情。
+    blocks = "\n\n".join(f"--- SOURCE_SECTION {i} ---\nTITLE: {title}\nCONTENT:\n{content}" for i, (title, content) in enumerate(source_sections, source_order_start))
+    # Keep this prompt readable and explicit.  Do not keep the old, incorrectly
+    # decoded prompt here: even unreachable string literals are easy to send to
+    # a provider when this function is patched by an extension.
+    return f"""你是 TRPG 剧本文档结构化转换器。只做忠实结构化，不续写、不改编、不补充原文没有的事实。
+先判断每个 SOURCE_SECTION 的用途，再输出 module_type。opening（导入模块）仅允许用于全文最前面明确写着“导入/开场/序幕”的旁白，最多一个；“准备/游戏准备/角色创建/推荐技能”必须是 preparation，绝不能标成 opening。background 只放 KP 幕后信息；public_info 放玩家开局可知信息；timeline 只放明确时间线。
+凡是玩家可以抵达、观察、调查或行动的地点、房间、物件区域或空间阶段，均为 scene：例如“房间”“光幕”“吊灯”都应作为独立 scene；标题变化就是边界。地点过多时，只有相邻且同一空间、内容很短的地点才可合并，合并后的 title 必须列出全部地点（如“房间 / 光幕 / 吊灯”），summary 必须明确说明包含哪些地点。不得把多个不相邻地点概括成一个 scene。地点内的描述、检定成功/失败、NPC、线索和战斗留在该 scene。
+ending 中 True End、BAD END、Crazy End、死亡或逃生结局各自独立；npc/monster 仅在原文有独立卡片或数值时使用。
+每个 SOURCE_SECTION 必须对应一个 module（允许仅合并相邻短小 scene，但不得丢失 source_order，合并时使用 source_order 数组），不得把普通场景改成 opening。检定行不是标题。不要输出 content，服务端按 source_order 保留原文。只返回合法 JSON，module 至少含 source_order、module_type、title、summary、visibility；summary 最多180字。
+参考：常闇の箱的 6/7/5/4/3/2 号车厢及车头车厢分别是 scene；True End、BAD END、Crazy End 分别是 ending；《侦查》成功/失败留在所属车厢。
 
-【编辑器模块的真实用途】
-1. background：仅放 KP 才应预先知道的背景、幕后真相、作者说明、运行建议、改编说明。它不是默认垃圾桶。
-2. preparation：人数、游戏时长、难度、推荐技能、角色创建限制、道具限制。
-3. public_info：开局即可告诉玩家的世界观、任务目标、玩家可知设定。
-4. timeline：按“多久以前/当前/之后”排列的事件时间线；没有明确时间顺序时不要使用。
-5. scene：玩家可以抵达、调查或行动的具体地点/空间/阶段。一个地点一个模块：每个车厢、房间必须独立；站台、驾驶室、大厅、血池、其他区域也都必须独立。标题变化或地点变化就是边界。地点内的描述、可调查物、检定成功/失败文本、NPC、战斗、线索全部留在该地点 scene 中，不要拆成 background。
-6. ending：明确标记为 True End、Bad End、Crazy End、死亡结局、逃生结局、其他结局的分支；每一种结局必须独立模块，不能合并。
-7. npc / monster：只有原文提供了独立角色卡、数值、能力或战斗数据时才使用；角色在某个地点的对白和行为仍留在该 scene，同时可在该模块建立引用。
-8. triggers：只用于“满足某条件后才揭示”的线索。把检定条件写入 condition，把玩家看到的原文写入 content；不要把普通段落变成 trigger。
-
-【按样本《常暗之厢》执行的判定示例】
-- “概要/导入/游戏准备”是背景、准备或公开信息，按标题分别保留，不能把它们和场景正文合成一个背景。
-- “<6号车厢>、<7号车厢>、<5号车厢>、<4号车厢>、<3号车厢>、<2号车厢>、<车头车厢>”各是独立 scene；即使某车厢很短，也不能并入前后车厢。
-- “《侦查》成功……/失败……”是所属车厢中的检定分支，不是新模块标题。
-- “True End”“BAD END”“Crazy End”各是独立 ending。
-- 角色数据、Clicker、管理员等只有在原文以独立角色/敌人数据出现时才建立 npc/monster；不要因出现一个人名就把整段地点剧情移走。
-
-【边界和忠实性】
-- 输入已被服务端按检测到的原文标题切成 SOURCE_SECTION。每个 SOURCE_SECTION 必须且只能对应一个输出 module，source_order 必须完全相同，不能重排、拆分、合并、丢失。
-- 不得发明原文没有的地点、驾驶室、道具、人物、线索、结局或因果关系。无法确定时，保留为当前 SOURCE_SECTION 的 scene/custom，不要猜测。
-- 不要输出 content；服务端会按 source_order 原样保留该段全文。你只能返回模块类型、标题、摘要、可见性、结构化字段和线索元数据。
-- summary 只描述该段已有内容，最多 180 字；不要把多个地点概括成一个摘要。
-- 只输出合法 JSON，不要 Markdown、解释、前后缀文本。
-
-【输出 JSON】
-{{"title":"剧本标题","author":"作者（未知则 Imported）","playerCount":1,"notes":"仅根据原文填写","modules":[{{"source_order":1,"module_type":"scene","title":"原文标题","summary":"该段内容摘要","visibility":"public","triggers":[{{"display_name":"线索显示名","keyword":"内部关键词","condition":"原文条件","content_mode":"text"}}],"attributes":{{}},"battle":{{}},"skills":[],"weapons":[],"inputs":[],"timeline_entries":[]}}]}}
-
-【原始文档分段】
+原文分段：
 {blocks}
+
+兼容字段说明：每个车厢、房间必须独立；不要输出 content。
 """
 
 
+def _normalize_ai_module_type(local: dict[str, Any], candidate: dict[str, Any]) -> str:
+    """Apply conservative, deterministic type guards after model output."""
+    title = str(candidate.get("title") or local.get("title") or "").strip()
+    inferred = _module_type(title)
+    candidate_type = str(candidate.get("module_type") or "").casefold()
+    local_type = str(local.get("module_type") or "")
+    order = int(local.get("source_order") or 0)
+    # Preparation headings and location headings are stronger signals than a
+    # model's generic opening label.  Opening is allowed only for the first
+    # source section and an explicit marker in the title.
+    if inferred == "preparation":
+        return "preparation"
+    if inferred == "scene" and candidate_type in {"opening", "background", "public_info", "custom", ""}:
+        return "scene"
+    if local_type == "scene" and inferred == "background" and candidate_type in {"opening", "background", "public_info", "custom", ""}:
+        return "scene"
+    if candidate_type == "opening" and (order != 1 or not re.search(r"导入|开场|序幕|opening", title, re.I)):
+        return inferred if inferred in {"scene", "preparation", "ending", "public_info", "timeline", "npc", "monster"} else local.get("module_type", "background")
+    return candidate_type if candidate_type in {"opening", "background", "public_info", "preparation", "timeline", "scene", "ending", "npc", "monster", "custom"} else inferred
+
+
 def _merge_ai_module(local: dict[str, Any], candidate: dict[str, Any]) -> None:
-    if candidate.get("module_type") in {"background", "public_info", "preparation", "timeline", "scene", "ending", "npc", "monster", "custom"}: local["module_type"] = candidate["module_type"]
-    for key in ("title", "summary", "visibility", "notes", "triggers", "attributes", "battle", "skills", "weapons", "inputs", "timeline_entries", "open_ending"):
+    candidate_type = _normalize_ai_module_type(local, candidate)
+    local["module_type"] = candidate_type
+    for key in ("title", "summary", "visibility", "notes", "triggers", "attributes", "battle", "skills", "weapons", "inputs", "timeline_entries", "open_ending", "fixed_opening"):
         if key in candidate and candidate[key] is not None: local[key] = candidate[key]
     if local["module_type"] == "scene": local.setdefault("scene_id", local.get("source_order"))
     if local["module_type"] == "ending": local.setdefault("ending_id", local.get("source_order"))
 
 
-def convert_with_ai(requester: Callable[[dict[str, Any]], dict[str, Any]], text: str, model: str = "local-model", metadata: dict[str, Any] | None = None) -> dict[str, Any]:
+def convert_with_ai(requester: Callable[[dict[str, Any]], dict[str, Any]], text: str, model: str = "local-model", metadata: dict[str, Any] | None = None, *, max_sections_per_request: int = 8, max_chars_per_request: int = 24000) -> dict[str, Any]:
     sections = _split_sections(text)
-    payload = {
-        "model": model,
-        "messages": [
-            {
-                "role": "system",
-                "content": "你是严格遵守原文边界的 TRPG 剧本结构化转换器。只输出合法 JSON，不创作、不合并、不丢失任何 SOURCE_SECTION。",
-            },
-            {"role": "user", "content": build_ai_conversion_prompt(text, sections)},
-        ],
-        "temperature": 0,
-        "response_format": {"type": "json_object"},
-    }
-    # Keep the complete conversion request in the normal application log. The
-    # payload contains no API key, but redact defensively in case a requester
-    # adds authentication metadata in the future.
+    batches: list[tuple[int, list[tuple[str, str]]]] = []
+    current: list[tuple[str, str]] = []
+    current_chars = 0
+    for index, section in enumerate(sections, 1):
+        section_chars = len(section[0]) + len(section[1])
+        if current and (len(current) >= max_sections_per_request or current_chars + section_chars > max_chars_per_request):
+            batches.append((index - len(current), current)); current = []; current_chars = 0
+        current.append(section); current_chars += section_chars
+    if current: batches.append((len(sections) - len(current) + 1, current))
+
     from trpg_server.logging_config import redact_sensitive
-    logger.info("scenario_conversion.ai_request model=%s sections=%d chars=%d", model, len(sections), len(text))
-    logger.info("scenario_conversion.ai_request_full=%s", json.dumps(redact_sensitive(payload), ensure_ascii=False, default=str))
-    response = requester(payload)
-    logger.info("scenario_conversion.ai_response_full=%s", json.dumps(redact_sensitive(response), ensure_ascii=False, default=str))
-    try: content = response["choices"][0]["message"]["content"]; ai_payload = json.loads(content)
-    except (KeyError, IndexError, TypeError, json.JSONDecodeError) as exc: logger.exception("scenario_conversion.ai_invalid_json"); raise ValueError("AI converter returned invalid JSON") from exc
-    if not isinstance(ai_payload, dict) or not isinstance(ai_payload.get("modules"), list): raise ValueError("AI converter response must contain modules")
-    converted = convert_script_to_scenario(text, {**(metadata or {}), **{k: ai_payload[k] for k in ("title", "author", "playerCount", "notes") if k in ai_payload}})
-    by_order = {int(item.get("source_order", 0)): item for item in ai_payload["modules"] if isinstance(item, dict) and str(item.get("source_order", "")).isdigit()}
+    merged_candidates: dict[int, dict[str, Any]] = {}
+    ai_metadata: dict[str, Any] = {}
+    total_token_count = 0
+    token_count_seen = False
+    for source_start, batch in batches:
+        payload = {"model": model, "messages": [{"role": "system", "content": "你是严格遵守原文边界的 TRPG 剧本结构化转换器。只输出合法 JSON，不创作、不合并、不丢失任何 SOURCE_SECTION。"}, {"role": "user", "content": build_ai_conversion_prompt(text, batch, source_start)}], "temperature": 0, "response_format": {"type": "json_object"}}
+        logger.info("scenario_conversion.ai_request model=%s source_start=%d sections=%d chars=%d", model, source_start, len(batch), sum(len(t) + len(c) for t, c in batch))
+        logger.info("scenario_conversion.ai_request_full=%s", json.dumps(redact_sensitive(payload), ensure_ascii=False, default=str))
+        response = requester(payload)
+        logger.info("scenario_conversion.ai_response_full=%s", json.dumps(redact_sensitive(response), ensure_ascii=False, default=str))
+        try: content = response["choices"][0]["message"]["content"]; ai_payload = json.loads(content)
+        except (KeyError, IndexError, TypeError, json.JSONDecodeError) as exc: logger.exception("scenario_conversion.ai_invalid_json"); raise ValueError("AI converter returned invalid JSON") from exc
+        if not isinstance(ai_payload, dict) or not isinstance(ai_payload.get("modules"), list): raise ValueError("AI converter response must contain modules")
+        usage = response.get("usage") if isinstance(response, dict) else None
+        if isinstance(usage, dict):
+            round_tokens = usage.get("total_tokens")
+            if not isinstance(round_tokens, (int, float)) and isinstance(usage.get("prompt_tokens"), (int, float)) and isinstance(usage.get("completion_tokens"), (int, float)):
+                round_tokens = usage["prompt_tokens"] + usage["completion_tokens"]
+            if isinstance(round_tokens, (int, float)):
+                total_token_count += int(round_tokens); token_count_seen = True
+        ai_metadata.update({k: ai_payload[k] for k in ("title", "author", "playerCount", "notes") if k in ai_payload})
+        for item in ai_payload["modules"]:
+            if not isinstance(item, dict):
+                continue
+            source_order = item.get("source_order")
+            orders = source_order if isinstance(source_order, list) else [source_order]
+            for order in orders:
+                if str(order).isdigit():
+                    merged_candidates[int(order)] = item
+    converted = convert_script_to_scenario(text, {**(metadata or {}), **ai_metadata})
+    by_order = merged_candidates
     for item in converted["modules"]:
         candidate = by_order.get(int(item.get("source_order", 0)))
         if candidate: _merge_ai_module(item, candidate)
-    converted["conversion"]["ai"] = {"model": model, "response_module_count": len(ai_payload["modules"]), "merged_module_count": len(by_order)}
-    logger.info("scenario_conversion.ai_complete response_modules=%d merged=%d local_modules=%d", len(ai_payload["modules"]), len(by_order), len(converted["modules"]))
+    converted["conversion"]["ai"] = {"model": model, "request_count": len(batches), "response_module_count": len(by_order), "merged_module_count": len(by_order)}
+    if token_count_seen: converted["conversion"]["ai"]["total_token_count"] = total_token_count
+    logger.info("scenario_conversion.ai_complete requests=%d response_modules=%d merged=%d local_modules=%d", len(batches), len(by_order), len(by_order), len(converted["modules"]))
     return converted
 
 

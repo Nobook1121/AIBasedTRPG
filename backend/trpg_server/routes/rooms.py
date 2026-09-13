@@ -1,7 +1,9 @@
 import logging
 import tomllib
 import time
+import threading
 from uuid import uuid4
+from pathlib import Path
 
 from flask import Blueprint, current_app, request, session
 
@@ -12,6 +14,7 @@ from trpg_server.responses import error_response, success_response
 from trpg_server.role_config import load_roles
 from trpg_server.security import is_socket_user_online, safe_join
 from trpg_server.settings import CONFIG_DIR, ROOMS_DIR, SCENARIOS_DIR
+from trpg_server.agents.telemetry import load_room_ai_usage
 
 bp = Blueprint("rooms", __name__)
 logger = logging.getLogger(__name__)
@@ -23,6 +26,7 @@ ROOM_ROLE_MEMBER = "member"
 ROOM_MEMBER_ACTIVE = "active"
 ROOM_MEMBER_REMOVED = "removed"
 DEFAULT_AUTOSAVE_NODE_LIMIT = 3
+_ROOM_START_LOCK = threading.Lock()
 
 
 def _get_rooms_dir():
@@ -350,7 +354,7 @@ def _is_member_online(member):
 
 def _room_summary(info):
     _normalize_members(info)
-    return {
+    summary = {
         "id": info.get("id"),
         "name": info.get("name"),
         "room_code": info.get("room_code"),
@@ -369,7 +373,15 @@ def _room_summary(info):
         ],
         "created_at": info.get("created_at"),
         "updated_at": info.get("updated_at"),
+        "started": bool(info.get("started", False)),
+        "started_at": info.get("started_at"),
+        "opening_message_id": info.get("opening_message_id"),
     }
+    try:
+        summary["token_usage"] = load_room_ai_usage(current_app.config.get("LOGS_DIR", Path("data/logs")), info.get("id"))
+    except Exception:
+        summary["token_usage"] = {"room_id": str(info.get("id") or ""), "request_count": 0, "total_tokens": 0}
+    return summary
 
 
 def _invisible_room_view(room_dir, info):
@@ -438,6 +450,8 @@ def create_room():
         "members": [member],
         "created_at": now,
         "updated_at": now,
+        "started": False,
+        "started_at": None,
     }
     # Pin a deterministic starting scene in room state. The KP receives this
     # pointer and can only move it via room.activate_scenario_scene.
@@ -470,6 +484,109 @@ def create_room():
     data = _room_summary(info)
     data["messages"] = []
     return success_response(data, "Room created successfully", 201)
+
+
+@bp.route("/api/rooms/<room_id>/start", methods=["POST"])
+def start_room_game(room_id):
+    """Start a room once and emit the scenario opening automatically."""
+    login_error = _require_login()
+    if login_error:
+        return login_error
+    room_dir, info = _find_room(room_id)
+    if not room_dir:
+        return error_response("Room not found", 404, "Room not found")
+    if not _can_access(info):
+        return error_response("Permission denied", 403, "Permission denied")
+    if not _can_manage(info):
+        return error_response("Only the room owner can start the game", 403, "Permission denied")
+
+    with _ROOM_START_LOCK:
+        return _start_room_game_locked(room_id, room_dir, info)
+
+
+def _start_room_game_locked(room_id, room_dir, info):
+    messages = _read_messages(room_dir)
+    if info.get("started"):
+        opening = next((item for item in messages if item.get("id") == info.get("opening_message_id")), None)
+        return success_response({"room": _room_summary(info), "message": opening, "messages": messages}, "Room already started")
+
+    from trpg_server.scenario_store import load_scenario_by_id
+    scenarios_dir = current_app.config.get("SCENARIOS_DIR", SCENARIOS_DIR)
+    _, scenario = load_scenario_by_id(scenarios_dir, info.get("scenario_id"))
+    if not scenario:
+        return error_response("Scenario not found", 404, "Scenario not found")
+    modules = [item for item in scenario.get("modules", []) if isinstance(item, dict)]
+    opening = next((item for item in modules if str(item.get("module_type") or "").lower() == "opening"), None)
+    scene = next((item for item in modules if str(item.get("module_type") or "").lower() == "scene"), None)
+    if scene:
+        info["active_scene_id"] = str(scene.get("scene_id") or scene.get("id"))
+        info["active_scene_title"] = scene.get("title")
+
+    content = str((opening or {}).get("content") or "")
+    fixed = bool((opening or {}).get("fixed_opening", False))
+    if fixed:
+        if not content.strip():
+            return error_response("Fixed opening content is empty", 400, "Opening content is required")
+        opening_content = content
+    else:
+        # Reuse the normal agent pipeline in-process so provider selection,
+        # logging, tools, and history remain identical to regular chat.
+        from trpg_server.routes.chat import chat as chat_handler
+        scene_hint = str((scene or {}).get("content") or (scene or {}).get("summary") or "").strip()
+        prompt = (
+            "【系统：新游戏开始】请立即作为KP说出第一句话，不要等待玩家@KP。\n"
+            "根据以下剧本导入模块和第一个场景组织自然开场；不得创造剧本未提供的地点、人物或事实。"
+            "不要泄露仅KP可见的背景信息，不要列选项或解释规则，结尾给玩家一个可行动的叙事入口。\n"
+            f"导入模块：\n{content}\n第一个场景：\n{scene_hint}"
+        )
+        prompt = (
+            "[SYSTEM: NEW GAME START] Act as the KP and speak the first line now; do not wait for @KP.\n"
+            "Use only facts from the opening import module and the first scene. Do not invent locations, people, items, or causes. Never reveal KP-only background. Do not list choices or explain rules; end with a natural actionable narrative hook for players.\n"
+            f"OPENING IMPORT MODULE:\n{content}\nFIRST SCENE:\n{scene_hint}"
+        )
+        with current_app.test_request_context("/api/chat", method="POST", json={
+            "user_id": session.get("user_id", "unknown"),
+            "room_id": room_id,
+            "content": prompt,
+            "role_id": "kp",
+        }):
+            response = chat_handler()
+        response_obj = response[0] if isinstance(response, tuple) else response
+        payload = response_obj.get_json(silent=True) if hasattr(response_obj, "get_json") else None
+        if not payload or not payload.get("success"):
+            return error_response("AI opening request failed", 502, str((payload or {}).get("error") or (payload or {}).get("message") or "No response"))
+        opening_content = str(payload.get("content") or (payload.get("data") or {}).get("content") or "").strip()
+        if not opening_content:
+            return error_response("AI opening request returned no content", 502, "No response")
+
+    role = _configured_role("kp")
+    message = {
+        "id": uuid4().hex,
+        "type": "kp",
+        "sender_id": None,
+        "sender_name": role.get("name") or "KP",
+        "avatar": role.get("avatar") or "/assets/avatars/default_kp.jpg",
+        "content": opening_content,
+        "time": time.strftime("%H:%M"),
+        "created_at": _timestamp(),
+        "metadata": {"scenario_opening": True, "fixed_opening": fixed},
+    }
+    messages.append(message)
+    _write_messages(room_dir, messages)
+    info["started"] = True
+    info["started_at"] = _timestamp()
+    info["opening_message_id"] = message["id"]
+    _write_room(room_dir, info)
+    # Notify every connected player immediately; the initiating browser also
+    # receives the response and refreshes its own transcript.
+    try:
+        from trpg_server.app_factory import socketio
+        if getattr(socketio, "server", None) is not None:
+            socketio.emit("new_message", {"room_id": room_id, "message": message}, room=room_id)
+    except Exception:
+        logger.exception("Failed to broadcast room opening room_id=%s", room_id)
+    logger.info("room.game_started room_id=%s fixed_opening=%s", room_id, fixed)
+    return success_response({"room": _room_summary(info), "message": message, "messages": messages}, "Game started", 201)
 
 
 @bp.route("/api/rooms/spectate", methods=["POST"])
@@ -607,6 +724,33 @@ def delete_room_member(room_id, user_id):
         房间名=info.get("name"),
     )
     return success_response(_room_summary(info), "Player removed")
+
+
+@bp.route("/api/rooms/<room_id>/leave", methods=["POST"])
+def leave_room(room_id):
+    login_error = _require_login()
+    if login_error:
+        return login_error
+    room_dir, info = _find_room(room_id)
+    if not room_dir:
+        return error_response("Room not found", 404, "Room not found")
+    member = _find_member(info, user_id=session.get("user_id"), active_only=True)
+    if not member:
+        return error_response("You are not an active member of this room", 400, "Not a room member")
+    if str(member.get("user_id")) == str(info.get("creator_id")):
+        successors = [item for item in info.get("members", []) if _is_active_member(item) and str(item.get("user_id")) != str(member.get("user_id"))]
+        if not successors:
+            return error_response("Room owner cannot leave the only-member room", 400, "Room owner cannot leave")
+        successor = successors[0]
+        info["creator_id"] = successor.get("user_id")
+        info["creator_name"] = successor.get("username")
+        successor["room_role"] = ROOM_ROLE_OWNER
+        member["room_role"] = ROOM_ROLE_MEMBER
+    member["status"] = ROOM_MEMBER_REMOVED
+    member["is_active"] = False
+    member["left_at"] = _timestamp()
+    _write_room(room_dir, info)
+    return success_response(_room_summary(info), "Left room successfully")
 
 
 @bp.route("/api/rooms/<room_id>/members/<user_id>/role", methods=["PUT"])

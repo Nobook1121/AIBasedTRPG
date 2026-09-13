@@ -30,6 +30,7 @@ interface ChatApiResponse {
     completion_tokens?: number;
     cached_tokens?: number;
     cache_hit_rate?: number;
+    prefix_cache_hit?: boolean;
     elapsed_ms?: number;
     cache_key?: string;
 }
@@ -248,7 +249,7 @@ async function sendToAI(chatInput: HTMLInputElement, sendButton: HTMLButtonEleme
         if (toolMessages.length > 0) {
             moveThinkingMessageToEnd(thinkingMessageId);
         }
-        replaceThinkingMessage(thinkingMessageId, messageContent, processingTime, tokenCount, data.cache_hit_rate ?? null);
+        replaceThinkingMessage(thinkingMessageId, messageContent, processingTime, tokenCount, data.cache_hit_rate ?? null, data.prefix_cache_hit ?? null);
         broadcastAIThinkingEnd(aiRequestId);
         clearPersistedThinkingState(aiRequestId);
 
@@ -262,6 +263,7 @@ async function sendToAI(chatInput: HTMLInputElement, sendButton: HTMLButtonEleme
             completionTokens: data.completion_tokens,
             cachedTokens: data.cached_tokens,
             cacheHitRate: data.cache_hit_rate,
+            prefixCacheHit: data.prefix_cache_hit,
             cacheKey: data.cache_key,
         });
         if (persisted) {
@@ -603,6 +605,7 @@ function addMessage(
     processingTime: number | null = null,
     tokenCount: number | null = null,
     cacheHitRate: number | null = null,
+    prefixCacheHit: boolean | null = null,
     message: ChatMessage | null = null,
 ): string | number {
     const resolvedMessageId = messageId || Date.now();
@@ -630,16 +633,16 @@ function addMessage(
         sender,
         displayTime,
         contentHtml: renderedContent,
-        processingHtml: renderProcessingTime(type, processingTime, tokenCount, cacheHitRate),
+        processingHtml: renderProcessingTime(type, processingTime, tokenCount, cacheHitRate, prefixCacheHit),
     });
     chatHistory.appendChild(messageDiv);
     chatHistory.scrollTop = chatHistory.scrollHeight;
     return resolvedMessageId;
 }
 
-function renderProcessingTime(type: string, processingTime: number | null, tokenCount: number | null, cacheHitRate: number | null = null): string {
+function renderProcessingTime(type: string, processingTime: number | null, tokenCount: number | null, cacheHitRate: number | null = null, prefixCacheHit: boolean | null = null): string {
     if (processingTime === null || type !== "kp") return "";
-    return window.TrpgTemplates.render("chat-processing-time", { text: processingTimeText(processingTime, tokenCount, cacheHitRate) });
+    return window.TrpgTemplates.render("chat-processing-time", { text: processingTimeText(processingTime, tokenCount, cacheHitRate, prefixCacheHit) });
 }
 
 function addThinkingMessage(messageId: string | number, roleName = "KP", startedAt = Date.now()): void {
@@ -652,13 +655,13 @@ function addThinkingMessage(messageId: string | number, roleName = "KP", started
     startThinkingElapsedTimer(String(messageId), startedAt);
 }
 
-function replaceThinkingMessage(messageId: string | number, newContent: string, processingTime: number, tokenCount: number | null, cacheHitRate: number | null = null): void {
+function replaceThinkingMessage(messageId: string | number, newContent: string, processingTime: number, tokenCount: number | null, cacheHitRate: number | null = null, prefixCacheHit: boolean | null = null): void {
     stopThinkingElapsedTimer(String(messageId));
     const targetMessage = document.querySelector<HTMLElement>(`.message.thinking.kp-message[data-ai-request-id="${String(messageId)}"]`)
         || document.querySelector<HTMLElement>(`.message[data-id="${messageId}"]`);
 
     if (!targetMessage) {
-        addMessage("kp", "KP", newContent, null, false, processingTime, tokenCount, cacheHitRate);
+        addMessage("kp", "KP", newContent, null, false, processingTime, tokenCount, cacheHitRate, prefixCacheHit);
         return;
     }
 
@@ -676,16 +679,17 @@ function replaceThinkingMessage(messageId: string | number, newContent: string, 
         targetMessage.querySelector(".message-content-container")?.appendChild(processingTimeDiv);
     }
 
-    processingTimeDiv.textContent = processingTimeText(processingTime, tokenCount, cacheHitRate);
+    processingTimeDiv.textContent = processingTimeText(processingTime, tokenCount, cacheHitRate, prefixCacheHit);
 
     const chatHistory = document.getElementById("chatHistory");
     if (chatHistory) chatHistory.scrollTop = chatHistory.scrollHeight;
 }
 
-function processingTimeText(processingTime: number, tokenCount: number | null = null, cacheHitRate: number | null = null): string {
+function processingTimeText(processingTime: number, tokenCount: number | null = null, cacheHitRate: number | null = null, prefixCacheHit: boolean | null = null): string {
     let displayText = `已耗时: ${processingTime}秒`;
     if (tokenCount !== null) displayText += ` 消耗Token：${tokenCount}`;
     if (cacheHitRate !== null) displayText += ` 缓存命中率：${cacheHitRate}%`;
+    if (prefixCacheHit !== null) displayText += prefixCacheHit ? " 前缀缓存：命中" : " 前缀缓存：未命中";
     return displayText;
 }
 
@@ -837,6 +841,9 @@ function renderRoomMessage(message: ChatMessage | null): void {
         numericMetadata(metadata, "processingTime") ?? numericMetadata(metadata, "processing_time"),
         numericMetadata(metadata, "tokenCount") ?? numericMetadata(metadata, "token_count"),
         numericMetadata(metadata, "cacheHitRate") ?? numericMetadata(metadata, "cache_hit_rate"),
+        metadata.prefixCacheHit === true || metadata.prefix_cache_hit === true
+            ? true
+            : metadata.prefixCacheHit === false || metadata.prefix_cache_hit === false ? false : null,
         displayMessage,
     );
 }

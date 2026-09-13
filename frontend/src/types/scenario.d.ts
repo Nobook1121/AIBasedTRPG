@@ -1,5 +1,5 @@
 type ScenarioTriggerContentMode = "text" | "richtext" | "image" | "file";
-type ScenarioModuleType = "opening" | "background" | "public_info" | "preparation" | "timeline" | "scene" | "ending" | "monster" | "npc" | "custom";
+type ScenarioModuleType = "opening" | "background" | "public_info" | "preparation" | "timeline" | "scene" | "trigger" | "ending" | "monster" | "npc" | "custom";
 
 interface ScenarioModuleTimelineEntry {
     id: string;
@@ -58,6 +58,7 @@ interface ScenarioModule {
     scene_id?: number | undefined;
     ending_id?: number | undefined;
     triggers?: ScenarioTrigger[] | undefined;
+    target_module_id?: string | undefined;
     timeline_entries?: ScenarioModuleTimelineEntry[] | undefined;
     open_ending?: boolean | undefined;
     fixed_opening?: boolean | undefined;
@@ -75,6 +76,7 @@ interface Scenario {
     playerCount: number;
     notes?: string;
     allow_open_ending?: boolean;
+    sequential?: boolean;
     modules?: ScenarioModule[];
     cover?: string;
     owner_id?: string | number;
@@ -109,8 +111,8 @@ interface ScenarioModel {
     getScenarios(): Scenario[];
     saveScenarios(): void;
     importScenario(scenarioData: unknown): Promise<Scenario>;
-    convertScript(text: string, title?: string): Promise<ScenarioInput>;
-    convertScriptFile(file: File, title?: string): Promise<ScenarioInput>;
+    convertScript(text: string, title?: string, useAI?: boolean): Promise<ScenarioInput>;
+    convertScriptFile(file: File, title?: string, useAI?: boolean): Promise<ScenarioInput>;
     loadDraft(): Promise<ScenarioInput | null>;
     saveDraft(scenarioData: ScenarioInput): Promise<ScenarioInput>;
     discardDraft(): Promise<void>;
@@ -143,6 +145,7 @@ interface ScenarioView {
     openEditModal(scenario: Scenario): void;
     fillDraftData(draft: ScenarioInput): void;
     showDraftPrompt(): Promise<"continue" | "discard" | "cancel">;
+    showAIImportPrompt(estimatedRounds: number): Promise<boolean>;
     closeModal(): void;
     previewScenario(scenario: Scenario): void;
     getFormData(): ScenarioInput;

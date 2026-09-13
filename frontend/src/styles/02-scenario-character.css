@@ -142,8 +142,22 @@
 
 .scenario-preview-section,
 .scenario-preview-segment {
-    margin: 0 0 8px;
+    margin: 0 0 4px;
     padding: 0;
+}
+
+.scenario-preview-segment + .scenario-preview-segment {
+    border-top: 1px solid var(--border-subtle);
+    padding-top: 6px;
+}
+
+.scenario-module-drop-indicator {
+    height: 4px;
+    margin: 6px 0;
+    border-radius: 4px;
+    background: var(--color-primary, #4f8cff);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary, #4f8cff) 22%, transparent);
+    pointer-events: none;
 }
 
 .scenario-basic-layout {
@@ -269,6 +283,7 @@
 }
 
 .scenario-module-item {
+    cursor: grab;
     display: grid;
     gap: 14px;
     padding: 16px;
@@ -277,6 +292,8 @@
     background: var(--color-panel);
     box-shadow: var(--shadow-sm);
 }
+.scenario-module-item:active { cursor: grabbing; }
+.scenario-module-dragging { opacity: .55; }
 
 .scenario-module-header {
     display: flex;

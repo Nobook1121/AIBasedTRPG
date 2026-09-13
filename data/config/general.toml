@@ -19,9 +19,21 @@ message_font_size = 14
 max_history_messages = 1000
 
 [ai]
+# Chat streaming remains opt-in for compatibility.
 stream_output = false
 debug_mode = false
 show_ai_hints = true
+
+[ai.small_models]
+intent_classification = ""
+state_update = ""
+summarization = ""
+schema_repair = ""
+
+[scenario_import]
+# Long documents may legitimately take several minutes to structure.
+timeout = 300
+stream_output = true
 
 [character_rules]
 attribute_ratio_percent = 20

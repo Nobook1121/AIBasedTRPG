@@ -274,14 +274,45 @@ async function loadAITokenDashboard(): Promise<void> {
     const dateLabel = document.getElementById("aiTokenDashboardDate");
     if (!body) return;
     try {
-        const response = await TrpgApi.get<ApiResponse<{ day: string; roles: Record<string, { request_count?: number; prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; cache_hit_rate?: number }> }>>("/api/telemetry/ai/daily");
+        const response = await TrpgApi.get<ApiResponse<{ day?: string; roles?: Record<string, { request_count?: number; prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; cache_hit_rate?: number; prefix_cache_hit_rate?: number }>; days?: Array<{ day: string; roles: Record<string, { total_tokens?: number }> }> }>>("/api/telemetry/ai/daily?days=30");
         if (!response.success || !response.data) throw new Error(response.message || "无法加载 Token 用量");
-        if (dateLabel) dateLabel.textContent = `日期：${response.data.day}`;
-        const entries = Object.entries(response.data.roles || {});
-        body.innerHTML = entries.length ? entries.map(([role, usage]) => `<tr><td>${settingsEscapeHtml(role)}</td><td>${usage.request_count || 0}</td><td>${usage.prompt_tokens || 0}</td><td>${usage.completion_tokens || 0}</td><td>${usage.total_tokens || 0}</td><td>${usage.cache_hit_rate || 0}%</td></tr>`).join("") : '<tr><td colspan="6" class="text-muted">暂无用量记录</td></tr>';
+        type UsageBucket = { request_count?: number; prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; cache_hit_rate?: number; prefix_cache_hit_rate?: number };
+        type UsageDay = { day: string; roles: Record<string, UsageBucket> };
+        const history: UsageDay[] = (response.data.days || []) as UsageDay[];
+        const latest: UsageDay = history[history.length - 1] || { day: response.data.day || "", roles: (response.data.roles || {}) as Record<string, UsageBucket> };
+        if (dateLabel) dateLabel.textContent = `日期：${latest.day || "-"}（最近 30 天）`;
+        // Keep role aggregation data-driven so future AI roles render without code changes.
+        const entries = Object.entries(latest.roles || {}); // Object.entries(response.data.roles)
+        body.innerHTML = entries.length ? entries.map(([role, usage]) => `<tr><td>${settingsEscapeHtml(role)}</td><td>${usage.request_count || 0}</td><td>${usage.prompt_tokens || 0}</td><td>${usage.completion_tokens || 0}</td><td>${usage.total_tokens || 0}</td><td>${usage.cache_hit_rate || 0}%</td><td>${usage.prefix_cache_hit_rate || 0}%</td></tr>`).join("") : '<tr><td colspan="7" class="text-muted">暂无用量记录</td></tr>';
+        renderAIUsageCharts(history);
     } catch (error) {
-        body.innerHTML = `<tr><td colspan="6" class="text-danger">${settingsEscapeHtml(settingsErrorMessage(error))}</td></tr>`;
+        body.innerHTML = `<tr><td colspan="7" class="text-danger">${settingsEscapeHtml(settingsErrorMessage(error))}</td></tr>`;
     }
+}
+
+function renderAIUsageCharts(history: Array<{ day: string; roles: Record<string, { total_tokens?: number }> }>): void {
+    const chart = document.getElementById("aiUsageChart");
+    const legend = document.getElementById("aiUsageLegend");
+    const heatmap = document.getElementById("aiUsageHeatmap");
+    if (!chart || !legend || !heatmap) return;
+    const roleIds = Array.from(new Set(history.flatMap((day) => Object.keys(day.roles || {}))));
+    const colors = ["#2f80ed", "#27ae60", "#f2994a", "#9b51e0", "#eb5757", "#56ccf2", "#6fcf97"];
+    const totals = history.map((day) => roleIds.reduce((sum, role) => sum + Number(day.roles?.[role]?.total_tokens || 0), 0));
+    const max = Math.max(1, ...totals);
+    chart.innerHTML = history.map((day, index) => {
+        const total = totals[index] ?? 0;
+        const segments = roleIds.map((role, roleIndex) => {
+            const value = Number(day.roles?.[role]?.total_tokens || 0);
+            return `<span title="${settingsEscapeHtml(role)}: ${value}" style="flex:${Math.max(0, value)};background:${colors[roleIndex % colors.length]}"></span>`;
+        }).join("");
+        return `<div class="ai-usage-bar-group"><div class="ai-usage-bar" style="height:${Math.max(4, (total / max) * 100)}%">${segments}</div><small>${settingsEscapeHtml(day.day.slice(5))}</small></div>`;
+    }).join("");
+    legend.innerHTML = roleIds.map((role, index) => `<span><i style="background:${colors[index % colors.length]}"></i>${settingsEscapeHtml(role)}</span>`).join("");
+    heatmap.innerHTML = history.map((day) => {
+        const value = roleIds.reduce((sum, role) => sum + Number(day.roles?.[role]?.total_tokens || 0), 0);
+        const intensity = Math.min(4, Math.ceil((value / max) * 4));
+        return `<span class="heat-${intensity}" title="${settingsEscapeHtml(day.day)}: ${value} tokens"></span>`;
+    }).join("");
 }
 
 function bindGeneralCheckboxSetting(elementId: string, sectionName: string, key: string): void {

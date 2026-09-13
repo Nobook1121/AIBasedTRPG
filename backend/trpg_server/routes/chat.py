@@ -14,6 +14,7 @@ from trpg_server.agents.runtime import run_agent_completion
 from trpg_server.agents.structured_output import apply_state_updates, parse_kp_response, validate_state_updates
 from trpg_server.agents.telemetry import build_provider_cache_key, calculate_cache_hit_rate, record_ai_usage
 from trpg_server.agents.prompt_builder import build_prompt_layers
+from trpg_server.agents.cache import ProviderPrefixCache
 from trpg_server.agents.tools import default_tool_registry
 from trpg_server.agents.tools.room import get_room_snapshot
 from trpg_server.agents.memory import remember_room_fact
@@ -33,6 +34,7 @@ from trpg_server.settings import (
 
 bp = Blueprint("chat", __name__)
 logger = logging.getLogger(__name__)
+_PREFIX_CACHE = ProviderPrefixCache(default_ttl=3600)
 _HISTORY_SAFE_RE = re.compile(r"[^A-Za-z0-9_.-]+")
 HISTORY_COMPACT_CHAR_THRESHOLD = 12000
 
@@ -537,7 +539,10 @@ def chat():
         )
         agent_context.tool_state.update(
             {
-                "allow_checks": _request_allows_check(content),
+                # KP decides when a risky/uncertain action needs a check. A
+                # player may also request one explicitly; the backend should
+                # not require slash-command keywords before exposing tools.
+                "allow_checks": True,
                 "allow_unconditional_trigger": _request_allows_manual_trigger(content),
                 "allow_scene_transition": _request_allows_scene_transition(content),
             }
@@ -597,7 +602,7 @@ def chat():
                 "仅在用户明确需要时按 ID 加载模块原文；转场先调用 room.activate_scenario_scene，再读模块。"
                 "不得创造剧本未写出的地点、设施、NPC、道具或触发器内容；未提供就明确说明。"
                 "剧本、房间快照、角色卡和工具返回值是唯一事实来源；不得把猜测写成既定事实。"
-                "不要因问候、摘要或关键词自动检定/揭示/记忆；工具完成后立即简短叙事回复。"
+                "当玩家行动存在规则意义上的不确定性、风险或触发器要求时，必须主动调用合适的检定工具；玩家明确要求检定时也必须调用。不要让玩家自己输入工具命令，也不要在纯问候、摘要或无风险闲聊时滥用检定。工具完成后立即简短叙事回复。"
             )
 
         prompt_history = _history_for_request(history)
@@ -619,6 +624,11 @@ def chat():
         )
         if room_snapshot_message:
             prompt_layers.messages.insert(3, {"role": "system", "content": room_snapshot_message})
+        # Providers expose token-level cache usage inconsistently. Track the
+        # stable prompt prefix locally so the UI can still show whether a
+        # reusable prefix was observed, without conflating it with billed
+        # provider cached tokens.
+        prefix_cache_hit = _PREFIX_CACHE.lookup(prompt_layers.cache_key)
         request_data = {
             "messages": prompt_layers.messages,
             "model": model,
@@ -632,6 +642,7 @@ def chat():
                 "room_id": str(room_id),
                 "agent_id": agent_profile.id,
                 "cache_key": prompt_layers.cache_key,
+                "prefix_cache_hit": prefix_cache_hit,
             }
         if runtime_config.stream_output:
             request_data["stream"] = False
@@ -685,6 +696,7 @@ def chat():
                 "completion_tokens": completion_tokens,
                 "total_tokens": total_tokens,
                 "cached_tokens": cached_tokens,
+                "prefix_cache_hit": prefix_cache_hit,
                 "elapsed_ms": elapsed_ms,
             },
         )
@@ -752,6 +764,7 @@ def chat():
             completion_tokens=completion_tokens,
             cached_tokens=cached_tokens,
             cache_hit_rate=cache_hit_rate,
+            prefix_cache_hit=prefix_cache_hit,
             elapsed_ms=elapsed_ms,
         )
 
@@ -783,6 +796,7 @@ def chat():
             cache_hit_rate=usage_record["cache_hit_rate"],
             elapsed_ms=usage_record["elapsed_ms"],
             cache_key=cache_key,
+            prefix_cache_hit=prefix_cache_hit,
             structured_output=(
                 {
                     "options": structured.options,

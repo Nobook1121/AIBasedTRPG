@@ -6,6 +6,7 @@ export function HomeChat() {
                     <h2 id="homeRoomTitle" data-i18n="home.not_joined" data-i18n-dynamic="true">未加入房间</h2>
                     <p className="home-room-meta" id="homeRoomOnlineCount" data-i18n="room.status.online_players" data-i18n-dynamic="true">在线玩家 0/0</p>
                 </div>
+                <button className="btn btn-primary" id="startRoomGame" type="button" hidden>开始游戏</button>
             </header>
 
             <div className="save-status-bar" id="saveStatusBar" style={{ display: "none" }} aria-live="polite">

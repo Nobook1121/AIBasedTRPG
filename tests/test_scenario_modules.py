@@ -6,7 +6,7 @@ from trpg_server.agents.tools import default_tool_registry
 from trpg_server.agents.tools.room import get_room_scenario_context, get_room_scenario_module
 from trpg_server.agents.tools.trigger import reveal_scenario_trigger
 from trpg_server.scenario_store import build_trigger_message, normalize_scenario_payload, normalize_trigger
-from trpg_server.scenario_importer import convert_script_to_scenario
+from trpg_server.scenario_importer import convert_script_to_scenario, convert_with_ai
 from trpg_server.scenario_importer import analyze_script_structure, build_ai_conversion_prompt
 
 
@@ -54,6 +54,22 @@ def test_script_importer_does_not_split_skill_check_prose_into_modules():
     assert [item["title"] for item in result["modules"]] == ["背景", "6号车厢", "7号车厢", "True End", "BAD END"]
     assert result["modules"][1]["content"].count("侦查") == 2
     assert result["modules"][2]["content"].count("敏捷") == 1
+
+
+def test_ai_conversion_aggregates_usage_across_batches_without_network():
+    calls = []
+
+    def fake_request(payload):
+        calls.append(payload)
+        import json as _json
+        import re
+        marker = re.findall(r"SOURCE_SECTION (\d+)", payload["messages"][1]["content"])[0]
+        return {"choices": [{"message": {"content": _json.dumps({"modules": [{"source_order": int(marker), "module_type": "opening", "title": "房间", "summary": "房间场景"}]})}}], "usage": {"prompt_tokens": 10, "completion_tokens": 5}}
+
+    result = convert_with_ai(fake_request, "房间\n内容\n\n光幕\n内容", max_sections_per_request=1)
+    assert len(calls) == 2
+    assert result["conversion"]["ai"]["total_token_count"] == 30
+    assert [module["module_type"] for module in result["modules"][:2]] == ["scene", "scene"]
 
 
 def test_room_scenario_context_returns_module_summaries(tmp_path):

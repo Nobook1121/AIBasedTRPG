@@ -35,6 +35,7 @@
     "scenario.module.type.preparation": "Preparation",
     "scenario.module.type.timeline": "Timeline",
     "scenario.module.type.scene": "Scene",
+    "scenario.module.type.opening": "Opening",
     "scenario.module.type.ending": "Ending",
     "scenario.module.type.monster": "Monster Information",
     "scenario.module.type.npc": "NPC Information",

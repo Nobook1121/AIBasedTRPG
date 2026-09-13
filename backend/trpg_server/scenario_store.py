@@ -28,6 +28,7 @@ SCENARIO_MODULE_TYPES = {
     "preparation",
     "timeline",
     "scene",
+    "trigger",
     "ending",
     "monster",
     "npc",
@@ -120,6 +121,7 @@ def _module_default_title(module_type: str, index: int = 1) -> str:
         "preparation": "游戏准备",
         "timeline": "时间线",
         "scene": "场景",
+        "trigger": "触发器",
         "ending": "结局",
         "monster": "怪物信息",
         "npc": "NPC信息",
@@ -325,7 +327,10 @@ def _normalize_module(
     raw_title = str(module.get("title") or module.get("name") or module.get("label") or "").strip()
     title = _module_default_title(module_type, ordinal) if _is_generated_module_title(raw_title, module_type) else raw_title
     summary = str(module.get("summary") or module.get("marker") or module.get("brief") or "").strip()
-    content = str(module.get("content") or module.get("body") or "").strip()
+    raw_content = str(module.get("content") or module.get("body") or "")
+    # Fixed openings are sent verbatim by KP. Preserve their whitespace while
+    # retaining the historical normalization for every other module type.
+    content = raw_content if module_type == "opening" else raw_content.strip()
     notes = str(module.get("notes") or module.get("remark") or "").strip()
     visibility = str(module.get("visibility") or _module_default_visibility(module_type)).strip().lower()
     if visibility not in SCENARIO_MODULE_VISIBILITY:
@@ -359,11 +364,12 @@ def _normalize_module(
         if existing_codes is not None:
             existing_codes.add(code)
 
-    if module_type == "scene":
-        scene_id = _coerce_int(module.get("scene_id") or module.get("sceneId") or module.get("id"), 0)
-        if scene_id <= 0:
-            scene_id = int(time.time() * 1000)
-        normalized["scene_id"] = scene_id
+    if module_type not in {"npc", "monster"}:
+        if module_type == "scene":
+            scene_id = _coerce_int(module.get("scene_id") or module.get("sceneId") or module.get("id"), 0)
+            if scene_id <= 0:
+                scene_id = int(time.time() * 1000)
+            normalized["scene_id"] = scene_id
         triggers = []
         for trigger in module.get("triggers", []) if isinstance(module.get("triggers"), list) else []:
             normalized_trigger = normalize_trigger(trigger, storage_dir, include_content=include_content)
@@ -371,7 +377,7 @@ def _normalize_module(
                 triggers.append(normalized_trigger)
         if triggers:
             normalized["triggers"] = triggers
-    elif module_type == "ending":
+    if module_type == "ending":
         normalized["open_ending"] = _coerce_bool(module.get("open_ending") or module.get("openEnding"), False)
     elif module_type == "custom":
         inputs = _normalize_custom_inputs(module.get("inputs") or module.get("fields"), include_content=include_content)
@@ -456,6 +462,7 @@ def _scenario_modules_from_payload(scenario: dict[str, Any], storage_dir: Path |
 
     if not modules:
         for value, module_type, title, visibility, send_to_ai in (
+            (scenario.get("opening"), "opening", "导入模块", "kp", True),
             (scenario.get("background"), "background", "背景", "kp", True),
             (scenario.get("public_info"), "public_info", "公开信息", "public", True),
             (scenario.get("preparation"), "preparation", "游戏准备", "public", True),
@@ -549,6 +556,8 @@ def normalize_scenario_payload(scenario: dict[str, Any], storage_dir: Path | Non
 
     normalized = dict(scenario)
     modules = _scenario_modules_from_payload(scenario, storage_dir, include_content=include_content)
+    if not _coerce_bool(scenario.get("sequential") or scenario.get("ordered"), False):
+        modules.sort(key=lambda module: 0 if _module_type(module.get("module_type")) == "opening" else 1)
     legacy_fields = _scenario_legacy_fields_from_modules(modules)
     normalized["modules"] = modules
     normalized["scenes"] = legacy_fields["scenes"]
@@ -558,6 +567,7 @@ def normalize_scenario_payload(scenario: dict[str, Any], storage_dir: Path | Non
     normalized["preparation"] = legacy_fields["preparation"]
     normalized["timeline"] = legacy_fields["timeline"]
     normalized["allow_open_ending"] = legacy_fields["allow_open_ending"]
+    normalized["sequential"] = _coerce_bool(scenario.get("sequential") or scenario.get("ordered"), False)
     return normalized
 
 
@@ -572,7 +582,7 @@ def iter_scenario_trigger_catalog(scenario: dict[str, Any], scene_id: int | str 
     triggers: list[dict[str, Any]] = []
     expected_scene_id = str(scene_id) if scene_id not in (None, "") else None
     for module in _iter_modules(scenario):
-        if _module_type(module.get("module_type")) != "scene":
+        if _module_type(module.get("module_type")) in {"npc", "monster"}:
             continue
         current_scene_id = str(module.get("scene_id") or module.get("id"))
         if expected_scene_id and current_scene_id != expected_scene_id:
@@ -584,6 +594,8 @@ def iter_scenario_trigger_catalog(scenario: dict[str, Any], scene_id: int | str 
                 "id": trigger.get("id"),
                 "scene_id": module.get("scene_id") or module.get("id"),
                 "module_id": module.get("id"),
+                "module_type": _module_type(module),
+                "target_module_id": module.get("target_module_id"),
                 "module_title": module.get("title"),
                 "display_name": trigger.get("display_name") or trigger.get("name"),
                 "keyword": trigger.get("keyword"),
@@ -629,7 +641,7 @@ def load_scenario_record(descriptor_path: Path, scenarios_dir: Path) -> dict[str
     normalized = normalize_scenario_payload(scenario, storage_dir, include_content=True) or {}
 
     for module in normalized.get("modules", []):
-        if not isinstance(module, dict) or _module_type(module.get("module_type")) != "scene":
+        if not isinstance(module, dict) or _module_type(module.get("module_type")) in {"npc", "monster"}:
             continue
         triggers = []
         for trigger in module.get("triggers", []) if isinstance(module.get("triggers"), list) else []:
@@ -701,7 +713,7 @@ def save_scenario_record(
     modules = normalized.get("modules", [])
     if isinstance(modules, list):
         for module in modules:
-            if not isinstance(module, dict) or _module_type(module.get("module_type")) != "scene":
+            if not isinstance(module, dict) or _module_type(module.get("module_type")) in {"npc", "monster"}:
                 continue
             triggers = []
             for trigger in module.get("triggers", []) if isinstance(module.get("triggers"), list) else []:
@@ -762,9 +774,9 @@ def delete_scenario_record(descriptor_path: Path) -> None:
 def _iter_scene_sources(scenario: dict[str, Any]) -> list[dict[str, Any]]:
     modules = scenario.get("modules")
     if isinstance(modules, list):
-        scenes = [module for module in modules if isinstance(module, dict) and _module_type(module.get("module_type")) == "scene"]
-        if scenes:
-            return scenes
+        trigger_sources = [module for module in modules if isinstance(module, dict) and _module_type(module.get("module_type")) not in {"npc", "monster"} and isinstance(module.get("triggers"), list)]
+        if trigger_sources:
+            return trigger_sources
     return [scene for scene in scenario.get("scenes", []) if isinstance(scene, dict)]
 
 

@@ -176,6 +176,82 @@ def _select_model(platform_config):
     return model.get("id", "local-model")
 
 
+def _scenario_import_ai_settings() -> tuple[int, bool]:
+    """Read import-specific AI controls without making config mandatory.
+
+    Importing a long document is deliberately more patient than chat.  The
+    values are kept in the normal TOML config so deployments can tune them,
+    while the safe defaults also work for older installations.
+    """
+    timeout, stream = 300, True
+    ai_stream: bool | None = None
+    scenario_stream_seen = False
+    path = _get_config_dir() / "general.toml"
+    try:
+        section = ""
+        for raw in path.read_text(encoding="utf-8").splitlines():
+            line = raw.split("#", 1)[0].strip()
+            if line.startswith("[") and line.endswith("]"):
+                section = line[1:-1].strip().casefold()
+            elif "=" in line and section in {"ai", "scenario_import"}:
+                key, value = (part.strip() for part in line.split("=", 1))
+                value = value.strip().strip('"').strip("'")
+                if key == "stream_output":
+                    parsed_stream = value.casefold() in {"1", "true", "yes", "on"}
+                    if section == "scenario_import":
+                        stream = parsed_stream
+                        scenario_stream_seen = True
+                    else: ai_stream = parsed_stream
+                elif section == "scenario_import" and key in {"timeout", "timeout_seconds"}:
+                    timeout = int(value)
+    except (OSError, ValueError):
+        logger.warning("Unable to read scenario import AI settings; using defaults")
+    if not scenario_stream_seen and ai_stream is not None:
+        stream = ai_stream
+    return max(30, min(timeout, 900)), stream
+
+
+def _decode_stream_response(response):
+    """Decode an OpenAI-compatible JSON or SSE response into one JSON object."""
+    headers = getattr(response, "headers", {}) or {}
+    content_type = str(headers.get("Content-Type", headers.get("content-type", ""))).casefold()
+    if "event-stream" not in content_type:
+        try:
+            return response.json()
+        except (AttributeError, ValueError, json.JSONDecodeError):
+            pass
+    chunks = []
+    usage = None
+    iterator = getattr(response, "iter_lines", None)
+    if not callable(iterator):
+        raise ValueError("AI platform returned invalid JSON")
+    for raw_line in iterator(decode_unicode=True):
+        line = raw_line.decode("utf-8", "replace") if isinstance(raw_line, bytes) else str(raw_line)
+        if not line.startswith("data:"):
+            continue
+        data = line[5:].strip()
+        if not data or data == "[DONE]":
+            continue
+        try:
+            event = json.loads(data)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(event, dict) and isinstance(event.get("usage"), dict):
+            usage = event["usage"]
+        choices = event.get("choices") if isinstance(event, dict) else None
+        if choices and isinstance(choices[0], dict):
+            delta = choices[0].get("delta") or choices[0].get("message") or {}
+            if isinstance(delta, dict) and delta.get("content"):
+                chunks.append(str(delta["content"]))
+    content = "".join(chunks).strip()
+    if not content:
+        raise ValueError("AI platform returned an empty stream")
+    result = {"choices": [{"message": {"content": content}}]}
+    if usage is not None:
+        result["usage"] = usage
+    return result
+
+
 def _extract_ai_response(response_data):
     choices = response_data.get("choices", []) if isinstance(response_data, dict) else []
     if not choices:
@@ -431,6 +507,8 @@ def import_script():
         if not (_can_use_permission("scenarios.create") or _can_use_permission("scenarios.edit")):
             return error_response("Permission denied", 403, "Permission denied")
         payload = request.get_json(silent=True) if request.is_json else None
+        requested_use_ai = payload.get("use_ai", True) if isinstance(payload, dict) else request.form.get("use_ai", "true")
+        use_ai = str(requested_use_ai).casefold() not in {"0", "false", "no", "off"}
         metadata = ({k: payload[k] for k in ("title", "description") if k in payload}
                     if isinstance(payload, dict) else {})
         if isinstance(payload, dict) and payload.get("text"):
@@ -471,7 +549,7 @@ def import_script():
         result = None
         role = _summary_role()
         selected_platform, platform_config = _load_enabled_platform(role.get("provider"))
-        if platform_config:
+        if use_ai and platform_config:
             api_key = platform_config.get("config", {}).get("api_key")
             base_url = platform_config.get("config", {}).get("base_url")
             if selected_platform == "lmstudio" and not api_key: api_key = "lm-studio"
@@ -480,10 +558,17 @@ def import_script():
                 model = _select_model(platform_config)
                 # Conversion prompts contain the full source document and ask
                 # for structured JSON. They legitimately take longer than a
-                # short chat completion; never reuse the 20s chat timeout.
-                configured_timeout = int(platform_config.get("config", {}).get("timeout", 60) or 60)
-                timeout = max(120, configured_timeout)
+                # short chat completion.  Prefer an explicit import setting,
+                # then the provider timeout, with a generous bounded default.
+                default_timeout, stream_output = _scenario_import_ai_settings()
+                try:
+                    configured_timeout = int(platform_config.get("config", {}).get("timeout", default_timeout) or default_timeout)
+                except (TypeError, ValueError):
+                    configured_timeout = default_timeout
+                timeout = max(30, min(max(default_timeout, configured_timeout), 900))
                 def request_ai(ai_payload):
+                    ai_payload = dict(ai_payload)
+                    ai_payload["stream"] = bool(stream_output)
                     # Keep a complete, searchable copy of the outbound request.
                     # Authentication headers are redacted; the JSON body is the
                     # actual prompt sent to the provider and must not be reduced
@@ -500,7 +585,15 @@ def import_script():
                     )
                     started_at = time.monotonic()
                     try:
-                        response = requests.post(base_url, headers=headers, json=ai_payload, timeout=timeout)
+                        # `stream` is part of the request body for all
+                        # OpenAI-compatible providers.  Passing stream=True to
+                        # requests additionally enables incremental SSE reads;
+                        # retain a compatibility fallback for test doubles and
+                        # older adapters that do not accept the keyword.
+                        try:
+                            response = requests.post(base_url, headers=headers, json=ai_payload, timeout=timeout, stream=bool(stream_output))
+                        except TypeError:
+                            response = requests.post(base_url, headers=headers, json=ai_payload, timeout=timeout)
                     except requests.exceptions.RequestException:
                         logger.exception(
                             "scenario_import.ai_http_transport_error elapsed_seconds=%.3f",
@@ -508,8 +601,8 @@ def import_script():
                         )
                         raise
                     try:
-                        response_data = response.json()
-                    except ValueError:
+                        response_data = _decode_stream_response(response) if stream_output else response.json()
+                    except (ValueError, json.JSONDecodeError):
                         logger.exception(
                             "scenario_import.ai_http_invalid_response status=%s elapsed_seconds=%.3f body=%s",
                             response.status_code,
@@ -541,11 +634,14 @@ def import_script():
                     # in the log for diagnosis.
                     logger.warning("scenario_import.ai_failed_fallback error_type=%s error=%s", type(exc).__name__, exc)
                     result = convert_script_to_scenario(text, metadata)
-                    result.setdefault("conversion", {})["ai"] = {"status": "fallback", "error": str(exc)}
+                    section_count = int(result.get("conversion", {}).get("analysis", {}).get("section_count") or 1)
+                    result.setdefault("conversion", {})["ai"] = {"status": "fallback", "error": str(exc), "request_count": (section_count + 7) // 8}
             else:
                 logger.warning("scenario_import.ai_unavailable provider=%s reason=incomplete_config", selected_platform)
         if result is None:
             result = convert_script_to_scenario(text, metadata)
+            if not use_ai:
+                result.setdefault("conversion", {})["ai"] = {"status": "skipped", "reason": "user_disabled"}
             logger.info("scenario_import.local_conversion modules=%d", len(result.get("modules", [])))
         log_user_action(logger, user_action_text(session.get("username"), "导入并解析剧本"),
                         用户ID=session.get("user_id"), 模块数=len(result.get("modules", [])),

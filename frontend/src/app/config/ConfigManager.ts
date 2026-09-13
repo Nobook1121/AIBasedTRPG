@@ -115,6 +115,7 @@ class ConfigManager {
         configSetInputValue("triggerMaxFileSize", this.get("general", "scenario", "trigger_max_file_size", 5242880));
         configSetCheckboxValue("showTimestamp", this.get("general", "chat", "show_timestamp", true));
         configSetCheckboxValue("streamOutput", this.get("general", "ai", "stream_output", false));
+        configSetCheckboxValue("scenarioImportStreamOutput", this.get("general", "scenario_import", "stream_output", true));
         configSetCheckboxValue("showAIHints", this.get("general", "ai", "show_ai_hints", true));
         configSetInputValue("messageFontSize", this.get("general", "chat", "message_font_size", 14));
 

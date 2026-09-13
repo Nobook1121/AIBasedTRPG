@@ -25,7 +25,10 @@
             </p>
         </div>
         <div class="card-footer bg-transparent border-0">
-            <button class="btn btn-primary w-100 view-room-btn">{{ actionLabel }}</button>
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary flex-grow-1 view-room-btn">{{ actionLabel }}</button>
+                {{{ leaveButtonHtml }}}
+            </div>
         </div>
     </div>
 </div>
@@ -37,6 +40,10 @@
 
 <template id="room-character-empty">
 <div class="text-muted">&#26242;&#26080;&#29609;&#23478;&#35760;&#24405;</div>
+</template>
+
+<template id="room-leave-button">
+<button type="button" class="btn btn-outline-danger leave-room-btn" data-action="leave-room" data-room-id="{{ roomId }}" title="退出房间"><i class="fa fa-sign-out" aria-hidden="true"></i><span class="visually-hidden">退出房间</span></button>
 </template>
 
 <template id="room-character-binding-table">
