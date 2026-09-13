@@ -75,3 +75,8 @@ def serve_config(filename):
 @bp.route("/data/characters/<path:filename>")
 def serve_character_data(filename):
     return _with_no_cache(send_from_directory(CHARACTERS_DIR, filename))
+
+
+@bp.route("/data/tools/<path:filename>")
+def serve_tool_script(filename):
+    return _with_no_cache(send_from_directory(TOOLS_DIR, filename))

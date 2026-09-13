@@ -3,22 +3,7 @@ class AIPlatformManager {
     private readonly platformsPath = "config/aiplatform";
 
     async loadPlatforms(): Promise<AIPlatformConfig[]> {
-        try {
-            const response = await TrpgApi.get<ApiResponse<AIPlatformConfig[]>>("/api/config/aiplatforms");
-            if (response.success && Array.isArray(response.data)) {
-                Object.keys(this.platforms).forEach((platform) => delete this.platforms[platform]);
-                response.data
-                    .filter(isAIPlatformConfig)
-                    .forEach((platform) => {
-                        this.platforms[platform.platform] = platform;
-                    });
-                return this.getAllPlatforms();
-            }
-        } catch (error) {
-            console.error("鍔犺浇骞冲彴鍒楄〃澶辫触锛屽皾璇曢潤鎬侀€€鍥?:", error);
-        }
-
-        const platformIds = ["aliyun", "siliconflow", "deepseek", "openrouter", "lmstudio", "anythingllm"];
+        const platformIds = ["aliyun", "siliconflow", "deepseek", "openrouter", "lmstudio"];
         const results = await Promise.all(platformIds.map((platform) => this.loadPlatform(platform)));
         return results.filter((platform): platform is AIPlatformConfig => platform !== null);
     }

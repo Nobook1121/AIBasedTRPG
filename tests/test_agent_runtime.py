@@ -2,7 +2,6 @@ from trpg_server.agents.context import AgentRequestContext
 from trpg_server.agents.profiles import AgentProfile
 from trpg_server.agents.runtime import run_agent_completion
 from trpg_server.agents.tools.base import AgentTool, ToolRegistry
-from trpg_server.json_store import read_json
 
 
 class FakeRequester:
@@ -23,33 +22,6 @@ class FakeRequester:
                                     "id": "call-1",
                                     "type": "function",
                                     "function": {"name": "test.echo", "arguments": "{\"value\":\"hello\"}"},
-                                }
-                            ],
-                        }
-                    }
-                ]
-            }
-        return {"choices": [{"message": {"role": "assistant", "content": "final answer"}}], "usage": {"total_tokens": 9}}
-
-
-class FakeCheckRequester:
-    def __init__(self):
-        self.calls = []
-
-    def __call__(self, payload):
-        self.calls.append(payload)
-        if len(self.calls) == 1:
-            return {
-                "choices": [
-                    {
-                        "message": {
-                            "role": "assistant",
-                            "content": "",
-                            "tool_calls": [
-                                {
-                                    "id": "call-check",
-                                    "type": "function",
-                                    "function": {"name": "check.roll_room_check", "arguments": "{}"},
                                 }
                             ],
                         }
