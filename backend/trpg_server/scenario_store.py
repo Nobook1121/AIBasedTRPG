@@ -17,6 +17,7 @@ from trpg_server.security import normalize_filename, safe_join
 
 
 SCENARIO_DESCRIPTOR_NAME = "scenario.json"
+SCENARIO_VERSIONS_DIR_NAME = "versions"
 SCENARIO_TRIGGER_DIR_NAME = "trigger-content"
 SCENARIO_TRIGGER_PREVIEW_DIR_NAME = "trigger-previews"
 SCENARIO_PUBLIC_ROUTE_PREFIX = "/assets/scenarios"
@@ -73,10 +74,22 @@ def find_scenario_descriptor_by_id(scenarios_dir: Path, scenario_id: int | str) 
     return None
 
 
-def load_scenario_by_id(scenarios_dir: Path, scenario_id: int | str) -> tuple[Path | None, dict[str, Any] | None]:
+def scenario_version_path(descriptor_path: Path, version: int | str) -> Path:
+    return descriptor_path.parent / SCENARIO_VERSIONS_DIR_NAME / f"{version}.json"
+
+
+def load_scenario_by_id(
+    scenarios_dir: Path,
+    scenario_id: int | str,
+    scenario_version: int | str | None = None,
+) -> tuple[Path | None, dict[str, Any] | None]:
     descriptor_path = find_scenario_descriptor_by_id(scenarios_dir, scenario_id)
     if not descriptor_path:
         return None, None
+    if scenario_version not in (None, ""):
+        version_path = scenario_version_path(descriptor_path, scenario_version)
+        if version_path.exists():
+            return version_path, load_scenario_record(version_path, scenarios_dir, storage_dir_override=descriptor_path.parent)
     return descriptor_path, load_scenario_record(descriptor_path, scenarios_dir)
 
 
@@ -548,6 +561,9 @@ def normalize_scenario_payload(scenario: dict[str, Any], storage_dir: Path | Non
         return None
 
     normalized = dict(scenario)
+    normalized["scenario_version"] = str(
+        scenario.get("scenario_version") or scenario.get("version") or scenario.get("version_id") or "1"
+    )
     modules = _scenario_modules_from_payload(scenario, storage_dir, include_content=include_content)
     legacy_fields = _scenario_legacy_fields_from_modules(modules)
     normalized["modules"] = modules
@@ -623,9 +639,13 @@ def iter_scenario_trigger_catalog(scenario: dict[str, Any], scene_id: int | str 
     return triggers
 
 
-def load_scenario_record(descriptor_path: Path, scenarios_dir: Path) -> dict[str, Any]:
+def load_scenario_record(
+    descriptor_path: Path,
+    scenarios_dir: Path,
+    storage_dir_override: Path | None = None,
+) -> dict[str, Any]:
     scenario = read_json(descriptor_path, default={})
-    storage_dir = scenario_storage_dir(descriptor_path)
+    storage_dir = Path(storage_dir_override) if storage_dir_override else scenario_storage_dir(descriptor_path)
     normalized = normalize_scenario_payload(scenario, storage_dir, include_content=True) or {}
 
     for module in normalized.get("modules", []):
@@ -733,6 +753,11 @@ def save_scenario_record(
         existing_descriptor.unlink()
 
     write_json_atomic(descriptor_path, normalized)
+    version_path = scenario_version_path(descriptor_path, normalized.get("scenario_version") or "1")
+    version_path.parent.mkdir(parents=True, exist_ok=True)
+    write_json_atomic(version_path, normalized)
+    from trpg_server.agents.knowledge_base import persist_knowledge_index
+    persist_knowledge_index(descriptor_path, normalized)
     return descriptor_path
 
 

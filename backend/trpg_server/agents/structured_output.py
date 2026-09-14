@@ -63,6 +63,68 @@ ALLOWED_STATE_FIELDS = {
     "rolling_summary",
 }
 
+KP_RESPONSE_SCHEMA = {
+    "type": "object",
+    "required": ["narration", "options", "state_updates", "next_scene", "npc_actions"],
+    "properties": {
+        "narration": {"type": "string"},
+        "options": {"type": "array", "items": {"type": "string"}},
+        "state_updates": {"type": "object"},
+        "next_scene": {"type": ["string", "null"]},
+        "npc_actions": {"type": "array", "items": {"type": "object"}},
+    },
+}
+
+
+def validate_structured_response(
+    response: StructuredKPResponse | None,
+    scenario: dict[str, Any] | None,
+) -> StructuredKPResponse | None:
+    """Apply current-version entity boundaries to the complete model response."""
+    if response is None:
+        return None
+    scenario_data = scenario if isinstance(scenario, dict) else {}
+    scene_ids = {
+        str(item.get("id") or item.get("module_id"))
+        for item in scenario_data.get("scene_manifest", [])
+        if isinstance(item, dict)
+    }
+    scene_ids.update(
+        str(item.get("scene_id") or item.get("id"))
+        for item in scenario_data.get("modules", [])
+        if isinstance(item, dict) and str(item.get("module_type") or "").casefold() in {"scene", "ending"}
+    )
+    npc_ids: set[str] = set()
+    modules = scenario_data.get("modules") if isinstance(scenario_data.get("modules"), list) else []
+    for module in modules:
+        if isinstance(module, dict) and str(module.get("card_type") or module.get("module_type") or "").casefold() in {"npc", "npcs", "character"}:
+            identifier = module.get("id") or module.get("code")
+            if identifier not in (None, ""):
+                npc_ids.add(str(identifier))
+    entity_manifest = scenario_data.get("entity_manifest") if isinstance(scenario_data.get("entity_manifest"), list) else []
+    npc_ids.update(
+        str(item.get("id"))
+        for item in entity_manifest
+        if isinstance(item, dict)
+        and str(item.get("type") or "").casefold() in {"npc", "npcs", "character"}
+        and item.get("id") not in (None, "")
+    )
+    actions = []
+    for action in response.npc_actions:
+        if not isinstance(action, dict):
+            continue
+        npc_id = action.get("npc_id") or action.get("id")
+        text = str(action.get("action") or "").strip()
+        if text and (not npc_ids or str(npc_id) in npc_ids):
+            actions.append({"npc_id": str(npc_id), "action": text[:500]})
+    return StructuredKPResponse(
+        narration=response.narration,
+        options=response.options,
+        state_updates=validate_state_updates(response.state_updates, {}, scenario_data),
+        next_scene=response.next_scene if response.next_scene in scene_ids else None,
+        npc_actions=actions[:20],
+    )
+
 
 def validate_state_updates(
     updates: dict[str, Any] | None,
@@ -75,6 +137,42 @@ def validate_state_updates(
     scenario_data = scenario if isinstance(scenario, dict) else {}
     manifest = scenario_data.get("scene_manifest") if isinstance(scenario_data.get("scene_manifest"), list) else []
     scene_ids = {str(item.get("id") or item.get("module_id")) for item in manifest if isinstance(item, dict)}
+    entity_ids: dict[str, set[str]] = {"clues": set(), "items": set(), "npc_attitudes": set()}
+    modules = scenario_data.get("modules") if isinstance(scenario_data.get("modules"), list) else []
+    for module in modules:
+        if not isinstance(module, dict):
+            continue
+        identifier = module.get("id") or module.get("code")
+        if identifier in (None, ""):
+            continue
+        module_type = str(module.get("card_type") or module.get("module_type") or "").casefold()
+        if module_type in {"clue", "clues", "evidence"}:
+            entity_ids["clues"].add(str(identifier))
+        elif module_type in {"item", "items", "inventory"}:
+            entity_ids["items"].add(str(identifier))
+        elif module_type in {"npc", "character", "npcs"}:
+            entity_ids["npc_attitudes"].add(str(identifier))
+        if module_type in {"scene", "ending"}:
+            scene_ids.add(str(module.get("scene_id") or identifier))
+    for field_name, keys in {
+        "clues": ("clue_ids", "allowed_clue_ids"),
+        "items": ("item_ids", "allowed_item_ids"),
+        "npc_attitudes": ("npc_ids", "allowed_npc_ids"),
+    }.items():
+        for key in keys:
+            values = scenario_data.get(key)
+            if isinstance(values, (list, tuple, set)):
+                entity_ids[field_name].update(str(item) for item in values)
+    for item in scenario_data.get("entity_manifest", []) if isinstance(scenario_data.get("entity_manifest"), list) else []:
+        if not isinstance(item, dict) or item.get("id") in (None, ""):
+            continue
+        kind = str(item.get("type") or "").casefold()
+        if kind in {"clue", "clues", "evidence"}:
+            entity_ids["clues"].add(str(item["id"]))
+        elif kind in {"item", "items", "inventory"}:
+            entity_ids["items"].add(str(item["id"]))
+        elif kind in {"npc", "npcs", "character"}:
+            entity_ids["npc_attitudes"].add(str(item["id"]))
     for key, value in updates.items():
         if key not in ALLOWED_STATE_FIELDS:
             continue
@@ -84,11 +182,13 @@ def validate_state_updates(
             result[key] = str(value) if value not in (None, "") else None
         elif key == "npc_attitudes":
             if isinstance(value, dict):
-                result[key] = {str(k)[:100]: str(v)[:200] for k, v in value.items()} 
+                allowed = entity_ids["npc_attitudes"]
+                result[key] = {str(k)[:100]: str(v)[:200] for k, v in value.items() if not allowed or str(k) in allowed}
         elif key == "rolling_summary":
             result[key] = str(value or "")[:4000]
         elif isinstance(value, list):
-            result[key] = value[:50]
+            allowed = entity_ids.get(key, set())
+            result[key] = [item for item in value[:50] if not allowed or str(item) in allowed]
     return result
 
 

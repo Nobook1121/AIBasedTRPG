@@ -54,6 +54,14 @@ def record_ai_usage(log_dir: Path, usage: dict[str, Any]) -> dict[str, Any]:
 def load_daily_ai_usage(log_dir: Path, day: str | None = None) -> dict[str, Any]:
     target_day = day or date.today().isoformat()
     roles: dict[str, dict[str, Any]] = {}
+    scenario_distribution: dict[str, int] = {}
+    prefix_hits = 0
+    prefix_requests = 0
+    room_costs: dict[str, dict[str, int]] = {}
+    ruleset_distribution: dict[str, int] = {}
+    retrieval_topics: dict[str, int] = {}
+    retrieval_chunks = 0
+    retrieval_latency_total = 0.0
     totals = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0, "cached_tokens": 0}
     path = _usage_path(Path(log_dir))
     if path.exists():
@@ -73,7 +81,29 @@ def load_daily_ai_usage(log_dir: Path, day: str | None = None) -> dict[str, Any]
                 bucket[key] += int(item.get(key) or 0)
                 totals[key] += int(item.get(key) or 0)
             bucket["request_count"] += 1
+            if item.get("prefix_cache_hit"):
+                bucket["prefix_cache_hits"] = bucket.get("prefix_cache_hits", 0) + 1
+                prefix_hits += 1
+            prefix_requests += 1
+            scenario_key = item.get("scenario_id")
+            if scenario_key not in (None, ""):
+                scenario_distribution[str(scenario_key)] = scenario_distribution.get(str(scenario_key), 0) + 1
+            room_id = item.get("room_id")
+            if room_id not in (None, ""):
+                room_bucket = room_costs.setdefault(str(room_id), {"request_count": 0, "total_tokens": 0})
+                room_bucket["request_count"] += 1
+                room_bucket["total_tokens"] += int(item.get("total_tokens") or 0)
+            for ruleset_id in item.get("ruleset_ids") or []:
+                ruleset_distribution[str(ruleset_id)] = ruleset_distribution.get(str(ruleset_id), 0) + 1
+            for topic in item.get("retrieval_topics") or []:
+                retrieval_topics[str(topic)] = retrieval_topics.get(str(topic), 0) + 1
+            retrieval_chunks += int(item.get("retrieval_chunk_count") or 0)
+            retrieval_latency_total += float(item.get("retrieval_latency_ms") or 0)
     for bucket in roles.values():
         bucket["cache_hit_rate"] = calculate_cache_hit_rate(bucket["prompt_tokens"], bucket["cached_tokens"])
+        bucket["prefix_cache_hit_rate"] = round((bucket.get("prefix_cache_hits", 0) / bucket["request_count"]) * 100, 2) if bucket["request_count"] else 0.0
     totals["cache_hit_rate"] = calculate_cache_hit_rate(totals["prompt_tokens"], totals["cached_tokens"])
-    return {"day": target_day, **totals, "roles": roles}
+    totals["prefix_cache_hit_rate"] = round((prefix_hits / prefix_requests) * 100, 2) if prefix_requests else 0.0
+    return {"day": target_day, **totals, "roles": roles, "scenario_distribution": scenario_distribution, "room_costs": room_costs,
+            "ruleset_distribution": ruleset_distribution, "retrieval_topics": retrieval_topics,
+            "retrieval_chunk_count": retrieval_chunks, "retrieval_latency_ms": round(retrieval_latency_total, 2)}

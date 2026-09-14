@@ -472,6 +472,7 @@
                             <button class="settings-tab" data-settings="character" data-i18n="settings.tab.character">角色卡规则</button>
                             <button class="settings-tab" data-settings="users" data-admin-only="true" data-i18n="settings.tab.users">用户管理</button>
                             <button class="settings-tab" data-settings="permissions" data-i18n="settings.tab.permissions">权限配置</button>
+                            <button class="settings-tab" data-settings="knowledge" data-admin-only="true">规则知识库</button>
                             <button class="settings-tab" data-settings="about" data-i18n="settings.tab.about">关于应用</button>
                         </div>
                         
@@ -620,6 +621,20 @@
                             <div id="ai-platforms-container" class="ai-platforms-container">
                                 <!-- 平台卡片将在这里动态生成 -->
                             </div>
+                        </div>
+
+                        <div id="knowledge-settings-content" class="settings-content">
+                            <section class="tool-panel mb-4">
+                                <div class="tool-panel-header"><h4>外部规则知识库</h4><span>管理员上传后按规则主题语义切块</span></div>
+                                <p class="text-muted">COC7 使用独立索引；未来可接入 COC6、D&amp;D 等规则集。</p>
+                                <div class="d-flex gap-2 align-items-center mb-3">
+                                    <select class="form-select" id="rulesetSelect" aria-label="规则集"></select>
+                                    <input class="form-control" type="file" id="rulesetFile" accept=".txt,.md,.markdown,.text,.doc,.docx">
+                                    <button class="btn btn-primary" id="uploadRulesetButton" type="button">上传并索引</button>
+                                </div>
+                                <div id="rulesetList" class="list-group" aria-live="polite">正在加载规则集…</div>
+                                <div id="rulesetMessage" class="settings-message" aria-live="polite"></div>
+                            </section>
                         </div>
                         
                         <!-- 网络配置内容 -->

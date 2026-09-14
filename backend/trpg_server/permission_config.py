@@ -25,6 +25,7 @@ _GROUPS = {
     "settings": [
         "settings.general", "settings.ai_models", "settings.network",
         "settings.character_rules", "settings.permissions", "settings.ai_debug",
+        "settings.knowledge_bases",
     ],
     "rooms": ["rooms.create", "rooms.manage_members", "rooms.runtime_records"],
 }
@@ -65,6 +66,7 @@ DEFAULT_PERMISSION_MATRIX: dict[str, list[str]] = {
     "settings.network": ["ADMIN", "OWNER"],
     "settings.character_rules": ["ADMIN", "OWNER"],
     "settings.permissions": ["ADMIN", "OWNER"],
+    "settings.knowledge_bases": ["ADMIN", "OWNER"],
     "rooms.create": ["USER", "ADMIN", "OWNER"],
     "rooms.manage_members": ["ADMIN", "OWNER"],
     "rooms.runtime_records": ["USER", "ADMIN", "OWNER"],

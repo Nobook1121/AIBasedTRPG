@@ -53,3 +53,18 @@ def test_prompt_cache_key_excludes_room_and_dynamic_values():
     assert first.cache_key == second.cache_key
     assert first.static_prefix == second.static_prefix
 
+
+def test_prompt_layers_place_retrieval_after_static_layers():
+    result = build_prompt_layers(
+        global_rules="GLOBAL",
+        scenario={"id": "s", "scenario_version": "2", "core": "CORE"},
+        scene={"id": "scene-1", "version": "1", "content": "SCENE"},
+        room_state={"room_id": "room-1"},
+        history=[],
+        user_input="look",
+        retrieval_results=[{"text": "The brass key is hidden here.", "spoiler_level": 0}],
+    )
+    assert result.messages[3]["role"] == "system"
+    assert "brass key" in result.messages[3]["content"]
+    assert "room-1" in result.messages[4]["content"]
+    assert "scenario:s@2" in result.cache_key

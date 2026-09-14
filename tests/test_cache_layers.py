@@ -2,6 +2,7 @@ from trpg_server.agents.cache import (
     ExactResponseCache,
     ProviderPrefixCache,
     SemanticCache,
+    build_exact_response_key,
 )
 
 
@@ -24,4 +25,12 @@ def test_semantic_cache_is_bound_to_state_fingerprint():
     cache.set("open door", {"active_scene_id": "scene-1"}, "result-1")
     assert cache.get("open door", {"active_scene_id": "scene-1"}) == "result-1"
     assert cache.get("open door", {"active_scene_id": "scene-2"}) is None
+
+
+def test_exact_response_key_is_versioned_and_state_bound():
+    first = build_exact_response_key("s", "1", "scene", {"items": ["key"]}, "look")
+    second = build_exact_response_key("s", "2", "scene", {"items": ["key"]}, "look")
+    third = build_exact_response_key("s", "1", "scene", {"items": ["torch"]}, "look")
+    assert first != second
+    assert first != third
 

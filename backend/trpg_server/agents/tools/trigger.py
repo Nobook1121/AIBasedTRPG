@@ -26,7 +26,7 @@ def reveal_scenario_trigger(arguments: dict[str, Any], context: Any) -> dict[str
     if not scenarios_dir:
         return {"error": "scenarios directory is not configured"}
 
-    _, scenario = load_scenario_by_id(scenarios_dir, scenario_id)
+    _, scenario = load_scenario_by_id(scenarios_dir, scenario_id, scenario_version=room_info.get("scenario_version"))
     if not scenario:
         return {"error": f"scenario {scenario_id} was not found"}
 

@@ -11,10 +11,12 @@ from trpg_server.agents.config import load_ai_runtime_config
 from trpg_server.agents.context import build_agent_context
 from trpg_server.agents.profiles import resolve_agent_profile
 from trpg_server.agents.runtime import run_agent_completion
-from trpg_server.agents.structured_output import apply_state_updates, parse_kp_response, validate_state_updates
+from trpg_server.agents.structured_output import apply_state_updates, parse_kp_response, validate_state_updates, validate_structured_response
 from trpg_server.agents.telemetry import build_provider_cache_key, calculate_cache_hit_rate, record_ai_usage
 from trpg_server.agents.prompt_builder import build_prompt_layers
-from trpg_server.agents.cache import ProviderPrefixCache
+from trpg_server.agents.cache import ExactResponseCache, ProviderPrefixCache, SemanticCache, build_exact_response_key
+from trpg_server.agents.knowledge_base import KnowledgeBaseService
+from trpg_server.agents.ruleset_knowledge import RulesetKnowledgeStore, search_ruleset
 from trpg_server.agents.tools import default_tool_registry
 from trpg_server.agents.tools.room import get_room_snapshot
 from trpg_server.agents.memory import remember_room_fact
@@ -30,11 +32,14 @@ from trpg_server.settings import (
     ROOMS_DIR,
     SCENARIOS_DIR,
     LOGS_DIR,
+    KNOWLEDGE_BASES_DIR,
 )
 
 bp = Blueprint("chat", __name__)
 logger = logging.getLogger(__name__)
 _PREFIX_CACHE = ProviderPrefixCache(default_ttl=3600)
+_EXACT_CACHE = ExactResponseCache(default_ttl=300)
+_SEMANTIC_CACHE = SemanticCache(default_ttl=120)
 _HISTORY_SAFE_RE = re.compile(r"[^A-Za-z0-9_.-]+")
 HISTORY_COMPACT_CHAR_THRESHOLD = 12000
 
@@ -370,6 +375,7 @@ def _compact_room_snapshot(snapshot):
             "active_scene_id": scenario.get("active_scene_id"),
             "scene_manifest": (scenario.get("scene_manifest", []) if isinstance(scenario.get("scene_manifest", []), list) else [])[:40],
             "global_manifest": (scenario.get("global_manifest", []) if isinstance(scenario.get("global_manifest", []), list) else [])[:12],
+            "entity_manifest": (scenario.get("entity_manifest", []) if isinstance(scenario.get("entity_manifest", []), list) else [])[:80],
             "opening": scenario.get("opening"),
         }
     else:
@@ -610,6 +616,17 @@ def chat():
                 active_scene = scenario_data.get("active_scene_id")
                 manifest = scenario_data.get("scene_manifest") if isinstance(scenario_data.get("scene_manifest"), list) else []
                 scene_static = next((item for item in manifest if isinstance(item, dict) and str(item.get("id")) == str(active_scene)), None)
+        ruleset_results = []
+        ruleset_started = time.perf_counter()
+        if room_id:
+            try:
+                ruleset_results = search_ruleset(room_id, content, store=RulesetKnowledgeStore(
+                    current_app.config.get("KNOWLEDGE_BASES_DIR", KNOWLEDGE_BASES_DIR),
+                    rooms_dir=current_app.config.get("ROOMS_DIR", ROOMS_DIR),
+                ), top_k=3)
+            except (OSError, ValueError):
+                logger.exception("Ruleset retrieval failed")
+        ruleset_latency_ms = round((time.perf_counter() - ruleset_started) * 1000, 2)
         prompt_layers = build_prompt_layers(
             global_rules=system_prompt,
             scenario=(room_snapshot or {}).get("scenario") if isinstance(room_snapshot, dict) else None,
@@ -617,11 +634,76 @@ def chat():
             room_state=agent_context.room_state() if room_id else {},
             history=prompt_history,
             user_input=user_content,
-            rules_version="1",
+            rules_version=("|".join(sorted({str(item.get("knowledge_version")) for item in ruleset_results if item.get("knowledge_version")})) or "1"),
+            retrieval_results=(
+                KnowledgeBaseService(
+                    rooms_dir=current_app.config.get("ROOMS_DIR", ROOMS_DIR),
+                    scenarios_dir=current_app.config.get("SCENARIOS_DIR", SCENARIOS_DIR),
+                ).search(room_id, content, top_k=5)
+                if room_id
+                else []
+            ),
+            ruleset_results=ruleset_results,
         )
         if room_snapshot_message:
             prompt_layers.messages.insert(3, {"role": "system", "content": room_snapshot_message})
         prefix_cache_hit = _PREFIX_CACHE.lookup(prompt_layers.cache_key)
+        scenario_info_for_cache = (room_snapshot or {}).get("scenario") if isinstance(room_snapshot, dict) else {}
+        scenario_info_for_cache = scenario_info_for_cache if isinstance(scenario_info_for_cache, dict) else {}
+        state_for_cache = agent_context.room_state() if room_id else {}
+        exact_cache_key = build_exact_response_key(
+            scenario_info_for_cache.get("id") or "unknown",
+            scenario_info_for_cache.get("scenario_version") or scenario_info_for_cache.get("version") or "1",
+            scenario_info_for_cache.get("active_scene_id") or "unknown",
+            state_for_cache,
+            content,
+        )
+        semantic_state = {
+            "room_id": str(room_id or "home"),
+            "scenario_id": scenario_info_for_cache.get("id"),
+            "scenario_version": scenario_info_for_cache.get("scenario_version") or scenario_info_for_cache.get("version") or "1",
+            "active_scene_id": scenario_info_for_cache.get("active_scene_id"),
+            "state": state_for_cache,
+        }
+        cached_result = _EXACT_CACHE.get(exact_cache_key) if not room_id else _SEMANTIC_CACHE.get(content, semantic_state)
+        if isinstance(cached_result, dict) and cached_result.get("content"):
+            record_ai_usage(
+                current_app.config.get("LOGS_DIR", LOGS_DIR),
+                {
+                    "agent_id": agent_profile.id,
+                    "provider": selected_platform,
+                    "model": model,
+                    "room_id": str(room_id) if room_id else None,
+                    "scenario_id": scenario_info_for_cache.get("id") or None,
+                    "scenario_version": scenario_info_for_cache.get("scenario_version") or scenario_info_for_cache.get("version") or "1",
+                    "scene_id": scenario_info_for_cache.get("active_scene_id") or None,
+                    "cache_key": prompt_layers.cache_key,
+                    "cache_layer": "semantic" if room_id else "exact",
+                    "prefix_cache_hit": True,
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "cached_tokens": 0,
+                    "total_tokens": 0,
+                    "ruleset_ids": sorted({str(item.get("ruleset_id")) for item in ruleset_results if item.get("ruleset_id")}),
+                    "knowledge_versions": sorted({str(item.get("knowledge_version")) for item in ruleset_results if item.get("knowledge_version")}),
+                    "retrieval_topics": sorted({str(item.get("topic")) for item in ruleset_results if item.get("topic")}),
+                    "retrieval_chunk_count": len(ruleset_results),
+                    "retrieval_latency_ms": ruleset_latency_ms,
+                    "retrieval_citations": [str(item.get("citation")) for item in ruleset_results if item.get("citation")],
+                },
+            )
+            return success_response(
+                message=None,
+                content=cached_result["content"],
+                token_count=cached_result.get("token_count"),
+                prompt_tokens=0,
+                completion_tokens=0,
+                cached_tokens=0,
+                cache_hit_rate=100.0,
+                cache_key=prompt_layers.cache_key,
+                prefix_cache_hit=True,
+                structured_output=cached_result.get("structured_output"),
+            )
         request_data = {
             "messages": prompt_layers.messages,
             "model": model,
@@ -636,6 +718,7 @@ def chat():
                 "agent_id": agent_profile.id,
                 "cache_key": prompt_layers.cache_key,
             }
+            request_data["response_format"] = {"type": "json_object"}
         if runtime_config.stream_output:
             request_data["stream"] = False
 
@@ -683,6 +766,8 @@ def chat():
                 "model": request_data["model"],
                 "room_id": str(room_id) if room_id else None,
                 "scene_id": scenario_info.get("active_scene_id") if isinstance(scenario_info, dict) else None,
+                "scenario_id": scenario_info.get("id") if isinstance(scenario_info, dict) else None,
+                "scenario_version": (scenario_info.get("scenario_version") or scenario_info.get("version")) if isinstance(scenario_info, dict) else None,
                 "cache_key": cache_key,
                 "prefix_cache_hit": prefix_cache_hit,
                 "prompt_tokens": prompt_tokens,
@@ -690,6 +775,12 @@ def chat():
                 "total_tokens": total_tokens,
                 "cached_tokens": cached_tokens,
                 "elapsed_ms": elapsed_ms,
+                "ruleset_ids": sorted({str(item.get("ruleset_id")) for item in ruleset_results if item.get("ruleset_id")}),
+                "knowledge_versions": sorted({str(item.get("knowledge_version")) for item in ruleset_results if item.get("knowledge_version")}),
+                "retrieval_topics": sorted({str(item.get("topic")) for item in ruleset_results if item.get("topic")}),
+                "retrieval_chunk_count": len(ruleset_results),
+                "retrieval_latency_ms": ruleset_latency_ms,
+                "retrieval_citations": [str(item.get("citation")) for item in ruleset_results if item.get("citation")],
             },
         )
 
@@ -701,6 +792,8 @@ def chat():
             direct_messages = [direct_message]
 
         structured = parse_kp_response(result.content)
+        if structured:
+            structured = validate_structured_response(structured, (room_snapshot or {}).get("scenario") if isinstance(room_snapshot, dict) else {})
         validated_updates = {}
         if structured:
             ai_response = structured.narration
@@ -763,6 +856,12 @@ def chat():
         if speaker:
             user_history_item["speaker"] = speaker
         history.extend([user_history_item, {"role": "assistant", "content": ai_response}])
+        if not result.tool_messages and not direct_messages and not validated_updates and structured is None:
+            cache_value = {"content": ai_response, "token_count": token_count, "structured_output": None}
+            if room_id:
+                _SEMANTIC_CACHE.set(content, semantic_state, cache_value)
+            else:
+                _EXACT_CACHE.set(exact_cache_key, cache_value)
         _maybe_remember_important_action(content, agent_context)
         if compact_requested_by_ai:
             try:

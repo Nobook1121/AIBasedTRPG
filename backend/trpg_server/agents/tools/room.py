@@ -7,10 +7,10 @@ from trpg_server.scenario_store import build_trigger_message, iter_scenario_trig
 from trpg_server.json_store import write_json_atomic
 
 
-def _find_scenario(scenarios_dir, scenario_id):
+def _find_scenario(scenarios_dir, scenario_id, scenario_version=None):
     if not scenarios_dir or scenario_id is None or not scenarios_dir.exists():
         return None
-    _, scenario = load_scenario_by_id(scenarios_dir, scenario_id)
+    _, scenario = load_scenario_by_id(scenarios_dir, scenario_id, scenario_version=scenario_version)
     return scenario
 
 
@@ -131,6 +131,23 @@ def _global_manifest(scenario: dict[str, Any]) -> list[dict[str, Any]]:
     return result
 
 
+def _entity_manifest(scenario: dict[str, Any]) -> list[dict[str, Any]]:
+    result = []
+    for module in _scenario_modules(scenario):
+        module_type = _module_type(module)
+        if module_type not in {"npc", "custom", "monster", "item", "clue", "scene", "ending"}:
+            continue
+        identifier = module.get("id") or module.get("code")
+        if identifier in (None, ""):
+            continue
+        result.append({
+            "id": str(identifier),
+            "type": str(module.get("card_type") or module_type),
+            "scene_id": str(module.get("scene_id") or "") or None,
+        })
+    return result
+
+
 def _find_module(scenario: dict[str, Any], module_id: str | None = None, module_type: str | None = None, scene_id: str | None = None) -> dict[str, Any] | None:
     for module in _scenario_modules(scenario):
         if module_id and str(module.get("id")) == module_id:
@@ -144,7 +161,7 @@ def _find_module(scenario: dict[str, Any], module_id: str | None = None, module_
 
 def get_room_scenario_context(arguments: dict[str, Any], context: Any) -> dict[str, Any]:
     info = context.room_info()
-    scenario = _find_scenario(context.scenarios_dir, info.get("scenario_id"))
+    scenario = _find_scenario(context.scenarios_dir, info.get("scenario_id"), info.get("scenario_version"))
     if not scenario:
         return {"scenario": None, "matches": [], "message": "current room scenario was not found"}
 
@@ -182,6 +199,7 @@ def get_room_scenario_context(arguments: dict[str, Any], context: Any) -> dict[s
             "active_scene_id": info.get("active_scene_id"),
             "scene_manifest": _scene_manifest(scenario),
             "global_manifest": _global_manifest(scenario),
+            "entity_manifest": _entity_manifest(scenario),
         },
         "matches": candidates[:max_items],
         "triggers": iter_scenario_trigger_catalog(scenario, scene_id=scene_id or None),
@@ -190,7 +208,7 @@ def get_room_scenario_context(arguments: dict[str, Any], context: Any) -> dict[s
 
 def get_room_scenario_module(arguments: dict[str, Any], context: Any) -> dict[str, Any]:
     info = context.room_info()
-    scenario = _find_scenario(context.scenarios_dir, info.get("scenario_id"))
+    scenario = _find_scenario(context.scenarios_dir, info.get("scenario_id"), info.get("scenario_version"))
     if not scenario:
         return {"error": "current room scenario was not found"}
 
@@ -220,7 +238,7 @@ def activate_scenario_scene(arguments: dict[str, Any], context: Any) -> dict[str
     if not context.room_dir:
         return {"error": "room context is required"}
     info = context.room_info()
-    scenario = _find_scenario(context.scenarios_dir, info.get("scenario_id"))
+    scenario = _find_scenario(context.scenarios_dir, info.get("scenario_id"), info.get("scenario_version"))
     if not scenario:
         return {"error": "current room scenario was not found"}
     scene_id = str(arguments.get("scene_id") or arguments.get("module_id") or "").strip()
@@ -270,6 +288,7 @@ def _summarize_scenario(scenario: dict[str, Any] | None, room_info: dict[str, An
         return {
             "id": scenario_id,
             "title": room_info.get("scenario_title"),
+            "scenario_version": room_info.get("scenario_version") or "1",
             "found": False,
             "available_sections": {},
         }
@@ -277,6 +296,7 @@ def _summarize_scenario(scenario: dict[str, Any] | None, room_info: dict[str, An
     return {
         "id": scenario.get("id"),
         "title": scenario.get("title"),
+        "scenario_version": scenario.get("scenario_version") or scenario.get("version") or "1",
         "description": scenario.get("description") or scenario.get("notes"),
         "found": True,
         "available_sections": _collect_available_sections(scenario),
@@ -286,6 +306,7 @@ def _summarize_scenario(scenario: dict[str, Any] | None, room_info: dict[str, An
         "active_scene_id": room_info.get("active_scene_id"),
         "scene_manifest": _scene_manifest(scenario),
         "global_manifest": _global_manifest(scenario),
+        "entity_manifest": _entity_manifest(scenario),
     }
 
 
@@ -333,7 +354,7 @@ def _summarize_members(members: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def get_room_snapshot(arguments: dict[str, Any], context: Any) -> dict[str, Any]:
     info = context.room_info()
-    scenario = _find_scenario(context.scenarios_dir, info.get("scenario_id"))
+    scenario = _find_scenario(context.scenarios_dir, info.get("scenario_id"), info.get("scenario_version"))
     characters = get_room_character_cards(
         {"include_inactive": bool(arguments.get("include_inactive", False))},
         context,
@@ -343,6 +364,7 @@ def get_room_snapshot(arguments: dict[str, Any], context: Any) -> dict[str, Any]
             "id": info.get("id") or context.room_id,
             "name": info.get("name"),
             "scenario_id": info.get("scenario_id"),
+            "scenario_version": info.get("scenario_version") or (scenario or {}).get("scenario_version") or (scenario or {}).get("version") or "1",
             "scenario_title": info.get("scenario_title"),
             "active_scene_id": info.get("active_scene_id"),
             "active_scene_title": info.get("active_scene_title"),

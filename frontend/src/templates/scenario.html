@@ -14,6 +14,7 @@
         {{{ actionButtons }}}
     </div>
     <div class="scenario-id-chip"><span data-i18n="scenario.card.id">ID</span> <span data-user-content="true">{{ publicId }}</span></div>
+    <div class="scenario-id-chip"><span data-i18n="scenario.card.version">Version</span> <span data-user-content="true">{{ scenarioVersion }}</span></div>
 </div>
 </template>
 
@@ -22,6 +23,7 @@
     <h3 data-user-content="true">{{ title }}</h3>
     <div class="scenario-preview-meta">
         <p><strong><span data-i18n="scenario.preview.id">剧本ID</span>：</strong><span data-user-content="true">{{ publicId }}</span></p>
+        <p><strong><span data-i18n="scenario.preview.version">剧本版本</span>：</strong><span data-user-content="true">{{ scenarioVersion }}</span></p>
         <p><strong><span data-i18n="scenario.preview.author">作者</span>：</strong><span data-user-content="true">{{ author }}</span></p>
         <p><strong><span data-i18n="scenario.preview.player_count">推荐人数</span>：</strong>{{ playerCount }}</p>
     </div>

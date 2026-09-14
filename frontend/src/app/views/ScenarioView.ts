@@ -36,6 +36,7 @@ class ScenarioView {
                 playerCount: scenario.playerCount,
                 id: scenario.id,
                 publicId: scenario.public_id || String(scenario.id),
+                scenarioVersion: scenario.scenario_version || "1",
                 actionButtons: this.renderScenarioActionButtons(scenario),
             });
             window.TrpgI18n?.apply(card);
@@ -114,6 +115,7 @@ class ScenarioView {
         const previewContent = window.TrpgTemplates.render("scenario-preview-content", {
             title: scenario.title,
             publicId: scenario.public_id || String(scenario.id),
+            scenarioVersion: scenario.scenario_version || "1",
             author: scenario.author,
             playerCount: scenario.playerCount,
             notes: scenario.notes || scenarioT("scenario.preview.none", "无"),
@@ -330,6 +332,7 @@ class ScenarioView {
     private resetScenarioForm(): void {
         input("scenarioTitle").value = "";
         input("scenarioPublicId").value = scenarioT("scenario.cover.auto", "保存后自动生成");
+        input("scenarioVersion").value = "1";
         input("scenarioAuthor").value = "";
         input("scenarioPlayerCount").value = "0";
         textarea("scenarioNotes").value = "";
@@ -347,6 +350,7 @@ class ScenarioView {
     private fillScenarioForm(scenario: Scenario): void {
         input("scenarioTitle").value = scenario.title;
         input("scenarioPublicId").value = scenario.public_id || String(scenario.id);
+        input("scenarioVersion").value = scenario.scenario_version || "1";
         input("scenarioAuthor").value = scenario.author;
         input("scenarioPlayerCount").value = String(scenario.playerCount);
         textarea("scenarioNotes").value = scenario.notes || "";

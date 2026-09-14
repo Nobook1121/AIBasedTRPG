@@ -69,3 +69,17 @@ class SemanticCache(_TTLCache):
 
     def set(self, intent: str, state: dict[str, Any] | None, value: Any, ttl: int | None = None) -> Any:
         return super().set(self._key(intent, state), value, ttl=ttl)
+
+
+def build_exact_response_key(
+    scenario_id: Any,
+    scenario_version: Any,
+    scene_id: Any,
+    state: dict[str, Any] | None,
+    user_input: str,
+) -> str:
+    state_hash = hashlib.sha256(
+        json.dumps(state or {}, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+    ).hexdigest()[:16]
+    input_hash = hashlib.sha256(str(user_input or "").encode("utf-8")).hexdigest()[:16]
+    return f"scenario:{scenario_id}@{scenario_version}:scene:{scene_id}:state:{state_hash}:input:{input_hash}"

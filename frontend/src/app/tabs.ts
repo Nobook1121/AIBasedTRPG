@@ -177,6 +177,9 @@ function switchSettingsTab(tabName: string): void {
     if (tabName === "users") {
         void loadUserManagement();
     }
+    if (tabName === "knowledge") {
+        void loadRulesetKnowledge();
+    }
 }
 
 function switchToolTab(toolName: string): void {
@@ -267,6 +270,40 @@ function initSettingsTabs(): void {
         void loadAITokenDashboard();
     });
     void loadAITokenDashboard();
+}
+
+async function loadRulesetKnowledge(): Promise<void> {
+    const list = document.getElementById("rulesetList");
+    const select = document.getElementById("rulesetSelect") as HTMLSelectElement | null;
+    if (!list || list.dataset.loaded === "true") return;
+    try {
+        const response = await TrpgApi.get<ApiResponse<Array<Record<string, unknown>>>>("/api/knowledge-bases/rulesets");
+        if (!response.success || !response.data) throw new Error(response.message || "规则集加载失败");
+        if (select) {
+            select.innerHTML = response.data.map((item) => `<option value="${String(item.ruleset_id || "")}">${String(item.display_name || item.ruleset_id || "")}</option>`).join("");
+        }
+        list.innerHTML = response.data.map((item) => `<div class="list-group-item"><strong>${String(item.display_name || item.ruleset_id || "")}</strong><span class="text-muted ms-2">版本 ${String(item.active_version || "未索引")} · ${String(Array.isArray(item.sources) ? item.sources.length : 0)} 个来源</span></div>`).join("");
+        list.dataset.loaded = "true";
+    } catch (error) {
+        list.textContent = settingsErrorMessage(error);
+    }
+    document.getElementById("uploadRulesetButton")?.addEventListener("click", () => void uploadRulesetSource());
+}
+
+async function uploadRulesetSource(): Promise<void> {
+    const fileInput = document.getElementById("rulesetFile") as HTMLInputElement | null;
+    const select = document.getElementById("rulesetSelect") as HTMLSelectElement | null;
+    const message = document.getElementById("rulesetMessage");
+    const file = fileInput?.files?.[0];
+    if (!file || !select?.value) { if (message) message.textContent = "请选择规则文件"; return; }
+    const form = new FormData(); form.append("file", file);
+    try {
+        const response = await TrpgApi.post<ApiResponse<unknown>>(`/api/knowledge-bases/${encodeURIComponent(select.value)}/sources`, form);
+        if (!response.success) throw new Error(response.message || "上传失败");
+        if (message) message.textContent = "上传并索引成功";
+        const list = document.getElementById("rulesetList"); if (list) list.dataset.loaded = "";
+        await loadRulesetKnowledge();
+    } catch (error) { if (message) message.textContent = settingsErrorMessage(error); }
 }
 
 async function loadAITokenDashboard(): Promise<void> {

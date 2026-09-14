@@ -12,6 +12,8 @@ from trpg_server.responses import error_response, success_response
 from trpg_server.role_config import load_roles
 from trpg_server.security import is_socket_user_online, safe_join
 from trpg_server.settings import CONFIG_DIR, ROOMS_DIR, SCENARIOS_DIR
+from trpg_server.agents.versioning import migrate_room_binding
+from trpg_server.scenario_store import load_scenario_by_id
 
 bp = Blueprint("rooms", __name__)
 logger = logging.getLogger(__name__)
@@ -355,6 +357,7 @@ def _room_summary(info):
         "name": info.get("name"),
         "room_code": info.get("room_code"),
         "scenario_id": info.get("scenario_id"),
+        "scenario_version": info.get("scenario_version"),
         "scenario_title": info.get("scenario_title"),
         "creator_id": info.get("creator_id"),
         "creator_name": info.get("creator_name"),
@@ -447,6 +450,7 @@ def create_room():
             current_app.config.get("SCENARIOS_DIR", SCENARIOS_DIR), scenario_id
         )
         if bound_scenario:
+            info["scenario_version"] = str(bound_scenario.get("scenario_version") or bound_scenario.get("version") or "1")
             scene = next((m for m in bound_scenario.get("modules", [])
                           if isinstance(m, dict) and str(m.get("module_type")) == "scene"), None)
             if scene:
@@ -660,6 +664,41 @@ def get_room(room_id):
     return success_response(data, "Room loaded successfully")
 
 
+@bp.route("/api/rooms/<room_id>/scenario-migration", methods=["POST"])
+def migrate_room_scenario(room_id):
+    login_error = _require_login()
+    if login_error:
+        return login_error
+    room_dir, info = _find_room(room_id)
+    if not room_dir:
+        return error_response("Room not found", 404, "Room not found")
+    if not _can_manage(info):
+        return error_response("Permission denied", 403, "Permission denied")
+    payload = request.get_json(silent=True) or {}
+    target_version = payload.get("scenario_version")
+    _, target = load_scenario_by_id(
+        current_app.config.get("SCENARIOS_DIR", SCENARIOS_DIR),
+        info.get("scenario_id"),
+        scenario_version=target_version,
+    )
+    if not target:
+        return error_response("Target scenario version not found", 404, "Scenario version not found")
+    state = read_json(room_dir / "state.json", default={})
+    old_entities = {str(item.get("id")) for item in payload.get("old_entities", []) if isinstance(item, dict)}
+    if not old_entities:
+        for key in ("clues", "items", "quests", "triggered_event_ids"):
+            values = state.get(key, []) if isinstance(state, dict) else []
+            if isinstance(values, list):
+                old_entities.update(str(item.get("id") if isinstance(item, dict) else item) for item in values)
+    new_entities = {str(item.get("id")) for item in target.get("modules", []) if isinstance(item, dict) and item.get("id")}
+    try:
+        updated = migrate_room_binding(info, target, payload.get("mapping") or {}, old_entities, new_entities)
+    except ValueError as exc:
+        return error_response(str(exc), 400, "Scenario migration rejected")
+    write_json_atomic(room_dir / "info.json", updated)
+    return success_response(_room_summary(updated), "Room migrated to scenario version")
+
+
 @bp.route("/api/rooms/<room_id>/spectate", methods=["GET"])
 def spectate_room(room_id):
     login_error = _require_login()
@@ -797,7 +836,7 @@ def trigger_room_scenario(room_id):
     scenarios_dir = current_app.config.get("SCENARIOS_DIR", ROOMS_DIR.parent / "scenarios")
     from trpg_server.scenario_store import build_trigger_message, load_scenario_by_id
 
-    _, scenario = load_scenario_by_id(scenarios_dir, info.get("scenario_id"))
+    _, scenario = load_scenario_by_id(scenarios_dir, info.get("scenario_id"), scenario_version=info.get("scenario_version"))
     if not scenario:
         return error_response("Scenario not found", 404, "Scenario not found")
 

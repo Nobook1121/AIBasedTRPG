@@ -79,6 +79,7 @@ def project_room_state(state: dict[str, Any] | None, snapshot: dict[str, Any] | 
     scenario = snapshot_data.get("scenario") if isinstance(snapshot_data.get("scenario"), dict) else {}
     active_scene_id = normalized.get("active_scene_id") or scenario.get("active_scene_id")
     return {
+        "scenario_version": snapshot_data.get("room", {}).get("scenario_version") if isinstance(snapshot_data.get("room"), dict) else None,
         "active_scene_id": active_scene_id,
         "triggered_event_ids": normalized["triggered_event_ids"][-30:],
         "clues": normalized["clues"][-30:],

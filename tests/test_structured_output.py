@@ -1,4 +1,4 @@
-from trpg_server.agents.structured_output import parse_kp_response, validate_state_updates
+from trpg_server.agents.structured_output import parse_kp_response, validate_state_updates, validate_structured_response
 
 
 def test_parse_kp_response_accepts_fenced_json_and_normalizes_fields():
@@ -26,3 +26,39 @@ def test_validate_state_updates_rejects_unknown_fields_and_unlisted_scene():
 
     assert result == {"items": ["key"]}
 
+
+def test_validate_state_updates_rejects_entities_not_in_current_scenario():
+    result = validate_state_updates(
+        {"clues": ["clue-1", "clue-secret"], "items": ["item-1", "item-forged"], "npc_attitudes": {"npc-1": "friendly", "npc-x": "hostile"}},
+        {},
+        {
+            "scene_manifest": [{"id": "scene-1"}],
+            "modules": [
+                {"id": "npc-1", "module_type": "npc"},
+                {"id": "clue-1", "module_type": "custom", "card_type": "clue"},
+                {"id": "item-1", "module_type": "custom", "card_type": "item"},
+            ],
+        },
+    )
+    assert result == {"clues": ["clue-1"], "items": ["item-1"], "npc_attitudes": {"npc-1": "friendly"}}
+
+
+def test_parse_kp_response_filters_npc_actions_to_known_npcs():
+    result = parse_kp_response('{"narration":"ok","npc_actions":[{"npc_id":"guard","action":"wait"},{"npc_id":"forged","action":"steal"}]}')
+    validated = validate_structured_response(result, {"modules": [{"id": "guard", "module_type": "npc"}]})
+    assert validated.npc_actions == [{"npc_id": "guard", "action": "wait"}]
+
+
+def test_validate_state_updates_uses_compact_entity_manifest():
+    result = validate_state_updates(
+        {"clues": ["clue-1", "forged"], "items": ["item-1", "fake"]},
+        {},
+        {"entity_manifest": [{"id": "clue-1", "type": "clue"}, {"id": "item-1", "type": "item"}]},
+    )
+    assert result == {"clues": ["clue-1"], "items": ["item-1"]}
+
+
+def test_validate_structured_response_rejects_unknown_next_scene():
+    response = parse_kp_response('{"narration":"ok","next_scene":"forged"}')
+    validated = validate_structured_response(response, {"scene_manifest": [{"id": "scene-1"}]})
+    assert validated.next_scene is None

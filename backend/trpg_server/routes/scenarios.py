@@ -25,6 +25,7 @@ from trpg_server.scenario_store import (
     scenario_public_asset_url,
     trigger_size_limit,
 )
+from trpg_server.agents.versioning import next_scenario_version
 from trpg_server.scenario_importer import convert_script_to_scenario, convert_with_ai, extract_script_text
 from trpg_server.security import (
     build_public_asset_url,
@@ -239,6 +240,20 @@ def _find_scenario_file(scenario_id):
             return path, data
 
     return None, None
+
+
+def _rooms_using_scenario(scenario_id):
+    rooms_dir = Path(current_app.config.get("ROOMS_DIR", Path("data/runtime/rooms")))
+    result = []
+    if not rooms_dir.exists():
+        return result
+    for room_dir in rooms_dir.iterdir():
+        if not room_dir.is_dir():
+            continue
+        info = read_json(room_dir / "info.json", default={})
+        if str(info.get("scenario_id")) == str(scenario_id):
+            result.append((room_dir, info))
+    return result
 
 
 def load_scenarios():
@@ -589,6 +604,7 @@ def create_scenario():
 
         scenario_id = int(time.time() * 1000)
         scenario_data["id"] = scenario_id
+        scenario_data["scenario_version"] = str(scenario_data.get("scenario_version") or "1")
         scenario_data["owner_id"] = session["user_id"]
         scenario_data["creator_username"] = session.get("username", "")
         scenario_data["public_id"] = _generate_public_id(
@@ -652,6 +668,10 @@ def update_scenario(scenario_id):
             return error_response("Permission denied", 403, "Permission denied")
 
         scenario_data["id"] = scenario_id
+        scenario_data["scenario_version"] = str(
+            scenario_data.get("scenario_version")
+            or next_scenario_version(existing_scenario.get("scenario_version") or existing_scenario.get("version") or "1")
+        )
         scenario_data["owner_id"] = existing_scenario.get("owner_id")
         scenario_data["creator_username"] = existing_scenario.get("creator_username") or session.get("username", "")
         scenario_data["public_id"] = existing_scenario.get("public_id") or _generate_public_id(
@@ -715,6 +735,13 @@ def delete_scenario(scenario_id):
         if not _can_use_permission("scenarios.delete"):
             return error_response("Permission denied", 403, "Permission denied")
 
+        active_rooms = _rooms_using_scenario(scenario_id)
+        if active_rooms:
+            scenario_data["archived"] = True
+            scenario_data["archivedAt"] = _current_timestamp()
+            save_scenario_record(SCENARIOS_DIR, scenario_data, existing_descriptor=target_file, trigger_max_file_size=_trigger_size_limit())
+            clear_scenarios_cache()
+            return success_response({"archived": True, "active_rooms": len(active_rooms)}, "Scenario archived because active rooms still use it")
         delete_scenario_record(target_file)
         cover_url = str((scenario_data or {}).get("cover") or "")
         if cover_url.startswith("/assets/scenarios/"):
@@ -736,6 +763,23 @@ def delete_scenario(scenario_id):
     except Exception as exc:
         logger.exception("Failed to delete scenario: %s", scenario_id)
         return error_response("Failed to delete scenario", 500, str(exc))
+
+
+@bp.route("/api/scenarios/<int:scenario_id>/archive", methods=["POST"])
+def archive_scenario(scenario_id):
+    login_error = _require_login()
+    if login_error:
+        return login_error
+    target_file, scenario_data = _find_scenario_file(scenario_id)
+    if target_file is None:
+        return error_response("Scenario not found", 404, "Scenario not found")
+    if not _can_modify_scenario(scenario_data) or not _can_use_permission("scenarios.delete"):
+        return error_response("Permission denied", 403, "Permission denied")
+    scenario_data["archived"] = True
+    scenario_data["archivedAt"] = _current_timestamp()
+    save_scenario_record(SCENARIOS_DIR, scenario_data, existing_descriptor=target_file, trigger_max_file_size=_trigger_size_limit())
+    clear_scenarios_cache()
+    return success_response(load_scenario_record(target_file, SCENARIOS_DIR), "Scenario archived")
 
 
 @bp.route("/api/scenarios/cover", methods=["POST"])

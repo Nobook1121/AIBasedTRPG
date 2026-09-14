@@ -209,3 +209,71 @@ npm run build:frontend
 
 - [API Overview](docs/api.md)
 - [Development Notes](docs/development.md)
+
+## AI 剧本检索与版本隔离
+
+当前 AI 运行时使用兼容式的知识卡片检索链：剧本模块会被规范化为带有
+`scenario_id`、`scenario_version`、`scene_id`、`card_type`、`visibility`、
+`spoiler_level`、`unlock_condition` 和 `text` 的卡片。聊天请求通过
+`KnowledgeBaseService.search(room_id, query)` 访问检索服务；服务先按房间绑定的剧本、
+版本、当前场景和剧透等级过滤，再进行确定性的词法排序，因此业务层不会直接访问索引。
+默认实现不新增向量数据库依赖，后续可用相同卡片接口替换为 Chroma、pgvector 或远程向量服务。
+
+剧本记录使用永久 `id` 与发布递增的 `scenario_version`。创建房间时会把当前版本写入
+`info.json`，旧房间继续锁定原版本；编辑剧本会生成下一版本，新房间默认使用最新版本。
+所有 Prompt 缓存键、知识库过滤和房间快照都携带版本号。迁移到新版本应由上层提供实体映射，
+并通过 `validate_version_migration` 校验场景、NPC、线索和道具是否仍可对应。
+
+架构边界：
+
+```text
+房间请求 -> 版本绑定加载 -> 知识卡片过滤/排序 -> 分层 Prompt -> LLM
+    |              |                  |                  |
+ state.json   scenario.json     versions/<n>.json    JSON 校验/状态更新
+```
+
+版本相关 API：
+
+- `POST /api/rooms/<room_id>/scenario-migration`：提交 `scenario_version`、实体 `mapping`，迁移前校验映射，失败时不写入房间。
+- `POST /api/scenarios/<scenario_id>/archive`：归档剧本版本；有房间引用时删除接口也只归档，不物理删除。
+- `DELETE /api/scenarios/<scenario_id>`：无房间引用时删除，存在引用时自动转为归档。
+
+缓存层：provider 前缀缓存用于稳定 Prompt 前缀；无房间请求使用带剧本版本、场景、状态摘要和输入哈希的精确缓存；房间请求使用包含 `room_id`、剧本版本和状态的语义缓存，避免房间间复用。缓存均为进程内 TTL 缓存，重启后清空。
+
+Telemetry 观测：
+
+1. 确保账号拥有 `settings.ai_models` 权限。
+2. 打开设置页的 AI Token Dashboard，或请求 `GET /api/telemetry/ai/daily`；可选 `?day=YYYY-MM-DD` 查询历史日期。
+3. 后端原始记录位于 `data/runtime/logs/ai_usage.jsonl`。每条记录包含 `prompt_tokens`、`completion_tokens`、`cached_tokens`、`cache_hit_rate`、`prefix_cache_hit`、`scenario_id`、`scenario_version`、`scene_id`、`room_id` 和 `elapsed_ms`。
+4. API 返回 `prefix_cache_hit_rate`、`scenario_distribution` 和 `room_costs`，分别用于前缀命中率、剧本串扰分布和房间 token 成本观测。真实 Provider 是否命中其服务端前缀缓存，以返回的 `cached_tokens` 为准；本地 `prefix_cache_hit` 只表示稳定前缀键已被复用。
+
+建议验收方式：同一剧本/场景连续发送至少 20 轮后，检查 `prefix_cache_hit_rate > 80`；对比全量注入和按需检索两组请求的 `prompt_tokens`，计算输入 token 降幅；若 `scenario_distribution` 出现非当前剧本 ID，应立即检查房间版本绑定和检索过滤。
+
+示例房间绑定：
+
+```json
+{"id":"room-1","scenario_id":7,"scenario_version":"3","active_scene_id":"scene-1"}
+```
+
+示例迁移请求：
+
+```json
+{"scenario_version":"4","mapping":{"scene-1":"scene-a","npc-1":"npc-a"},"old_entities":[{"id":"scene-1"},{"id":"npc-1"}]}
+```
+
+结构化 KP 输出只能更新白名单字段，且 `next_scene`、NPC、线索和道具必须存在当前剧本版本的
+索引中；非法实体会被丢弃，不会触发自动重试。房间状态通过 `project_room_state` 投影为当前场景、
+有限事件日志和滚动摘要，完整历史仍保存在房间运行数据中。
+### External ruleset knowledge bases
+
+Administrators can use the settings page's Ruleset Knowledge Base tab to upload `.txt`, `.md`, `.doc`, or `.docx` files for COC7. The service extracts headings, rule topics, formulas, tables, exceptions, and examples into semantic chunks; this chunker is deliberately separate from scenario scene/module chunking. Versioned indexes are stored under `data/runtime/knowledge-bases/` and room bindings keep `ruleset_id` plus `knowledge_version`.
+
+The protected API requires `settings.knowledge_bases`:
+
+- `GET /api/knowledge-bases/rulesets`
+- `POST /api/knowledge-bases/<ruleset_id>/sources`
+- `POST /api/knowledge-bases/<ruleset_id>/reindex`
+- `POST /api/knowledge-bases/<ruleset_id>/enable` or `/archive`
+- `POST /api/rooms/<room_id>/rulesets`
+
+Index failures retain the previous active version. Future COC6 or D&D adapters can implement the same `RulesetAdapter` interface and reuse upload, versioning, permissions, retrieval, prompt, and telemetry infrastructure.

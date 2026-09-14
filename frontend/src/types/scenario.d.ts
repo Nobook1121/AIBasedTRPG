@@ -70,6 +70,7 @@ interface ScenarioModule {
 
 interface Scenario {
     id: number;
+    scenario_version?: string;
     title: string;
     author: string;
     playerCount: number;

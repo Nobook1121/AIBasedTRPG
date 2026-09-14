@@ -25,6 +25,7 @@ WEAPONS_DIR = DATA_DIR / "weapons"
 USERS_DIR = RUNTIME_DIR / "users"
 HISTORY_DIR = RUNTIME_DIR / "history"
 LOGS_DIR = RUNTIME_DIR / "logs"
+KNOWLEDGE_BASES_DIR = RUNTIME_DIR / "knowledge-bases"
 
 NETWORK_CONFIG_FILE = CONFIG_DIR / "network.json"
 PENETRATION_CONFIG_FILE = CONFIG_DIR / "penetration.json"
