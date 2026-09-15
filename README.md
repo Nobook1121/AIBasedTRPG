@@ -212,6 +212,13 @@ npm run build:frontend
 
 ## AI 剧本检索与版本隔离
 
+剧本导入与索引存储位置：正式剧本位于 `data/scenarios/scenario-<id>/scenario.json`，历史版本位于
+`data/scenarios/scenario-<id>/versions/<version>.json`，向量/词法索引位于
+`data/scenarios/scenario-<id>/knowledge-index/<version>.json`。原始文件与发布清单保存在同目录的
+`source/` 和 `imports/`；异步导入任务及中间结果位于 `data/runtime/scenario_imports/<job_id>/`。
+当前文本 PDF 使用 PyMuPDF；扫描 PDF 需要后续 OCR 扩展。可用 `python scripts/reindex-scenarios.py`
+为旧版本重建缺失索引。
+
 当前 AI 运行时使用兼容式的知识卡片检索链：剧本模块会被规范化为带有
 `scenario_id`、`scenario_version`、`scene_id`、`card_type`、`visibility`、
 `spoiler_level`、`unlock_condition` 和 `text` 的卡片。聊天请求通过

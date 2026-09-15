@@ -8,6 +8,7 @@ contract later without changing callers.
 from __future__ import annotations
 
 import re
+import math
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -28,6 +29,8 @@ class KnowledgeChunk:
     text: str
     chunk_id: str
     embedding: list[float] | None = None
+    source_ref: dict[str, Any] | None = None
+    metadata: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -89,6 +92,8 @@ def build_knowledge_chunks(scenario: Mapping[str, Any] | None) -> list[Knowledge
                 text=text,
                 chunk_id=chunk_id,
                 embedding=module.get("embedding") if isinstance(module.get("embedding"), list) else None,
+                source_ref=module.get("source_ref") if isinstance(module.get("source_ref"), dict) else None,
+                metadata=module.get("metadata") if isinstance(module.get("metadata"), dict) else None,
             )
         )
     return chunks
@@ -155,12 +160,21 @@ class KnowledgeBaseService:
             if audience != "kp" and chunk.visibility == "kp_only":
                 continue
             haystack = _tokens(f"{chunk.text} {chunk.card_type} {chunk.unlock_condition or ''}")
-            score = sum(haystack.count(token) for token in query_tokens) if query_tokens else 1
+            lexical = sum(haystack.count(token) for token in query_tokens) if query_tokens else 1
+            vector = 0.0
+            if chunk.embedding:
+                qv = [0.0] * len(chunk.embedding)
+                for token in query_tokens:
+                    qv[hash(token) % len(qv)] += 1.0
+                norm = math.sqrt(sum(v * v for v in qv)) or 1.0
+                cnorm = math.sqrt(sum(v * v for v in chunk.embedding)) or 1.0
+                vector = sum(a * b for a, b in zip(qv, chunk.embedding)) / (norm * cnorm)
+            score = lexical + vector
             if score <= 0:
                 continue
             candidates.append((score, chunk))
         candidates.sort(key=lambda item: (-item[0], item[1].chunk_id))
-        return [{**chunk.to_dict(), "score": score} for score, chunk in candidates[: max(1, min(int(top_k), 20))]]
+        return [{**chunk.to_dict(), "score": score, "score_components": {"lexical": score, "vector": 0.0}} for score, chunk in candidates[: max(1, min(int(top_k), 20))]]
 
 
 def search(

@@ -20,3 +20,15 @@ python scripts/convert_scenario.py docs/样本/模组.docx -o scenario.json --ti
 
 运行时通过精简房间快照、只注入最近历史、摘要与正文分离来降低输入 token；不对 KP
 单轮输出设置人为上限。模块摘要接口使用低温度并按需调用，避免每轮重复发送长文本。
+# 异步剧本导入
+
+剧本文档可通过 `POST /api/scripts/import` 上传 `.docx`、`.pdf`、`.txt` 或 `.md`。任务状态保存在
+`data/runtime/scenario_imports/<job_id>/job.json`，原始文件和中间结果位于同一任务目录；使用
+`GET /api/scripts/import/<job_id>` 查询，或连接 `/stream` 获取 SSE 进度。失败任务可调用
+`POST .../retry`，运行中任务可调用 `POST .../cancel`。
+
+完成后，审核内容通过 `PUT .../<job_id>/preview` 保存，并调用 `POST /api/scripts/<script_id>/publish`
+发布。正式剧本位于 `data/scenarios/scenario-<id>/scenario.json`，版本快照位于
+`versions/<version>.json`，知识索引（embedding 或词法兜底）位于 `knowledge-index/<version>.json`。
+旧房间继续使用创建时绑定的版本；只有显式迁移接口会改变绑定。扫描 PDF 当前会提示需要 OCR，
+不会丢弃原始文件。

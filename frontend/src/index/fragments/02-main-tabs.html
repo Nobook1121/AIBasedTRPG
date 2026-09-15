@@ -8,6 +8,7 @@
                 <div id="scenario" class="tab-content">
                     <div class="p-4">
                         <header class="page-command-header d-flex justify-content-between align-items-start" data-page-header="scenario">
+                            <div data-scenario-import-dropzone="true" hidden></div>
                             <div>
                                 <p class="page-kicker"><i class="fa fa-map-o" aria-hidden="true"></i> SCENARIO ARCHIVE</p>
                                 <h2 data-i18n="scenario.page.title">剧本</h2>
@@ -19,7 +20,7 @@
                                 <button class="btn btn-secondary" id="importScenario" data-i18n="scenario.action.import">导入剧本</button>
                             </div>
                             <input type="file" id="importScenarioFile" accept=".json" style="display: none;" multiple>
-                            <input type="file" id="importScenarioDocumentFile" accept=".doc,.docx,.txt,.md,.markdown,.text" style="display: none;">
+                            <input type="file" id="importScenarioDocumentFile" accept=".docx,.pdf,.txt,.md,.markdown,.text" style="display: none;">
                         </header>
                         <div class="scenario-list" id="scenarioList">
                             <!-- 剧本卡片将在这里动态生成 -->

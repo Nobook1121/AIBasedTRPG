@@ -13,11 +13,16 @@ class ScenarioController {
         try {
             await this.model.init();
             this.renderScenarioList();
+            await this.restoreImportJob();
         } catch (error) {
             console.error("初始化剧本控制器时出错:", error);
             this.view.showMessage(`初始化失败: ${scenarioErrorMessage(error)}`, true);
         }
     }
+
+    private async restoreImportJob(): Promise<void> { const id = sessionStorage.getItem("ai-trpg:scenario-import-job"); if (!id) return; try { const job = await this.model.getImportJob(id); if (job.status === "done") this.view.showMessage("文档导入完成，请审核后发布"); } catch { sessionStorage.removeItem("ai-trpg:scenario-import-job"); } }
+
+    private pollImportJob(id: string): void { void this.model.getImportJob(id).catch(() => undefined); }
 
     private bindEventHandlers(): void {
         this.view.setEventHandlers({

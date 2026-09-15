@@ -152,3 +152,6 @@ interface ScenarioView {
     updateConversionProgress(stage: number, state: "pending" | "active" | "complete" | "error", detail?: string): void;
     closeConversionProgress(): void;
 }
+
+type ScenarioImportStatus = "pending" | "parsing" | "chunking" | "extracting" | "merging" | "carding" | "summarizing" | "embedding" | "done" | "failed" | "cancelled" | "published";
+interface ScenarioImportJob { id: string; script_id: number; status: ScenarioImportStatus; progress: number; current_stage: string; stage_progress: number; stage_meta?: Record<string, unknown>; error?: string; preview?: ScenarioInput; }

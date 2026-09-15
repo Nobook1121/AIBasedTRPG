@@ -1,0 +1,171 @@
+"""Structured scenario document parsing and deterministic chunking."""
+from __future__ import annotations
+
+import io
+import re
+import zipfile
+from dataclasses import dataclass
+from pathlib import Path
+from xml.etree import ElementTree
+
+try:
+    import fitz  # type: ignore
+except ImportError:  # pragma: no cover
+    fitz = None
+
+
+SUPPORTED_SCENARIO_EXTENSIONS = {".docx", ".pdf", ".txt", ".md", ".markdown", ".text"}
+
+
+class ScenarioDocumentError(ValueError):
+    pass
+
+
+@dataclass(frozen=True)
+class DocumentBlock:
+    text: str
+    page: int | None = None
+    heading_level: int | None = None
+    chapter_path: list[str] | None = None
+
+
+@dataclass(frozen=True)
+class ParsedDocument:
+    filename: str
+    markdown: str
+    blocks: list[DocumentBlock]
+    page_count: int | None = None
+
+
+@dataclass(frozen=True)
+class DocumentChunk:
+    chunk_id: str
+    text: str
+    page: int | None = None
+    page_end: int | None = None
+    chapter_path: list[str] | None = None
+
+
+def validate_scenario_upload(filename: str, size: int, max_bytes: int) -> str:
+    suffix = Path(filename or "").suffix.casefold()
+    if suffix not in SUPPORTED_SCENARIO_EXTENSIONS:
+        raise ScenarioDocumentError("仅支持 DOCX、PDF、TXT 和 Markdown 文档")
+    if size <= 0:
+        raise ScenarioDocumentError("文件为空")
+    if size > max_bytes:
+        raise ScenarioDocumentError(f"文件超过 {max_bytes // 1024 // 1024} MiB 上限")
+    return suffix
+
+
+def _clean(text: str) -> str:
+    text = text.replace("\x00", "").replace("\r\n", "\n").replace("\r", "\n")
+    text = re.sub(r"[ \t]+\n", "\n", text)
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
+
+
+def _heading(line: str) -> tuple[int, str] | None:
+    match = re.match(r"^\s*(#{1,6})\s+(.+?)\s*$", line)
+    if match:
+        return len(match.group(1)), match.group(2).strip()
+    match = re.match(r"^\s*第\s*[一二三四五六七八九十百0-9]+\s*[章节幕场景、:.：]\s*(.+?)\s*$", line)
+    return (1, match.group(1).strip()) if match else None
+
+
+def _text_document(raw: bytes, filename: str) -> ParsedDocument:
+    text = _clean(raw.decode("utf-8-sig", errors="replace"))
+    if not text:
+        raise ScenarioDocumentError("文件为空")
+    blocks: list[DocumentBlock] = []
+    path: list[str] = []
+    for line in text.splitlines():
+        heading = _heading(line)
+        if heading:
+            level, title = heading
+            path = path[: level - 1] + [title]
+            blocks.append(DocumentBlock(line.strip(), None, level, list(path)))
+        elif line.strip():
+            blocks.append(DocumentBlock(line.strip(), None, None, list(path)))
+    return ParsedDocument(filename, text, blocks, None)
+
+
+def _docx_document(raw: bytes, filename: str) -> ParsedDocument:
+    try:
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            root = ElementTree.fromstring(archive.read("word/document.xml"))
+    except (KeyError, OSError, ValueError, ElementTree.ParseError) as exc:
+        raise ScenarioDocumentError("Unable to read docx document") from exc
+    ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+    lines: list[str] = []
+    for paragraph in root.findall(".//w:body/w:p", ns):
+        value = "".join(node.text or "" for node in paragraph.findall(".//w:t", ns)).strip()
+        if not value:
+            continue
+        style = paragraph.find("./w:pPr/w:pStyle", ns)
+        style_name = style.get("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val", "") if style is not None else ""
+        if style_name.casefold().startswith("heading"):
+            level = re.search(r"(\d+)", style_name)
+            value = "#" * min(int(level.group(1)) if level else 1, 6) + " " + value
+        lines.append(value)
+    for table in root.findall(".//w:tbl", ns):
+        for row in table.findall("./w:tr", ns):
+            cells = ["".join(node.text or "" for node in cell.findall(".//w:t", ns)).strip() for cell in row.findall("./w:tc", ns)]
+            if any(cells):
+                lines.append(" | ".join(cells))
+    return _text_document("\n".join(lines).encode("utf-8"), filename)
+
+
+def _pdf_document(raw: bytes, filename: str) -> ParsedDocument:
+    if fitz is None:
+        raise ScenarioDocumentError("PDF support requires PyMuPDF")
+    try:
+        document = fitz.open(stream=raw, filetype="pdf")
+        pages: list[str] = []
+        blocks: list[DocumentBlock] = []
+        for page_number, page in enumerate(document, 1):
+            text = page.get_text("text").strip()
+            if not text:
+                continue
+            pages.append(text)
+            for line in text.splitlines():
+                line = line.strip()
+                if line:
+                    heading = _heading(line)
+                    blocks.append(DocumentBlock(line, page_number, heading[0] if heading else None, []))
+        if not "".join(pages).strip():
+            raise ScenarioDocumentError("PDF appears scanned; OCR is required")
+        parsed = _text_document("\n\n".join(pages).encode("utf-8"), filename)
+        return ParsedDocument(filename, parsed.markdown, [DocumentBlock(b.text, blocks[i].page if i < len(blocks) else None, b.heading_level, b.chapter_path) for i, b in enumerate(parsed.blocks)], len(document))
+    except ScenarioDocumentError:
+        raise
+    except Exception as exc:
+        raise ScenarioDocumentError("Unable to read PDF document") from exc
+
+
+def parse_scenario_document(raw: bytes, filename: str) -> ParsedDocument:
+    validate_scenario_upload(filename, len(raw), max(len(raw), 1))
+    suffix = Path(filename).suffix.casefold()
+    if suffix == ".pdf":
+        return _pdf_document(raw, filename)
+    if suffix == ".docx":
+        return _docx_document(raw, filename)
+    return _text_document(raw, filename)
+
+
+def chunk_parsed_document(document: ParsedDocument, target_min: int = 800, target_max: int = 1500, overlap: int = 150) -> list[DocumentChunk]:
+    if not document.markdown.strip():
+        return []
+    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", document.markdown) if p.strip()]
+    chunks: list[DocumentChunk] = []
+    current = ""
+    for paragraph in paragraphs:
+        if current and len(current) + 2 + len(paragraph) > target_max:
+            chunks.append(DocumentChunk(f"chunk-{len(chunks)+1:04d}", current, None, None, []))
+            current = current[-overlap:] + "\n\n" + paragraph
+        else:
+            current = paragraph if not current else current + "\n\n" + paragraph
+        if len(current) >= target_min and len(current) >= target_max:
+            chunks.append(DocumentChunk(f"chunk-{len(chunks)+1:04d}", current, None, None, []))
+            current = ""
+    if current:
+        chunks.append(DocumentChunk(f"chunk-{len(chunks)+1:04d}", current, None, None, []))
+    return chunks

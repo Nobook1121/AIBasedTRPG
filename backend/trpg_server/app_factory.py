@@ -9,6 +9,9 @@ from trpg_server.logging_config import configure_logging
 from trpg_server.security import register_session_guard
 from trpg_server.socket_events import register_socket_events
 from trpg_server.settings import LOGS_DIR, SECRET_KEY, SESSION_COOKIE_SECURE, USERS_DIR, WEAPONS_DIR
+from trpg_server.settings import SCENARIO_IMPORTS_DIR, SCENARIO_IMPORT_MAX_BYTES, SCENARIO_IMPORT_WORKERS
+from trpg_server.scenario_import_jobs import ImportJobStore
+from concurrent.futures import ThreadPoolExecutor
 from trpg_server.users.database import UserDatabase
 from trpg_server.users.migrations import migrate_json_users
 from trpg_server.users.service import UserService
@@ -30,6 +33,9 @@ def create_app(config=None):
         USERS_FILE=USERS_DIR / "users.json",
         USER_IP_CONFIG_DIR=USERS_DIR / "ip_configs",
         WEAPONS_DIR=WEAPONS_DIR,
+        SCENARIO_IMPORTS_DIR=SCENARIO_IMPORTS_DIR,
+        SCENARIO_IMPORT_MAX_BYTES=SCENARIO_IMPORT_MAX_BYTES,
+        SCENARIO_IMPORT_WORKERS=SCENARIO_IMPORT_WORKERS,
     )
     if config:
         app.config.update(config)
@@ -40,6 +46,9 @@ def create_app(config=None):
     socketio.init_app(app)
     register_session_guard(app)
     register_blueprints(app)
+    app.extensions["scenario_import_store"] = ImportJobStore(app.config["SCENARIO_IMPORTS_DIR"])
+    app.extensions["scenario_import_store"].recover_interrupted()
+    app.extensions["scenario_import_executor"] = ThreadPoolExecutor(max_workers=app.config["SCENARIO_IMPORT_WORKERS"])
     register_socket_events(socketio)
     return app
 
@@ -68,11 +77,13 @@ def register_blueprints(app):
     from trpg_server.routes.pages import bp as pages_bp
     from trpg_server.routes.rooms import bp as rooms_bp
     from trpg_server.routes.scenarios import bp as scenarios_bp
+    from trpg_server.routes.scenario_imports import bp as scenario_imports_bp
     from trpg_server.routes.telemetry import bp as telemetry_bp
     from trpg_server.routes.users import bp as users_bp
 
     app.register_blueprint(assets_bp)
     app.register_blueprint(scenarios_bp)
+    app.register_blueprint(scenario_imports_bp)
     app.register_blueprint(characters_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(users_bp)

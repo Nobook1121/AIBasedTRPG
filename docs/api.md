@@ -84,3 +84,12 @@
 - `disconnect`：客户端断开。
 - `send_message`：广播实时消息。
 - `typing`：广播输入状态。
+# 剧本导入 API
+
+- `POST /api/scripts/import`：multipart `file`、`title`、`author`，返回 `202` 和 `jobId`。
+- `GET /api/scripts/import/<job_id>`：任务状态、阶段和审核预览摘要。
+- `GET /api/scripts/import/<job_id>/stream`：SSE 进度流。
+- `POST /api/scripts/import/<job_id>/retry`、`POST .../cancel`：重试或取消。
+- `PUT /api/scripts/import/<job_id>/preview`：保存审核修改。
+- `POST /api/scripts/<id>/publish`：生成版本快照和知识索引。
+- `GET /api/scripts/<id>/versions`：查看版本列表。

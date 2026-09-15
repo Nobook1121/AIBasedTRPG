@@ -71,21 +71,12 @@ def extract_script_text(source: str | Path | bytes, filename: str | None = None)
     suffix = Path(name).suffix.casefold()
     logger.debug("scenario_import.extract filename=%s suffix=%s bytes=%d", name, suffix, len(raw))
     if suffix == ".doc": return _extract_legacy_doc(raw)
-    if suffix == ".docx":
+    if suffix in {".docx", ".pdf", ".txt", ".md", ".markdown", ".text"} or not suffix:
+        from trpg_server.scenario_documents import ScenarioDocumentError, parse_scenario_document
         try:
-            with zipfile.ZipFile(io.BytesIO(raw)) as archive: xml = archive.read("word/document.xml")
-            root = ElementTree.fromstring(xml)
-        except (KeyError, OSError, ValueError, ElementTree.ParseError) as exc: raise ValueError("Unable to read docx document") from exc
-        ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}; paragraphs = []
-        for paragraph in root.findall(".//w:p", ns):
-            value = "".join(node.text or "" for node in paragraph.findall(".//w:t", ns)).strip()
-            if not value: continue
-            style = paragraph.find("./w:pPr/w:pStyle", ns); style_name = str(style.get("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val", "")) if style is not None else ""
-            if style_name.casefold().startswith("heading"):
-                level = re.search(r"(\d+)", style_name); value = "#" * min(int(level.group(1)) if level else 1, 6) + " " + value
-            paragraphs.append(value)
-        return _clean_doc_text("\n".join(paragraphs))
-    if suffix in {".txt", ".md", ".markdown", ".text"} or not suffix: return _clean_doc_text(raw.decode("utf-8-sig", errors="replace"))
+            return parse_scenario_document(raw, name).markdown
+        except ScenarioDocumentError as exc:
+            raise ValueError(str(exc)) from exc
     raise ValueError(f"Unsupported script format: {suffix or 'unknown'}; use txt, md, docx, or doc")
 
 
