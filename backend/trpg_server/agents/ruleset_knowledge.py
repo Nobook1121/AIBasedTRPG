@@ -82,7 +82,7 @@ class RulesetKnowledgeStore:
 
     def search(self, ruleset_id: str, query: str, version: str | None = None, top_k: int = 3, topic: str | None = None) -> list[dict[str, Any]]:
         meta = self._meta(ruleset_id); selected = str(version or meta.get("active_version") or "")
-        if not selected: return []
+        if not selected or meta.get("enabled") is False: return []
         values = read_json(self._base(ruleset_id) / "indexes" / f"{selected}.json", default=[])
         query_tokens = _tokens(query); result = []
         for item in values if isinstance(values, list) else []:
