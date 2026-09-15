@@ -32,3 +32,8 @@ python scripts/convert_scenario.py docs/样本/模组.docx -o scenario.json --ti
 `versions/<version>.json`，知识索引（embedding 或词法兜底）位于 `knowledge-index/<version>.json`。
 旧房间继续使用创建时绑定的版本；只有显式迁移接口会改变绑定。扫描 PDF 当前会提示需要 OCR，
 不会丢弃原始文件。
+
+启用 OCR：安装 `requirements-ocr.txt` 并设置 `AI_TRPG_OCR_ENABLED=1`。启用本地向量库：安装
+`requirements-vector.txt`，执行 `docker compose -f docker-compose.qdrant.yml up -d`；Qdrant 数据位于
+`data/runtime/vector-db/qdrant/`。Embedding 使用 `AI_TRPG_EMBEDDING_BASE_URL`、
+`AI_TRPG_EMBEDDING_API_KEY`、`AI_TRPG_EMBEDDING_MODEL` 配置，失败时保留 JSON 索引并使用本地哈希向量。

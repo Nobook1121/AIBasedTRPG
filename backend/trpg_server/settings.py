@@ -29,6 +29,15 @@ KNOWLEDGE_BASES_DIR = RUNTIME_DIR / "knowledge-bases"
 SCENARIO_IMPORTS_DIR = RUNTIME_DIR / "scenario_imports"
 SCENARIO_IMPORT_MAX_BYTES = 32 * 1024 * 1024
 SCENARIO_IMPORT_WORKERS = 2
+VECTOR_DB_URL = os.environ.get("AI_TRPG_VECTOR_DB_URL", "http://127.0.0.1:6333")
+VECTOR_DB_PATH = RUNTIME_DIR / "vector-db" / "qdrant"
+VECTOR_DB_API_KEY = os.environ.get("AI_TRPG_VECTOR_DB_API_KEY", "")
+EMBEDDING_BASE_URL = os.environ.get("AI_TRPG_EMBEDDING_BASE_URL", "")
+EMBEDDING_API_KEY = os.environ.get("AI_TRPG_EMBEDDING_API_KEY", "")
+EMBEDDING_MODEL = os.environ.get("AI_TRPG_EMBEDDING_MODEL", "")
+EMBEDDING_DIMENSIONS = int(os.environ.get("AI_TRPG_EMBEDDING_DIMENSIONS", "256"))
+OCR_ENABLED = os.environ.get("AI_TRPG_OCR_ENABLED", "0").strip().lower() in {"1", "true", "yes"}
+OCR_LANG = os.environ.get("AI_TRPG_OCR_LANG", "ch")
 
 NETWORK_CONFIG_FILE = CONFIG_DIR / "network.json"
 PENETRATION_CONFIG_FILE = CONFIG_DIR / "penetration.json"

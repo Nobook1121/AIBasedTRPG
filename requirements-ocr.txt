@@ -1,0 +1,3 @@
+# Optional scanned-PDF OCR stack (large models)
+paddlepaddle>=3.0,<4
+paddleocr>=3.0,<4

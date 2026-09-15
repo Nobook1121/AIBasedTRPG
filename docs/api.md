@@ -93,3 +93,4 @@
 - `PUT /api/scripts/import/<job_id>/preview`：保存审核修改。
 - `POST /api/scripts/<id>/publish`：生成版本快照和知识索引。
 - `GET /api/scripts/<id>/versions`：查看版本列表。
+- `GET /api/vector/health`：查看 Qdrant、Embedding 和 OCR 可用性（不返回密钥）。

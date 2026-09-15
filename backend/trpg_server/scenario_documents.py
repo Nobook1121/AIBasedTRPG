@@ -114,7 +114,7 @@ def _docx_document(raw: bytes, filename: str) -> ParsedDocument:
     return _text_document("\n".join(lines).encode("utf-8"), filename)
 
 
-def _pdf_document(raw: bytes, filename: str) -> ParsedDocument:
+def _pdf_document(raw: bytes, filename: str, ocr_provider=None) -> ParsedDocument:
     if fitz is None:
         raise ScenarioDocumentError("PDF support requires PyMuPDF")
     try:
@@ -123,6 +123,13 @@ def _pdf_document(raw: bytes, filename: str) -> ParsedDocument:
         blocks: list[DocumentBlock] = []
         for page_number, page in enumerate(document, 1):
             text = page.get_text("text").strip()
+            if not text and ocr_provider is not None:
+                try:
+                    pix = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
+                    rows = ocr_provider.extract(pix.tobytes("png"))
+                    text = "\n".join(str(row.get("text", "")) for row in rows if row.get("text"))
+                except Exception:
+                    text = ""
             if not text:
                 continue
             pages.append(text)
@@ -141,11 +148,11 @@ def _pdf_document(raw: bytes, filename: str) -> ParsedDocument:
         raise ScenarioDocumentError("Unable to read PDF document") from exc
 
 
-def parse_scenario_document(raw: bytes, filename: str) -> ParsedDocument:
+def parse_scenario_document(raw: bytes, filename: str, ocr_provider=None) -> ParsedDocument:
     validate_scenario_upload(filename, len(raw), max(len(raw), 1))
     suffix = Path(filename).suffix.casefold()
     if suffix == ".pdf":
-        return _pdf_document(raw, filename)
+        return _pdf_document(raw, filename, ocr_provider=ocr_provider)
     if suffix == ".docx":
         return _docx_document(raw, filename)
     return _text_document(raw, filename)

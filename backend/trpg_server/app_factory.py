@@ -10,6 +10,10 @@ from trpg_server.security import register_session_guard
 from trpg_server.socket_events import register_socket_events
 from trpg_server.settings import LOGS_DIR, SECRET_KEY, SESSION_COOKIE_SECURE, USERS_DIR, WEAPONS_DIR
 from trpg_server.settings import SCENARIO_IMPORTS_DIR, SCENARIO_IMPORT_MAX_BYTES, SCENARIO_IMPORT_WORKERS
+from trpg_server.settings import VECTOR_DB_URL, VECTOR_DB_PATH, VECTOR_DB_API_KEY, EMBEDDING_BASE_URL, EMBEDDING_API_KEY, EMBEDDING_MODEL, EMBEDDING_DIMENSIONS, OCR_ENABLED, OCR_LANG
+from trpg_server.agents.vector_store import QdrantVectorStore
+from trpg_server.agents.embedding_provider import OpenAICompatibleEmbeddingProvider
+from trpg_server.agents.ocr_provider import PaddleOcrProvider
 from trpg_server.scenario_import_jobs import ImportJobStore
 from concurrent.futures import ThreadPoolExecutor
 from trpg_server.users.database import UserDatabase
@@ -36,6 +40,9 @@ def create_app(config=None):
         SCENARIO_IMPORTS_DIR=SCENARIO_IMPORTS_DIR,
         SCENARIO_IMPORT_MAX_BYTES=SCENARIO_IMPORT_MAX_BYTES,
         SCENARIO_IMPORT_WORKERS=SCENARIO_IMPORT_WORKERS,
+        VECTOR_DB_URL=VECTOR_DB_URL, VECTOR_DB_PATH=VECTOR_DB_PATH, VECTOR_DB_API_KEY=VECTOR_DB_API_KEY,
+        EMBEDDING_BASE_URL=EMBEDDING_BASE_URL, EMBEDDING_API_KEY=EMBEDDING_API_KEY, EMBEDDING_MODEL=EMBEDDING_MODEL,
+        EMBEDDING_DIMENSIONS=EMBEDDING_DIMENSIONS, OCR_ENABLED=OCR_ENABLED, OCR_LANG=OCR_LANG,
     )
     if config:
         app.config.update(config)
@@ -49,6 +56,12 @@ def create_app(config=None):
     app.extensions["scenario_import_store"] = ImportJobStore(app.config["SCENARIO_IMPORTS_DIR"])
     app.extensions["scenario_import_store"].recover_interrupted()
     app.extensions["scenario_import_executor"] = ThreadPoolExecutor(max_workers=app.config["SCENARIO_IMPORT_WORKERS"])
+    app.extensions["vector_store"] = QdrantVectorStore(app.config["VECTOR_DB_URL"], str(app.config["VECTOR_DB_PATH"]), app.config["VECTOR_DB_API_KEY"], app.config["EMBEDDING_DIMENSIONS"])
+    app.extensions["embedding_provider"] = OpenAICompatibleEmbeddingProvider(app.config["EMBEDDING_BASE_URL"], app.config["EMBEDDING_API_KEY"], app.config["EMBEDDING_MODEL"], app.config["EMBEDDING_DIMENSIONS"])
+    app.extensions["ocr_provider"] = PaddleOcrProvider(app.config["OCR_LANG"]) if app.config["OCR_ENABLED"] else None
+    app.config["OCR_PROVIDER"] = app.extensions["ocr_provider"]
+    app.config["EMBEDDING_PROVIDER"] = app.extensions["embedding_provider"]
+    app.config["VECTOR_STORE"] = app.extensions["vector_store"]
     register_socket_events(socketio)
     return app
 
@@ -78,12 +91,14 @@ def register_blueprints(app):
     from trpg_server.routes.rooms import bp as rooms_bp
     from trpg_server.routes.scenarios import bp as scenarios_bp
     from trpg_server.routes.scenario_imports import bp as scenario_imports_bp
+    from trpg_server.routes.vector_health import bp as vector_health_bp
     from trpg_server.routes.telemetry import bp as telemetry_bp
     from trpg_server.routes.users import bp as users_bp
 
     app.register_blueprint(assets_bp)
     app.register_blueprint(scenarios_bp)
     app.register_blueprint(scenario_imports_bp)
+    app.register_blueprint(vector_health_bp)
     app.register_blueprint(characters_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(users_bp)

@@ -1,0 +1,2 @@
+# Optional local vector/embedding stack
+qdrant-client>=1.12,<2

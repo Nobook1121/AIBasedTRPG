@@ -219,6 +219,21 @@ npm run build:frontend
 当前文本 PDF 使用 PyMuPDF；扫描 PDF 需要后续 OCR 扩展。可用 `python scripts/reindex-scenarios.py`
 为旧版本重建缺失索引。
 
+### 本地向量、Embedding 与 OCR
+
+```powershell
+pip install -r requirements-vector.txt
+pip install -r requirements-ocr.txt
+docker compose -f docker-compose.qdrant.yml up -d
+```
+
+配置 `AI_TRPG_VECTOR_DB_URL`、`AI_TRPG_EMBEDDING_BASE_URL`、
+`AI_TRPG_EMBEDDING_API_KEY`、`AI_TRPG_EMBEDDING_MODEL`、
+`AI_TRPG_EMBEDDING_DIMENSIONS=256`、`AI_TRPG_OCR_ENABLED=1` 和 `AI_TRPG_OCR_LANG=ch`。
+Qdrant 数据持久化到 `data/runtime/vector-db/qdrant/`；未配置服务时自动退回 JSON 词法索引和
+本地哈希向量。扫描 PDF 仅在 OCR 开启且 PaddleOCR 可用时识别。健康检查：`GET /api/vector/health`。
+可复制 `config/vector-embedding-ocr.example.env` 作为配置模板。
+
 当前 AI 运行时使用兼容式的知识卡片检索链：剧本模块会被规范化为带有
 `scenario_id`、`scenario_version`、`scene_id`、`card_type`、`visibility`、
 `spoiler_level`、`unlock_condition` 和 `text` 的卡片。聊天请求通过

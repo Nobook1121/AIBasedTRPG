@@ -1,0 +1,34 @@
+"""Embedding providers with deterministic offline fallback."""
+from __future__ import annotations
+import hashlib, math
+from typing import Sequence
+
+class EmbeddingError(RuntimeError): pass
+
+class HashedTokenEmbedding:
+    def __init__(self, dimensions: int = 256): self.dimensions = max(8, int(dimensions))
+    def embed(self, texts: Sequence[str]) -> list[list[float]]:
+        vectors=[]
+        for text in texts:
+            values=[0.0]*self.dimensions; normalized=str(text or "").casefold(); tokens=list(normalized)
+            tokens += [normalized[i:i+2] for i in range(max(0,len(normalized)-1))]
+            for token in tokens:
+                digest=hashlib.blake2b(token.encode("utf-8"), digest_size=8).digest(); index=int.from_bytes(digest[:4],"big")%self.dimensions; sign=1.0 if digest[4]&1 else -1.0; values[index]+=sign
+            norm=math.sqrt(sum(v*v for v in values)) or 1.0; vectors.append([v/norm for v in values])
+        return vectors
+
+class OpenAICompatibleEmbeddingProvider:
+    def __init__(self, base_url: str|None, api_key: str|None, model: str|None, dimensions: int = 256, timeout: float = 30):
+        self.base_url, self.api_key, self.model, self.dimensions, self.timeout = base_url, api_key, model, int(dimensions), timeout; self.fallback=HashedTokenEmbedding(self.dimensions)
+    @property
+    def configured(self): return bool(self.base_url and self.api_key and self.model)
+    def embed(self, texts: Sequence[str]) -> list[list[float]]:
+        if not self.configured: return self.fallback.embed(texts)
+        try:
+            import requests
+            response=requests.post(self.base_url, headers={"Authorization":f"Bearer {self.api_key}","Content-Type":"application/json"}, json={"model":self.model,"input":list(texts)}, timeout=self.timeout)
+            response.raise_for_status(); values=[item.get("embedding") for item in response.json().get("data",[])]
+            if len(values)!=len(texts) or any(not isinstance(v,list) or len(v)!=self.dimensions for v in values): raise EmbeddingError("embedding dimension mismatch")
+            return values
+        except Exception:
+            return self.fallback.embed(texts)
