@@ -299,3 +299,5 @@ The protected API requires `settings.knowledge_bases`:
 - `POST /api/rooms/<room_id>/rulesets`
 
 Index failures retain the previous active version. Future COC6 or D&D adapters can implement the same `RulesetAdapter` interface and reuse upload, versioning, permissions, retrieval, prompt, and telemetry infrastructure.
+
+Docker 不是必需依赖。安装 `requirements-vector.txt` 后，应用直接使用 Python Qdrant client 的本地持久化模式，数据位于 `data/runtime/vector-db/qdrant/`；Docker Compose 仅用于可选的 Qdrant 服务部署。Embedding 优先读取 `data/runtime/models/embedding/bge-small-zh-v1.5/` 中的 `BAAI/bge-small-zh-v1.5`，没有本地模型时使用启用 AI 平台的 OpenAI-compatible embedding，最后回退到本地哈希向量。下载模型：`pip install huggingface_hub sentence-transformers`，然后 `huggingface-cli download BAAI/bge-small-zh-v1.5 --local-dir data/runtime/models/embedding/bge-small-zh-v1.5`。PaddleOCR 模型缓存位于 `data/runtime/models/paddleocr/`。

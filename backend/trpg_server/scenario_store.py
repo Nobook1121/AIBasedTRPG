@@ -88,6 +88,9 @@ def load_scenario_by_id(
         return None, None
     if scenario_version not in (None, ""):
         version_path = scenario_version_path(descriptor_path, scenario_version)
+        if not version_path.exists() and str(scenario_version).isdigit():
+            from trpg_server.agents.versioning import normalize_semver
+            version_path = scenario_version_path(descriptor_path, normalize_semver(scenario_version))
         if version_path.exists():
             return version_path, load_scenario_record(version_path, scenarios_dir, storage_dir_override=descriptor_path.parent)
     return descriptor_path, load_scenario_record(descriptor_path, scenarios_dir)
@@ -561,8 +564,9 @@ def normalize_scenario_payload(scenario: dict[str, Any], storage_dir: Path | Non
         return None
 
     normalized = dict(scenario)
-    normalized["scenario_version"] = str(
-        scenario.get("scenario_version") or scenario.get("version") or scenario.get("version_id") or "1"
+    from trpg_server.agents.versioning import normalize_semver
+    normalized["scenario_version"] = normalize_semver(
+        scenario.get("scenario_version") or scenario.get("version") or scenario.get("version_id") or "1.0.0"
     )
     modules = _scenario_modules_from_payload(scenario, storage_dir, include_content=include_content)
     legacy_fields = _scenario_legacy_fields_from_modules(modules)

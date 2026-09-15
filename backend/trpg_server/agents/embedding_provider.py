@@ -2,10 +2,13 @@
 from __future__ import annotations
 import hashlib, math
 from typing import Sequence
+from pathlib import Path
 
 class EmbeddingError(RuntimeError): pass
 
 class HashedTokenEmbedding:
+    configured = True
+
     def __init__(self, dimensions: int = 256): self.dimensions = max(8, int(dimensions))
     def embed(self, texts: Sequence[str]) -> list[list[float]]:
         vectors=[]
@@ -32,3 +35,27 @@ class OpenAICompatibleEmbeddingProvider:
             return values
         except Exception:
             return self.fallback.embed(texts)
+
+class LocalSentenceTransformerEmbedding:
+    configured = True
+
+    def __init__(self, model_path: str | Path):
+        self.model_path=Path(model_path); self._model=None; self.dimensions=None
+    def _load(self):
+        if self._model is None:
+            from sentence_transformers import SentenceTransformer
+            self._model=SentenceTransformer(str(self.model_path), local_files_only=True)
+            get_dimensions = getattr(self._model, "get_sentence_embedding_dimension", None)
+            if callable(get_dimensions):
+                self.dimensions = get_dimensions()
+        return self._model
+    def embed(self, texts: Sequence[str]) -> list[list[float]]:
+        vectors = self._load().encode(list(texts), normalize_embeddings=True).tolist()
+        if vectors and self.dimensions is None:
+            self.dimensions = len(vectors[0])
+        return vectors
+
+def select_embedding_provider(*, local_model_path: str|Path|None=None, base_url: str|None=None, api_key: str|None=None, model: str|None=None, dimensions: int=256):
+    if local_model_path and Path(local_model_path).is_dir(): return LocalSentenceTransformerEmbedding(local_model_path)
+    if base_url and api_key and model: return OpenAICompatibleEmbeddingProvider(base_url, api_key, model, dimensions)
+    return HashedTokenEmbedding(dimensions)

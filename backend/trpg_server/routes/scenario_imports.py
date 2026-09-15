@@ -104,4 +104,4 @@ def versions(script_id):
 @bp.post("/api/scripts/<int:script_id>/search")
 def script_search(script_id):
     if (e := _login()): return e
-    data = request.get_json(silent=True) or {}; return success_response(KnowledgeBaseService(scenarios_dir=current_app.config.get("SCENARIOS_DIR")).search(str(data.get("roomId", "")), str(data.get("query", "")), top_k=data.get("topK", 5)))
+    data = request.get_json(silent=True) or {}; return success_response(KnowledgeBaseService(rooms_dir=current_app.config.get("ROOMS_DIR"), scenarios_dir=current_app.config.get("SCENARIOS_DIR"), vector_store=current_app.extensions.get("vector_store"), embedding_provider=current_app.extensions.get("embedding_provider")).search(str(data.get("roomId", "")), str(data.get("query", "")), top_k=data.get("topK", 5)))

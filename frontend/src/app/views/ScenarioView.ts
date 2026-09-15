@@ -36,7 +36,7 @@ class ScenarioView {
                 playerCount: scenario.playerCount,
                 id: scenario.id,
                 publicId: scenario.public_id || String(scenario.id),
-                scenarioVersion: scenario.scenario_version || "1",
+                scenarioVersion: scenario.scenario_version || "1.0.0",
                 actionButtons: this.renderScenarioActionButtons(scenario),
             });
             window.TrpgI18n?.apply(card);
@@ -115,7 +115,7 @@ class ScenarioView {
         const previewContent = window.TrpgTemplates.render("scenario-preview-content", {
             title: scenario.title,
             publicId: scenario.public_id || String(scenario.id),
-            scenarioVersion: scenario.scenario_version || "1",
+            scenarioVersion: scenario.scenario_version || "1.0.0",
             author: scenario.author,
             playerCount: scenario.playerCount,
             notes: scenario.notes || scenarioT("scenario.preview.none", "无"),
@@ -141,6 +141,8 @@ class ScenarioView {
         if (!title || !author || !Number.isFinite(playerCount)) {
             throw new Error(scenarioT("scenario.form.required", "请填写所有必填项"));
         }
+        const scenarioVersion = input("scenarioVersion").value.trim();
+        if (scenarioVersion && !/^\d+\.\d+\.\d+$/.test(scenarioVersion)) throw new Error("剧本版本必须使用 n.n.n 格式，例如 1.0.0");
 
         const modules = collectScenarioModules();
         const hasScene = modules.some((module) => module.module_type === "scene");
@@ -152,6 +154,7 @@ class ScenarioView {
             title,
             author,
             playerCount,
+            scenario_version: scenarioVersion,
             notes: textarea("scenarioNotes").value.trim(),
             allow_open_ending: checkbox("scenarioAllowOpenEnding").checked,
             modules,
@@ -160,7 +163,7 @@ class ScenarioView {
     }
 
     getDraftData(): ScenarioInput {
-        return { title: input("scenarioTitle").value.trim(), author: input("scenarioAuthor").value.trim(), playerCount: Number.parseInt(input("scenarioPlayerCount").value, 10) || 0, notes: textarea("scenarioNotes").value.trim(), allow_open_ending: checkbox("scenarioAllowOpenEnding").checked, modules: collectScenarioModules(), cover: input("scenarioCoverUrl").value };
+        return { title: input("scenarioTitle").value.trim(), author: input("scenarioAuthor").value.trim(), playerCount: Number.parseInt(input("scenarioPlayerCount").value, 10) || 0, notes: textarea("scenarioNotes").value.trim(), allow_open_ending: checkbox("scenarioAllowOpenEnding").checked, modules: collectScenarioModules(), cover: input("scenarioCoverUrl").value, scenario_version: input("scenarioVersion").value.trim() };
     }
 
     showMessage(message: string, isError = false): void {
@@ -332,7 +335,7 @@ class ScenarioView {
     private resetScenarioForm(): void {
         input("scenarioTitle").value = "";
         input("scenarioPublicId").value = scenarioT("scenario.cover.auto", "保存后自动生成");
-        input("scenarioVersion").value = "1";
+        input("scenarioVersion").value = "1.0.0";
         input("scenarioAuthor").value = "";
         input("scenarioPlayerCount").value = "0";
         textarea("scenarioNotes").value = "";
@@ -350,7 +353,7 @@ class ScenarioView {
     private fillScenarioForm(scenario: Scenario): void {
         input("scenarioTitle").value = scenario.title;
         input("scenarioPublicId").value = scenario.public_id || String(scenario.id);
-        input("scenarioVersion").value = scenario.scenario_version || "1";
+        input("scenarioVersion").value = scenario.scenario_version || "1.0.0";
         input("scenarioAuthor").value = scenario.author;
         input("scenarioPlayerCount").value = String(scenario.playerCount);
         textarea("scenarioNotes").value = scenario.notes || "";

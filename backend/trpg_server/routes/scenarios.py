@@ -25,7 +25,7 @@ from trpg_server.scenario_store import (
     scenario_public_asset_url,
     trigger_size_limit,
 )
-from trpg_server.agents.versioning import next_scenario_version
+from trpg_server.agents.versioning import next_scenario_version, normalize_semver, scenario_content_changed
 from trpg_server.scenario_importer import convert_script_to_scenario, convert_with_ai, extract_script_text
 from trpg_server.security import (
     build_public_asset_url,
@@ -588,6 +588,9 @@ def create_scenario():
             return error_response("Please provide scenario data", 400, "No data")
 
         title = scenario_data.get("title", "unnamed")
+        requested_version = str(scenario_data.get("scenario_version") or "").strip()
+        if requested_version and normalize_semver(requested_version, default="") == "":
+            return error_response("Scenario version must use n.n.n format", 400, "Invalid scenario version")
         for path in _iter_scenario_files():
             try:
                 existing_data = load_scenario_record(path, SCENARIOS_DIR)
@@ -604,7 +607,7 @@ def create_scenario():
 
         scenario_id = int(time.time() * 1000)
         scenario_data["id"] = scenario_id
-        scenario_data["scenario_version"] = str(scenario_data.get("scenario_version") or "1")
+        scenario_data["scenario_version"] = normalize_semver(scenario_data.get("scenario_version"))
         scenario_data["owner_id"] = session["user_id"]
         scenario_data["creator_username"] = session.get("username", "")
         scenario_data["public_id"] = _generate_public_id(
@@ -668,10 +671,17 @@ def update_scenario(scenario_id):
             return error_response("Permission denied", 403, "Permission denied")
 
         scenario_data["id"] = scenario_id
-        scenario_data["scenario_version"] = str(
-            scenario_data.get("scenario_version")
-            or next_scenario_version(existing_scenario.get("scenario_version") or existing_scenario.get("version") or "1")
-        )
+        current_version = str(existing_scenario.get("scenario_version") or existing_scenario.get("version") or "1")
+        requested_version = str(scenario_data.get("scenario_version") or "").strip()
+        if requested_version and normalize_semver(requested_version, default="") == "":
+            return error_response("Scenario version must use n.n.n format", 400, "Invalid scenario version")
+        changed = scenario_content_changed(existing_scenario, {**existing_scenario, **scenario_data})
+        if not changed:
+            scenario_data["scenario_version"] = current_version
+        elif requested_version and normalize_semver(requested_version) != normalize_semver(current_version) and "." in requested_version:
+            scenario_data["scenario_version"] = normalize_semver(requested_version)
+        else:
+            scenario_data["scenario_version"] = normalize_semver(next_scenario_version(normalize_semver(current_version)))
         scenario_data["owner_id"] = existing_scenario.get("owner_id")
         scenario_data["creator_username"] = existing_scenario.get("creator_username") or session.get("username", "")
         scenario_data["public_id"] = existing_scenario.get("public_id") or _generate_public_id(

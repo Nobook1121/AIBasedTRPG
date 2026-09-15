@@ -6,6 +6,7 @@
         <p><span data-i18n="scenario.card.author">作者</span>：<span data-user-content="true">{{ author }}</span></p>
         <p><span data-i18n="scenario.card.creator">创建者</span>：<span data-user-content="true">{{ createdBy }}</span></p>
         <p><span data-i18n="scenario.card.players">推荐人数</span>：{{ playerCount }}</p>
+        <p><span data-i18n="scenario.card.version">Version</span>：<span data-user-content="true">{{ scenarioVersion }}</span></p>
     </div>
     <div class="scenario-card-actions">
         <button class="btn btn-sm btn-success play-scenario" data-id="{{ id }}">
@@ -14,7 +15,6 @@
         {{{ actionButtons }}}
     </div>
     <div class="scenario-id-chip"><span data-i18n="scenario.card.id">ID</span> <span data-user-content="true">{{ publicId }}</span></div>
-    <div class="scenario-id-chip"><span data-i18n="scenario.card.version">Version</span> <span data-user-content="true">{{ scenarioVersion }}</span></div>
 </div>
 </template>
 

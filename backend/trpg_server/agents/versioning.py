@@ -3,13 +3,38 @@
 from __future__ import annotations
 
 from typing import Any, Iterable, Mapping
+import copy
+import re
+
+SEMVER_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
+
+def normalize_semver(value: Any, default: str = "1.0.0") -> str:
+    text = str(value or "").strip()
+    match = SEMVER_RE.fullmatch(text)
+    if match: return ".".join(str(int(part)) for part in match.groups())
+    if text.isdigit(): return f"1.0.{int(text)}"
+    return default
 
 
 def next_scenario_version(current: Any) -> str:
+    text = str(current or "").strip()
+    match = SEMVER_RE.fullmatch(text)
+    if match:
+        major, minor, patch = (int(part) for part in match.groups())
+        return f"{major}.{minor}.{patch + 1}"
     try:
-        return str(int(str(current)) + 1)
+        return str(int(text) + 1)
     except (TypeError, ValueError):
         return "1"
+
+def scenario_content_changed(old: Mapping[str, Any] | None, new: Mapping[str, Any] | None) -> bool:
+    def stable(value):
+        if not isinstance(value, Mapping): return value
+        result = copy.deepcopy(dict(value))
+        for key in ("id", "scenario_version", "version", "version_id", "createdAt", "updatedAt", "owner_id", "creator_username", "public_id"):
+            result.pop(key, None)
+        return result
+    return stable(old or {}) != stable(new or {})
 
 
 def scenario_version(scenario: Mapping[str, Any] | None) -> str:

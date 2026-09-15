@@ -35,3 +35,10 @@ def test_openai_provider_template_is_openai_compatible():
     assert config["enabled"] is False
     assert config["config"]["base_url"].endswith("/chat/completions")
     assert config["small_models"]["summarization"]["id"] == "gpt-4o-mini"
+
+
+def test_aliyun_provider_includes_enabled_economy_model_and_embedding_endpoint():
+    config = json.loads(open("data/config/aiplatform/aliyun.json", encoding="utf-8").read())
+    assert any(model["id"] == "qwen-turbo" and model["enabled"] for model in config["models"])
+    assert config["small_models"]["summarization"]["id"] == "qwen-turbo"
+    assert config["embedding"]["base_url"].endswith("/embeddings")

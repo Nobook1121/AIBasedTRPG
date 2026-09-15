@@ -58,6 +58,56 @@ def test_search_filters_scenario_version_scene_and_spoiler_before_scoring(tmp_pa
     assert [item["text"] for item in result] == ["brass key library"]
 
 
+def test_search_fuses_vector_results_after_hard_filters(tmp_path):
+    scenarios = tmp_path / "scenarios"
+    rooms = tmp_path / "rooms"
+    scenarios.mkdir()
+    room = rooms / "room-1"
+    room.mkdir(parents=True)
+    (room / "info.json").write_text(
+        '{"id":"room-1","scenario_id":"case-1","scenario_version":"1.0.0","active_scene_id":"scene-1","spoiler_level":1}',
+        encoding="utf-8",
+    )
+
+    class FakeEmbedding:
+        configured = True
+        dimensions = 2
+
+        def embed(self, texts):
+            assert texts == ["brass key"]
+            return [[1.0, 0.0]]
+
+    class FakeVectorStore:
+        def search(self, collection, vector, limit=5):
+            assert collection == "scenario_case-1_1.0.0"
+            assert vector == [1.0, 0.0]
+            return [
+                {"id": "secret", "score": 0.99, "payload": {"module_id": "scene-secret"}},
+                {"id": "scene-1", "score": 0.8, "payload": {"module_id": "scene-1"}},
+            ]
+
+    service = KnowledgeBaseService(
+        rooms_dir=rooms,
+        scenarios={
+            "case-1": {
+                "id": "case-1",
+                "scenario_version": "1.0.0",
+                "modules": [
+                    {"id": "scene-1", "module_type": "scene", "content": "brass key library", "spoiler_level": 0},
+                    {"id": "scene-secret", "module_type": "scene", "content": "brass key secret", "spoiler_level": 2},
+                ],
+            }
+        },
+        vector_store=FakeVectorStore(),
+        embedding_provider=FakeEmbedding(),
+    )
+
+    result = service.search("room-1", "brass key", top_k=5)
+
+    assert [item["chunk_id"] for item in result] == ["scene-1"]
+    assert result[0]["score_components"]["vector"] == 0.8
+
+
 def test_saving_scenario_persists_versioned_knowledge_index(tmp_path):
     scenarios = tmp_path / "scenarios"
     scenarios.mkdir()

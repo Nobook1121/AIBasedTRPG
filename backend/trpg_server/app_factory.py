@@ -4,15 +4,18 @@ from flask_socketio import SocketIO
 from datetime import timedelta
 import logging
 import sqlite3
+import os
+from pathlib import Path
 
 from trpg_server.logging_config import configure_logging
 from trpg_server.security import register_session_guard
 from trpg_server.socket_events import register_socket_events
 from trpg_server.settings import LOGS_DIR, SECRET_KEY, SESSION_COOKIE_SECURE, USERS_DIR, WEAPONS_DIR
 from trpg_server.settings import SCENARIO_IMPORTS_DIR, SCENARIO_IMPORT_MAX_BYTES, SCENARIO_IMPORT_WORKERS
-from trpg_server.settings import VECTOR_DB_URL, VECTOR_DB_PATH, VECTOR_DB_API_KEY, EMBEDDING_BASE_URL, EMBEDDING_API_KEY, EMBEDDING_MODEL, EMBEDDING_DIMENSIONS, OCR_ENABLED, OCR_LANG
+from trpg_server.settings import VECTOR_DB_URL, VECTOR_DB_PATH, VECTOR_DB_API_KEY, EMBEDDING_BASE_URL, EMBEDDING_API_KEY, EMBEDDING_MODEL, EMBEDDING_DIMENSIONS, OCR_ENABLED, OCR_LANG, LOCAL_EMBEDDING_MODEL_PATH, PADDLEOCR_HOME, AI_PLATFORM_SECRET_DIR, CONFIG_DIR
 from trpg_server.agents.vector_store import QdrantVectorStore
-from trpg_server.agents.embedding_provider import OpenAICompatibleEmbeddingProvider
+from trpg_server.agents.embedding_provider import select_embedding_provider
+from trpg_server.ai_platform_config import load_platform_config
 from trpg_server.agents.ocr_provider import PaddleOcrProvider
 from trpg_server.scenario_import_jobs import ImportJobStore
 from concurrent.futures import ThreadPoolExecutor
@@ -43,6 +46,7 @@ def create_app(config=None):
         VECTOR_DB_URL=VECTOR_DB_URL, VECTOR_DB_PATH=VECTOR_DB_PATH, VECTOR_DB_API_KEY=VECTOR_DB_API_KEY,
         EMBEDDING_BASE_URL=EMBEDDING_BASE_URL, EMBEDDING_API_KEY=EMBEDDING_API_KEY, EMBEDDING_MODEL=EMBEDDING_MODEL,
         EMBEDDING_DIMENSIONS=EMBEDDING_DIMENSIONS, OCR_ENABLED=OCR_ENABLED, OCR_LANG=OCR_LANG,
+        LOCAL_EMBEDDING_MODEL_PATH=LOCAL_EMBEDDING_MODEL_PATH,
     )
     if config:
         app.config.update(config)
@@ -56,8 +60,22 @@ def create_app(config=None):
     app.extensions["scenario_import_store"] = ImportJobStore(app.config["SCENARIO_IMPORTS_DIR"])
     app.extensions["scenario_import_store"].recover_interrupted()
     app.extensions["scenario_import_executor"] = ThreadPoolExecutor(max_workers=app.config["SCENARIO_IMPORT_WORKERS"])
-    app.extensions["vector_store"] = QdrantVectorStore(app.config["VECTOR_DB_URL"], str(app.config["VECTOR_DB_PATH"]), app.config["VECTOR_DB_API_KEY"], app.config["EMBEDDING_DIMENSIONS"])
-    app.extensions["embedding_provider"] = OpenAICompatibleEmbeddingProvider(app.config["EMBEDDING_BASE_URL"], app.config["EMBEDDING_API_KEY"], app.config["EMBEDDING_MODEL"], app.config["EMBEDDING_DIMENSIONS"])
+    embedding_url, embedding_key, embedding_model, embedding_dimensions = app.config["EMBEDDING_BASE_URL"], app.config["EMBEDDING_API_KEY"], app.config["EMBEDDING_MODEL"], app.config["EMBEDDING_DIMENSIONS"]
+    if not (embedding_url and embedding_key and embedding_model):
+        platform_dir = Path(app.config.get("AI_PLATFORM_DIR", CONFIG_DIR / "aiplatform"))
+        secret_dir = Path(app.config.get("AI_PLATFORM_SECRET_DIR", AI_PLATFORM_SECRET_DIR))
+        for public_path in sorted(platform_dir.glob("*.json")):
+            candidate = load_platform_config(public_path, secret_dir / public_path.name)
+            embedding = candidate.get("embedding") if isinstance(candidate.get("embedding"), dict) else {}
+            key = candidate.get("config", {}).get("api_key")
+            if candidate.get("enabled") and embedding.get("base_url") and embedding.get("model") and key:
+                embedding_url, embedding_key, embedding_model = embedding["base_url"], key, embedding["model"]
+                embedding_dimensions = int(embedding.get("dimensions") or embedding_dimensions)
+                break
+    app.extensions["embedding_provider"] = select_embedding_provider(local_model_path=app.config["LOCAL_EMBEDDING_MODEL_PATH"], base_url=embedding_url, api_key=embedding_key, model=embedding_model, dimensions=embedding_dimensions)
+    provider_dimensions = getattr(app.extensions["embedding_provider"], "dimensions", None) or embedding_dimensions
+    app.extensions["vector_store"] = QdrantVectorStore(app.config["VECTOR_DB_URL"], str(app.config["VECTOR_DB_PATH"]), app.config["VECTOR_DB_API_KEY"], provider_dimensions)
+    os.environ.setdefault("PADDLE_PDX_CACHE_HOME", str(PADDLEOCR_HOME))
     app.extensions["ocr_provider"] = PaddleOcrProvider(app.config["OCR_LANG"]) if app.config["OCR_ENABLED"] else None
     app.config["OCR_PROVIDER"] = app.extensions["ocr_provider"]
     app.config["EMBEDDING_PROVIDER"] = app.extensions["embedding_provider"]

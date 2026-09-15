@@ -639,6 +639,8 @@ def chat():
                 KnowledgeBaseService(
                     rooms_dir=current_app.config.get("ROOMS_DIR", ROOMS_DIR),
                     scenarios_dir=current_app.config.get("SCENARIOS_DIR", SCENARIOS_DIR),
+                    vector_store=current_app.extensions.get("vector_store"),
+                    embedding_provider=current_app.extensions.get("embedding_provider"),
                 ).search(room_id, content, top_k=5)
                 if room_id
                 else []

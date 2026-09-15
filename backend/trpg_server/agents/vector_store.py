@@ -8,8 +8,10 @@ class VectorStore:
     def health(self) -> dict[str, Any]: return {"available": False}
 
 class QdrantVectorStore(VectorStore):
-    def __init__(self, url: str|None = None, path: str|None = None, api_key: str|None = None, dimensions: int = 256):
-        self.url, self.path, self.api_key, self.dimensions = url, path, api_key, int(dimensions); self.client=None
+    def __init__(self, url: str|None = None, path: str|None = None, api_key: str|None = None, dimensions: int|None = 256):
+        self.url, self.path, self.api_key = url, path, api_key
+        self.dimensions = int(dimensions) if dimensions else None
+        self.client=None
         try:
             from qdrant_client import QdrantClient
             self.client = QdrantClient(url=url, path=path, api_key=api_key) if url else QdrantClient(path=path or "data/runtime/vector-db/qdrant")
@@ -22,7 +24,15 @@ class QdrantVectorStore(VectorStore):
         if not self.client: return False
         try:
             from qdrant_client.models import Distance, PointStruct, VectorParams
-            if not self.client.collection_exists(collection): self.client.create_collection(collection_name=collection, vectors_config=VectorParams(size=self.dimensions, distance=Distance.COSINE))
+            points = list(points)
+            if not points: return True
+            vector_size = len(points[0].get("vector") or [])
+            if not vector_size: return False
+            if not self.client.collection_exists(collection):
+                self.dimensions = vector_size
+                self.client.create_collection(collection_name=collection, vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE))
+            elif self.dimensions and vector_size != self.dimensions:
+                return False
             self.client.upsert(collection_name=collection, points=[PointStruct(id=p["id"], vector=p["vector"], payload=p.get("payload",{})) for p in points]); return True
         except Exception: return False
     def search(self, collection, vector, limit=5):

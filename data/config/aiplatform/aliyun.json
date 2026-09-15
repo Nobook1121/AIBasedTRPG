@@ -24,8 +24,20 @@
         "max_tokens": 4096
       },
       "doc_url": "https://help.aliyun.com/zh/model-studio/developer-reference/qwen3-5-model-api-reference"
+    },
+    {
+      "id": "qwen-turbo",
+      "name": "Qwen Turbo（经济型）",
+      "description": "用于摘要、意图识别、状态更新和格式修复等低成本任务",
+      "enabled": true,
+      "params": {"context_window": 1000000, "temperature": 0.2, "top_p": 0.8, "max_tokens": 2048}
     }
   ],
+  "embedding": {
+    "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings",
+    "model": "text-embedding-v3",
+    "dimensions": 1024
+  },
   "small_models": {
     "intent_classification": {"id": "qwen-turbo", "name": "Qwen Turbo", "enabled": true},
     "state_update": {"id": "qwen-turbo", "name": "Qwen Turbo", "enabled": true},

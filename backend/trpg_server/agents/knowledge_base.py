@@ -106,10 +106,19 @@ def _tokens(value: str) -> list[str]:
 class KnowledgeBaseService:
     """Room-aware retrieval facade; callers never access the index directly."""
 
-    def __init__(self, rooms_dir: Path | None = None, scenarios_dir: Path | None = None, scenarios: Mapping[str, Mapping[str, Any]] | None = None):
+    def __init__(
+        self,
+        rooms_dir: Path | None = None,
+        scenarios_dir: Path | None = None,
+        scenarios: Mapping[str, Mapping[str, Any]] | None = None,
+        vector_store: Any = None,
+        embedding_provider: Any = None,
+    ):
         self.rooms_dir = Path(rooms_dir) if rooms_dir else None
         self.scenarios_dir = Path(scenarios_dir) if scenarios_dir else None
         self.scenarios = {str(key): dict(value) for key, value in (scenarios or {}).items()}
+        self.vector_store = vector_store
+        self.embedding_provider = embedding_provider
         self._chunks: dict[tuple[str, str], list[KnowledgeChunk]] = {}
 
     def _room_info(self, room_id: str) -> dict[str, Any]:
@@ -149,7 +158,7 @@ class KnowledgeBaseService:
         current_scene = str(info.get("active_scene_id") or info.get("current_scene_id") or "") or None
         spoiler_level = max(0, _int(info.get("spoiler_level") or info.get("current_spoiler_level"), 0))
         query_tokens = _tokens(str(query or ""))
-        candidates: list[tuple[int, KnowledgeChunk]] = []
+        filtered: list[KnowledgeChunk] = []
         for chunk in self._get_chunks(scenario):
             if chunk.scenario_id != scenario_id or chunk.scenario_version != scenario_version:
                 continue
@@ -159,22 +168,52 @@ class KnowledgeBaseService:
                 continue
             if audience != "kp" and chunk.visibility == "kp_only":
                 continue
+            filtered.append(chunk)
+
+        vector_scores: dict[str, float] = {}
+        query_vector: list[float] | None = None
+        if query and self.embedding_provider is not None:
+            try:
+                embedded = self.embedding_provider.embed([str(query)])
+                query_vector = embedded[0] if embedded else None
+            except Exception:
+                query_vector = None
+        if query_vector and self.vector_store is not None:
+            try:
+                collection = f"scenario_{scenario_id}_{scenario_version}"
+                vector_results = self.vector_store.search(collection, query_vector, limit=max(20, int(top_k) * 4))
+                allowed_ids = {chunk.chunk_id for chunk in filtered}
+                for item in vector_results:
+                    payload = item.get("payload") if isinstance(item, dict) else {}
+                    payload = payload if isinstance(payload, dict) else {}
+                    chunk_id = str(payload.get("chunk_id") or payload.get("module_id") or item.get("id") or "")
+                    if chunk_id in allowed_ids:
+                        vector_scores[chunk_id] = max(vector_scores.get(chunk_id, 0.0), float(item.get("score") or 0.0))
+            except Exception:
+                vector_scores = {}
+
+        candidates: list[tuple[float, KnowledgeChunk, float, float]] = []
+        for chunk in filtered:
             haystack = _tokens(f"{chunk.text} {chunk.card_type} {chunk.unlock_condition or ''}")
-            lexical = sum(haystack.count(token) for token in query_tokens) if query_tokens else 1
-            vector = 0.0
-            if chunk.embedding:
-                qv = [0.0] * len(chunk.embedding)
+            lexical = float(sum(haystack.count(token) for token in query_tokens) if query_tokens else 1)
+            vector = vector_scores.get(chunk.chunk_id, 0.0)
+            if not vector and chunk.embedding:
+                qv = query_vector if query_vector and len(query_vector) == len(chunk.embedding) else [0.0] * len(chunk.embedding)
                 for token in query_tokens:
-                    qv[hash(token) % len(qv)] += 1.0
+                    if query_vector is None:
+                        qv[hash(token) % len(qv)] += 1.0
                 norm = math.sqrt(sum(v * v for v in qv)) or 1.0
                 cnorm = math.sqrt(sum(v * v for v in chunk.embedding)) or 1.0
                 vector = sum(a * b for a, b in zip(qv, chunk.embedding)) / (norm * cnorm)
             score = lexical + vector
             if score <= 0:
                 continue
-            candidates.append((score, chunk))
+            candidates.append((score, chunk, lexical, vector))
         candidates.sort(key=lambda item: (-item[0], item[1].chunk_id))
-        return [{**chunk.to_dict(), "score": score, "score_components": {"lexical": score, "vector": 0.0}} for score, chunk in candidates[: max(1, min(int(top_k), 20))]]
+        return [
+            {**chunk.to_dict(), "score": score, "score_components": {"lexical": lexical, "vector": vector}}
+            for score, chunk, lexical, vector in candidates[: max(1, min(int(top_k), 20))]
+        ]
 
 
 def search(
@@ -206,7 +245,11 @@ def persist_knowledge_index(descriptor_path: Path, scenario: Mapping[str, Any]) 
 
 
 def load_knowledge_index(descriptor_path: Path, version: Any) -> list[KnowledgeChunk]:
-    values = read_json(knowledge_index_path(descriptor_path, version), default=[])
+    path = knowledge_index_path(descriptor_path, version)
+    if not path.exists() and str(version).isdigit():
+        from trpg_server.agents.versioning import normalize_semver
+        path = knowledge_index_path(descriptor_path, normalize_semver(version))
+    values = read_json(path, default=[])
     if not isinstance(values, list):
         return []
     result = []

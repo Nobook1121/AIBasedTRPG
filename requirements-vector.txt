@@ -1,2 +1,3 @@
-# Optional local vector/embedding stack
+# Optional local vector/embedding stack (Docker is not required)
 qdrant-client>=1.12,<2
+sentence-transformers>=3.0,<6

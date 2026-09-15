@@ -4,6 +4,16 @@ from trpg_server.agents.versioning import (
     validate_version_migration,
     migrate_room_binding,
 )
+from trpg_server.agents.versioning import normalize_semver, next_scenario_version, scenario_content_changed
+
+def test_semver_defaults_and_increments_patch():
+    assert normalize_semver("") == "1.0.0"
+    assert next_scenario_version("1.2.3") == "1.2.4"
+
+def test_scenario_content_change_ignores_timestamps():
+    old = {"title": "A", "scenario_version": "1.0.0", "updatedAt": "old", "modules": []}
+    new = {"title": "A", "scenario_version": "1.0.0", "updatedAt": "new", "modules": []}
+    assert scenario_content_changed(old, new) is False
 from trpg_server.scenario_store import load_scenario_by_id, save_scenario_record
 
 

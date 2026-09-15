@@ -2,6 +2,7 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import Any
+import hashlib
 from trpg_server.scenario_documents import chunk_parsed_document, parse_scenario_document
 from trpg_server.scenario_import_jobs import IMPORT_STAGES
 from trpg_server.scenario_importer import convert_script_to_scenario
@@ -39,7 +40,7 @@ class ScenarioImportPipeline:
                 store = self.config["VECTOR_STORE"]
             else:
                 store = QdrantVectorStore(self.config.get("VECTOR_DB_URL"), str(self.config.get("VECTOR_DB_PATH", "data/runtime/vector-db/qdrant")), self.config.get("VECTOR_DB_API_KEY"), self.config.get("EMBEDDING_DIMENSIONS", 256))
-            points = [{"id": abs(hash(str(module.get("id")))) % (2**63), "vector": vector, "payload": {"scenario_id": job.get("script_id"), "scenario_version": job.get("target_version"), "module_id": module.get("id")}} for module, vector in zip([m for m in scenario.get("modules", []) if isinstance(m, dict)], vectors)]
+            points = [{"id": int.from_bytes(hashlib.sha256(f"{job.get('script_id')}:{job.get('target_version')}:{module.get('id')}".encode("utf-8")).digest()[:8], "big") & ((1 << 63) - 1), "vector": vector, "payload": {"scenario_id": job.get("script_id"), "scenario_version": job.get("target_version"), "module_id": module.get("id"), "chunk_id": module.get("id")}} for module, vector in zip([m for m in scenario.get("modules", []) if isinstance(m, dict)], vectors)]
             if points: store.upsert(f"scenario_{job.get('script_id')}_{job.get('target_version')}", points)
             self.store.save_intermediate(job_id, "preview", scenario)
             return self.store.update(job_id, status="done", current_stage="done", progress=100, preview=scenario)
