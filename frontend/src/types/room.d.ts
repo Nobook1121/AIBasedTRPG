@@ -40,6 +40,8 @@ interface Room {
     owner_id?: string | number;
     scenario_id?: number;
     scenario_title?: string;
+    scenario_started_at?: string;
+    scenario_started_by?: string | number;
     invisible_view?: boolean;
     members?: RoomMember[];
     messages?: ChatMessage[];

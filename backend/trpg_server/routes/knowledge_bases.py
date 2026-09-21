@@ -1,20 +1,97 @@
 from __future__ import annotations
 
+import logging
+
 from flask import Blueprint, current_app, request
+from pathlib import Path
 
 from trpg_server.agents.ruleset_knowledge import RulesetKnowledgeStore
 from trpg_server.responses import error_response, success_response
 from trpg_server.security import is_allowed_upload, require_permission_node
-from trpg_server.settings import KNOWLEDGE_BASES_DIR, ROOMS_DIR
+from trpg_server.settings import KNOWLEDGE_BASES_DIR, ROOMS_DIR, SCENARIOS_DIR, EMBEDDED_VECTOR_DB_PATH
+from trpg_server.scenario_store import load_scenario_record, scenario_descriptor_paths
+from trpg_server.agents.knowledge_base import knowledge_index_path
 
 bp = Blueprint("knowledge_bases", __name__)
-ALLOWED_EXTENSIONS = {"txt", "md", "markdown", "text", "doc", "docx"}
+logger = logging.getLogger(__name__)
+ALLOWED_EXTENSIONS = {"txt", "md", "markdown", "text", "doc", "docx", "pdf"}
 
 
 def _store() -> RulesetKnowledgeStore:
     root = current_app.config.get("KNOWLEDGE_BASES_DIR", KNOWLEDGE_BASES_DIR)
     rooms = current_app.config.get("ROOMS_DIR", ROOMS_DIR)
-    return RulesetKnowledgeStore(root, rooms_dir=rooms)
+    return RulesetKnowledgeStore(root, rooms_dir=rooms, ocr_provider=current_app.extensions.get("ocr_provider"))
+
+
+def _scenario_knowledge_items(search: str = "") -> list[dict]:
+    configured_dir = current_app.config.get("SCENARIOS_DIR", SCENARIOS_DIR)
+    scenario_roots = [Path(configured_dir)]
+    if Path(SCENARIOS_DIR) not in scenario_roots:
+        scenario_roots.append(Path(SCENARIOS_DIR))
+    vector_store = current_app.extensions.get("vector_store")
+    needle = str(search or "").strip().casefold()
+    items = []
+    descriptors = [descriptor for root in scenario_roots for descriptor in scenario_descriptor_paths(root)]
+    for descriptor in descriptors:
+        try:
+            scenario = load_scenario_record(descriptor, descriptor.parents[1])
+            scenario_id = scenario.get("id")
+            title = str(scenario.get("title") or descriptor.parent.name)
+            if needle and needle not in f"{title} {scenario_id}".casefold():
+                continue
+            version = str(scenario.get("scenario_version") or scenario.get("version") or "1")
+            index_path = knowledge_index_path(descriptor, version)
+            # A scenario's persisted vectors can predate semver normalization
+            # (legacy payloads use versions such as ``1`` or ``2``).  The
+            # management view represents the knowledge base for the scenario,
+            # so count all of its vectors regardless of the historical version.
+            vector_filter = {"scenario_id": str(scenario_id)}
+            count = int(vector_store.count(vector_filter)) if vector_store else 0
+            health = vector_store.health() if vector_store else {"backend": "none"}
+            items.append({
+                "scenario_id": scenario_id,
+                "title": title,
+                "version": version,
+                "vector_count": count,
+                "path": str(index_path),
+                "descriptor_path": str(descriptor),
+                "vector_db_path": str(getattr(vector_store, "db_path", current_app.config.get("EMBEDDED_VECTOR_DB_PATH", EMBEDDED_VECTOR_DB_PATH))),
+                "backend": health.get("backend", "unknown"),
+                "index_exists": index_path.exists(),
+            })
+        except (OSError, ValueError, TypeError):
+            continue
+    return sorted(items, key=lambda item: (str(item.get("title", "")).casefold(), int(item.get("scenario_id") or 0)))
+
+
+@bp.route("/api/knowledge-bases/scenarios", methods=["GET"])
+@require_permission_node("settings.knowledge_bases")
+def list_scenario_knowledge():
+    return success_response(data=_scenario_knowledge_items(request.args.get("search", "")))
+
+
+@bp.route("/api/knowledge-bases/scenarios/<int:scenario_id>", methods=["DELETE"])
+@require_permission_node("settings.knowledge_bases")
+def delete_scenario_knowledge(scenario_id: int):
+    configured_dir = Path(current_app.config.get("SCENARIOS_DIR", SCENARIOS_DIR))
+    roots = [configured_dir] + ([] if configured_dir == Path(SCENARIOS_DIR) else [Path(SCENARIOS_DIR)])
+    descriptor = next((path for root in roots for path in scenario_descriptor_paths(root)
+                       if str(load_scenario_record(path, root).get("id")) == str(scenario_id)), None)
+    if descriptor is None:
+        return error_response("Scenario not found", 404, "Scenario not found")
+    vector_store = current_app.extensions.get("vector_store")
+    deleted_vectors = int(vector_store.delete_by_filter({"scenario_id": str(scenario_id)})) if vector_store else 0
+    index_dir = descriptor.parent / "knowledge-index"
+    deleted_files = 0
+    if index_dir.exists():
+        for path in index_dir.glob("*.json"):
+            path.unlink()
+            deleted_files += 1
+        try:
+            index_dir.rmdir()
+        except OSError:
+            pass
+    return success_response(data={"scenario_id": scenario_id, "deleted_vectors": deleted_vectors, "deleted_files": deleted_files})
 
 
 @bp.route("/api/knowledge-bases/rulesets", methods=["GET"])
@@ -45,6 +122,9 @@ def upload_source(ruleset_id):
         return success_response(data={"source": source, "version": result}, status=201)
     except (ValueError, OSError) as exc:
         return error_response(str(exc), 400)
+    except Exception:
+        logger.exception("Failed to upload and index ruleset source: %s", ruleset_id)
+        return error_response("Failed to upload and index source", 500)
 
 
 @bp.route("/api/knowledge-bases/<ruleset_id>/reindex", methods=["POST"])
@@ -54,6 +134,9 @@ def reindex(ruleset_id):
         return success_response(data=_store().reindex(ruleset_id))
     except (ValueError, OSError) as exc:
         return error_response(str(exc), 400)
+    except Exception:
+        logger.exception("Failed to reindex ruleset knowledge base: %s", ruleset_id)
+        return error_response("Failed to reindex knowledge base", 500)
 
 
 @bp.route("/api/knowledge-bases/<ruleset_id>/enable", methods=["POST"])

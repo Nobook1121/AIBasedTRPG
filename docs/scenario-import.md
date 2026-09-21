@@ -34,6 +34,5 @@ python scripts/convert_scenario.py docs/样本/模组.docx -o scenario.json --ti
 不会丢弃原始文件。
 
 启用 OCR：安装 `requirements-ocr.txt` 并设置 `AI_TRPG_OCR_ENABLED=1`。启用本地向量库：安装
-`requirements-vector.txt`，执行 `docker compose -f docker-compose.qdrant.yml up -d`；Qdrant 数据位于
-`data/runtime/vector-db/qdrant/`。Embedding 使用 `AI_TRPG_EMBEDDING_BASE_URL`、
-`AI_TRPG_EMBEDDING_API_KEY`、`AI_TRPG_EMBEDDING_MODEL` 配置，失败时保留 JSON 索引并使用本地哈希向量。
+默认使用内置 SQLite 向量库，无需 Docker；如需 Qdrant，请安装 `requirements-vector-qdrant.txt`，设置 `AI_TRPG_VECTOR_BACKEND=qdrant`，并使用 `data/runtime/vector-db/qdrant/`。
+Embedding 仍按本地模型 → OpenAI-compatible 服务 → 本地哈希向量顺序回退；失败时保留 JSON 索引。

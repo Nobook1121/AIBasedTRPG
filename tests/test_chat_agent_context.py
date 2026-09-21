@@ -1,9 +1,12 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 from flask import Flask, session
 
 from trpg_server.routes.chat import (
     _build_messages,
+    _build_knowledge_usage,
+    _can_start_scenario,
     _compact_history_entries,
     _compact_history_with_ai,
     _get_debug_kp_prompt_file,
@@ -16,6 +19,7 @@ from trpg_server.routes.chat import (
     _room_snapshot_system_message,
     _speaker_for_user,
     _strip_compact_command,
+    _mark_scenario_started,
 )
 from trpg_server.routes.characters import _runtime_to_test_character, _test_character_to_runtime
 from trpg_server.socket_events import register_socket_events
@@ -25,6 +29,60 @@ from trpg_server.routes.rooms import create_room_message
 def test_history_filename_is_room_scoped_when_room_is_available():
     assert _history_filename("user-1", "room-alpha", "kp") == "room-room-alpha-kp.json"
     assert _history_filename("user-1", "room-beta", "kp") == "room-room-beta-kp.json"
+
+
+def test_knowledge_usage_distinguishes_ruleset_tool_from_scenario_retrieval():
+    result = SimpleNamespace(
+        knowledge_usage={
+            "ruleset_chunks": 2,
+            "ruleset_sources": 1,
+            "ruleset_ids": ["coc7"],
+            "knowledge_versions": ["4"],
+            "topics": ["keeper_guidance"],
+            "citations": ["Keeper Rulebook p.42"],
+            "tool_calls": 1,
+        }
+    )
+    scenario_results = [{"chunk_id": "scene-1"}, {"chunk_id": "npc-1"}]
+
+    usage = _build_knowledge_usage(result, scenario_results)
+
+    assert usage["used"] is True
+    assert usage["total_chunks"] == 4
+    assert usage["ruleset"]["called"] is True
+    assert usage["ruleset"]["chunks"] == 2
+    assert usage["ruleset"]["sources"] == 1
+    assert usage["scenario"]["chunks"] == 2
+
+
+def test_scenario_start_permission_allows_room_managers_but_not_members():
+    room = {
+        "creator_id": 1,
+        "members": [
+            {"user_id": 1, "room_role": "owner", "status": "active"},
+            {"user_id": 2, "room_role": "admin", "status": "active"},
+            {"user_id": 3, "room_role": "member", "status": "active"},
+        ],
+    }
+
+    assert _can_start_scenario(room, 1, "USER") is True
+    assert _can_start_scenario(room, 2, "USER") is True
+    assert _can_start_scenario(room, 3, "USER") is False
+    assert _can_start_scenario(room, 99, "ADMIN") is True
+
+
+def test_mark_scenario_started_persists_once(tmp_path):
+    room_dir = tmp_path / "room-1"
+    room_dir.mkdir()
+    info_path = room_dir / "info.json"
+    info_path.write_text('{"id":"room-1","scenario_started_at":"2026-01-01 10:00:00"}', encoding="utf-8")
+
+    started_at = _mark_scenario_started(room_dir, user_id=7)
+
+    saved = __import__("json").loads(info_path.read_text(encoding="utf-8"))
+    assert started_at == "2026-01-01 10:00:00"
+    assert saved["scenario_started_at"] == "2026-01-01 10:00:00"
+    assert saved["scenario_started_by"] == 7
 
 
 def test_debug_prompt_uses_configured_config_directory(tmp_path):
@@ -241,6 +299,44 @@ def test_post_ai_request_logs_full_request_and_response_payload(monkeypatch, cap
     assert "系统提示" in log_text
     assert "AI API response payload" in log_text
     assert "完整回复" in log_text
+
+
+def test_post_ai_request_retries_json_object_when_provider_requires_json(monkeypatch, caplog):
+    calls = []
+
+    class FakeResponse:
+        def __init__(self, ok, status_code, body):
+            self.ok = ok
+            self.status_code = status_code
+            self._body = body
+            self.text = str(body)
+
+        def json(self):
+            return self._body
+
+    def fake_post(base_url, headers, json, timeout):
+        calls.append(json)
+        if len(calls) == 1:
+            return FakeResponse(False, 400, {
+                "message": "'messages' must contain the word 'json' in some form, to use 'response_format' of type 'json_object'."
+            })
+        return FakeResponse(True, 200, {"choices": [{"message": {"content": "ok"}}]})
+
+    monkeypatch.setattr("trpg_server.routes.chat.requests.post", fake_post)
+    caplog.set_level("INFO", logger="trpg_server.routes.chat")
+    requester = _post_ai_request("https://example.test/chat", {"Authorization": "Bearer secret"})
+
+    response = requester({
+        "model": "model-a",
+        "messages": [{"role": "system", "content": "ordinary prompt"}],
+        "response_format": {"type": "json_object"},
+    })
+
+    assert response["choices"][0]["message"]["content"] == "ok"
+    assert len(calls) == 2
+    assert calls[1]["response_format"] == {"type": "json_object"}
+    assert any("JSON" in str(message.get("content")) for message in calls[1]["messages"])
+    assert "retry" in "\n".join(record.getMessage() for record in caplog.records).lower()
 
 
 def test_room_message_logs_display_name_and_full_content(monkeypatch, caplog):

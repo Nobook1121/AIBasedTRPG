@@ -55,6 +55,43 @@ def test_runtime_executes_enabled_tool_and_finishes():
     assert requester.calls[1]["messages"][-1]["role"] == "tool"
 
 
+def test_runtime_reports_tool_stage_through_context_callback():
+    stages = []
+    tool = AgentTool(
+        name="test.echo",
+        description="Echo value",
+        parameters={"type": "object", "properties": {}},
+        handler=lambda arguments, context: {"ok": True},
+    )
+
+    class Requester:
+        def __init__(self):
+            self.calls = 0
+
+        def __call__(self, payload):
+            self.calls += 1
+            if self.calls == 1:
+                return {"choices": [{"message": {"tool_calls": [{"id": "call", "function": {"name": "test.echo", "arguments": "{}"}}]}}]}
+            return {"choices": [{"message": {"content": "done"}}]}
+
+    context = AgentRequestContext(room_id="room-1")
+    context.tool_state["thinking_stage_callback"] = lambda stage, label: stages.append((stage, label))
+    result = run_agent_completion(
+        requester=Requester(),
+        base_payload={"model": "fake-model", "messages": [{"role": "user", "content": "hi"}]},
+        profile=AgentProfile(id="kp", name="KP", prompt="prompt", tool_names=["test.echo"]),
+        registry=ToolRegistry([tool]),
+        context=context,
+    )
+
+    assert result.content == "done"
+    assert stages == [
+        ("ai_request", "正在请求 AI"),
+        ("tool_call", "正在执行工具：test.echo"),
+        ("ai_request", "正在请求 AI"),
+    ]
+
+
 def test_runtime_accumulates_token_count_across_multiple_tool_rounds():
     class MultiRoundRequester:
         def __init__(self):
@@ -168,6 +205,67 @@ def test_runtime_returns_tool_result_to_model_and_collects_visible_message():
     assert result.tool_messages == [tool_result["visible_message"]]
     assert '"roll": 17' in requester.calls[1]["messages"][-1]["content"]
     assert "侦查 d%: [17] = 17 / 50 成功" in requester.calls[1]["messages"][-1]["content"]
+
+
+def test_runtime_collects_knowledge_usage_from_executed_tool():
+    class KnowledgeRequester:
+        def __init__(self):
+            self.calls = 0
+
+        def __call__(self, payload):
+            self.calls += 1
+            if self.calls == 1:
+                return {
+                    "choices": [{
+                        "message": {
+                            "role": "assistant",
+                            "content": "",
+                            "tool_calls": [{
+                                "id": "knowledge-call",
+                                "type": "function",
+                                "function": {"name": "knowledge.search_ruleset", "arguments": "{\"query\":\"角色死亡\"}"},
+                            }],
+                        }
+                    }]
+                }
+            return {"choices": [{"message": {"role": "assistant", "content": "handled"}}]}
+
+    tool = AgentTool(
+        name="knowledge.search_ruleset",
+        description="Search rules",
+        parameters={"type": "object", "properties": {}},
+        handler=lambda arguments, context: {
+            "used": True,
+            "references": [{"text": "respect player agency"}],
+            "knowledge_usage": {
+                "ruleset_chunks": 2,
+                "ruleset_sources": 1,
+                "ruleset_ids": ["coc7"],
+                "knowledge_versions": ["4"],
+                "topics": ["keeper_guidance"],
+                "citations": ["Keeper Rulebook p.42"],
+            },
+        },
+    )
+
+    result = run_agent_completion(
+        requester=KnowledgeRequester(),
+        base_payload={"model": "fake-model", "messages": [{"role": "user", "content": "hi"}]},
+        profile=AgentProfile(id="kp", name="KP", prompt="prompt", tool_names=["knowledge.search_ruleset"]),
+        registry=ToolRegistry([tool]),
+        context=AgentRequestContext(room_id="room-1"),
+    )
+
+    assert result.content == "handled"
+    assert result.knowledge_usage == {
+        "ruleset_chunks": 2,
+        "ruleset_sources": 1,
+        "ruleset_ids": ["coc7"],
+        "knowledge_versions": ["4"],
+        "topics": ["keeper_guidance"],
+        "citations": ["Keeper Rulebook p.42"],
+        "tool_calls": 1,
+    }
 
 
 def test_runtime_continues_after_direct_message_tool_and_collects_both_messages():

@@ -1,0 +1,2 @@
+# Optional Qdrant backend. The default embedded backend does not need this file.
+qdrant-client>=1.12,<2

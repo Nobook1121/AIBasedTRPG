@@ -84,10 +84,15 @@ def publish_import(script_id):
     payload = request.get_json(silent=True) or {}; job = _job(str(payload.get("jobId", "")))
     if not job or int(job.get("script_id", 0)) != script_id: return error_response("Import job not found", 404, "Not found")
     scenario = job.get("preview") or _store().load_intermediate(job["id"], "preview", {})
-    scenario["id"] = script_id; scenario["scenario_version"] = str(job.get("target_version") or "1"); scenario["owner_id"] = session["user_id"]
+    scenario["id"] = script_id; scenario["scenario_version"] = str(job.get("target_version") or "1.0.0"); scenario["owner_id"] = session["user_id"]
     from trpg_server.settings import SCENARIOS_DIR
     descriptor = save_scenario_record(SCENARIOS_DIR, scenario)
-    persist_knowledge_index(descriptor, load_scenario_record(descriptor, SCENARIOS_DIR))
+    persist_knowledge_index(
+        descriptor,
+        load_scenario_record(descriptor, SCENARIOS_DIR),
+        vector_store=current_app.extensions.get("vector_store"),
+        embedding_provider=current_app.extensions.get("embedding_provider"),
+    )
     _store().update(job["id"], status="published", progress=100)
     return success_response(load_scenario_record(descriptor, SCENARIOS_DIR), "Published", 201)
 

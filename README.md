@@ -224,8 +224,9 @@ npm run build:frontend
 ```powershell
 pip install -r requirements-vector.txt
 pip install -r requirements-ocr.txt
-docker compose -f docker-compose.qdrant.yml up -d
 ```
+
+The commands above are optional model/OCR enhancements. The embedded SQLite vector store is already included in the main application and does not require Docker. Install `requirements-vector-qdrant.txt` only when selecting Qdrant.
 
 配置 `AI_TRPG_VECTOR_DB_URL`、`AI_TRPG_EMBEDDING_BASE_URL`、
 `AI_TRPG_EMBEDDING_API_KEY`、`AI_TRPG_EMBEDDING_MODEL`、
@@ -300,4 +301,25 @@ The protected API requires `settings.knowledge_bases`:
 
 Index failures retain the previous active version. Future COC6 or D&D adapters can implement the same `RulesetAdapter` interface and reuse upload, versioning, permissions, retrieval, prompt, and telemetry infrastructure.
 
-Docker 不是必需依赖。安装 `requirements-vector.txt` 后，应用直接使用 Python Qdrant client 的本地持久化模式，数据位于 `data/runtime/vector-db/qdrant/`；Docker Compose 仅用于可选的 Qdrant 服务部署。Embedding 优先读取 `data/runtime/models/embedding/bge-small-zh-v1.5/` 中的 `BAAI/bge-small-zh-v1.5`，没有本地模型时使用启用 AI 平台的 OpenAI-compatible embedding，最后回退到本地哈希向量。下载模型：`pip install huggingface_hub sentence-transformers`，然后 `huggingface-cli download BAAI/bge-small-zh-v1.5 --local-dir data/runtime/models/embedding/bge-small-zh-v1.5`。PaddleOCR 模型缓存位于 `data/runtime/models/paddleocr/`。
+### Embedded vector storage (default)
+
+The default vector backend is an embedded SQLite store implemented with Python's standard library. A fresh checkout can run with only `pip install -r requirements.txt`; Docker and Qdrant are not required. Vectors are persisted in `data/runtime/vector-db/embedded/vectors.sqlite3`, while readable per-scenario backups remain in `data/scenarios/scenario-<id>/knowledge-index/<version>.json`.
+
+Set `AI_TRPG_VECTOR_BACKEND=embedded` to make the choice explicit. Existing JSON indexes can be imported idempotently with:
+
+```powershell
+python scripts/migrate-vector-store.py
+```
+
+The migration never deletes JSON or Qdrant data. For the optional Qdrant backend, install `requirements-vector-qdrant.txt`, set `AI_TRPG_VECTOR_BACKEND=qdrant` and `AI_TRPG_VECTOR_DB_URL`, then use the same `VectorStore` contract. The embedded mode is intended for single-machine or small LAN deployments (thousands of cards per scenario and tens of thousands overall).
+
+Docker 不是必需依赖。默认使用内置 SQLite 向量库，数据位于 `data/runtime/vector-db/embedded/`；仅在配置 Qdrant 后端时安装 `requirements-vector-qdrant.txt` 并使用 `data/runtime/vector-db/qdrant/`。Embedding 优先读取 `data/runtime/models/embedding/bge-small-zh-v1.5/` 中的 `BAAI/bge-small-zh-v1.5`，没有本地模型时使用启用 AI 平台的 OpenAI-compatible embedding，最后回退到本地哈希向量。下载模型：`pip install huggingface_hub sentence-transformers`，然后 `huggingface-cli download BAAI/bge-small-zh-v1.5 --local-dir data/runtime/models/embedding/bge-small-zh-v1.5`。PaddleOCR 模型缓存位于 `data/runtime/models/paddleocr/`。
+## 剧本触发器与资源
+
+剧本资源严格保存在 `data/scenarios/scenario-<id>/assets/`，描述和触发器定义保存在同一目录的 `scenario.json`，资源索引为 `assets.json`。资源引用包含 `type/path/url/alt/mime/size/hash`，`alt` 必须由编辑者手动填写，系统不会自动分析资源内容。
+
+触发器支持场景进入、事件、线索、NPC 对话、玩家行动和自定义条件。附件可设置 `spoilerLevel`（0-5）、`visibility`、`repeatable`、`priority` 与 `enabled`。房间 `state.json` 新增 `triggeredFiles` 和 `triggerHistory`，状态按房间隔离。
+
+管理 API：`POST/GET /api/scripts/:id/assets`、`PUT/DELETE /api/scripts/:id/assets/:assetId`；`POST/PUT/DELETE /api/scripts/:id/cards/:cardId/attachments[/triggerId]`；`GET/POST /api/scripts/:id/triggers`、`PUT /api/scripts/:id/triggers/:triggerId`；`GET /api/rooms/:id/triggers`。
+
+结构化 KP 输出可包含 `triggered_files: [{"trigger_id": "...", "reason": "..."}]`。后端会校验剧本 ID、版本、场景、解锁条件、剧透级别、可见性和重复触发状态；失败时不会向玩家推送资源，并写入日志。

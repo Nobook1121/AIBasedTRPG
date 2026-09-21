@@ -179,6 +179,8 @@ function switchSettingsTab(tabName: string): void {
     }
     if (tabName === "knowledge") {
         void loadRulesetKnowledge();
+        void loadScenarioKnowledge();
+        void loadEmbeddingHealth();
     }
 }
 
@@ -288,6 +290,41 @@ async function loadRulesetKnowledge(): Promise<void> {
         list.textContent = settingsErrorMessage(error);
     }
     document.getElementById("uploadRulesetButton")?.addEventListener("click", () => void uploadRulesetSource());
+    document.getElementById("scenarioKnowledgeRefresh")?.addEventListener("click", () => void loadScenarioKnowledge());
+}
+
+async function loadScenarioKnowledge(): Promise<void> {
+    const list = document.getElementById("scenarioKnowledgeList");
+    const search = (document.getElementById("scenarioKnowledgeSearch") as HTMLInputElement | null)?.value || "";
+    if (!list) return;
+    try {
+        const response = await TrpgApi.get<ApiResponse<Array<Record<string, unknown>>>>(`/api/knowledge-bases/scenarios?search=${encodeURIComponent(search)}`);
+        if (!response.success || !response.data) throw new Error(response.message || "剧本知识库加载失败");
+        list.innerHTML = response.data.length ? response.data.map((item) => `<div class="list-group-item d-flex justify-content-between align-items-center"><div><strong>${settingsEscapeHtml(item.title)}</strong><div class="small text-muted">向量 ${Number(item.vector_count || 0)} · ${settingsEscapeHtml(item.backend)}<br>${settingsEscapeHtml(item.path)}</div></div><button class="btn btn-sm btn-outline-danger" data-delete-scenario-kb="${String(item.scenario_id)}">删除知识库</button></div>`).join("") : '<div class="list-group-item text-muted">没有匹配的剧本知识库</div>';
+        list.querySelectorAll<HTMLButtonElement>("[data-delete-scenario-kb]").forEach((button) => button.addEventListener("click", async () => {
+            if (!confirm("确认删除该剧本的知识库向量和索引吗？")) return;
+            const result = await TrpgApi.del<ApiResponse<unknown>>(`/api/knowledge-bases/scenarios/${encodeURIComponent(button.dataset.deleteScenarioKb || "")}`);
+            if (!result.success) throw new Error(result.message || "删除失败");
+            await loadScenarioKnowledge();
+        }));
+    } catch (error) { list.textContent = settingsErrorMessage(error); }
+}
+
+async function loadEmbeddingHealth(): Promise<void> {
+    const target = document.getElementById("embeddingModelStatus");
+    if (!target) return;
+    try {
+        const response = await TrpgApi.get<ApiResponse<Record<string, unknown>>>("/api/vector/health");
+        const embedding = (response.data?.embedding || {}) as Record<string, unknown>;
+        const loaded = embedding.loaded === true;
+        const label = loaded ? "Embedding 模型已加载" : "Embedding 模型未成功加载";
+        (loaded ? console.info : console.warn)(`[Embedding] ${label}`, embedding);
+        target.className = `alert ${loaded ? "alert-success" : "alert-warning"}`;
+        target.textContent = `${label} · 后端：${String(embedding.backend || "unknown")} · 维度：${String(embedding.dimensions || "未知")}${embedding.model ? ` · 模型：${String(embedding.model)}` : ""}${embedding.error ? ` · ${String(embedding.error)}` : ""}`;
+    } catch (error) {
+        target.className = "alert alert-warning";
+        target.textContent = `无法读取 Embedding 模型状态：${settingsErrorMessage(error)}`;
+    }
 }
 
 async function uploadRulesetSource(): Promise<void> {

@@ -1,10 +1,12 @@
-from flask import Flask
+from flask import Flask, request
 from flask_cors import CORS
 from flask_socketio import SocketIO
 from datetime import timedelta
 import logging
 import sqlite3
 import os
+import json
+import requests
 from pathlib import Path
 
 from trpg_server.logging_config import configure_logging
@@ -12,8 +14,8 @@ from trpg_server.security import register_session_guard
 from trpg_server.socket_events import register_socket_events
 from trpg_server.settings import LOGS_DIR, SECRET_KEY, SESSION_COOKIE_SECURE, USERS_DIR, WEAPONS_DIR
 from trpg_server.settings import SCENARIO_IMPORTS_DIR, SCENARIO_IMPORT_MAX_BYTES, SCENARIO_IMPORT_WORKERS
-from trpg_server.settings import VECTOR_DB_URL, VECTOR_DB_PATH, VECTOR_DB_API_KEY, EMBEDDING_BASE_URL, EMBEDDING_API_KEY, EMBEDDING_MODEL, EMBEDDING_DIMENSIONS, OCR_ENABLED, OCR_LANG, LOCAL_EMBEDDING_MODEL_PATH, PADDLEOCR_HOME, AI_PLATFORM_SECRET_DIR, CONFIG_DIR
-from trpg_server.agents.vector_store import QdrantVectorStore
+from trpg_server.settings import VECTOR_DB_URL, VECTOR_DB_PATH, VECTOR_DB_API_KEY, VECTOR_BACKEND, VECTOR_BACKEND_EXPLICIT, EMBEDDED_VECTOR_DB_PATH, SCENARIOS_DIR, EMBEDDING_BASE_URL, EMBEDDING_API_KEY, EMBEDDING_MODEL, EMBEDDING_DIMENSIONS, OCR_ENABLED, OCR_LANG, LOCAL_EMBEDDING_MODEL_PATH, PADDLEOCR_HOME, AI_PLATFORM_SECRET_DIR, CONFIG_DIR
+from trpg_server.agents.vector_store import create_vector_store
 from trpg_server.agents.embedding_provider import select_embedding_provider
 from trpg_server.ai_platform_config import load_platform_config
 from trpg_server.agents.ocr_provider import PaddleOcrProvider
@@ -35,7 +37,7 @@ def create_app(config=None):
         SESSION_COOKIE_SAMESITE="Lax",
         SESSION_COOKIE_SECURE=SESSION_COOKIE_SECURE,
         PERMANENT_SESSION_LIFETIME=timedelta(days=7),
-        MAX_CONTENT_LENGTH=4 * 1024 * 1024,
+        MAX_CONTENT_LENGTH=SCENARIO_IMPORT_MAX_BYTES,
         USER_DATABASE_FILE=USERS_DIR / "users.sqlite3",
         USERS_FILE=USERS_DIR / "users.json",
         USER_IP_CONFIG_DIR=USERS_DIR / "ip_configs",
@@ -44,17 +46,23 @@ def create_app(config=None):
         SCENARIO_IMPORT_MAX_BYTES=SCENARIO_IMPORT_MAX_BYTES,
         SCENARIO_IMPORT_WORKERS=SCENARIO_IMPORT_WORKERS,
         VECTOR_DB_URL=VECTOR_DB_URL, VECTOR_DB_PATH=VECTOR_DB_PATH, VECTOR_DB_API_KEY=VECTOR_DB_API_KEY,
+        VECTOR_BACKEND=VECTOR_BACKEND, VECTOR_BACKEND_EXPLICIT=VECTOR_BACKEND_EXPLICIT, EMBEDDED_VECTOR_DB_PATH=EMBEDDED_VECTOR_DB_PATH,
+        SCENARIOS_DIR=SCENARIOS_DIR,
         EMBEDDING_BASE_URL=EMBEDDING_BASE_URL, EMBEDDING_API_KEY=EMBEDDING_API_KEY, EMBEDDING_MODEL=EMBEDDING_MODEL,
         EMBEDDING_DIMENSIONS=EMBEDDING_DIMENSIONS, OCR_ENABLED=OCR_ENABLED, OCR_LANG=OCR_LANG,
         LOCAL_EMBEDDING_MODEL_PATH=LOCAL_EMBEDDING_MODEL_PATH,
     )
     if config:
         app.config.update(config)
+    # Scenario imports support the larger limit declared by the import
+    # validator.  Ruleset uploads still enforce their own smaller limit inside
+    # the route, but Flask must not reject them first with an HTML 413 page.
     configure_logging(app.config.get("LOGS_DIR", LOGS_DIR))
     if "USER_MANAGER" not in app.config:
         _configure_user_service(app)
     CORS(app)
     socketio.init_app(app)
+    app.extensions["socketio"] = socketio
     register_session_guard(app)
     register_blueprints(app)
     app.extensions["scenario_import_store"] = ImportJobStore(app.config["SCENARIO_IMPORTS_DIR"])
@@ -73,15 +81,123 @@ def create_app(config=None):
                 embedding_dimensions = int(embedding.get("dimensions") or embedding_dimensions)
                 break
     app.extensions["embedding_provider"] = select_embedding_provider(local_model_path=app.config["LOCAL_EMBEDDING_MODEL_PATH"], base_url=embedding_url, api_key=embedding_key, model=embedding_model, dimensions=embedding_dimensions)
+    embedding_health = app.extensions["embedding_provider"].health()
+    if embedding_health.get("loaded"):
+        logger.info("embedding_model_loaded backend=%s model=%s dimensions=%s", embedding_health.get("backend"), embedding_health.get("model", ""), embedding_health.get("dimensions"))
+    else:
+        logger.warning("embedding_model_load_failed backend=%s model=%s error=%s", embedding_health.get("backend"), embedding_health.get("model", ""), embedding_health.get("error", "unknown"))
     provider_dimensions = getattr(app.extensions["embedding_provider"], "dimensions", None) or embedding_dimensions
-    app.extensions["vector_store"] = QdrantVectorStore(app.config["VECTOR_DB_URL"], str(app.config["VECTOR_DB_PATH"]), app.config["VECTOR_DB_API_KEY"], provider_dimensions)
+    selected_backend = app.config["VECTOR_BACKEND"]
+    if app.config.get("VECTOR_DB_URL") and not app.config.get("VECTOR_BACKEND_EXPLICIT"):
+        selected_backend = "qdrant"
+    vector_path = app.config["EMBEDDED_VECTOR_DB_PATH"] if selected_backend == "embedded" else app.config["VECTOR_DB_PATH"]
+    app.extensions["vector_store"] = create_vector_store(
+        backend=selected_backend,
+        url=app.config["VECTOR_DB_URL"],
+        path=vector_path,
+        api_key=app.config["VECTOR_DB_API_KEY"],
+        dimensions=provider_dimensions,
+    )
+    if selected_backend == "embedded" and app.extensions["vector_store"].count() == 0:
+        try:
+            from trpg_server.agents.vector_migration import migrate_json_indexes
+
+            # Startup migration uses the lightweight deterministic fallback; normal
+            # imports still use the configured provider in their embedding stage.
+            migrate_json_indexes(app.config["SCENARIOS_DIR"], app.extensions["vector_store"])
+        except Exception:
+            logger.debug("Skipping automatic JSON vector migration", exc_info=True)
     os.environ.setdefault("PADDLE_PDX_CACHE_HOME", str(PADDLEOCR_HOME))
     app.extensions["ocr_provider"] = PaddleOcrProvider(app.config["OCR_LANG"]) if app.config["OCR_ENABLED"] else None
     app.config["OCR_PROVIDER"] = app.extensions["ocr_provider"]
     app.config["EMBEDDING_PROVIDER"] = app.extensions["embedding_provider"]
     app.config["VECTOR_STORE"] = app.extensions["vector_store"]
+    _configure_scenario_chunk_analyzer(app)
     register_socket_events(socketio)
+
+    @app.errorhandler(404)
+    def _api_not_found(error):
+        if request.path.startswith("/api/"):
+            from trpg_server.responses import error_response
+
+            return error_response("API endpoint not found", 404, str(error))
+        return error
+
+    @app.errorhandler(405)
+    def _api_method_not_allowed(error):
+        if request.path.startswith("/api/"):
+            from trpg_server.responses import error_response
+
+            return error_response("API method not allowed", 405, str(error))
+        return error
+
+    @app.errorhandler(413)
+    def _api_request_too_large(error):
+        if request.path.startswith("/api/"):
+            from trpg_server.responses import error_response
+
+            return error_response("Uploaded file is too large", 413, str(error))
+        return error
+
+    @app.errorhandler(500)
+    def _api_internal_error(error):
+        if request.path.startswith("/api/"):
+            logger.exception("Unhandled API exception: %s", error)
+            from trpg_server.responses import error_response
+
+            return error_response("Internal server error", 500)
+        return error
+
     return app
+
+
+def _configure_scenario_chunk_analyzer(app):
+    """Attach an optional per-chunk JSON analyzer using the configured AI API.
+
+    The callback is deliberately small and injectable so tests and offline
+    installations can use deterministic metadata.  When an enabled platform is
+    configured, each chunk is sent as a separate request rather than sending the
+    complete source document in one oversized prompt.
+    """
+    if callable(app.config.get("SCENARIO_CHUNK_ANALYZER")):
+        return
+    platform_dir = Path(app.config.get("AI_PLATFORM_DIR", CONFIG_DIR / "aiplatform"))
+    secret_dir = Path(app.config.get("AI_PLATFORM_SECRET_DIR", AI_PLATFORM_SECRET_DIR))
+    for public_path in sorted(platform_dir.glob("*.json")):
+        try:
+            candidate = load_platform_config(public_path, secret_dir / public_path.name)
+        except (OSError, ValueError, json.JSONDecodeError):
+            logger.debug("Skipping invalid AI platform config for chunk analyzer: %s", public_path, exc_info=True)
+            continue
+        config = candidate.get("config") if isinstance(candidate.get("config"), dict) else {}
+        base_url = str(config.get("base_url") or "").strip()
+        api_key = str(config.get("api_key") or "").strip()
+        if not candidate.get("enabled") or not base_url or not api_key:
+            continue
+        models = candidate.get("models") if isinstance(candidate.get("models"), list) else []
+        model = str(next((item.get("id") for item in models if isinstance(item, dict) and item.get("enabled", True)), "local-model"))
+        timeout = max(15, min(int(config.get("timeout", 60) or 60), 90))
+
+        def analyze(chunk, index, total, *, _url=base_url, _key=api_key, _model=model, _timeout=timeout):
+            payload = {
+                "model": _model,
+                "messages": [
+                    {"role": "system", "content": "只根据原文抽取 JSON，不要创作。字段：card_type, scene_id, spoiler_level, visibility, unlock_condition, summary。"},
+                    {"role": "user", "content": json.dumps({"chunk_index": index, "chunk_total": total, "text": chunk.text}, ensure_ascii=False)},
+                ],
+                "temperature": 0,
+                "response_format": {"type": "json_object"},
+            }
+            response = requests.post(_url, headers={"Content-Type": "application/json", "Authorization": f"Bearer {_key}"}, json=payload, timeout=_timeout)
+            response.raise_for_status()
+            body = response.json()
+            content = body.get("choices", [{}])[0].get("message", {}).get("content", "")
+            value = json.loads(content) if isinstance(content, str) else content
+            return value if isinstance(value, dict) else {}
+
+        app.config["SCENARIO_CHUNK_ANALYZER"] = analyze
+        logger.info("scenario_chunk_analyzer_configured platform=%s model=%s", public_path.stem, model)
+        return
 
 
 def _configure_user_service(app):
@@ -111,6 +227,7 @@ def register_blueprints(app):
     from trpg_server.routes.scenario_imports import bp as scenario_imports_bp
     from trpg_server.routes.vector_health import bp as vector_health_bp
     from trpg_server.routes.telemetry import bp as telemetry_bp
+    from trpg_server.routes.triggers import bp as triggers_bp
     from trpg_server.routes.users import bp as users_bp
 
     app.register_blueprint(assets_bp)
@@ -127,3 +244,4 @@ def register_blueprints(app):
     app.register_blueprint(knowledge_bases_bp)
     app.register_blueprint(pages_bp)
     app.register_blueprint(telemetry_bp)
+    app.register_blueprint(triggers_bp)

@@ -1,4 +1,54 @@
 type ScenarioTriggerContentMode = "text" | "richtext" | "image" | "file";
+type TriggerResourceType = "image" | "video" | "audio" | "richtext" | "file";
+type TriggerVisibility = "kp_only" | "player_visible";
+
+interface ResourceRef {
+    type: TriggerResourceType;
+    path: string;
+    url: string;
+    alt: string;
+    mime: string;
+    size: number;
+    hash: string;
+    content?: string;
+}
+
+interface TriggerCondition {
+    type: "scene_enter" | "event_triggered" | "clue_found" | "npc_dialogue" | "player_action" | "custom";
+    sceneId?: string;
+    eventId?: string;
+    clueId?: string;
+    npcId?: string;
+    keyword?: string;
+    naturalLanguage?: string;
+}
+
+interface Attachment {
+    triggerId: string;
+    resourceRef: ResourceRef;
+    condition: TriggerCondition;
+    relatedCards?: string[];
+    spoilerLevel: number;
+    visibility: TriggerVisibility;
+    repeatable: boolean;
+    priority: number;
+    enabled: boolean;
+    note?: string;
+}
+
+interface TriggerCard {
+    id: string;
+    scriptId: string;
+    scriptVersion: string;
+    cardType: "trigger";
+    sceneId?: string;
+    spoilerLevel: number;
+    visibility: TriggerVisibility;
+    unlockCondition?: string;
+    text: string;
+    attachments: Attachment[];
+    metadata: Record<string, unknown>;
+}
 type ScenarioModuleType = "opening" | "background" | "public_info" | "preparation" | "timeline" | "scene" | "ending" | "monster" | "npc" | "custom";
 
 interface ScenarioModuleTimelineEntry {
@@ -43,6 +93,11 @@ interface ScenarioTrigger {
     asset_path?: string | undefined;
     asset_url?: string | undefined;
     asset_data_url?: string | undefined;
+    spoiler_level?: number | undefined;
+    visibility?: TriggerVisibility | undefined;
+    repeatable?: boolean | undefined;
+    priority?: number | undefined;
+    enabled?: boolean | undefined;
 }
 
 interface ScenarioModule {
@@ -58,6 +113,7 @@ interface ScenarioModule {
     scene_id?: number | undefined;
     ending_id?: number | undefined;
     triggers?: ScenarioTrigger[] | undefined;
+    attachments?: Attachment[] | undefined;
     timeline_entries?: ScenarioModuleTimelineEntry[] | undefined;
     open_ending?: boolean | undefined;
     fixed_opening?: boolean | undefined;
@@ -84,6 +140,7 @@ interface Scenario {
     createdAt?: string;
     updatedAt?: string;
     user_id?: string | number;
+    trigger_cards?: TriggerCard[];
 }
 
 type ScenarioInput = Omit<Scenario, "id" | "createdAt" | "updatedAt" | "owner_id"> & {
@@ -112,10 +169,20 @@ interface ScenarioModel {
     importScenario(scenarioData: unknown): Promise<Scenario>;
     convertScript(text: string, title?: string): Promise<ScenarioInput>;
     convertScriptFile(file: File, title?: string): Promise<ScenarioInput>;
+    getKnowledgeStats(id: number): Promise<{ scenario_id: number; version: string; vector_count: number; path: string; backend: string }>;
+    createImportJob(formData: FormData, onProgress?: (value: number) => void): Promise<ScenarioImportJob>;
+    getImportJob(id: string): Promise<ScenarioImportJob>;
+    publishImport(scriptId: number, jobId: string): Promise<Scenario>;
+    waitForImportJob(id: string, onProgress?: (job: ScenarioImportJob) => void): Promise<ScenarioImportJob>;
     loadDraft(): Promise<ScenarioInput | null>;
     saveDraft(scenarioData: ScenarioInput): Promise<ScenarioInput>;
     discardDraft(): Promise<void>;
     validateScenarioData(data: unknown): data is ScenarioInput;
+    listTriggerAssets(id: number): Promise<ResourceRef[]>;
+    uploadTriggerAssets(id: number, files: File[], alt: string[]): Promise<ResourceRef[]>;
+    updateTriggerAsset(id: number, assetId: string, patch: Partial<ResourceRef>): Promise<ResourceRef>;
+    deleteTriggerAsset(id: number, assetId: string): Promise<void>;
+    createTriggerCard(id: number, card: Omit<TriggerCard, "scriptId" | "scriptVersion">): Promise<TriggerCard>;
 }
 
 interface ScenarioViewHandlers {
@@ -143,13 +210,16 @@ interface ScenarioView {
     openCreateModal(): Promise<void>;
     openEditModal(scenario: Scenario): void;
     fillDraftData(draft: ScenarioInput): void;
+    setImportReviewReadOnly(readonly: boolean): void;
     showDraftPrompt(): Promise<"continue" | "discard" | "cancel">;
     closeModal(): void;
-    previewScenario(scenario: Scenario): void;
+    previewScenario(scenario: Scenario, knowledge?: { vector_count?: number; path?: string; backend?: string }): void;
+    showImportChoice(): Promise<"edit" | "direct" | "cancel">;
     getFormData(): ScenarioInput;
     showMessage(message: string, isError?: boolean): void;
     showConversionProgress(fileName: string): void;
     updateConversionProgress(stage: number, state: "pending" | "active" | "complete" | "error", detail?: string): void;
+    updateImportJobProgress(job: ScenarioImportJob): void;
     closeConversionProgress(): void;
 }
 

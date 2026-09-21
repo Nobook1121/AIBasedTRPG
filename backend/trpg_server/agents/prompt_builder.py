@@ -90,10 +90,18 @@ def build_prompt_layers(
                 "chunk_id": item.get("chunk_id"),
                 "card_type": item.get("card_type"),
                 "scene_id": item.get("scene_id"),
-                "text": str(item.get("text"))[:2000],
+                "text": str(item.get("text"))[:1200],
             })
         if cards:
             dynamic_messages.append({"role": "system", "content": f"Knowledge retrieval: {_stable_json(cards)}"})
+    trigger_catalog = (scenario or {}).get("trigger_catalog") if isinstance(scenario, dict) else None
+    if isinstance(trigger_catalog, list) and trigger_catalog:
+        visible = [
+            {key: item.get(key) for key in ("id", "scene_id", "keyword", "condition", "content_mode", "spoiler_level", "visibility") if key in item}
+            for item in trigger_catalog[:50] if isinstance(item, dict)
+        ]
+        if visible:
+            dynamic_messages.append({"role": "system", "content": "可触发资源（仅当前场景、动态检索结果；不要猜测未列出的内容）：" + _stable_json(visible)})
     dynamic_messages.append(
         {
             "role": "system",

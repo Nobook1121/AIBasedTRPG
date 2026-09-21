@@ -15,7 +15,7 @@ class ImportJobStore:
     def _path(self, job_id: str) -> Path: return self.root / str(job_id) / "job.json"
     def create(self, *, owner_id: str, filename: str, metadata: Mapping[str, Any]) -> dict[str, Any]:
         now = time.time(); job_id = secrets.token_urlsafe(18)
-        job = {"id": job_id, "owner_id": str(owner_id), "script_id": int(now * 1000), "target_version": "1", "source_filename": filename, "metadata": dict(metadata), "status": "pending", "progress": 0, "current_stage": "pending", "stage_progress": 0, "stage_meta": {}, "intermediate_results": {}, "cancel_requested": False, "retry_count": 0, "created_at": now, "updated_at": now}
+        job = {"id": job_id, "owner_id": str(owner_id), "script_id": int(now * 1000), "target_version": "1.0.0", "source_filename": filename, "metadata": dict(metadata), "status": "pending", "progress": 0, "current_stage": "pending", "stage_progress": 0, "stage_meta": {}, "intermediate_results": {}, "cancel_requested": False, "retry_count": 0, "created_at": now, "updated_at": now}
         self.update(job_id, **job); return job
     def get(self, job_id: str) -> dict[str, Any] | None: return read_json(self._path(job_id), default=None)
     def update(self, job_id: str, **changes: Any) -> dict[str, Any]:

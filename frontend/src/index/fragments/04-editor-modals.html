@@ -49,6 +49,22 @@
                         </div>
                     </div>
 
+                    <section class="scenario-resource-panel" id="scenarioResourcePanel" hidden>
+                        <div class="scenario-module-toolbar">
+                            <div>
+                                <h6>触发器资源库</h6>
+                                <p class="text-muted mb-0">资源严格归档到当前剧本；描述需由编辑者手动确认。</p>
+                            </div>
+                        </div>
+                        <div class="scenario-resource-dropzone" id="scenarioResourceDropzone" tabindex="0" role="button" aria-label="上传触发器资源">
+                            <i class="fa fa-cloud-upload" aria-hidden="true"></i>
+                            <span>拖拽多个文件到此处，或点击选择</span>
+                            <input id="scenarioResourceFiles" type="file" multiple hidden accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,audio/mpeg,audio/wav,text/html,text/markdown,.pdf,.txt,.zip">
+                        </div>
+                        <div class="progress mt-2" id="scenarioResourceProgress" hidden><div class="progress-bar" role="progressbar" style="width:0%">0%</div></div>
+                        <div class="scenario-resource-list mt-3" id="scenarioResourceList"></div>
+                    </section>
+
                     <div class="scenario-module-toolbar">
                         <div>
                             <h6 data-i18n="scenario.module.group">模块</h6>
@@ -84,6 +100,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-outline-primary" id="replaceScenarioDocument">重新上传文档</button>
                     <button type="button" class="btn btn-outline-secondary" id="saveScenarioDraft">保存草稿</button>
                     <button type="button" class="btn btn-primary" id="saveScenario">保存并发布</button>
                 </div>

@@ -18,6 +18,7 @@ class AgentCompletionResult:
     prompt_token_count: int | None = None
     completion_token_count: int | None = None
     cached_token_count: int | None = None
+    knowledge_usage: dict[str, Any] | None = None
 
 
 def _extract_message(response_data: dict[str, Any] | None) -> dict[str, Any]:
@@ -121,8 +122,21 @@ def run_agent_completion(
     has_prompt_count = False
     has_completion_count = False
     has_cached_count = False
+    knowledge_usage: dict[str, Any] = {
+        "ruleset_chunks": 0,
+        "ruleset_sources": 0,
+        "ruleset_ids": [],
+        "knowledge_versions": [],
+        "topics": [],
+        "citations": [],
+        "tool_calls": 0,
+    }
+    tool_state = getattr(context, "tool_state", None)
+    stage_callback = tool_state.get("thinking_stage_callback") if isinstance(tool_state, dict) else None
 
     for _round in range(max_tool_rounds + 1):
+        if callable(stage_callback):
+            stage_callback("ai_request", "正在请求 AI")
         response_data = requester(payload)
         last_response = response_data
         round_token_count = _extract_token_count(response_data)
@@ -167,6 +181,7 @@ def run_agent_completion(
                 prompt_token_count=prompt_token_count if has_prompt_count else None,
                 completion_token_count=completion_token_count if has_completion_count else None,
                 cached_token_count=cached_token_count if has_cached_count else None,
+                knowledge_usage=knowledge_usage if knowledge_usage["tool_calls"] else None,
             )
 
         messages.append(_assistant_tool_call_message(message))
@@ -176,6 +191,8 @@ def run_agent_completion(
             resolved_name, tool = _resolve_tool(tool_name, enabled_by_name)
             if not tool:
                 return AgentCompletionResult(error=f"Tool {tool_name} is not enabled for agent {profile.id}")
+            if callable(stage_callback):
+                stage_callback("tool_call", f"正在执行工具：{resolved_name}")
             try:
                 arguments = _parse_arguments(function.get("arguments"))
                 result = tool.handler(arguments, context)
@@ -185,7 +202,16 @@ def run_agent_completion(
                 import logging
                 logging.getLogger(__name__).warning("Agent tool %s failed: %s", resolved_name, result.get("error"))
 
-            tool_state = getattr(context, "tool_state", None)
+            reported_usage = result.get("knowledge_usage") if isinstance(result, dict) else None
+            if isinstance(reported_usage, dict):
+                knowledge_usage["ruleset_chunks"] += int(reported_usage.get("ruleset_chunks") or 0)
+                knowledge_usage["ruleset_sources"] += int(reported_usage.get("ruleset_sources") or 0)
+                knowledge_usage["tool_calls"] += 1
+                for key in ("ruleset_ids", "knowledge_versions", "topics", "citations"):
+                    values = reported_usage.get(key)
+                    if isinstance(values, list):
+                        knowledge_usage[key] = list(dict.fromkeys([*knowledge_usage[key], *[str(value) for value in values if value]]))
+
             if isinstance(tool_state, dict) and isinstance(result, dict):
                 tool_state["last_tool"] = resolved_name
                 if resolved_name in {"check.roll_room_check", "dice.roll_coc_check"}:
@@ -217,4 +243,5 @@ def run_agent_completion(
         prompt_token_count=prompt_token_count if has_prompt_count else None,
         completion_token_count=completion_token_count if has_completion_count else None,
         cached_token_count=cached_token_count if has_cached_count else None,
+        knowledge_usage=knowledge_usage if knowledge_usage["tool_calls"] else None,
     )

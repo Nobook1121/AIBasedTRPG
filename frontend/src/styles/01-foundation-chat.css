@@ -175,6 +175,17 @@ body, html {
     color: var(--theme-text-primary);
 }
 
+.knowledge-usage {
+    margin-top: 4px;
+    color: var(--text-muted, #6c757d);
+    font-size: 0.75rem;
+    line-height: 1.4;
+}
+
+.knowledge-usage i {
+    margin-right: 4px;
+}
+
 .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4, .markdown-body h5, .markdown-body h6 {
     margin-top: 0.6em;
     margin-bottom: 0.3em;

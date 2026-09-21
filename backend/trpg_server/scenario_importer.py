@@ -61,7 +61,7 @@ def _extract_legacy_doc(raw: bytes) -> str:
     return _clean_doc_text(text)
 
 
-def extract_script_text(source: str | Path | bytes, filename: str | None = None) -> str:
+def extract_script_text(source: str | Path | bytes, filename: str | None = None, *, ocr_provider: Any = None) -> str:
     if isinstance(source, bytes):
         raw, name = source, filename or "script.txt"
     else:
@@ -74,10 +74,10 @@ def extract_script_text(source: str | Path | bytes, filename: str | None = None)
     if suffix in {".docx", ".pdf", ".txt", ".md", ".markdown", ".text"} or not suffix:
         from trpg_server.scenario_documents import ScenarioDocumentError, parse_scenario_document
         try:
-            return parse_scenario_document(raw, name).markdown
+            return parse_scenario_document(raw, name, ocr_provider=ocr_provider).markdown
         except ScenarioDocumentError as exc:
             raise ValueError(str(exc)) from exc
-    raise ValueError(f"Unsupported script format: {suffix or 'unknown'}; use txt, md, docx, or doc")
+    raise ValueError(f"Unsupported script format: {suffix or 'unknown'}; use pdf, txt, md, docx, or doc")
 
 
 def _summary(text: str, limit: int = 180) -> str:

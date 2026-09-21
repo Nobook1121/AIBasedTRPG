@@ -1,0 +1,279 @@
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+from uuid import uuid4
+
+from flask import Blueprint, current_app, request, session
+
+from trpg_server.agents.trigger_system import (
+    delete_resource,
+    load_resources,
+    normalize_attachment,
+    persist_uploaded_resource,
+    trigger_cards,
+)
+from trpg_server.json_store import read_json
+from trpg_server.responses import error_response, success_response
+from trpg_server.scenario_store import load_scenario_by_id, load_scenario_record, save_scenario_record, scenario_descriptor_paths
+from trpg_server.settings import ROOMS_DIR, SCENARIOS_DIR
+
+bp = Blueprint("triggers", __name__)
+logger = logging.getLogger(__name__)
+
+
+def _scenario_dir() -> Path:
+    return Path(current_app.config.get("SCENARIOS_DIR", SCENARIOS_DIR))
+
+
+def _login_required():
+    if "user_id" not in session:
+        return error_response("Please login first", 401, "Not logged in")
+    return None
+
+
+def _scenario(scenario_id):
+    descriptor, value = load_scenario_by_id(_scenario_dir(), scenario_id)
+    if descriptor and value:
+        return descriptor, value
+    if _scenario_dir() != Path(SCENARIOS_DIR):
+        return load_scenario_by_id(Path(SCENARIOS_DIR), scenario_id)
+    return descriptor, value
+
+
+def _can_edit(value: dict) -> bool:
+    role = str(session.get("role") or "").upper()
+    return role in {"ADMIN", "OWNER"} or str(value.get("owner_id")) == str(session.get("user_id"))
+
+
+def _save_scenario(descriptor, scenario):
+    return save_scenario_record(
+        _scenario_dir(), scenario, existing_descriptor=descriptor,
+        trigger_max_file_size=int(current_app.config.get("TRIGGER_MAX_FILE_SIZE", 5 * 1024 * 1024)),
+    )
+
+
+def _storage_root(descriptor: Path) -> Path:
+    return descriptor.parent.parent
+
+
+@bp.route("/api/scripts/<int:script_id>/assets", methods=["GET"])
+def list_assets(script_id):
+    if (error := _login_required()) is not None:
+        return error
+    descriptor, scenario = _scenario(script_id)
+    if not descriptor or not scenario:
+        return error_response("Scenario not found", 404, "Scenario not found")
+    return success_response(load_resources(_storage_root(descriptor), script_id))
+
+
+@bp.route("/api/scripts/<int:script_id>/assets", methods=["POST"])
+def upload_assets(script_id):
+    if (error := _login_required()) is not None:
+        return error
+    descriptor, scenario = _scenario(script_id)
+    if not descriptor or not scenario:
+        return error_response("Scenario not found", 404, "Scenario not found")
+    if not _can_edit(scenario):
+        return error_response("Permission denied", 403, "Permission denied")
+    uploads = request.files.getlist("files") or request.files.getlist("file")
+    if not uploads:
+        return error_response("Please provide one or more files", 400, "No files")
+    alt_values = request.form.getlist("alt")
+    results = []
+    try:
+        for index, uploaded in enumerate(uploads):
+            alt = (alt_values[index] if index < len(alt_values) else request.form.get("alt", "")).strip()
+            if not alt:
+                return error_response("alt is required for every resource", 400, "Invalid metadata")
+            results.append(persist_uploaded_resource(_storage_root(descriptor), script_id, uploaded, alt, request.form.get("type")))
+    except ValueError as exc:
+        return error_response(str(exc), 400, "Invalid resource")
+    return success_response(results, "Resources uploaded successfully", 201)
+
+
+@bp.route("/api/scripts/<int:script_id>/assets/<asset_id>", methods=["PUT"])
+def update_asset(script_id, asset_id):
+    if (error := _login_required()) is not None:
+        return error
+    descriptor, scenario = _scenario(script_id)
+    if not descriptor or not scenario:
+        return error_response("Scenario not found", 404, "Scenario not found")
+    if not _can_edit(scenario):
+        return error_response("Permission denied", 403, "Permission denied")
+    payload = request.get_json(silent=True) or {}
+    resources = load_resources(_storage_root(descriptor), script_id)
+    for item in resources:
+        if str(item.get("hash") or item.get("path")) == str(asset_id):
+            if "alt" in payload:
+                alt = str(payload.get("alt") or "").strip()
+                if not alt:
+                    return error_response("alt is required", 400, "Invalid metadata")
+                item["alt"] = alt[:500]
+            if "type" in payload and str(payload["type"]) not in {"image", "video", "audio", "richtext", "file"}:
+                return error_response("invalid resource type", 400, "Invalid metadata")
+            for key in ("type", "url", "content"):
+                if key in payload:
+                    item[key] = payload[key]
+            from trpg_server.agents.trigger_system import save_resources
+            save_resources(_storage_root(descriptor), script_id, resources)
+            return success_response(item)
+    return error_response("Resource not found", 404, "Resource not found")
+
+
+@bp.route("/api/scripts/<int:script_id>/assets/<asset_id>", methods=["DELETE"])
+def remove_asset(script_id, asset_id):
+    if (error := _login_required()) is not None:
+        return error
+    descriptor, scenario = _scenario(script_id)
+    if not descriptor or not scenario:
+        return error_response("Scenario not found", 404, "Scenario not found")
+    if not _can_edit(scenario):
+        return error_response("Permission denied", 403, "Permission denied")
+    if not delete_resource(_storage_root(descriptor), script_id, asset_id):
+        return error_response("Resource not found", 404, "Resource not found")
+    return success_response(message="Resource deleted successfully")
+
+
+def _find_card_attachment(scenario: dict, card_id: str):
+    for module in scenario.get("modules", []) if isinstance(scenario.get("modules"), list) else []:
+        if not isinstance(module, dict) or str(module.get("id")) != str(card_id):
+            continue
+        return module.setdefault("attachments", [])
+    for card in scenario.get("trigger_cards", []) if isinstance(scenario.get("trigger_cards"), list) else []:
+        if isinstance(card, dict) and str(card.get("id")) == str(card_id):
+            return card.setdefault("attachments", [])
+    return None
+
+
+@bp.route("/api/scripts/<int:script_id>/cards/<card_id>/attachments", methods=["POST"])
+def add_attachment(script_id, card_id):
+    return _attachment_mutation(script_id, card_id, None, "POST")
+
+
+@bp.route("/api/scripts/<int:script_id>/cards/<card_id>/attachments/<trigger_id>", methods=["PUT"])
+def edit_attachment(script_id, card_id, trigger_id):
+    return _attachment_mutation(script_id, card_id, trigger_id, "PUT")
+
+
+@bp.route("/api/scripts/<int:script_id>/cards/<card_id>/attachments/<trigger_id>", methods=["DELETE"])
+def remove_attachment(script_id, card_id, trigger_id):
+    if (error := _login_required()) is not None:
+        return error
+    descriptor, scenario = _scenario(script_id)
+    if not descriptor or not scenario or not _can_edit(scenario):
+        return error_response("Permission denied", 403, "Permission denied")
+    attachments = _find_card_attachment(scenario, card_id)
+    if attachments is None:
+        return error_response("Card not found", 404, "Card not found")
+    kept = [item for item in attachments if str(item.get("triggerId")) != str(trigger_id)]
+    if len(kept) == len(attachments):
+        return error_response("Attachment not found", 404, "Attachment not found")
+    attachments[:] = kept
+    _save_scenario(descriptor, scenario)
+    return success_response(message="Attachment deleted successfully")
+
+
+def _attachment_mutation(script_id, card_id, trigger_id, method):
+    if (error := _login_required()) is not None:
+        return error
+    descriptor, scenario = _scenario(script_id)
+    if not descriptor or not scenario:
+        return error_response("Scenario not found", 404, "Scenario not found")
+    if not _can_edit(scenario):
+        return error_response("Permission denied", 403, "Permission denied")
+    attachments = _find_card_attachment(scenario, card_id)
+    if attachments is None:
+        return error_response("Card not found", 404, "Card not found")
+    payload = request.get_json(silent=True) or {}
+    if method == "PUT":
+        current = next((item for item in attachments if str(item.get("triggerId")) == str(trigger_id)), None)
+        if current is None:
+            return error_response("Attachment not found", 404, "Attachment not found")
+        payload = {**current, **payload, "triggerId": trigger_id}
+        attachments.remove(current)
+    else:
+        payload = {**payload, "triggerId": payload.get("triggerId") or f"trg_{uuid4().hex[:12]}"}
+    try:
+        item = normalize_attachment(payload)
+    except ValueError as exc:
+        return error_response(str(exc), 400, "Invalid attachment")
+    attachments.append(item)
+    _save_scenario(descriptor, scenario)
+    return success_response(item, "Attachment saved successfully", 201 if method == "POST" else 200)
+
+
+@bp.route("/api/scripts/<int:script_id>/triggers", methods=["GET", "POST"])
+def manage_trigger_cards(script_id):
+    if (error := _login_required()) is not None:
+        return error
+    descriptor, scenario = _scenario(script_id)
+    if not descriptor or not scenario:
+        return error_response("Scenario not found", 404, "Scenario not found")
+    if request.method == "GET":
+        return success_response(trigger_cards(scenario))
+    if not _can_edit(scenario):
+        return error_response("Permission denied", 403, "Permission denied")
+    payload = request.get_json(silent=True) or {}
+    attachments = []
+    try:
+        attachments = [normalize_attachment(item) for item in payload.get("attachments", [])]
+    except ValueError as exc:
+        return error_response(str(exc), 400, "Invalid attachment")
+    if not attachments:
+        return error_response("At least one attachment is required", 400, "Invalid trigger")
+    card = {
+        "id": str(payload.get("id") or f"trg_{uuid4().hex[:12]}"),
+        "scriptId": str(script_id),
+        "scriptVersion": str(payload.get("scriptVersion") or scenario.get("scenario_version") or "1.0.0"),
+        "cardType": "trigger",
+        "sceneId": payload.get("sceneId"),
+        "spoilerLevel": max(0, min(5, int(payload.get("spoilerLevel", 0)))),
+        "visibility": payload.get("visibility", "player_visible"),
+        "unlockCondition": payload.get("unlockCondition"),
+        "text": str(payload.get("text") or ""),
+        "attachments": attachments,
+        "metadata": payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {},
+    }
+    scenario.setdefault("trigger_cards", []).append(card)
+    _save_scenario(descriptor, scenario)
+    return success_response(card, "Trigger card created successfully", 201)
+
+
+@bp.route("/api/scripts/<int:script_id>/triggers/<trigger_id>", methods=["PUT"])
+def update_trigger_card(script_id, trigger_id):
+    if (error := _login_required()) is not None:
+        return error
+    descriptor, scenario = _scenario(script_id)
+    if not descriptor or not scenario or not _can_edit(scenario):
+        return error_response("Permission denied", 403, "Permission denied")
+    cards = scenario.get("trigger_cards") if isinstance(scenario.get("trigger_cards"), list) else []
+    card = next((item for item in cards if isinstance(item, dict) and str(item.get("id")) == str(trigger_id)), None)
+    if card is None:
+        return error_response("Trigger card not found", 404, "Trigger card not found")
+    payload = request.get_json(silent=True) or {}
+    if "attachments" in payload:
+        try:
+            card["attachments"] = [normalize_attachment(item) for item in payload["attachments"]]
+        except ValueError as exc:
+            return error_response(str(exc), 400, "Invalid attachment")
+    for key in ("sceneId", "spoilerLevel", "visibility", "unlockCondition", "text", "metadata"):
+        if key in payload:
+            card[key] = payload[key]
+    _save_scenario(descriptor, scenario)
+    return success_response(card, "Trigger card updated successfully")
+
+
+@bp.route("/api/rooms/<room_id>/triggers", methods=["GET"])
+def room_trigger_status(room_id):
+    if (error := _login_required()) is not None:
+        return error
+    rooms_dir = Path(current_app.config.get("ROOMS_DIR", ROOMS_DIR))
+    room_dir = rooms_dir / str(room_id)
+    info = read_json(room_dir / "info.json", default={})
+    if not info:
+        return error_response("Room not found", 404, "Room not found")
+    state = read_json(room_dir / "state.json", default={})
+    _, scenario = load_scenario_by_id(_scenario_dir(), info.get("scenario_id"), scenario_version=info.get("scenario_version"))
+    cards = trigger_cards(scenario or {})
+    return success_response({"triggeredFiles": state.get("triggeredFiles", []), "triggerHistory": state.get("triggerHistory", []), "triggers": cards})

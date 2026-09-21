@@ -9,9 +9,15 @@ from pathlib import Path
 from xml.etree import ElementTree
 
 try:
-    import fitz  # type: ignore
+    # PyMuPDF 1.24+ exposes the supported module name ``pymupdf``.  Importing
+    # the historical ``fitz`` alias emits a deprecation warning at server
+    # startup, so keep it only as a compatibility fallback for older installs.
+    import pymupdf as fitz  # type: ignore
 except ImportError:  # pragma: no cover
-    fitz = None
+    try:
+        import fitz  # type: ignore
+    except ImportError:
+        fitz = None
 
 
 SUPPORTED_SCENARIO_EXTENSIONS = {".docx", ".pdf", ".txt", ".md", ".markdown", ".text"}

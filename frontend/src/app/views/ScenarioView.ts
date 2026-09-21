@@ -47,6 +47,7 @@ class ScenarioView {
     async openCreateModal(): Promise<void> {
         this.isCreating = true;
         this.resetScenarioForm();
+        this.setImportReviewReadOnly(false);
         const modal = new bootstrap.Modal(requiredElement("scenarioModal"), { backdrop: "static" });
         modal.show();
     }
@@ -54,12 +55,24 @@ class ScenarioView {
     openEditModal(scenario: Scenario): void {
         this.isCreating = false;
         this.fillScenarioForm(scenario);
+        this.setImportReviewReadOnly(false);
         new bootstrap.Modal(requiredElement("scenarioModal"), { backdrop: "static" }).show();
     }
 
     fillDraftData(draft: ScenarioInput): void {
         this.fillScenarioForm({ id: 0, title: draft.title || "", author: draft.author || "", playerCount: draft.playerCount || 0, notes: draft.notes || "", ...(draft.allow_open_ending === undefined ? {} : { allow_open_ending: draft.allow_open_ending }), modules: draft.modules || [], cover: draft.cover || "" });
         updateScenarioModalTitle("scenario.modal.create", "创建剧本");
+    }
+
+    setImportReviewReadOnly(readonly: boolean): void {
+        const modal = document.getElementById("scenarioModal");
+        if (!modal) return;
+        modal.dataset.importReviewReadonly = readonly ? "true" : "false";
+        modal.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>("input, textarea, select").forEach((field) => {
+            if (field.id !== "scenarioPublicId") field.disabled = readonly;
+        });
+        document.getElementById("addModule")?.classList.toggle("d-none", readonly);
+        document.getElementById("saveScenarioDraft")?.classList.toggle("d-none", readonly);
     }
 
     showDraftPrompt(): Promise<"continue" | "discard" | "cancel"> {
@@ -110,7 +123,7 @@ class ScenarioView {
         bootstrap.Modal.getInstance(document.getElementById("scenarioModal"))?.hide();
     }
 
-    previewScenario(scenario: Scenario): void {
+    previewScenario(scenario: Scenario, knowledge?: { vector_count?: number; path?: string; backend?: string }): void {
         const modules = normalizeScenarioModules(scenario);
         const previewContent = window.TrpgTemplates.render("scenario-preview-content", {
             title: scenario.title,
@@ -118,6 +131,8 @@ class ScenarioView {
             scenarioVersion: scenario.scenario_version || "1.0.0",
             author: scenario.author,
             playerCount: scenario.playerCount,
+            vectorCount: knowledge?.vector_count ?? 0,
+            vectorBackend: knowledge?.backend || "unknown",
             notes: scenario.notes || scenarioT("scenario.preview.none", "无"),
             modulesHtml: renderPreviewModules(modules),
         });
@@ -132,6 +147,21 @@ class ScenarioView {
         window.TrpgI18n?.apply(modal);
         new bootstrap.Modal(modal).show();
         modal.addEventListener("hidden.bs.modal", () => modal.remove());
+    }
+
+    showImportChoice(): Promise<"edit" | "direct" | "cancel"> {
+        return new Promise((resolve) => {
+            const modal = document.createElement("div");
+            modal.className = "modal fade";
+            modal.innerHTML = `<div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">选择导入模式</h5></div><div class="modal-body">请选择处理方式：直接导入会按标题和结构分块，逐块抽取字段并向量化；审核模式会生成草稿供检查，发现问题可重新上传文档。</div><div class="modal-footer"><button class="btn btn-secondary" data-import-choice="cancel">取消</button><button class="btn btn-outline-primary" data-import-choice="edit">生成审核草稿</button><button class="btn btn-primary" data-import-choice="direct">直接导入并发布</button></div></div></div>`;
+            document.body.appendChild(modal);
+            const instance = new bootstrap.Modal(modal, { backdrop: "static" });
+            let settled = false;
+            const finish = (choice: "edit" | "direct" | "cancel") => { if (settled) return; settled = true; instance.hide(); resolve(choice); };
+            modal.querySelectorAll<HTMLElement>("[data-import-choice]").forEach((button) => button.addEventListener("click", () => finish((button.dataset.importChoice || "cancel") as "edit" | "direct" | "cancel")));
+            modal.addEventListener("hidden.bs.modal", () => { modal.remove(); if (!settled) resolve("cancel"); });
+            instance.show();
+        });
     }
 
     getFormData(): ScenarioInput {
@@ -208,11 +238,22 @@ class ScenarioView {
         });
 
         document.getElementById("saveScenario")?.addEventListener("click", this.saveScenarioHandler);
+        document.getElementById("replaceScenarioDocument")?.addEventListener("click", () => {
+            this.closeModal();
+            window.setTimeout(() => input("importScenarioDocumentFile").click(), 150);
+        });
         document.getElementById("saveScenarioDraft")?.addEventListener("click", async () => { await this.handlers?.onSaveDraft(); });
         document.getElementById("scenarioModal")?.addEventListener("keydown", (event) => { if ((event as KeyboardEvent).ctrlKey && (event as KeyboardEvent).key.toLowerCase() === "s") { event.preventDefault(); void this.handlers?.onSaveDraft(); } });
         document.getElementById("addModule")?.addEventListener("click", () => this.addModule());
         document.getElementById("scenarioModal")?.addEventListener("click", (event) => this.handleScenarioEditorClick(event));
         document.getElementById("scenarioModal")?.addEventListener("change", (event) => this.handleScenarioEditorChange(event));
+        const resourceDropzone = document.getElementById("scenarioResourceDropzone");
+        const resourceFiles = document.getElementById("scenarioResourceFiles") as HTMLInputElement | null;
+        resourceDropzone?.addEventListener("click", () => resourceFiles?.click());
+        resourceDropzone?.addEventListener("dragover", (event) => { event.preventDefault(); resourceDropzone.classList.add("is-dragging"); });
+        resourceDropzone?.addEventListener("dragleave", () => resourceDropzone.classList.remove("is-dragging"));
+        resourceDropzone?.addEventListener("drop", (event) => { event.preventDefault(); resourceDropzone.classList.remove("is-dragging"); const files = (event as DragEvent).dataTransfer?.files; if (files) void this.uploadResourceFiles(files); });
+        resourceFiles?.addEventListener("change", () => { if (resourceFiles.files) void this.uploadResourceFiles(resourceFiles.files); resourceFiles.value = ""; });
         const modal = document.getElementById("scenarioModal");
         modal?.addEventListener("shown.bs.modal", () => {
             if (!this.isCreating) return;
@@ -291,6 +332,21 @@ class ScenarioView {
         }
     }
 
+    updateImportJobProgress(job: ScenarioImportJob): void {
+        const stageIndex: Record<string, number> = { parsing: 0, chunking: 1, extracting: 2, carding: 2, summarizing: 2, embedding: 3, done: 3 };
+        const index = stageIndex[job.current_stage] ?? 0;
+        const meta = job.stage_meta || {};
+        const total = Number(meta.totalChunks || 0);
+        const processed = Number(meta.processedChunks || 0);
+        this.updateConversionProgress(index, job.status === "failed" ? "error" : job.status === "done" ? "complete" : "active", total ? `${processed}/${total} blocks` : job.current_stage);
+        const progress = this.conversionProgressModal?.querySelector<HTMLElement>("[data-conversion-progress]");
+        if (progress) {
+            const value = Math.max(0, Math.min(100, Number(job.progress || 0)));
+            progress.style.width = `${value}%`;
+            progress.textContent = `${Math.round(value)}%${total ? ` · ${processed}/${total}` : ""}`;
+        }
+    }
+
     closeConversionProgress(): void {
         if (!this.conversionProgressModal) return;
         if (this.conversionProgressTimer !== null) window.clearInterval(this.conversionProgressTimer);
@@ -333,6 +389,7 @@ class ScenarioView {
     }
 
     private resetScenarioForm(): void {
+        requiredElement("scenarioModal").dataset.scenarioId = "";
         input("scenarioTitle").value = "";
         input("scenarioPublicId").value = scenarioT("scenario.cover.auto", "保存后自动生成");
         input("scenarioVersion").value = "1.0.0";
@@ -351,6 +408,8 @@ class ScenarioView {
     }
 
     private fillScenarioForm(scenario: Scenario): void {
+        requiredElement("scenarioModal").dataset.scenarioId = String(scenario.id);
+        document.getElementById("scenarioResourcePanel")?.removeAttribute("hidden");
         input("scenarioTitle").value = scenario.title;
         input("scenarioPublicId").value = scenario.public_id || String(scenario.id);
         input("scenarioVersion").value = scenario.scenario_version || "1.0.0";
@@ -362,8 +421,42 @@ class ScenarioView {
         image("coverPreview").src = safeScenarioCover(scenario.cover);
 
         renderModuleList(requiredElement("scenarioModules"), normalizeScenarioModules(scenario));
+        void this.loadResourceList(scenario.id);
         (requiredElement("scenarioModuleType") as HTMLSelectElement).value = "scene";
         updateScenarioModalTitle("scenario.modal.edit", "编辑剧本");
+    }
+
+    private async uploadResourceFiles(files: FileList): Promise<void> {
+        const scenarioId = Number.parseInt(document.getElementById("scenarioModal")?.dataset.scenarioId || "", 10);
+        if (!Number.isFinite(scenarioId) || scenarioId <= 0) {
+            this.showMessage("请先保存剧本，再上传资源", true);
+            return;
+        }
+        const selected = Array.from(files);
+        const alt = selected.map((file) => window.prompt(`请为 ${file.name} 填写资源描述（必填）`, file.name) || "");
+        if (alt.some((value) => !value.trim())) {
+            this.showMessage("每个资源都必须填写描述", true);
+            return;
+        }
+        try {
+            const form = new FormData();
+            selected.forEach((file) => form.append("files", file, file.name));
+            alt.forEach((value) => form.append("alt", value));
+            const response = await TrpgApi.requestWithResponse<ApiResponse<ResourceRef[]>>(`/api/scripts/${scenarioId}/assets`, { method: "POST", body: form });
+            if (!response.response.ok || !response.data.success) throw new Error(response.data.message || "资源上传失败");
+            this.showMessage(`已上传 ${response.data.data?.length || selected.length} 个资源`);
+            await this.loadResourceList(scenarioId);
+        } catch (error) {
+            this.showMessage(error instanceof Error ? error.message : "资源上传失败", true);
+        }
+    }
+
+    private async loadResourceList(scenarioId: number): Promise<void> {
+        const list = document.getElementById("scenarioResourceList");
+        if (!list) return;
+        const response = await TrpgApi.requestWithResponse<ApiResponse<ResourceRef[]>>(`/api/scripts/${scenarioId}/assets`);
+        if (!response.response.ok || !response.data.success || !Array.isArray(response.data.data)) return;
+        list.innerHTML = response.data.data.map((resource) => `<div class="scenario-resource-row" data-resource-hash="${scenarioEscapeHtml(resource.hash)}"><span>${scenarioEscapeHtml(resource.alt)}</span><small>${scenarioEscapeHtml(resource.mime)} · ${resource.size} bytes</small></div>`).join("");
     }
 
     private addModule(): void {
@@ -994,6 +1087,13 @@ function renderTriggerRow(index: number, trigger?: ScenarioTrigger): string {
                 <button type="button" class="btn btn-sm btn-danger" data-remove-trigger>${scenarioT("scenario.module.remove", "删除")}</button>
             </div>
             <input class="form-control mt-2" data-trigger-condition value="${scenarioEscapeHtml(trigger?.condition || "")}" placeholder="${scenarioT("scenario.module.trigger.condition_placeholder", "触发条件，例如：检定侦察成功")}">
+            <div class="scenario-trigger-grid mt-2">
+                <label>剧透等级<input class="form-control" data-trigger-spoiler type="number" min="0" max="5" value="${scenarioEscapeHtml(trigger?.spoiler_level ?? 0)}"></label>
+                <label>可见性<select class="form-select" data-trigger-visibility><option value="player_visible" ${(trigger?.visibility || "player_visible") === "player_visible" ? "selected" : ""}>玩家可见</option><option value="kp_only" ${trigger?.visibility === "kp_only" ? "selected" : ""}>仅 KP</option></select></label>
+                <label class="scenario-module-toggle"><span>可重复</span><input type="checkbox" data-trigger-repeatable ${trigger?.repeatable ? "checked" : ""}></label>
+                <label>优先级<input class="form-control" data-trigger-priority type="number" value="${scenarioEscapeHtml(trigger?.priority ?? 0)}"></label>
+                <label class="scenario-module-toggle"><span>启用</span><input type="checkbox" data-trigger-enabled ${trigger?.enabled !== false ? "checked" : ""}></label>
+            </div>
             <textarea class="form-control mt-2" data-trigger-content rows="3" placeholder="${scenarioT("scenario.module.trigger.placeholder", "触发内容")}">${scenarioEscapeHtml(trigger?.content || "")}</textarea>
             <div class="scenario-trigger-upload mt-2">
                 <input class="form-control" data-trigger-file type="file">
@@ -1229,6 +1329,11 @@ function collectTriggers(card: HTMLElement): ScenarioTrigger[] {
             keyword: item.querySelector<HTMLInputElement>("[data-trigger-keyword]")?.value.trim() || "",
             condition: item.querySelector<HTMLInputElement>("[data-trigger-condition]")?.value.trim() || "",
             content_mode: mode,
+            spoiler_level: Number.parseInt(item.querySelector<HTMLInputElement>("[data-trigger-spoiler]")?.value || "0", 10) || 0,
+            visibility: (item.querySelector<HTMLSelectElement>("[data-trigger-visibility]")?.value || "player_visible") as TriggerVisibility,
+            repeatable: item.querySelector<HTMLInputElement>("[data-trigger-repeatable]")?.checked === true,
+            priority: Number.parseInt(item.querySelector<HTMLInputElement>("[data-trigger-priority]")?.value || "0", 10) || 0,
+            enabled: item.querySelector<HTMLInputElement>("[data-trigger-enabled]")?.checked !== false,
         };
         const content = item.querySelector<HTMLTextAreaElement>("[data-trigger-content]")?.value || "";
         if (mode === "text" || mode === "richtext") trigger.content = content;

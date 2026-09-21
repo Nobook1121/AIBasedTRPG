@@ -16,6 +16,7 @@ class StructuredKPResponse:
     state_updates: dict[str, Any] = field(default_factory=dict)
     next_scene: str | None = None
     npc_actions: list[dict[str, Any]] = field(default_factory=list)
+    triggered_files: list[dict[str, str]] = field(default_factory=list)
 
 
 def _extract_json_object(content: str) -> dict[str, Any] | None:
@@ -38,17 +39,22 @@ def _extract_json_object(content: str) -> dict[str, Any] | None:
 
 def parse_kp_response(content: str) -> StructuredKPResponse | None:
     data = _extract_json_object(content)
-    if not data or not any(key in data for key in ("narration", "options", "state_updates", "next_scene", "npc_actions")):
+    if not data or not any(key in data for key in ("narration", "options", "state_updates", "next_scene", "npc_actions", "triggered_files")):
         return None
     options = data.get("options") if isinstance(data.get("options"), list) else []
     actions = data.get("npc_actions") if isinstance(data.get("npc_actions"), list) else []
     updates = data.get("state_updates") if isinstance(data.get("state_updates"), dict) else {}
+    triggered = data.get("triggered_files") if isinstance(data.get("triggered_files"), list) else []
     return StructuredKPResponse(
         narration=str(data.get("narration") or "").strip(),
         options=[str(item).strip()[:200] for item in options if str(item).strip()][:8],
         state_updates=updates,
         next_scene=str(data.get("next_scene")).strip() if data.get("next_scene") not in (None, "") else None,
         npc_actions=[item for item in actions if isinstance(item, dict)][:20],
+        triggered_files=[
+            {"trigger_id": str(item.get("trigger_id") or "").strip(), "reason": str(item.get("reason") or "").strip()[:500]}
+            for item in triggered if isinstance(item, dict) and str(item.get("trigger_id") or "").strip()
+        ][:20],
     )
 
 
@@ -65,13 +71,14 @@ ALLOWED_STATE_FIELDS = {
 
 KP_RESPONSE_SCHEMA = {
     "type": "object",
-    "required": ["narration", "options", "state_updates", "next_scene", "npc_actions"],
+    "required": ["narration", "options", "state_updates", "next_scene", "npc_actions", "triggered_files"],
     "properties": {
         "narration": {"type": "string"},
         "options": {"type": "array", "items": {"type": "string"}},
         "state_updates": {"type": "object"},
         "next_scene": {"type": ["string", "null"]},
-        "npc_actions": {"type": "array", "items": {"type": "object"}},
+    "npc_actions": {"type": "array", "items": {"type": "object"}},
+        "triggered_files": {"type": "array", "items": {"type": "object", "required": ["trigger_id"], "properties": {"trigger_id": {"type": "string"}, "reason": {"type": "string"}}}},
     },
 }
 
@@ -123,6 +130,7 @@ def validate_structured_response(
         state_updates=validate_state_updates(response.state_updates, {}, scenario_data),
         next_scene=response.next_scene if response.next_scene in scene_ids else None,
         npc_actions=actions[:20],
+        triggered_files=response.triggered_files[:20],
     )
 
 

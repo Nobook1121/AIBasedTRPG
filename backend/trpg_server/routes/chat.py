@@ -2,6 +2,8 @@
 import logging
 import re
 import time
+from pathlib import Path
+from uuid import uuid4
 
 import requests
 from flask import Blueprint, current_app, request, session
@@ -21,6 +23,7 @@ from trpg_server.agents.tools import default_tool_registry
 from trpg_server.agents.tools.room import get_room_snapshot
 from trpg_server.agents.memory import remember_room_fact
 from trpg_server.agents.room_state import append_room_event, project_room_state
+from trpg_server.agents.trigger_system import find_trigger_definition, record_trigger, validate_trigger
 from trpg_server.json_store import read_json, write_json_atomic
 from trpg_server.logging_config import log_user_action, user_action_text
 from trpg_server.responses import error_response, success_response
@@ -46,6 +49,50 @@ HISTORY_COMPACT_CHAR_THRESHOLD = 12000
 
 def _timestamp():
     return time.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _deliver_structured_triggers(room_dir, room_info, scenario, requests):
+    """Validate model-selected trigger ids and persist only approved messages."""
+    if not room_dir or not isinstance(scenario, dict):
+        return []
+    messages_path = Path(room_dir) / "messages.json"
+    messages = read_json(messages_path, default=[])
+    if not isinstance(messages, list):
+        messages = []
+    state = read_json(Path(room_dir) / "state.json", default={})
+    state = state if isinstance(state, dict) else {}
+    delivered = []
+    from trpg_server.scenario_store import build_trigger_message
+    for requested in requests if isinstance(requests, list) else []:
+        trigger_id = str(requested.get("trigger_id") or "").strip() if isinstance(requested, dict) else ""
+        if not trigger_id:
+            continue
+        definition = find_trigger_definition(scenario, trigger_id)
+        if definition:
+            validation = validate_trigger(trigger_id, {**state, "scenario_version": room_info.get("scenario_version")}, scenario, audience="player")
+            if not validation.get("ok"):
+                logger.info("structured_trigger_rejected room_id=%s trigger_id=%s reason=%s", room_info.get("id"), trigger_id, validation.get("reason"))
+                continue
+            body = []
+            for attachment in definition.get("attachments", []):
+                resource = attachment.get("resourceRef") or {}
+                if resource.get("content"):
+                    body.append(str(resource["content"]))
+                elif resource.get("url"):
+                    body.append(f"[{resource.get('alt')}]({resource.get('url')})")
+            message = {"type": "trigger", "sender_id": None, "sender_name": definition.get("text") or f"触发器{trigger_id}", "avatar": "/assets/avatars/default_system.jpg", "content": "\n\n".join(body), "time": time.strftime("%H:%M"), "created_at": _timestamp(), "metadata": {"trigger_id": trigger_id, "reason": requested.get("reason", "")}}
+        else:
+            message = build_trigger_message(scenario, trigger_id)
+            if not message:
+                continue
+            message = {**message, "id": uuid4().hex, "sender_id": None, "time": time.strftime("%H:%M"), "created_at": _timestamp(), "metadata": {**(message.get("metadata") or {}), "reason": requested.get("reason", "")}}
+        messages.append(message)
+        delivered.append(message)
+        record_trigger(room_dir, trigger_id, reason=str(requested.get("reason") or "AI trigger"))
+        state = read_json(Path(room_dir) / "state.json", default=state)
+    if delivered:
+        write_json_atomic(messages_path, messages[-200:])
+    return delivered
 
 
 def _message_response(user_id, content, message, script_id=None):
@@ -116,21 +163,122 @@ def _load_role_for_content(content):
     return select_role_for_content(roles, content)
 
 
+def _can_start_scenario(room_info, user_id, global_role="USER"):
+    if str(global_role or "").upper() in {"ADMIN", "OWNER"}:
+        return True
+    if str(room_info.get("creator_id")) == str(user_id):
+        return True
+    for member in room_info.get("members", []):
+        if str(member.get("user_id")) != str(user_id):
+            continue
+        if member.get("is_active", True) is False or member.get("status", "active") == "removed":
+            return False
+        return member.get("room_role") in {"owner", "admin"}
+    return False
+
+
+def _build_knowledge_usage(result, scenario_results):
+    ruleset = getattr(result, "knowledge_usage", None)
+    ruleset = ruleset if isinstance(ruleset, dict) else {}
+    scenario_chunks = len(scenario_results) if isinstance(scenario_results, list) else 0
+    ruleset_chunks = int(ruleset.get("ruleset_chunks") or 0)
+    ruleset_calls = int(ruleset.get("tool_calls") or 0)
+    return {
+        "used": bool(ruleset_chunks or scenario_chunks),
+        "total_chunks": ruleset_chunks + scenario_chunks,
+        "ruleset": {
+            "called": ruleset_calls > 0,
+            "calls": ruleset_calls,
+            "chunks": ruleset_chunks,
+            "sources": int(ruleset.get("ruleset_sources") or 0),
+            "ruleset_ids": list(ruleset.get("ruleset_ids") or []),
+            "knowledge_versions": list(ruleset.get("knowledge_versions") or []),
+            "topics": list(ruleset.get("topics") or []),
+            "citations": list(ruleset.get("citations") or []),
+        },
+        "scenario": {"chunks": scenario_chunks},
+    }
+
+
+def _mark_scenario_started(room_dir, user_id):
+    info_path = room_dir / "info.json"
+    room_info = read_json(info_path, default={})
+    started_at = room_info.get("scenario_started_at") or _timestamp()
+    room_info["scenario_started_at"] = started_at
+    room_info["scenario_started_by"] = user_id
+    write_json_atomic(info_path, room_info)
+    return started_at
+
+
 def _json_for_log(value):
     return json.dumps(value, ensure_ascii=False, default=str)
 
 
+def _emit_thinking_stage(room_id, ai_request_id, stage, label):
+    """Best-effort stage updates for connected clients; never block chat."""
+    if not room_id or not ai_request_id:
+        return
+    try:
+        socketio = current_app.extensions.get("socketio")
+        if socketio is None:
+            return
+        socketio.emit(
+            "new_message",
+            {
+                "room_id": str(room_id),
+                "type": "ai_thinking_stage",
+                "aiRequestId": str(ai_request_id),
+                "stage": stage,
+                "label": label,
+            },
+            room=str(room_id),
+            namespace="/",
+        )
+    except Exception:
+        logger.debug("Unable to emit AI thinking stage", exc_info=True)
+
+
 def _post_ai_request(base_url, headers):
+    def response_detail(response):
+        try:
+            detail = response.json()
+            return detail.get("error", detail) if isinstance(detail, dict) else detail
+        except (ValueError, requests.exceptions.JSONDecodeError):
+            return str(getattr(response, "text", ""))[:500]
+
+    def provider_requires_json(status_code, detail):
+        text = str(detail).lower()
+        return (
+            status_code == 400
+            and "response_format" in text
+            and "json_object" in text
+            and "must contain" in text
+            and "json" in text
+        )
+
     def requester(payload):
         logger.info("AI API request payload: %s", _json_for_log(payload))
         response = requests.post(base_url, headers=headers, json=payload, timeout=300)
         if not response.ok:
-            try:
-                detail = response.json()
-                detail = detail.get("error", detail) if isinstance(detail, dict) else detail
-            except (ValueError, requests.exceptions.JSONDecodeError):
-                detail = str(getattr(response, "text", ""))[:500]
-            raise RuntimeError(f"AI 平台请求失败（HTTP {response.status_code}）：{detail}")
+            detail = response_detail(response)
+            if provider_requires_json(response.status_code, detail):
+                retry_payload = {**payload}
+                retry_messages = [dict(message) for message in payload.get("messages", [])]
+                if not any("json" in str(message.get("content", "")).lower() for message in retry_messages):
+                    retry_messages.append(
+                        {
+                            "role": "system",
+                            "content": "Return the final answer as valid JSON. The response must be a JSON object.",
+                        }
+                    )
+                retry_payload["messages"] = retry_messages
+                logger.warning("AI API retry after provider JSON response_format validation failure")
+                logger.info("AI API retry request payload: %s", _json_for_log(retry_payload))
+                response = requests.post(base_url, headers=headers, json=retry_payload, timeout=300)
+                if not response.ok:
+                    detail = response_detail(response)
+            if not response.ok:
+                raise RuntimeError(f"AI 平台请求失败（HTTP {response.status_code}）：{detail}")
         response_data = response.json()
         if not isinstance(response_data, dict):
             raise RuntimeError("AI 平台返回的数据格式无效：响应必须是对象")
@@ -535,6 +683,10 @@ def chat():
             )
 
         room_id = message_data.get("room_id")
+        scenario_start = message_data.get("scenario_start") is True
+        if scenario_start and agent_profile.id != "kp":
+            return error_response("Scenario start must use the KP agent", 400, "KP agent required")
+        ai_request_id = str(message_data.get("ai_request_id") or "").strip()
         agent_context = build_agent_context(
             room_id=room_id,
             rooms_dir=current_app.config.get("ROOMS_DIR", ROOMS_DIR),
@@ -543,6 +695,28 @@ def chat():
             agent_id=agent_profile.id,
             request_content=content,
         )
+        if scenario_start:
+            if not room_id or not agent_context.room_dir:
+                return error_response("A room is required to start the scenario", 400, "Room is required")
+            room_info = agent_context.room_info()
+            session_user_id = session.get("user_id")
+            if session_user_id is None or not _can_start_scenario(room_info, session_user_id, session.get("role")):
+                return error_response("Permission denied", 403, "Only room managers can start the scenario")
+            if room_info.get("scenario_started_at"):
+                return error_response("Scenario has already started", 409, "Scenario already started")
+            content = (
+                "@KP [系统开场任务] 请读取当前房间快照和起始场景所需的剧本模块，"
+                "直接为所有玩家进行简洁、有代入感的开场导入。不要声称玩家说了‘开始’，"
+                "不要替玩家决定行动，不要在结尾列出选项。"
+            )
+            agent_context = build_agent_context(
+                room_id=room_id,
+                rooms_dir=current_app.config.get("ROOMS_DIR", ROOMS_DIR),
+                scenarios_dir=current_app.config.get("SCENARIOS_DIR", SCENARIOS_DIR),
+                user_id=session_user_id,
+                agent_id=agent_profile.id,
+                request_content=content,
+            )
         agent_context.tool_state.update(
             {
                 "allow_checks": _request_allows_check(content),
@@ -550,6 +724,26 @@ def chat():
                 "allow_scene_transition": _request_allows_scene_transition(content),
             }
         )
+        ruleset_metrics = {"latency_ms": 0.0}
+        if room_id:
+            ruleset_store = RulesetKnowledgeStore(
+                current_app.config.get("KNOWLEDGE_BASES_DIR", KNOWLEDGE_BASES_DIR),
+                rooms_dir=current_app.config.get("ROOMS_DIR", ROOMS_DIR),
+            )
+
+            def ruleset_search(query, top_k):
+                started = time.perf_counter()
+                _emit_thinking_stage(room_id, ai_request_id, "ruleset_search", "正在查询规则书")
+                try:
+                    return search_ruleset(room_id, query, store=ruleset_store, top_k=top_k)
+                finally:
+                    ruleset_metrics["latency_ms"] += round((time.perf_counter() - started) * 1000, 2)
+
+            agent_context.tool_state["ruleset_search"] = ruleset_search
+        if room_id and ai_request_id:
+            agent_context.tool_state["thinking_stage_callback"] = lambda stage, label: _emit_thinking_stage(
+                room_id, ai_request_id, stage, label
+            )
         room_snapshot_message = None
         room_snapshot = None
         if room_id:
@@ -589,7 +783,7 @@ def chat():
             except Exception:
                 logger.exception("Failed to compact chat history automatically")
 
-        speaker = _speaker_for_user(agent_context.room_info(), user_id) if room_id else None
+        speaker = None if scenario_start else (_speaker_for_user(agent_context.room_info(), user_id) if room_id else None)
         user_content = _format_user_content(content, speaker)
         system_prompt = (
             _load_debug_kp_prompt()
@@ -601,6 +795,7 @@ def chat():
         if room_id:
             system_prompt = (
                 f"{system_prompt}\n"
+                "最终回复必须是有效的 JSON 对象（JSON object），不要输出 JSON 之外的内容。"
                 "房间快照中的 scene_manifest/global_manifest 是唯一索引；摘要不是事实。若 sequential=true，优先按 order 顺序加载模块。"
                 "仅在用户明确需要时按 ID 加载模块原文；转场先调用 room.activate_scenario_scene，再读模块。"
                 "不得创造剧本未写出的地点、设施、NPC、道具或触发器内容；未提供就明确说明。"
@@ -616,17 +811,23 @@ def chat():
                 active_scene = scenario_data.get("active_scene_id")
                 manifest = scenario_data.get("scene_manifest") if isinstance(scenario_data.get("scene_manifest"), list) else []
                 scene_static = next((item for item in manifest if isinstance(item, dict) and str(item.get("id")) == str(active_scene)), None)
-        ruleset_results = []
-        ruleset_started = time.perf_counter()
+        scenario_results = []
         if room_id:
+            _emit_thinking_stage(room_id, ai_request_id, "vector_search", "正在调用向量库")
             try:
-                ruleset_results = search_ruleset(room_id, content, store=RulesetKnowledgeStore(
-                    current_app.config.get("KNOWLEDGE_BASES_DIR", KNOWLEDGE_BASES_DIR),
+                scenario_results = KnowledgeBaseService(
                     rooms_dir=current_app.config.get("ROOMS_DIR", ROOMS_DIR),
-                ), top_k=3)
+                    scenarios_dir=current_app.config.get("SCENARIOS_DIR", SCENARIOS_DIR),
+                    vector_store=current_app.extensions.get("vector_store"),
+                    embedding_provider=current_app.extensions.get("embedding_provider"),
+                ).search(room_id, content, top_k=3)
+                scenario_results = [
+                    item for item in scenario_results
+                    if isinstance(item, dict) and str(item.get("text") or "").strip()
+                ]
             except (OSError, ValueError):
-                logger.exception("Ruleset retrieval failed")
-        ruleset_latency_ms = round((time.perf_counter() - ruleset_started) * 1000, 2)
+                logger.exception("Scenario retrieval failed")
+        rules_version = str((agent_context.room_info().get("rulesets") or {}).get("coc7") or "1") if room_id else "1"
         prompt_layers = build_prompt_layers(
             global_rules=system_prompt,
             scenario=(room_snapshot or {}).get("scenario") if isinstance(room_snapshot, dict) else None,
@@ -634,19 +835,11 @@ def chat():
             room_state=agent_context.room_state() if room_id else {},
             history=prompt_history,
             user_input=user_content,
-            rules_version=("|".join(sorted({str(item.get("knowledge_version")) for item in ruleset_results if item.get("knowledge_version")})) or "1"),
-            retrieval_results=(
-                KnowledgeBaseService(
-                    rooms_dir=current_app.config.get("ROOMS_DIR", ROOMS_DIR),
-                    scenarios_dir=current_app.config.get("SCENARIOS_DIR", SCENARIOS_DIR),
-                    vector_store=current_app.extensions.get("vector_store"),
-                    embedding_provider=current_app.extensions.get("embedding_provider"),
-                ).search(room_id, content, top_k=5)
-                if room_id
-                else []
-            ),
-            ruleset_results=ruleset_results,
+            rules_version=rules_version,
+            retrieval_results=scenario_results,
+            ruleset_results=[],
         )
+        _emit_thinking_stage(room_id, ai_request_id, "vector_search_done", "向量库检索完成")
         if room_snapshot_message:
             prompt_layers.messages.insert(3, {"role": "system", "content": room_snapshot_message})
         prefix_cache_hit = _PREFIX_CACHE.lookup(prompt_layers.cache_key)
@@ -667,8 +860,16 @@ def chat():
             "active_scene_id": scenario_info_for_cache.get("active_scene_id"),
             "state": state_for_cache,
         }
-        cached_result = _EXACT_CACHE.get(exact_cache_key) if not room_id else _SEMANTIC_CACHE.get(content, semantic_state)
+        cached_result = None if scenario_start else (_EXACT_CACHE.get(exact_cache_key) if not room_id else _SEMANTIC_CACHE.get(content, semantic_state))
         if isinstance(cached_result, dict) and cached_result.get("content"):
+            _emit_thinking_stage(room_id, ai_request_id, "finalizing", "正在整理回复")
+            cached_knowledge_usage = cached_result.get("knowledge_usage") or {
+                "used": bool(scenario_results),
+                "total_chunks": len(scenario_results),
+                "ruleset": {"called": False, "calls": 0, "chunks": 0, "sources": 0, "ruleset_ids": [], "knowledge_versions": [], "topics": [], "citations": []},
+                "scenario": {"chunks": len(scenario_results)},
+            }
+            cached_knowledge_usage = {**cached_knowledge_usage, "cached": True}
             record_ai_usage(
                 current_app.config.get("LOGS_DIR", LOGS_DIR),
                 {
@@ -686,12 +887,12 @@ def chat():
                     "completion_tokens": 0,
                     "cached_tokens": 0,
                     "total_tokens": 0,
-                    "ruleset_ids": sorted({str(item.get("ruleset_id")) for item in ruleset_results if item.get("ruleset_id")}),
-                    "knowledge_versions": sorted({str(item.get("knowledge_version")) for item in ruleset_results if item.get("knowledge_version")}),
-                    "retrieval_topics": sorted({str(item.get("topic")) for item in ruleset_results if item.get("topic")}),
-                    "retrieval_chunk_count": len(ruleset_results),
-                    "retrieval_latency_ms": ruleset_latency_ms,
-                    "retrieval_citations": [str(item.get("citation")) for item in ruleset_results if item.get("citation")],
+                    "ruleset_ids": cached_knowledge_usage.get("ruleset", {}).get("ruleset_ids", []),
+                    "knowledge_versions": cached_knowledge_usage.get("ruleset", {}).get("knowledge_versions", []),
+                    "retrieval_topics": cached_knowledge_usage.get("ruleset", {}).get("topics", []),
+                    "retrieval_chunk_count": cached_knowledge_usage.get("ruleset", {}).get("chunks", 0),
+                    "retrieval_latency_ms": 0,
+                    "retrieval_citations": cached_knowledge_usage.get("ruleset", {}).get("citations", []),
                 },
             )
             return success_response(
@@ -704,6 +905,7 @@ def chat():
                 cache_hit_rate=100.0,
                 cache_key=prompt_layers.cache_key,
                 prefix_cache_hit=True,
+                knowledge_usage=cached_knowledge_usage,
                 structured_output=cached_result.get("structured_output"),
             )
         request_data = {
@@ -743,7 +945,12 @@ def chat():
         )
         elapsed_ms = round((time.perf_counter() - started_at) * 1000, 2)
         if result.error:
+            _emit_thinking_stage(room_id, ai_request_id, "error", "AI 请求失败")
             return error_response("AI agent request failed", 500, result.error)
+
+        knowledge_usage = _build_knowledge_usage(result, scenario_results)
+
+        _emit_thinking_stage(room_id, ai_request_id, "finalizing", "正在整理回复")
 
         prompt_tokens = result.prompt_token_count or 0
         completion_tokens = result.completion_token_count or 0
@@ -777,12 +984,13 @@ def chat():
                 "total_tokens": total_tokens,
                 "cached_tokens": cached_tokens,
                 "elapsed_ms": elapsed_ms,
-                "ruleset_ids": sorted({str(item.get("ruleset_id")) for item in ruleset_results if item.get("ruleset_id")}),
-                "knowledge_versions": sorted({str(item.get("knowledge_version")) for item in ruleset_results if item.get("knowledge_version")}),
-                "retrieval_topics": sorted({str(item.get("topic")) for item in ruleset_results if item.get("topic")}),
-                "retrieval_chunk_count": len(ruleset_results),
-                "retrieval_latency_ms": ruleset_latency_ms,
-                "retrieval_citations": [str(item.get("citation")) for item in ruleset_results if item.get("citation")],
+                "ruleset_ids": knowledge_usage["ruleset"]["ruleset_ids"],
+                "knowledge_versions": knowledge_usage["ruleset"]["knowledge_versions"],
+                "retrieval_topics": knowledge_usage["ruleset"]["topics"],
+                "retrieval_chunk_count": knowledge_usage["ruleset"]["chunks"],
+                "retrieval_latency_ms": ruleset_metrics["latency_ms"],
+                "retrieval_citations": knowledge_usage["ruleset"]["citations"],
+                "scenario_retrieval_chunk_count": knowledge_usage["scenario"]["chunks"],
             },
         )
 
@@ -797,6 +1005,7 @@ def chat():
         if structured:
             structured = validate_structured_response(structured, (room_snapshot or {}).get("scenario") if isinstance(room_snapshot, dict) else {})
         validated_updates = {}
+        delivered_structured_triggers = []
         if structured:
             ai_response = structured.narration
             if room_id and structured.state_updates:
@@ -822,6 +1031,12 @@ def chat():
                 if next_updates:
                     apply_state_updates(agent_context.room_dir, next_updates)
                     validated_updates.update(next_updates)
+            if structured.triggered_files and agent_context.room_dir:
+                scenario_data = (room_snapshot or {}).get("scenario") if isinstance(room_snapshot, dict) else {}
+                room_info = (room_snapshot or {}).get("room") if isinstance(room_snapshot, dict) and isinstance((room_snapshot or {}).get("room"), dict) else {}
+                delivered_structured_triggers = _deliver_structured_triggers(agent_context.room_dir, room_info, scenario_data, structured.triggered_files)
+                if delivered_structured_triggers:
+                    direct_messages.extend(delivered_structured_triggers)
         else:
             ai_response, _ = _strip_compact_command(result.content)
         _, compact_requested_by_ai = _strip_compact_command(result.content)
@@ -854,12 +1069,12 @@ def chat():
             elapsed_ms=elapsed_ms,
         )
 
-        user_history_item = {"role": "user", "content": content}
+        user_history_item = {"role": "system" if scenario_start else "user", "content": content}
         if speaker:
             user_history_item["speaker"] = speaker
         history.extend([user_history_item, {"role": "assistant", "content": ai_response}])
         if not result.tool_messages and not direct_messages and not validated_updates and structured is None:
-            cache_value = {"content": ai_response, "token_count": token_count, "structured_output": None}
+            cache_value = {"content": ai_response, "token_count": token_count, "structured_output": None, "knowledge_usage": knowledge_usage}
             if room_id:
                 _SEMANTIC_CACHE.set(content, semantic_state, cache_value)
             else:
@@ -875,6 +1090,11 @@ def chat():
         else:
             write_json_atomic(history_file, history[-20:])
 
+        scenario_started_at = None
+        if scenario_start and agent_context.room_dir:
+            scenario_started_at = _mark_scenario_started(agent_context.room_dir, session.get("user_id"))
+            logger.info("scenario_started room_id=%s user_id=%s", room_id, session.get("user_id"))
+
         return success_response(
             message=None,
             content=ai_response,
@@ -889,12 +1109,15 @@ def chat():
             elapsed_ms=usage_record["elapsed_ms"],
             cache_key=cache_key,
             prefix_cache_hit=prefix_cache_hit,
+            knowledge_usage=knowledge_usage,
+            scenario_started_at=scenario_started_at,
             structured_output=(
                 {
                     "options": structured.options,
                     "state_updates": validated_updates,
                     "next_scene": structured.next_scene,
                     "npc_actions": structured.npc_actions,
+                    "triggered_files": structured.triggered_files,
                 }
                 if structured
                 else None

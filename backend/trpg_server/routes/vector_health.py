@@ -8,4 +8,5 @@ def health():
     vector = current_app.extensions.get("vector_store")
     embedding = current_app.extensions.get("embedding_provider")
     ocr = current_app.extensions.get("ocr_provider")
-    return {"success": True, "data": {"vector": vector.health() if vector else {"available": False}, "embedding": {"configured": bool(embedding and embedding.configured)}, "ocr": {"enabled": bool(ocr), "available": bool(ocr and ocr.available)}}}
+    embedding_health = embedding.health() if embedding and hasattr(embedding, "health") else {"configured": bool(embedding and embedding.configured), "loaded": False}
+    return {"success": True, "data": {"vector": vector.health() if vector else {"available": False}, "embedding": embedding_health, "ocr": {"enabled": bool(ocr), "available": bool(ocr and ocr.available)}}}

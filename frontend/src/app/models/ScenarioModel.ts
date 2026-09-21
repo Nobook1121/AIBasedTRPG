@@ -167,14 +167,48 @@ class ScenarioModel {
         return data.data;
     }
 
+    async getKnowledgeStats(id: number): Promise<{ scenario_id: number; version: string; vector_count: number; path: string; backend: string }> {
+        const { response, data } = await TrpgApi.requestWithResponse<ApiResponse<{ scenario_id: number; version: string; vector_count: number; path: string; backend: string }>>(`${this.apiBaseUrl}/scenarios/${id}/knowledge`);
+        if (!response.ok || !data.success || !data.data) throw new Error(data.message || "无法加载知识库信息");
+        return data.data;
+    }
+
     async createImportJob(formData: FormData, onProgress?: (value: number) => void): Promise<ScenarioImportJob> {
         const xhr = new XMLHttpRequest();
+        xhr.onreadystatechange = () => {
+            if (xhr.readyState === XMLHttpRequest.OPENED) {
+                xhr.setRequestHeader("Accept", "application/json");
+                const csrf = window.currentUser?.csrf_token;
+                if (csrf) xhr.setRequestHeader("X-CSRF-Token", csrf);
+            }
+        };
         const result = await new Promise<ScenarioImportJob>((resolve, reject) => { xhr.open("POST", "/api/scripts/import"); xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress?.(e.loaded / e.total * 100); }; xhr.onload = () => { try { const data = JSON.parse(xhr.responseText); if (xhr.status >= 200 && xhr.status < 300 && data.success) resolve(data.data); else reject(new Error(data.message || "导入失败")); } catch { reject(new Error("导入响应无效")); } }; xhr.onerror = () => reject(new Error("导入请求失败")); xhr.send(formData); });
         return result;
     }
     async getImportJob(id: string): Promise<ScenarioImportJob> { const { data } = await TrpgApi.requestWithResponse<ApiResponse<ScenarioImportJob>>(`/api/scripts/import/${encodeURIComponent(id)}`); if (!data.success || !data.data) throw new Error(data.message || "任务不存在"); return data.data; }
     async retryImportJob(id: string, stage?: string): Promise<ScenarioImportJob> { const { data } = await TrpgApi.requestWithResponse<ApiResponse<ScenarioImportJob>>(`/api/scripts/import/${encodeURIComponent(id)}/retry`, { method: "POST", body: stage ? { stage } : {} }); if (!data.success || !data.data) throw new Error(data.message || "重试失败"); return data.data; }
     async cancelImportJob(id: string): Promise<ScenarioImportJob> { const { data } = await TrpgApi.requestWithResponse<ApiResponse<ScenarioImportJob>>(`/api/scripts/import/${encodeURIComponent(id)}/cancel`, { method: "POST" }); if (!data.success || !data.data) throw new Error(data.message || "取消失败"); return data.data; }
+
+    async publishImport(scriptId: number, jobId: string): Promise<Scenario> {
+        const { response, data } = await TrpgApi.requestWithResponse<ApiResponse<Scenario>>(`/api/scripts/${scriptId}/publish`, { method: "POST", body: { jobId } });
+        if (!response.ok || !data.success || !data.data) throw new Error(data.message || data.error || "Import publish failed");
+        const index = this.scenarios.findIndex((item) => item.id === data.data!.id);
+        if (index >= 0) this.scenarios[index] = data.data!; else this.scenarios.push(data.data!);
+        this.saveScenarios();
+        return data.data!;
+    }
+
+    async waitForImportJob(id: string, onProgress?: (job: ScenarioImportJob) => void): Promise<ScenarioImportJob> {
+        for (;;) {
+            const job = await this.getImportJob(id);
+            onProgress?.(job);
+            if (["done", "failed", "cancelled", "published"].includes(job.status)) {
+                if (job.status !== "done") throw new Error(job.error || "Import job failed");
+                return job;
+            }
+            await new Promise((resolve) => window.setTimeout(resolve, 350));
+        }
+    }
 
     async loadDraft(): Promise<ScenarioInput | null> {
         const { response, data } = await TrpgApi.requestWithResponse<ApiResponse<ScenarioInput | null>>(`${this.apiBaseUrl}/scenarios/draft`);
@@ -195,6 +229,38 @@ class ScenarioModel {
 
     validateScenarioData(data: unknown): data is ScenarioInput {
         return isScenarioInput(data);
+    }
+
+    async listTriggerAssets(id: number): Promise<ResourceRef[]> {
+        const { response, data } = await TrpgApi.requestWithResponse<ApiResponse<ResourceRef[]>>(`${this.apiBaseUrl}/scripts/${id}/assets`);
+        if (!response.ok || !data.success || !Array.isArray(data.data)) throw new Error(data.message || "无法加载资源");
+        return data.data;
+    }
+
+    async uploadTriggerAssets(id: number, files: File[], alt: string[]): Promise<ResourceRef[]> {
+        const form = new FormData();
+        files.forEach((file) => form.append("files", file, file.name));
+        alt.forEach((value) => form.append("alt", value));
+        const { response, data } = await TrpgApi.requestWithResponse<ApiResponse<ResourceRef[]>>(`${this.apiBaseUrl}/scripts/${id}/assets`, { method: "POST", body: form });
+        if (!response.ok || !data.success || !Array.isArray(data.data)) throw new Error(data.message || "资源上传失败");
+        return data.data;
+    }
+
+    async updateTriggerAsset(id: number, assetId: string, patch: Partial<ResourceRef>): Promise<ResourceRef> {
+        const { response, data } = await TrpgApi.requestWithResponse<ApiResponse<ResourceRef>>(`${this.apiBaseUrl}/scripts/${id}/assets/${encodeURIComponent(assetId)}`, { method: "PUT", body: patch });
+        if (!response.ok || !data.success || !data.data) throw new Error(data.message || "资源更新失败");
+        return data.data;
+    }
+
+    async deleteTriggerAsset(id: number, assetId: string): Promise<void> {
+        const { response, data } = await TrpgApi.requestWithResponse<ApiResponse>(`${this.apiBaseUrl}/scripts/${id}/assets/${encodeURIComponent(assetId)}`, { method: "DELETE" });
+        if (!response.ok || !data.success) throw new Error(data.message || "资源删除失败");
+    }
+
+    async createTriggerCard(id: number, card: Omit<TriggerCard, "scriptId" | "scriptVersion">): Promise<TriggerCard> {
+        const { response, data } = await TrpgApi.requestWithResponse<ApiResponse<TriggerCard>>(`${this.apiBaseUrl}/scripts/${id}/triggers`, { method: "POST", body: card });
+        if (!response.ok || !data.success || !data.data) throw new Error(data.message || "触发器创建失败");
+        return data.data;
     }
 
     private loadCachedScenarios(): Scenario[] {

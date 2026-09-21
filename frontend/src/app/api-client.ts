@@ -3,7 +3,16 @@
 
     async function parseJson<T = unknown>(response: Response): Promise<T | null> {
         const text = await response.text();
-        return text ? JSON.parse(text) as T : null;
+        if (!text.trim()) return null;
+        try {
+            return JSON.parse(text) as T;
+        } catch {
+            const contentType = response.headers.get("content-type") || "";
+            const hint = contentType.includes("text/html")
+                ? "服务器返回了网页而不是 JSON（可能是登录失效或接口地址错误）"
+                : `服务器返回了无效 JSON（HTTP ${response.status}）`;
+            return { success: false, message: hint, error: `HTTP ${response.status}` } as T;
+        }
     }
 
     function buildOptions(options: TrpgRequestOptions): RequestInit {
@@ -20,6 +29,14 @@
                 ...(requestOptions.headers || {}),
             };
         }
+
+        // Every API request explicitly asks for JSON.  This keeps proxy/router
+        // fallbacks from returning the SPA HTML shell, while leaving FormData's
+        // Content-Type boundary to the browser.
+        requestOptions.headers = {
+            Accept: "application/json",
+            ...(requestOptions.headers || {}),
+        };
 
         if (csrfToken && ["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
             requestOptions.headers = {

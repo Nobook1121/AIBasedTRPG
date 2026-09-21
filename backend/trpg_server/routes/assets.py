@@ -47,7 +47,7 @@ def serve_scenario_cover(filename):
 
 @bp.route("/assets/scenarios/<path:filename>")
 def serve_scenario_asset(filename):
-    return _with_no_cache(send_from_directory(SCENARIOS_DIR, filename))
+    return _with_no_cache(send_from_directory(current_app.config.get("SCENARIOS_DIR", SCENARIOS_DIR), filename))
 
 
 @bp.route("/assets/aiplatform/<path:filename>")

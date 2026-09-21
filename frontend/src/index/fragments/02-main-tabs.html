@@ -167,7 +167,12 @@
                                     </button>
                                     <h2 id="saveDetailTitle" data-i18n="room.detail.title">房间详情</h2>
                                 </div>
-                                <button class="btn btn-danger" id="deleteSave" data-i18n="room.action.delete">删除房间</button>
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-primary" id="startScenario" hidden>
+                                        <i class="fa fa-play" aria-hidden="true"></i> 开启剧本
+                                    </button>
+                                    <button class="btn btn-danger" id="deleteSave" data-i18n="room.action.delete">删除房间</button>
+                                </div>
                             </div>
                             <!-- 房间基本信息 -->
                             <div class="card mb-4" data-room-sensitive>

@@ -54,6 +54,9 @@ function initRoomManagement(): void {
     document.getElementById("deleteSave")?.addEventListener("click", () => {
         void deleteCurrentRoom();
     });
+    document.getElementById("startScenario")?.addEventListener("click", () => {
+        void window.startScenario?.();
+    });
     document.getElementById("createSaveNode")?.addEventListener("click", () => {
         void createRoomNode();
     });
@@ -514,6 +517,22 @@ function updateRoomDetail(room: Room): void {
     setInput("recordRoomName", room.name);
     setText("homeRoomOnlineCount", formatRoomOnlineCount(room));
     renderRoomCharacterBindings(room);
+    updateStartScenarioButton(room);
+}
+
+function canStartRoomScenario(room: Room): boolean {
+    if (isElevatedUser()) return true;
+    const userId = String(window.currentUser?.user_id || "");
+    if (String(room.creator_id ?? room.owner_id ?? "") === userId) return true;
+    const member = activeRoomMembers(room).find((item) => String(item.user_id) === userId);
+    return member?.room_role === "owner" || member?.room_role === "admin";
+}
+
+function updateStartScenarioButton(room: Room): void {
+    const button = document.getElementById("startScenario") as HTMLButtonElement | null;
+    if (!button) return;
+    button.hidden = room.invisible_view === true || Boolean(room.scenario_started_at) || !canStartRoomScenario(room);
+    button.disabled = false;
 }
 
 function renderRoomCharacterBindings(room: Room): void {

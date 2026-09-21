@@ -10,6 +10,7 @@ from trpg_server.agents.tools.room import (
     REMEMBER_FACT_TOOL,
 )
 from trpg_server.agents.tools.trigger import REVEAL_SCENARIO_TRIGGER_TOOL
+from trpg_server.agents.tools.knowledge import SEARCH_RULESET_KNOWLEDGE_TOOL
 
 
 def default_tool_registry() -> ToolRegistry:
@@ -29,5 +30,6 @@ def default_tool_registry() -> ToolRegistry:
             ROLL_DICE_TOOL,
             ROLL_DICE_FUNCTION_TOOL,
             REVEAL_SCENARIO_TRIGGER_TOOL,
+            SEARCH_RULESET_KNOWLEDGE_TOOL,
         ]
     )

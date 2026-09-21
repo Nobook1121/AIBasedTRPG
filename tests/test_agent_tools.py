@@ -12,6 +12,7 @@ from trpg_server.agents.tools.room import (
     get_room_scenario_module,
     get_room_snapshot,
 )
+from trpg_server.agents.tools.knowledge import search_ruleset_knowledge
 
 
 def test_coc_check_regular_success_with_fixed_rng():
@@ -161,6 +162,37 @@ def test_kp_default_tools_include_room_check_function():
 
     assert "check.roll_room_check" in DEFAULT_KP_TOOLS
     assert registry.get("check.roll_room_check") is not None
+
+
+def test_ruleset_knowledge_tool_limits_context_and_reports_usage(tmp_path):
+    room_dir = tmp_path / "rooms" / "room-1"
+    room_dir.mkdir(parents=True)
+    context = AgentRequestContext(room_id="room-1", room_dir=room_dir, agent_id="kp")
+    context.tool_state["ruleset_search"] = lambda query, top_k: [
+        {
+            "ruleset_id": "coc7",
+            "knowledge_version": "4",
+            "chunk_id": f"chunk-{index}",
+            "topic": "keeper_guidance",
+            "citation": f"Keeper Rulebook p.{index}",
+            "text": "死亡场景应尊重玩家体验。" * 200,
+        }
+        for index in range(1, 6)
+    ]
+
+    result = search_ruleset_knowledge({"query": "玩家角色死亡时如何处理", "top_k": 20}, context)
+
+    assert result["used"] is True
+    assert len(result["references"]) == 3
+    assert all(len(item["text"]) <= 1200 for item in result["references"])
+    assert result["knowledge_usage"] == {
+        "ruleset_chunks": 3,
+        "ruleset_sources": 3,
+        "ruleset_ids": ["coc7"],
+        "knowledge_versions": ["4"],
+        "topics": ["keeper_guidance"],
+        "citations": ["Keeper Rulebook p.1", "Keeper Rulebook p.2", "Keeper Rulebook p.3"],
+    }
 
 
 def test_frontend_registers_check_command():

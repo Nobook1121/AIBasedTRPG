@@ -1,4 +1,6 @@
-from trpg_server.agents.knowledge_base import KnowledgeBaseService, build_knowledge_chunks, load_knowledge_index
+from trpg_server.agents.embedding_provider import HashedTokenEmbedding
+from trpg_server.agents.knowledge_base import KnowledgeBaseService, build_knowledge_chunks, load_knowledge_index, persist_knowledge_index
+from trpg_server.agents.vector_store import EmbeddedVectorStore
 from trpg_server.scenario_store import save_scenario_record
 
 
@@ -114,3 +116,27 @@ def test_saving_scenario_persists_versioned_knowledge_index(tmp_path):
     descriptor = save_scenario_record(scenarios, {"id": 9, "scenario_version": "3", "modules": [{"id": "scene", "module_type": "scene", "content": "lighthouse"}]})
     chunks = load_knowledge_index(descriptor, "3")
     assert [chunk.text for chunk in chunks] == ["lighthouse"]
+
+
+def test_persisted_json_index_is_idempotently_written_to_embedded_store(tmp_path):
+    descriptor = tmp_path / "scenarios" / "scenario-9" / "scenario.json"
+    store = EmbeddedVectorStore(tmp_path / "vectors")
+    provider = HashedTokenEmbedding(32)
+    version_one = {
+        "id": "9",
+        "scenario_version": "1",
+        "modules": [{"id": "scene", "module_type": "scene", "content": "old lighthouse"}],
+    }
+    version_two = {
+        "id": "9",
+        "scenario_version": "2",
+        "modules": [{"id": "scene", "module_type": "scene", "content": "new lighthouse"}],
+    }
+
+    persist_knowledge_index(descriptor, version_one, vector_store=store, embedding_provider=provider)
+    persist_knowledge_index(descriptor, version_one, vector_store=store, embedding_provider=provider)
+    persist_knowledge_index(descriptor, version_two, vector_store=store, embedding_provider=provider)
+
+    assert store.count({"scenario_id": "9", "scenario_version": "1"}) == 1
+    assert store.count({"scenario_id": "9", "scenario_version": "2"}) == 1
+    assert store.count({"scenario_id": "9"}) == 2

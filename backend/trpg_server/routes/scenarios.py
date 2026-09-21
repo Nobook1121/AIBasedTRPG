@@ -83,6 +83,32 @@ def _draft_path():
     return Path(current_app.config.get("SCENARIO_DRAFTS_DIR", SCENARIO_DRAFTS_DIR)) / f"{owner}.json"
 
 
+def _index_scenario_knowledge(descriptor_path, scenario):
+    """Persist vectors and emit an observable result for manual saves."""
+    from trpg_server.agents.knowledge_base import persist_knowledge_index
+    vector_store = current_app.extensions.get("vector_store")
+    provider = current_app.extensions.get("embedding_provider")
+    try:
+        index_path = persist_knowledge_index(
+            descriptor_path,
+            scenario,
+            vector_store=vector_store,
+            embedding_provider=provider,
+        )
+        version = str(scenario.get("scenario_version") or scenario.get("version") or "1")
+        count = int(vector_store.count({"scenario_id": str(scenario.get("id")), "scenario_version": version})) if vector_store else 0
+        success = count > 0 or not scenario.get("modules")
+        logger.info(
+            "scenario_knowledge_vectorization scenario_id=%s version=%s success=%s vector_count=%d index_path=%s backend=%s",
+            scenario.get("id"), version, success, count, index_path,
+            (vector_store.health().get("backend") if vector_store else "none"),
+        )
+        return {"success": success, "vector_count": count, "path": str(index_path), "version": version}
+    except Exception as exc:
+        logger.exception("scenario_knowledge_vectorization scenario_id=%s success=False", scenario.get("id"))
+        return {"success": False, "vector_count": 0, "error": str(exc)}
+
+
 @bp.route("/api/scenarios/draft", methods=["GET"])
 def get_scenario_draft():
     login_error = _require_login()
@@ -339,6 +365,31 @@ def get_scenario(scenario_id):
         return error_response("Failed to load scenario", 500, str(exc))
 
 
+@bp.route("/api/scenarios/<int:scenario_id>/knowledge", methods=["GET"])
+def get_scenario_knowledge(scenario_id):
+    login_error = _require_login()
+    if login_error:
+        return login_error
+    if not _can_use_permission("scenarios.preview"):
+        return error_response("Permission denied", 403, "Permission denied")
+    scenarios_dir = current_app.config.get("SCENARIOS_DIR", SCENARIOS_DIR)
+    descriptor = next((path for path in scenario_descriptor_paths(scenarios_dir)
+                       if str(load_scenario_record(path, scenarios_dir).get("id")) == str(scenario_id)), None)
+    if descriptor is None:
+        return error_response("Scenario not found", 404, "Scenario not found")
+    scenario = load_scenario_record(descriptor, scenarios_dir)
+    version = str(scenario.get("scenario_version") or scenario.get("version") or "1")
+    from trpg_server.agents.knowledge_base import knowledge_index_path
+    vector_store = current_app.extensions.get("vector_store")
+    # Include vectors written by older releases that stored numeric versions
+    # (for example ``1``) before scenario versions were normalized to semver.
+    count = int(vector_store.count({"scenario_id": str(scenario_id)})) if vector_store else 0
+    health = vector_store.health() if vector_store else {"backend": "none"}
+    return success_response({"scenario_id": scenario_id, "version": version, "vector_count": count,
+                             "path": str(knowledge_index_path(descriptor, version)),
+                             "backend": health.get("backend", "unknown")})
+
+
 @bp.route("/api/scenarios/module-summary", methods=["POST"])
 def summarize_scenario_module():
     try:
@@ -452,7 +503,11 @@ def import_script():
             text = str(payload["text"])
         elif "file" in request.files:
             uploaded = request.files["file"]
-            text = extract_script_text(uploaded.read(), uploaded.filename or "script.txt")
+            text = extract_script_text(
+                uploaded.read(),
+                uploaded.filename or "script.txt",
+                ocr_provider=current_app.extensions.get("ocr_provider"),
+            )
             fallback_title = Path(uploaded.filename or "Imported scenario").stem or "Imported scenario"
             metadata = {"title": str(request.form.get("title") or fallback_title),
                         "source_filename": uploaded.filename or ""}
@@ -627,6 +682,8 @@ def create_scenario():
         if draft_path.exists():
             draft_path.unlink()
         saved_scenario = load_scenario_record(file_path, SCENARIOS_DIR)
+        knowledge = _index_scenario_knowledge(file_path, saved_scenario)
+        saved_scenario["knowledge"] = knowledge
         clear_scenarios_cache()
 
         log_user_action(
@@ -705,6 +762,8 @@ def update_scenario(scenario_id):
             trigger_max_file_size=_trigger_size_limit(),
         )
         saved_scenario = load_scenario_record(file_path, SCENARIOS_DIR)
+        knowledge = _index_scenario_knowledge(file_path, saved_scenario)
+        saved_scenario["knowledge"] = knowledge
         clear_scenarios_cache()
 
         log_user_action(

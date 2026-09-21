@@ -17,10 +17,11 @@ def _tokens(value: str) -> list[str]:
 
 
 class RulesetKnowledgeStore:
-    def __init__(self, root: Path, registry: RulesetRegistry | None = None, rooms_dir: Path | None = None):
+    def __init__(self, root: Path, registry: RulesetRegistry | None = None, rooms_dir: Path | None = None, ocr_provider: Any = None):
         self.root = Path(root)
         self.registry = registry or RulesetRegistry()
         self.rooms_dir = Path(rooms_dir) if rooms_dir else None
+        self.ocr_provider = ocr_provider
         self.root.mkdir(parents=True, exist_ok=True)
         self.registry_path = self.root / "rulesets.json"
 
@@ -71,7 +72,12 @@ class RulesetKnowledgeStore:
             source_dir = self._base(ruleset_id) / "sources" / str(source["source_id"])
             files = [path for path in source_dir.iterdir() if path.name != "source.json"] if source_dir.exists() else []
             if not files: continue
-            text = adapter.extract(files[0].read_bytes(), files[0].name)
+            try:
+                text = adapter.extract(files[0].read_bytes(), files[0].name, self.ocr_provider)
+            except TypeError:
+                # Preserve compatibility with third-party adapters implementing
+                # the original two-argument extraction contract.
+                text = adapter.extract(files[0].read_bytes(), files[0].name)
             chunks.extend(adapter.chunk(text, {**source, "knowledge_version": next_version}))
         index = [chunk.to_dict() for chunk in chunks]
         base = self._base(ruleset_id); write_json_atomic(base / "indexes" / f"{next_version}.json", index)

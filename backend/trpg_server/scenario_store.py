@@ -14,6 +14,7 @@ from typing import Any
 
 from trpg_server.json_store import read_json, write_json_atomic
 from trpg_server.security import normalize_filename, safe_join
+from trpg_server.agents.trigger_system import normalize_attachment
 
 
 SCENARIO_DESCRIPTOR_NAME = "scenario.json"
@@ -276,6 +277,16 @@ def normalize_trigger(trigger: dict[str, Any], storage_dir: Path | None = None, 
         "keyword": keyword,
         "content_mode": content_mode if content_mode in {"text", "richtext", "image", "file"} else "text",
     }
+    if any(key in trigger for key in ("spoiler_level", "spoilerLevel")):
+        normalized["spoiler_level"] = max(0, min(5, _coerce_int(trigger.get("spoiler_level") or trigger.get("spoilerLevel"), 0)))
+    if "visibility" in trigger:
+        normalized["visibility"] = str(trigger.get("visibility") or "player_visible") if str(trigger.get("visibility") or "player_visible") in {"kp_only", "player_visible"} else "player_visible"
+    if "repeatable" in trigger:
+        normalized["repeatable"] = _coerce_bool(trigger.get("repeatable"), False)
+    if "priority" in trigger:
+        normalized["priority"] = _coerce_int(trigger.get("priority"), 0)
+    if "enabled" in trigger:
+        normalized["enabled"] = _coerce_bool(trigger.get("enabled"), True)
     if display_name:
         normalized["display_name"] = display_name
     if condition:
@@ -387,6 +398,14 @@ def _normalize_module(
                 triggers.append(normalized_trigger)
         if triggers:
             normalized["triggers"] = triggers
+    attachments = []
+    for attachment in module.get("attachments", []) if isinstance(module.get("attachments"), list) else []:
+        try:
+            attachments.append(normalize_attachment(attachment))
+        except ValueError:
+            continue
+    if attachments:
+        normalized["attachments"] = attachments
     elif module_type == "ending":
         normalized["open_ending"] = _coerce_bool(module.get("open_ending") or module.get("openEnding"), False)
     elif module_type == "custom":
@@ -578,6 +597,25 @@ def normalize_scenario_payload(scenario: dict[str, Any], storage_dir: Path | Non
     normalized["preparation"] = legacy_fields["preparation"]
     normalized["timeline"] = legacy_fields["timeline"]
     normalized["allow_open_ending"] = legacy_fields["allow_open_ending"]
+    trigger_cards = []
+    for card in scenario.get("trigger_cards", []) if isinstance(scenario.get("trigger_cards"), list) else []:
+        if not isinstance(card, dict):
+            continue
+        card_copy = dict(card)
+        card_copy["id"] = str(card.get("id") or card.get("trigger_id") or "").strip()
+        card_copy["scriptId"] = str(card.get("scriptId") or card.get("script_id") or normalized.get("id") or "")
+        card_copy["scriptVersion"] = str(card.get("scriptVersion") or card.get("script_version") or normalized.get("scenario_version") or "1.0.0")
+        card_copy["cardType"] = "trigger"
+        card_copy["attachments"] = []
+        for attachment in card.get("attachments", []) if isinstance(card.get("attachments"), list) else []:
+            try:
+                card_copy["attachments"].append(normalize_attachment(attachment))
+            except ValueError:
+                continue
+        if card_copy["id"] and card_copy["attachments"]:
+            trigger_cards.append(card_copy)
+    if trigger_cards:
+        normalized["trigger_cards"] = trigger_cards
     return normalized
 
 
@@ -615,6 +653,22 @@ def iter_scenario_trigger_catalog(scenario: dict[str, Any], scene_id: int | str 
             if trigger.get("asset_url"):
                 item["asset_url"] = trigger["asset_url"]
             triggers.append(item)
+        for attachment in module.get("attachments", []) if isinstance(module.get("attachments"), list) else []:
+            if not isinstance(attachment, dict):
+                continue
+            condition = attachment.get("condition") or {}
+            resource = attachment.get("resourceRef") or {}
+            triggers.append({
+                "id": attachment.get("triggerId"),
+                "scene_id": module.get("scene_id") or module.get("id"),
+                "module_id": module.get("id"),
+                "display_name": resource.get("alt") or attachment.get("triggerId"),
+                "keyword": condition.get("keyword") or "",
+                "condition": condition.get("naturalLanguage") or condition,
+                "content_mode": "attachment",
+                "spoiler_level": attachment.get("spoilerLevel", 0),
+                "visibility": attachment.get("visibility", "player_visible"),
+            })
 
     if triggers:
         return triggers
@@ -640,6 +694,24 @@ def iter_scenario_trigger_catalog(scenario: dict[str, Any], scene_id: int | str 
             if trigger.get("asset_url"):
                 item["asset_url"] = trigger["asset_url"]
             triggers.append(item)
+
+    for card in scenario.get("trigger_cards", []) if isinstance(scenario.get("trigger_cards"), list) else []:
+        if not isinstance(card, dict):
+            continue
+        card_scene = card.get("sceneId") or card.get("scene_id")
+        if expected_scene_id and card_scene not in (None, "") and str(card_scene) != expected_scene_id:
+            continue
+        triggers.append({
+            "id": card.get("id"),
+            "scene_id": card_scene,
+            "module_id": card.get("id"),
+            "display_name": card.get("text") or card.get("id"),
+            "keyword": card.get("unlockCondition") or "",
+            "condition": card.get("unlockCondition"),
+            "content_mode": "attachment",
+            "spoiler_level": card.get("spoilerLevel", 0),
+            "visibility": card.get("visibility", "player_visible"),
+        })
     return triggers
 
 

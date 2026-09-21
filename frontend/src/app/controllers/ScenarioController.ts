@@ -28,7 +28,7 @@ class ScenarioController {
         this.view.setEventHandlers({
             onCreateScenarioClick: () => this.onCreateScenarioClick(),
             onImportScenarioDocumentClick: () => this.onImportScenarioDocumentClick(),
-            onImportScenarioDocument: (file) => this.onImportScenarioDocument(file),
+            onImportScenarioDocument: (file) => this.onImportScenarioDocumentV2(file),
             onSaveScenario: () => this.onSaveScenario(),
             onSaveDraft: () => this.onSaveDraft(),
             onPreviewScenario: (id) => this.onPreviewScenario(id),
@@ -89,9 +89,56 @@ class ScenarioController {
         inputElement("importScenarioDocumentFile")?.click();
     }
 
+    private async onImportScenarioDocumentV2(file: File): Promise<void> {
+        const title = file.name.replace(/\.[^.]+$/, "") || "Imported scenario";
+        const choice = await this.view.showImportChoice();
+        if (choice === "cancel") return;
+        this.view.showConversionProgress(file.name);
+        this.view.updateConversionProgress(0, "active", "Uploading document");
+        try {
+            if (choice === "direct") {
+                const form = new FormData();
+                form.append("file", file, file.name);
+                form.append("title", title);
+                const job = await this.model.createImportJob(form, (value) => {
+                    this.view.updateConversionProgress(0, "active", `${Math.round(value)}% uploaded`);
+                });
+                sessionStorage.setItem("ai-trpg:scenario-import-job", job.id);
+                const finished = await this.model.waitForImportJob(job.id, (progress) => this.view.updateImportJobProgress(progress));
+                const scenario = await this.model.publishImport(finished.script_id, job.id);
+                sessionStorage.removeItem("ai-trpg:scenario-import-job");
+                this.view.updateConversionProgress(3, "complete", "Vector index ready");
+                this.view.closeConversionProgress();
+                this.renderScenarioList();
+                this.view.showMessage(`Direct import completed: ${scenario.title}`);
+                return;
+            }
+
+            // Review mode keeps the existing editor flow, but the choice is
+            // made before parsing starts and the source can be replaced by
+            // selecting another document if the generated draft is unsuitable.
+            this.view.updateConversionProgress(0, "complete");
+            this.view.updateConversionProgress(1, "active", "Extracting sections");
+            const converted = await this.model.convertScriptFile(file, title);
+            this.view.updateConversionProgress(1, "complete");
+            this.view.updateConversionProgress(2, "complete", "Draft ready for review");
+            this.view.updateConversionProgress(3, "complete");
+            this.view.closeConversionProgress();
+            await this.view.openCreateModal();
+            this.view.fillDraftData(converted);
+            this.view.setImportReviewReadOnly(true);
+            this.view.showMessage("Review mode is ready. Upload another document to replace this draft, or publish it after checking.");
+        } catch (error) {
+            this.view.updateConversionProgress(1, "error", scenarioErrorMessage(error));
+            await new Promise((resolve) => window.setTimeout(resolve, 500));
+            this.view.closeConversionProgress();
+            this.view.showMessage(`Scenario import failed: ${scenarioErrorMessage(error)}`, true);
+        }
+    }
+
     private async onImportScenarioDocument(file: File): Promise<void> {
         const extension = file.name.toLowerCase().split(".").pop() || "";
-        if (!["doc", "docx", "txt", "md", "markdown", "text"].includes(extension)) {
+        if (!["doc", "docx", "pdf", "txt", "md", "markdown", "text"].includes(extension)) {
             this.view.showMessage("仅支持 doc、docx、txt、md 文档", true);
             return;
         }
@@ -112,6 +159,15 @@ class ScenarioController {
             this.view.updateConversionProgress(3, "complete");
             await new Promise((resolve) => window.setTimeout(resolve, 180));
             this.view.closeConversionProgress();
+            const choice = await this.view.showImportChoice();
+            if (choice === "cancel") return;
+            if (choice === "direct") {
+                const created = await this.model.createScenario(converted);
+                await this.model.updateScenario(created.id, { ...converted, id: created.id });
+                this.renderScenarioList();
+                this.view.showMessage("文档已直接导入并完成知识库向量化");
+                return;
+            }
             await this.view.openCreateModal();
             this.view.fillDraftData(converted);
             const conversionStatus = (converted as ScenarioInput & { conversion?: { ai?: { status?: string } } }).conversion?.ai?.status;
@@ -164,10 +220,14 @@ class ScenarioController {
         }
     }
 
-    private onPreviewScenario(id: number): void {
+    private async onPreviewScenario(id: number): Promise<void> {
         const scenario = this.model.getScenario(id);
         if (scenario) {
-            this.view.previewScenario(scenario);
+            try {
+                this.view.previewScenario(scenario, await this.model.getKnowledgeStats(id));
+            } catch {
+                this.view.previewScenario(scenario, { vector_count: 0, backend: "unknown" });
+            }
         } else {
             this.view.showMessage("剧本不存在", true);
         }

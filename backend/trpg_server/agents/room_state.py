@@ -24,6 +24,8 @@ def _default_state() -> dict[str, Any]:
         "timeline": [],
         "rolling_summary": "",
         "event_log": [],
+        "triggeredFiles": [],
+        "triggerHistory": [],
     }
 
 
@@ -31,7 +33,7 @@ def _normalize_state(value: Any) -> dict[str, Any]:
     state = _default_state()
     if isinstance(value, dict):
         state.update(value)
-    for key in ("triggered_event_ids", "clues", "items", "quests", "timeline", "event_log"):
+    for key in ("triggered_event_ids", "clues", "items", "quests", "timeline", "event_log", "triggeredFiles", "triggerHistory"):
         if not isinstance(state.get(key), list):
             state[key] = []
     if not isinstance(state.get("npc_attitudes"), dict):
@@ -89,4 +91,6 @@ def project_room_state(state: dict[str, Any] | None, snapshot: dict[str, Any] | 
         "timeline": normalized["timeline"][-30:],
         "rolling_summary": normalized["rolling_summary"],
         "event_log": normalized["event_log"][-20:],
+        "triggeredFiles": normalized["triggeredFiles"][-100:],
+        "triggerHistory": normalized["triggerHistory"][-50:],
     }

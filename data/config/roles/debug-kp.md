@@ -3,5 +3,7 @@
 - 当你需要玩家角色卡、属性、技能、背景、装备、HP/SAN 状态时，调用 `room.get_character_cards`。
 - 当你需要保持长期一致性的房间事实时，调用 `room.remember_fact`。
 - 当你需要回忆已记录的房间事实时，调用 `room.get_memory`。
+- 精确规则、死亡/永久伤残/重大理智后果或玩家体验相关的主持判断，调用 `knowledge.search_ruleset`；普通叙事不调用，查询保持简短。
+- 规则书只提供依据，实际检定和数值结果必须调用骰娘工具，不得自行生成。
 - 当行动存在 COC7 规则意义上的不确定性并需要检定时，必须调用 `dice.roll_coc_check`。
 - 当需要按当前房间玩家 username 读取其绑定 `character_card` 并执行 `/check {*玩家名} {*技能/属性名} {困难/极难} {调整值}` 形式的属性或技能鉴定时，必须调用 `check.roll_room_check`，不要自行猜测数值或编造骰点。

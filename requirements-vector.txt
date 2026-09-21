@@ -1,3 +1,3 @@
-# Optional local vector/embedding stack (Docker is not required)
-qdrant-client>=1.12,<2
+# Optional local embedding model stack (the embedded vector store uses the
+# standard-library sqlite3 module and needs no extra database package).
 sentence-transformers>=3.0,<6

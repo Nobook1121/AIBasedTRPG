@@ -1001,6 +1001,14 @@
     font-style: italic;
 }
 
+@media (prefers-reduced-motion: reduce) {
+    .thinking-dot {
+        animation: none;
+        opacity: 0.7;
+        transform: scale(0.8);
+    }
+}
+
 /* 玩家消息右对齐增强 */
 .message.player-message {
     flex-direction: row-reverse;

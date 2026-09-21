@@ -23,11 +23,16 @@
     </div>
     <div class="message-content markdown-body" data-user-content="true">{{{ contentHtml }}}</div>
     {{{ processingHtml }}}
+    {{{ knowledgeHtml }}}
 </div>
 </template>
 
 <template id="chat-processing-time">
 <div class="processing-time">{{ text }}</div>
+</template>
+
+<template id="chat-knowledge-usage">
+<div class="knowledge-usage" title="{{ title }}"><i class="fa fa-book" aria-hidden="true"></i> {{ text }}</div>
 </template>
 
 <template id="chat-welcome">

@@ -1,6 +1,7 @@
 interface Window {
     restoreThinkingState?: () => void;
     resumePendingAIRequest?: () => void;
+    startScenario?: () => Promise<void>;
     TRPG?: TrpgNamespace;
     TrpgApi: TrpgApiClient;
     TrpgDom: TrpgDomClient;

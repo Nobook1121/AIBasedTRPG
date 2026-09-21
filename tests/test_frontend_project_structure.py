@@ -137,7 +137,40 @@ def test_chat_tool_messages_render_before_final_ai_reply():
     assert "if (toolMessages.length > 0) {" in chat_source
     assert "moveThinkingMessageToEnd(thinkingMessageId);" in chat_source
     assert chat_source.index("for (const toolMessage of toolMessages)") < chat_source.index("replaceThinkingMessage(")
+
+
+def test_room_scenario_start_control_uses_hidden_ai_start_flow():
+    room_html = (ROOT / "frontend/src/index/fragments/02-main-tabs.html").read_text(encoding="utf-8")
+    rooms_source = (ROOT / "frontend/src/app/rooms.ts").read_text(encoding="utf-8")
+    chat_source = (ROOT / "frontend/src/app/chat.ts").read_text(encoding="utf-8")
+
+    assert 'id="startScenario"' in room_html
+    assert 'window.startScenario?.()' in rooms_source
+    assert "scenario_start: options.scenarioStart === true" in chat_source
+    assert "async function startScenario" in chat_source
+
+
+def test_chat_persists_and_renders_knowledge_usage_below_kp_message():
+    chat_source = (ROOT / "frontend/src/app/chat.ts").read_text(encoding="utf-8")
+    chat_template = (ROOT / "frontend/src/templates/chat.html").read_text(encoding="utf-8")
+
+    assert "knowledge_usage?: KnowledgeUsage" in chat_source
+    assert "knowledgeUsage: data.knowledge_usage" in chat_source
+    assert "renderKnowledgeUsage" in chat_source
+    assert 'id="chat-knowledge-usage"' in chat_template
     assert chat_source.index("replaceThinkingMessage(") < chat_source.index("for (const directMessage of directMessages)")
+
+
+def test_chat_thinking_state_reports_backend_stages_with_reduced_motion_support():
+    chat_source = (ROOT / "frontend/src/app/chat.ts").read_text(encoding="utf-8")
+    styles = (ROOT / "frontend/src/styles/04-auth-profile-overrides.css").read_text(encoding="utf-8")
+
+    assert 'ai_request_id: aiRequestId' in chat_source
+    assert 'incoming.type === "ai_thinking_stage"' in chat_source
+    assert "function updateThinkingStage(" in chat_source
+    assert 'data-thinking-label' in chat_source
+    assert 'aria-live="polite"' in chat_source
+    assert "@media (prefers-reduced-motion: reduce)" in styles
 
 
 def test_main_tabs_have_decorated_page_headers():

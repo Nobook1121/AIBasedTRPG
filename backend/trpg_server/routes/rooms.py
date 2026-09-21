@@ -13,6 +13,7 @@ from trpg_server.role_config import load_roles
 from trpg_server.security import is_socket_user_online, safe_join
 from trpg_server.settings import CONFIG_DIR, ROOMS_DIR, SCENARIOS_DIR
 from trpg_server.agents.versioning import migrate_room_binding
+from trpg_server.agents.trigger_system import find_trigger_definition, record_trigger, validate_trigger
 from trpg_server.scenario_store import load_scenario_by_id
 
 bp = Blueprint("rooms", __name__)
@@ -359,6 +360,8 @@ def _room_summary(info):
         "scenario_id": info.get("scenario_id"),
         "scenario_version": info.get("scenario_version"),
         "scenario_title": info.get("scenario_title"),
+        "scenario_started_at": info.get("scenario_started_at"),
+        "scenario_started_by": info.get("scenario_started_by"),
         "creator_id": info.get("creator_id"),
         "creator_name": info.get("creator_name"),
         "members": [
@@ -840,7 +843,24 @@ def trigger_room_scenario(room_id):
     if not scenario:
         return error_response("Scenario not found", 404, "Scenario not found")
 
-    trigger_message = build_trigger_message(scenario, trigger_id)
+    room_state = read_json(room_dir / "state.json", default={})
+    new_trigger = find_trigger_definition(scenario, str(trigger_id))
+    if new_trigger:
+        validation = validate_trigger(str(trigger_id), {**(room_state if isinstance(room_state, dict) else {}), "scenario_version": info.get("scenario_version")}, scenario, audience="kp")
+        if not validation.get("ok"):
+            logger.info("trigger_rejected room_id=%s trigger_id=%s reason=%s", room_id, trigger_id, validation.get("reason"))
+            return error_response("Trigger condition is not satisfied", 409, validation.get("reason", "Trigger rejected"))
+        attachments = validation["trigger"].get("attachments", [])
+        contents = []
+        for attachment in attachments:
+            resource = attachment.get("resourceRef") or {}
+            if resource.get("content"):
+                contents.append(str(resource["content"]))
+            elif resource.get("url"):
+                contents.append(f"[{resource.get('alt')}]({resource.get('url')})")
+        trigger_message = {"sender_name": validation["trigger"].get("text") or f"触发器{trigger_id}", "content": "\n\n".join(contents), "metadata": {"trigger_id": trigger_id, "content_mode": "attachment"}}
+    else:
+        trigger_message = build_trigger_message(scenario, trigger_id)
     if not trigger_message:
         return error_response("Trigger not found", 404, "Trigger not found")
 
@@ -859,6 +879,8 @@ def trigger_room_scenario(room_id):
     messages.append(message)
     _write_messages(room_dir, messages)
     _write_room(room_dir, info)
+    if new_trigger:
+        record_trigger(room_dir, str(trigger_id), reason=str(data.get("reason") or "manual trigger"))
     log_user_action(
         logger,
         user_action_text(session.get("username"), "触发了场景触发器"),

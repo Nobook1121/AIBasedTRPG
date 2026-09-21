@@ -32,7 +32,7 @@ class RulesetAdapter(Protocol):
     display_name: str
     supported_locales: tuple[str, ...]
 
-    def extract(self, raw: bytes, filename: str) -> str: ...
+    def extract(self, raw: bytes, filename: str, ocr_provider: Any = None) -> str: ...
     def chunk(self, text: str, source: dict[str, Any]) -> list[RulesetChunk]: ...
     def classify_query(self, query: str) -> str | None: ...
 
@@ -51,8 +51,8 @@ class COC7Adapter:
         "faq": ("faq", "常见问题"),
     }
 
-    def extract(self, raw: bytes, filename: str) -> str:
-        return extract_script_text(raw, filename)
+    def extract(self, raw: bytes, filename: str, ocr_provider: Any = None) -> str:
+        return extract_script_text(raw, filename, ocr_provider=ocr_provider)
 
     def classify_query(self, query: str) -> str | None:
         value = str(query or "").casefold()

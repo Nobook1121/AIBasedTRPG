@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 import math
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -31,6 +31,7 @@ class KnowledgeChunk:
     embedding: list[float] | None = None
     source_ref: dict[str, Any] | None = None
     metadata: dict[str, Any] | None = None
+    attachments: list[dict[str, Any]] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -94,6 +95,7 @@ def build_knowledge_chunks(scenario: Mapping[str, Any] | None) -> list[Knowledge
                 embedding=module.get("embedding") if isinstance(module.get("embedding"), list) else None,
                 source_ref=module.get("source_ref") if isinstance(module.get("source_ref"), dict) else None,
                 metadata=module.get("metadata") if isinstance(module.get("metadata"), dict) else None,
+                attachments=module.get("attachments") if isinstance(module.get("attachments"), list) else None,
             )
         )
     return chunks
@@ -181,7 +183,22 @@ class KnowledgeBaseService:
         if query_vector and self.vector_store is not None:
             try:
                 collection = f"scenario_{scenario_id}_{scenario_version}"
-                vector_results = self.vector_store.search(collection, query_vector, limit=max(20, int(top_k) * 4))
+                query_store = getattr(self.vector_store, "query", None)
+                if callable(query_store):
+                    try:
+                        vector_results = query_store(
+                            query_vector,
+                            {
+                                "collection": collection,
+                                "scenario_id": scenario_id,
+                                "scenario_version": scenario_version,
+                            },
+                            max(20, int(top_k) * 4),
+                        )
+                    except NotImplementedError:
+                        vector_results = self.vector_store.search(collection, query_vector, limit=max(20, int(top_k) * 4))
+                else:
+                    vector_results = self.vector_store.search(collection, query_vector, limit=max(20, int(top_k) * 4))
                 allowed_ids = {chunk.chunk_id for chunk in filtered}
                 for item in vector_results:
                     payload = item.get("payload") if isinstance(item, dict) else {}
@@ -236,11 +253,52 @@ def knowledge_index_path(descriptor_path: Path, version: Any) -> Path:
     return base / "knowledge-index" / f"{version}.json"
 
 
-def persist_knowledge_index(descriptor_path: Path, scenario: Mapping[str, Any]) -> Path:
+def index_knowledge_chunks(
+    chunks: Iterable[KnowledgeChunk],
+    *,
+    vector_store: Any = None,
+    embedding_provider: Any = None,
+) -> list[KnowledgeChunk]:
+    """Fill missing embeddings and idempotently write chunks to a vector store."""
+    prepared = list(chunks)
+    missing = [index for index, chunk in enumerate(prepared) if not chunk.embedding]
+    if missing and embedding_provider is not None:
+        try:
+            vectors = embedding_provider.embed([prepared[index].text for index in missing])
+        except Exception:
+            vectors = []
+        for index, vector in zip(missing, vectors):
+            if isinstance(vector, list) and vector:
+                prepared[index] = replace(prepared[index], embedding=[float(value) for value in vector])
+    if vector_store is not None:
+        records = []
+        for chunk in prepared:
+            if not chunk.embedding:
+                continue
+            record = chunk.to_dict()
+            record["collection"] = f"scenario_{chunk.scenario_id}_{chunk.scenario_version}"
+            records.append(record)
+        if records:
+            vector_store.upsert(records)
+    return prepared
+
+
+def persist_knowledge_index(
+    descriptor_path: Path,
+    scenario: Mapping[str, Any],
+    *,
+    vector_store: Any = None,
+    embedding_provider: Any = None,
+) -> Path:
     version = _version(scenario, "scenario_version", "version", "version_id")
     path = knowledge_index_path(descriptor_path, version)
     path.parent.mkdir(parents=True, exist_ok=True)
-    write_json_atomic(path, [chunk.to_dict() for chunk in build_knowledge_chunks(scenario)])
+    chunks = index_knowledge_chunks(
+        build_knowledge_chunks(scenario),
+        vector_store=vector_store,
+        embedding_provider=embedding_provider,
+    )
+    write_json_atomic(path, [chunk.to_dict() for chunk in chunks])
     return path
 
 

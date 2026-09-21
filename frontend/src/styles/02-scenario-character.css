@@ -451,6 +451,12 @@
     border-radius: 6px;
 }
 
+.scenario-resource-panel { margin: 1rem 0; padding: 1rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--color-panel-muted); }
+.scenario-resource-dropzone { display: flex; align-items: center; justify-content: center; gap: .6rem; min-height: 84px; border: 1px dashed var(--color-accent); border-radius: var(--radius-sm); cursor: pointer; }
+.scenario-resource-dropzone.is-dragging { background: color-mix(in srgb, var(--color-accent) 12%, transparent); }
+.scenario-resource-list { display: grid; gap: .45rem; }
+.scenario-resource-row { display: flex; justify-content: space-between; gap: 1rem; padding: .55rem .7rem; border-radius: var(--radius-sm); background: var(--color-panel); }
+
 .scenario-module-entity-top {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

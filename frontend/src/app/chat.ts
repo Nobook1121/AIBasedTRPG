@@ -12,6 +12,27 @@ interface PendingAIMessage {
     time: string;
 }
 
+interface KnowledgeUsage {
+    used: boolean;
+    total_chunks: number;
+    cached?: boolean;
+    ruleset: {
+        called: boolean;
+        calls: number;
+        chunks: number;
+        sources: number;
+        ruleset_ids?: string[];
+        knowledge_versions?: string[];
+        topics?: string[];
+        citations?: string[];
+    };
+    scenario: { chunks: number };
+}
+
+interface SendAIOptions {
+    scenarioStart?: boolean;
+}
+
 interface CommandDefinition {
     name: string;
     usage: string;
@@ -32,6 +53,8 @@ interface ChatApiResponse {
     cache_hit_rate?: number;
     elapsed_ms?: number;
     cache_key?: string;
+    knowledge_usage?: KnowledgeUsage;
+    scenario_started_at?: string;
 }
 
 interface IncomingSocketMessage {
@@ -42,6 +65,8 @@ interface IncomingSocketMessage {
     aiRequestId?: string;
     roleName?: string;
     startedAt?: number;
+    stage?: string;
+    label?: string;
 }
 
 let isAIThinking = false;
@@ -200,7 +225,7 @@ function isRateLimited(rateLimit: number): boolean {
     return false;
 }
 
-async function sendToAI(chatInput: HTMLInputElement, sendButton: HTMLButtonElement): Promise<void> {
+async function sendToAI(chatInput: HTMLInputElement, sendButton: HTMLButtonElement, options: SendAIOptions = {}): Promise<void> {
     if (pendingMessages.length === 0) return;
     const requestMessages = pendingMessages.slice();
 
@@ -212,6 +237,7 @@ async function sendToAI(chatInput: HTMLInputElement, sendButton: HTMLButtonEleme
     const startTime = Date.now();
     const role = pendingMessages[0]?.role || aiRoles[0] || { id: "kp", name: "KP" };
     addThinkingMessage(thinkingMessageId, role.name || "KP", startTime);
+    updateThinkingStage(aiRequestId, "正在准备上下文", "preparing");
     persistThinkingState({ id: thinkingMessageId, roomId: getCurrentRoom()?.id || null, roleName: role.name || "KP", roleId: role.id || "kp", content: pendingMessages.map((message) => message.content).join("\n"), startedAt: startTime });
     broadcastAIThinkingStart(aiRequestId, role.name || "KP", startTime);
 
@@ -224,6 +250,8 @@ async function sendToAI(chatInput: HTMLInputElement, sendButton: HTMLButtonEleme
                 role_id: role.id || "kp",
                 user_id: getCurrentUserId(),
                 room_id: getCurrentRoom()?.id || null,
+                ai_request_id: aiRequestId,
+                scenario_start: options.scenarioStart === true,
             },
         });
         if (!response.ok) {
@@ -248,7 +276,7 @@ async function sendToAI(chatInput: HTMLInputElement, sendButton: HTMLButtonEleme
         if (toolMessages.length > 0) {
             moveThinkingMessageToEnd(thinkingMessageId);
         }
-        replaceThinkingMessage(thinkingMessageId, messageContent, processingTime, tokenCount, data.cache_hit_rate ?? null);
+        replaceThinkingMessage(thinkingMessageId, messageContent, processingTime, tokenCount, data.cache_hit_rate ?? null, data.knowledge_usage);
         broadcastAIThinkingEnd(aiRequestId);
         clearPersistedThinkingState(aiRequestId);
 
@@ -263,10 +291,18 @@ async function sendToAI(chatInput: HTMLInputElement, sendButton: HTMLButtonEleme
             cachedTokens: data.cached_tokens,
             cacheHitRate: data.cache_hit_rate,
             cacheKey: data.cache_key,
+            knowledgeUsage: data.knowledge_usage,
         });
         if (persisted) {
             persisted.sender_name = role.name || "KP";
             broadcastMessage(persisted);
+        }
+
+        if (options.scenarioStart && data.scenario_started_at) {
+            const room = getCurrentRoom();
+            if (room) room.scenario_started_at = data.scenario_started_at;
+            const startButton = document.getElementById("startScenario") as HTMLButtonElement | null;
+            if (startButton) startButton.hidden = true;
         }
 
         for (const directMessage of directMessages) {
@@ -290,6 +326,39 @@ async function sendToAI(chatInput: HTMLInputElement, sendButton: HTMLButtonEleme
             void sendToAI(chatInput, sendButton);
         }
     }
+}
+
+async function startScenario(): Promise<void> {
+    const room = getCurrentRoom();
+    if (!room || room.invisible_view) {
+        showNotification("请先进入可操作的房间", "error");
+        return;
+    }
+    if (!canManageCurrentRoom()) {
+        showNotification("只有房主或房间管理员可以开启剧本", "error");
+        return;
+    }
+    if (room.scenario_started_at) return;
+    if (isAIThinking || pendingMessages.length > 0) {
+        showNotification("请等待当前 AI 回复完成后再开启剧本", "info");
+        return;
+    }
+
+    const chatInput = document.getElementById("chatInput") as HTMLInputElement | null;
+    const sendButton = document.getElementById("sendButton") as HTMLButtonElement | null;
+    const startButton = document.getElementById("startScenario") as HTMLButtonElement | null;
+    if (!chatInput || !sendButton) return;
+
+    const role = aiRoles.find((item) => item.id === "kp") || aiRoles[0] || { id: "kp", name: "KP" };
+    pendingMessages.push({
+        sender: "系统",
+        content: "@KP 开启当前房间剧本",
+        role,
+        time: new Date().toLocaleTimeString(),
+    });
+    if (startButton) startButton.disabled = true;
+    await sendToAI(chatInput, sendButton, { scenarioStart: true });
+    if (startButton && !room.scenario_started_at) startButton.disabled = false;
 }
 
 function updateInputState(chatInput: HTMLInputElement, sendButton: HTMLButtonElement): void {
@@ -622,7 +691,7 @@ function addMessage(
     if (message?.avatar) messageDiv.setAttribute("data-avatar", message.avatar);
 
     const displayTime = message?.time || message?.timestamp || new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    const renderedContent = isThinking ? chatEscapeHtml(content) : renderMarkdown(content);
+    const renderedContent = isThinking ? renderThinkingContent(content) : renderMarkdown(content);
     const avatarSrc = getAvatarSrc(type, message);
 
     messageDiv.innerHTML = window.TrpgTemplates.render("chat-message", {
@@ -631,6 +700,7 @@ function addMessage(
         displayTime,
         contentHtml: renderedContent,
         processingHtml: renderProcessingTime(type, processingTime, tokenCount, cacheHitRate),
+        knowledgeHtml: type === "kp" ? renderKnowledgeUsage(message?.metadata?.knowledgeUsage as KnowledgeUsage | undefined) : "",
     });
     chatHistory.appendChild(messageDiv);
     chatHistory.scrollTop = chatHistory.scrollHeight;
@@ -652,13 +722,43 @@ function addThinkingMessage(messageId: string | number, roleName = "KP", started
     startThinkingElapsedTimer(String(messageId), startedAt);
 }
 
-function replaceThinkingMessage(messageId: string | number, newContent: string, processingTime: number, tokenCount: number | null, cacheHitRate: number | null = null): void {
+function renderKnowledgeUsage(usage?: KnowledgeUsage): string {
+    if (!usage) return "";
+    const parts: string[] = [];
+    if (usage.ruleset.called) parts.push(`规则书 ${usage.ruleset.chunks} 段`);
+    else parts.push("规则书未调用");
+    if (usage.scenario.chunks > 0) parts.push(`剧本 ${usage.scenario.chunks} 段`);
+    if (!usage.used && !usage.ruleset.called) parts.splice(0, parts.length, "本次未调用知识库");
+    if (usage.cached) parts.push("缓存结果");
+    const citations = usage.ruleset.citations || [];
+    return window.TrpgTemplates.render("chat-knowledge-usage", {
+        text: `知识库：${parts.join(" · ")}`,
+        title: citations.length > 0 ? `规则书来源：${citations.join("；")}` : "显示本次回复实际检索的知识库用量",
+    });
+}
+
+function renderThinkingContent(label: string): string {
+    return `<div class="thinking-content" aria-live="polite" data-thinking-content>`
+        + `<span class="thinking-animation" aria-hidden="true"><span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span></span>`
+        + `<span class="thinking-text" data-thinking-label>${chatEscapeHtml(label)}</span>`
+        + `</div>`;
+}
+
+function updateThinkingStage(aiRequestId: string, label: string, stage = ""): void {
+    const messageElement = document.querySelector<HTMLElement>(`.message.thinking.kp-message[data-ai-request-id="${aiRequestId}"]`);
+    if (!messageElement) return;
+    const labelElement = messageElement.querySelector<HTMLElement>("[data-thinking-label]");
+    if (labelElement && label) labelElement.textContent = label;
+    if (stage) messageElement.setAttribute("data-thinking-stage", stage);
+}
+
+function replaceThinkingMessage(messageId: string | number, newContent: string, processingTime: number, tokenCount: number | null, cacheHitRate: number | null = null, knowledgeUsage?: KnowledgeUsage): void {
     stopThinkingElapsedTimer(String(messageId));
     const targetMessage = document.querySelector<HTMLElement>(`.message.thinking.kp-message[data-ai-request-id="${String(messageId)}"]`)
         || document.querySelector<HTMLElement>(`.message[data-id="${messageId}"]`);
 
     if (!targetMessage) {
-        addMessage("kp", "KP", newContent, null, false, processingTime, tokenCount, cacheHitRate);
+        addMessage("kp", "KP", newContent, null, false, processingTime, tokenCount, cacheHitRate, { content: newContent, metadata: { knowledgeUsage } });
         return;
     }
 
@@ -677,6 +777,14 @@ function replaceThinkingMessage(messageId: string | number, newContent: string, 
     }
 
     processingTimeDiv.textContent = processingTimeText(processingTime, tokenCount, cacheHitRate);
+    targetMessage.querySelector(".knowledge-usage")?.remove();
+    const knowledgeHtml = renderKnowledgeUsage(knowledgeUsage);
+    if (knowledgeHtml) {
+        const wrapper = document.createElement("div");
+        wrapper.innerHTML = knowledgeHtml;
+        const knowledgeElement = wrapper.firstElementChild;
+        if (knowledgeElement) targetMessage.querySelector(".message-content-container")?.appendChild(knowledgeElement);
+    }
 
     const chatHistory = document.getElementById("chatHistory");
     if (chatHistory) chatHistory.scrollTop = chatHistory.scrollHeight;
@@ -928,7 +1036,7 @@ function handleIncomingMessage(data: unknown): void {
     if (!incoming) return;
     const room = getCurrentRoom();
     if (incoming.room_id && room?.id !== incoming.room_id) return;
-    if (incoming.type === "ai_thinking_start" || incoming.type === "ai_thinking_end") {
+    if (incoming.type === "ai_thinking_start" || incoming.type === "ai_thinking_stage" || incoming.type === "ai_thinking_end") {
         handleAIThinkingEvent(incoming);
         return;
     }
@@ -948,8 +1056,15 @@ function handleAIThinkingEvent(incoming: IncomingSocketMessage): void {
         clearThinkingMessage(aiRequestId);
         return;
     }
+    if (incoming.type === "ai_thinking_stage") {
+        updateThinkingStage(aiRequestId, incoming.label || "AI 正在思考中...", incoming.stage || "");
+        return;
+    }
     const selector = `.message.thinking.kp-message[data-ai-request-id="${aiRequestId}"]`;
-    if (document.querySelector(selector)) return;
+    if (document.querySelector(selector)) {
+        updateThinkingStage(aiRequestId, incoming.label || "AI 正在思考中...", incoming.stage || "");
+        return;
+    }
     // Use the receiving browser's clock. Sender clocks can differ and produce
     // negative or wildly inflated elapsed times for other players.
     addThinkingMessage(aiRequestId, incoming.roleName || "KP", Date.now());
@@ -988,4 +1103,5 @@ window.reconnectSocket = reconnectSocket;
 window.disconnectSocket = disconnectSocket;
 window.loadAIRoles = loadAIRoles;
 window.restoreThinkingState = restoreThinkingState;
+window.startScenario = startScenario;
 window.resumePendingAIRequest = resumePendingAIRequest;

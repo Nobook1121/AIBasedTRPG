@@ -10,6 +10,8 @@ class HashedTokenEmbedding:
     configured = True
 
     def __init__(self, dimensions: int = 256): self.dimensions = max(8, int(dimensions))
+    def health(self) -> dict:
+        return {"backend": "hashed", "configured": True, "loaded": True, "dimensions": self.dimensions}
     def embed(self, texts: Sequence[str]) -> list[list[float]]:
         vectors=[]
         for text in texts:
@@ -25,6 +27,14 @@ class OpenAICompatibleEmbeddingProvider:
         self.base_url, self.api_key, self.model, self.dimensions, self.timeout = base_url, api_key, model, int(dimensions), timeout; self.fallback=HashedTokenEmbedding(self.dimensions)
     @property
     def configured(self): return bool(self.base_url and self.api_key and self.model)
+    def health(self) -> dict:
+        return {
+            "backend": "openai-compatible",
+            "configured": self.configured,
+            "loaded": self.configured,
+            "model": self.model,
+            "dimensions": self.dimensions,
+        }
     def embed(self, texts: Sequence[str]) -> list[list[float]]:
         if not self.configured: return self.fallback.embed(texts)
         try:
@@ -39,23 +49,32 @@ class OpenAICompatibleEmbeddingProvider:
 class LocalSentenceTransformerEmbedding:
     configured = True
 
-    def __init__(self, model_path: str | Path):
-        self.model_path=Path(model_path); self._model=None; self.dimensions=None
+    def __init__(self, model_path: str | Path, fallback_dimensions: int = 256):
+        self.model_path=Path(model_path); self._model=None; self.dimensions=None; self.fallback=HashedTokenEmbedding(fallback_dimensions)
     def _load(self):
         if self._model is None:
             from sentence_transformers import SentenceTransformer
             self._model=SentenceTransformer(str(self.model_path), local_files_only=True)
-            get_dimensions = getattr(self._model, "get_sentence_embedding_dimension", None)
+            get_dimensions = getattr(self._model, "get_embedding_dimension", None) or getattr(self._model, "get_sentence_embedding_dimension", None)
             if callable(get_dimensions):
                 self.dimensions = get_dimensions()
         return self._model
+    def health(self) -> dict:
+        try:
+            self._load()
+            return {"backend": "sentence-transformers", "configured": True, "loaded": True, "model": str(self.model_path), "dimensions": self.dimensions}
+        except Exception as exc:
+            return {"backend": "sentence-transformers", "configured": True, "loaded": False, "model": str(self.model_path), "dimensions": self.dimensions, "error": str(exc)}
     def embed(self, texts: Sequence[str]) -> list[list[float]]:
-        vectors = self._load().encode(list(texts), normalize_embeddings=True).tolist()
+        try:
+            vectors = self._load().encode(list(texts), normalize_embeddings=True).tolist()
+        except Exception:
+            return self.fallback.embed(texts)
         if vectors and self.dimensions is None:
             self.dimensions = len(vectors[0])
         return vectors
 
 def select_embedding_provider(*, local_model_path: str|Path|None=None, base_url: str|None=None, api_key: str|None=None, model: str|None=None, dimensions: int=256):
-    if local_model_path and Path(local_model_path).is_dir(): return LocalSentenceTransformerEmbedding(local_model_path)
+    if local_model_path and Path(local_model_path).is_dir(): return LocalSentenceTransformerEmbedding(local_model_path, dimensions)
     if base_url and api_key and model: return OpenAICompatibleEmbeddingProvider(base_url, api_key, model, dimensions)
     return HashedTokenEmbedding(dimensions)
