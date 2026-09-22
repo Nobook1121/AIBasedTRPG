@@ -25,7 +25,7 @@ from trpg_server.agents.memory import remember_room_fact
 from trpg_server.agents.room_state import append_room_event, project_room_state
 from trpg_server.agents.trigger_system import find_trigger_definition, record_trigger, validate_trigger
 from trpg_server.json_store import read_json, write_json_atomic
-from trpg_server.logging_config import log_user_action, user_action_text
+from trpg_server.logging_config import log_user_action, redact_sensitive, user_action_text
 from trpg_server.responses import error_response, success_response
 from trpg_server.role_config import load_roles, provider_small_model_config, select_role_for_content
 from trpg_server.settings import (
@@ -211,7 +211,7 @@ def _mark_scenario_started(room_dir, user_id):
 
 
 def _json_for_log(value):
-    return json.dumps(value, ensure_ascii=False, default=str)
+    return json.dumps(redact_sensitive(value), ensure_ascii=False, default=str)
 
 
 def _emit_thinking_stage(room_id, ai_request_id, stage, label):

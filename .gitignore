@@ -18,6 +18,7 @@ trpg_server/**/__pycache__/
 
 # Runtime data
 /data/runtime/
+/backend/data/runtime/
 /data/characters/*
 /data/history/
 /data/history/*

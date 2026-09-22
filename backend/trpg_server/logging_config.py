@@ -8,14 +8,22 @@ from typing import Any
 SENSITIVE_KEYS = {
     "api_key",
     "api-key",
+    "apikey",
     "authorization",
     "cookie",
     "set-cookie",
     "auth_token",
+    "accesstoken",
+    "access_token",
+    "refresh_token",
+    "session_token",
+    "csrf_token",
     "token",
     "password",
     "secret",
     "secret_key",
+    "private_key",
+    "client_secret",
 }
 MAX_LOG_VALUE_LENGTH = 200
 LEVEL_LABELS = {
@@ -37,12 +45,36 @@ class CompactFormatter(logging.Formatter):
 def redact_sensitive(value: Any) -> Any:
     if isinstance(value, dict):
         return {
-            key: "***" if str(key).lower() in SENSITIVE_KEYS else redact_sensitive(item)
+            key: "***" if _is_sensitive_key(key) else redact_sensitive(item)
             for key, item in value.items()
         }
     if isinstance(value, list):
         return [redact_sensitive(item) for item in value]
     return value
+
+
+def _is_sensitive_key(key: Any) -> bool:
+    normalized = str(key).strip().lower().replace("-", "_")
+    compact = normalized.replace("_", "")
+    if normalized in SENSITIVE_KEYS or compact in {
+        "apikey",
+        "authorization",
+        "cookie",
+        "setcookie",
+        "authtoken",
+        "accesstoken",
+        "refreshtoken",
+        "sessiontoken",
+        "csrftoken",
+        "token",
+        "password",
+        "secret",
+        "secretkey",
+        "privatekey",
+        "clientsecret",
+    }:
+        return True
+    return compact.endswith(("apikey", "accesstoken", "refreshtoken", "sessiontoken", "csrftoken", "password", "secret", "privatekey"))
 
 
 def user_action_text(username: Any = None, action: str = "进行了操作") -> str:

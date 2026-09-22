@@ -98,3 +98,23 @@ def test_compact_formatter_uses_thread_name_in_log_format():
     rendered = CompactFormatter("[%(asctime)s][%(levelname)s][%(threadName)s] %(message)s").format(record)
 
     assert "[INFO][trpg-console-commands] promoted" in rendered
+
+
+def test_redact_sensitive_covers_api_key_variants_recursively():
+    from trpg_server.logging_config import redact_sensitive
+
+    payload = redact_sensitive(
+        {
+            "apiKey": "top-secret",
+            "providerApiKey": "also-secret",
+            "headers": {"Authorization": "Bearer secret"},
+            "nested": [{"clientSecret": "client-secret"}],
+            "message": "safe",
+        }
+    )
+
+    assert payload["apiKey"] == "***"
+    assert payload["providerApiKey"] == "***"
+    assert payload["headers"]["Authorization"] == "***"
+    assert payload["nested"][0]["clientSecret"] == "***"
+    assert payload["message"] == "safe"
