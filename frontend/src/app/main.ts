@@ -9,6 +9,11 @@ async function initializeApplication(): Promise<void> {
     await window.TrpgI18n?.ready;
     window.TrpgI18n?.apply();
 
+    if (await SetupWizard.init()) {
+        // 向导处于激活状态：用户点击“跳过全部引导”后继续初始化主应用。
+        await SetupWizard.whenSkipped();
+    }
+
     toolManager = new ToolManager();
     window.toolManager = toolManager;
 

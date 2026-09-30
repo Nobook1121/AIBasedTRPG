@@ -93,6 +93,23 @@ def _assistant_tool_call_message(message: dict[str, Any]) -> dict[str, Any]:
     return clean_message
 
 
+def _truncate_tool_result(result: dict[str, Any], max_chars: int | None) -> tuple[str, str]:
+    """Serialize a tool result for re-sending to the model, truncating when it
+    exceeds ``max_chars``. Returns ``(payload, display_text)`` where payload is
+    what is sent back to the model and display_text is a human-friendly marker.
+    The original result is not truncated for UI/tool_messages purposes.
+    """
+    payload = json.dumps(result, ensure_ascii=False)
+    if not max_chars or len(payload) <= max_chars:
+        return payload, payload
+    truncated = payload[:max_chars]
+    marker = "\n…[工具结果已截断：完整结果共 %d 字符，仅保留前 %d 字符]" % (
+        len(payload),
+        max_chars,
+    )
+    return truncated + marker, truncated + marker
+
+
 def run_agent_completion(
     requester: Callable[[dict[str, Any]], dict[str, Any]],
     base_payload: dict[str, Any],
@@ -100,6 +117,7 @@ def run_agent_completion(
     registry: ToolRegistry,
     context: Any,
     max_tool_rounds: int = 8,
+    max_tool_result_chars: int | None = None,
 ) -> AgentCompletionResult:
     payload = {**base_payload}
     messages = list(payload.get("messages", []))
@@ -135,6 +153,8 @@ def run_agent_completion(
     stage_callback = tool_state.get("thinking_stage_callback") if isinstance(tool_state, dict) else None
 
     for _round in range(max_tool_rounds + 1):
+        if isinstance(tool_state, dict):
+            tool_state["agent_request_rounds"] = _round + 1
         if callable(stage_callback):
             stage_callback("ai_request", "正在请求 AI")
         response_data = requester(payload)
@@ -193,6 +213,10 @@ def run_agent_completion(
                 return AgentCompletionResult(error=f"Tool {tool_name} is not enabled for agent {profile.id}")
             if callable(stage_callback):
                 stage_callback("tool_call", f"正在执行工具：{resolved_name}")
+            if isinstance(tool_state, dict):
+                trace = tool_state.setdefault("tool_call_trace", [])
+                if isinstance(trace, list):
+                    trace.append(resolved_name)
             try:
                 arguments = _parse_arguments(function.get("arguments"))
                 result = tool.handler(arguments, context)
@@ -225,12 +249,13 @@ def run_agent_completion(
             if isinstance(result, dict) and isinstance(result.get("visible_message"), dict):
                 tool_messages.append(result["visible_message"])
 
+            result_payload, _ = _truncate_tool_result(result, max_tool_result_chars)
             messages.append(
                 {
                     "role": "tool",
                     "tool_call_id": call.get("id") or tool_name,
                     "name": resolved_name,
-                    "content": json.dumps(result, ensure_ascii=False),
+                    "content": result_payload,
                 }
             )
 

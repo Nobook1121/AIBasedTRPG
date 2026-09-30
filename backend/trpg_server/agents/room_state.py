@@ -26,6 +26,8 @@ def _default_state() -> dict[str, Any]:
         "event_log": [],
         "triggeredFiles": [],
         "triggerHistory": [],
+        "completed": False,
+        "ending_reached": False,
     }
 
 

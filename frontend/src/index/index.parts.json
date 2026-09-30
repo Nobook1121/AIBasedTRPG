@@ -1,7 +1,8 @@
-﻿[
+[
   "fragments/01-head-and-sidebar.html",
   "fragments/02-main-tabs.html",
   "fragments/03-room-tools-auth-settings.html",
   "fragments/04-editor-modals.html",
+  "fragments/06-setup-wizard.html",
   "fragments/05-platform-modals-and-scripts.html"
 ]

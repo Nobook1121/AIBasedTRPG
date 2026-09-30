@@ -11,6 +11,7 @@ from trpg_server.agents.tools.room import (
 )
 from trpg_server.agents.tools.trigger import REVEAL_SCENARIO_TRIGGER_TOOL
 from trpg_server.agents.tools.knowledge import SEARCH_RULESET_KNOWLEDGE_TOOL
+from trpg_server.agents.tools.suggest import SUGGEST_ACTIONS_TOOL
 
 
 def default_tool_registry() -> ToolRegistry:
@@ -31,5 +32,6 @@ def default_tool_registry() -> ToolRegistry:
             ROLL_DICE_FUNCTION_TOOL,
             REVEAL_SCENARIO_TRIGGER_TOOL,
             SEARCH_RULESET_KNOWLEDGE_TOOL,
+            SUGGEST_ACTIONS_TOOL,
         ]
     )

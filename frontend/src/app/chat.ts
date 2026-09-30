@@ -55,6 +55,10 @@ interface ChatApiResponse {
     cache_key?: string;
     knowledge_usage?: KnowledgeUsage;
     scenario_started_at?: string;
+    ending_reached?: boolean;
+    archived?: boolean;
+    suggestions?: string[];
+    suggestions_owner?: string | number;
 }
 
 interface IncomingSocketMessage {
@@ -67,6 +71,8 @@ interface IncomingSocketMessage {
     startedAt?: number;
     stage?: string;
     label?: string;
+    suggestions?: string[];
+    ownerId?: string | number | null;
 }
 
 let isAIThinking = false;
@@ -77,6 +83,7 @@ let aiName = "KP";
 let aiAvatar = "/assets/avatars/default_kp.jpg";
 let aiRoles: ChatRoleConfig[] = [{ id: "kp", name: "KP", wake_words: ["@KP"] }];
 let socket: SocketLike | null = null;
+let activeSuggestions: string[] | null = null;
 const thinkingTimers = new Map<string, number>();
 const THINKING_STORAGE_KEY = "trpg_ai_thinking";
 
@@ -191,6 +198,12 @@ function initChat(): void {
         await sendVisibleMessage("player", message);
         if (!isAIMessage || !matchedRole) return;
 
+        const currentRoomForSend = getCurrentRoom();
+        if (currentRoomForSend?.archived) {
+            showNotification("该房间已归档，AI 已关闭；仍可使用骰娘等房间工具", "info");
+            return;
+        }
+
         pendingMessages.push({
             sender: getCurrentUsername(),
             content: message,
@@ -298,11 +311,33 @@ async function sendToAI(chatInput: HTMLInputElement, sendButton: HTMLButtonEleme
             broadcastMessage(persisted);
         }
 
+        // Action suggestions returned by the KP tool are transient UI state: the
+        // requesting player may click one to auto-send it, everyone else in the
+        // room sees the same buttons read-only. Never persisted as a message.
+        if (data.suggestions && data.suggestions.length > 0) {
+            showActionSuggestions(data.suggestions, data.suggestions_owner ?? null);
+            broadcastActionSuggestions(data.suggestions, data.suggestions_owner ?? null);
+        } else {
+            clearActionSuggestions(true);
+        }
+
         if (options.scenarioStart && data.scenario_started_at) {
             const room = getCurrentRoom();
             if (room) room.scenario_started_at = data.scenario_started_at;
             const startButton = document.getElementById("startScenario") as HTMLButtonElement | null;
             if (startButton) startButton.hidden = true;
+        }
+
+        if (data.ending_reached) {
+            const room = getCurrentRoom();
+            if (room) {
+                room.completed_at = room.completed_at || new Date().toISOString();
+                room.archived = room.archived === true;
+                window.refreshRoomArchiveUi?.();
+            }
+            if (!room?.archived) {
+                showNotification("剧本已到达结局，房主/管理员可点击“归档房间”进行归档", "success");
+            }
         }
 
         for (const directMessage of directMessages) {
@@ -907,6 +942,7 @@ function renderChatMessages(messages: ChatMessage[]): void {
 
     chatHistory.innerHTML = "";
     hideWelcomeText();
+    clearActionSuggestions(false);
     messages.forEach((message) => renderRoomMessage(message));
     chatHistory.scrollTop = chatHistory.scrollHeight;
 }
@@ -953,6 +989,7 @@ function clearChatMessages(): void {
     const chatHistory = document.getElementById("chatHistory");
     if (!chatHistory) return;
     chatHistory.innerHTML = window.TrpgTemplates.render("chat-welcome");
+    clearActionSuggestions(false);
 }
 
 function hideWelcomeText(): void {
@@ -1031,6 +1068,76 @@ function broadcastAIThinkingEnd(aiRequestId: string): void {
     });
 }
 
+function showActionSuggestions(actions: string[], ownerId: string | number | null): void {
+    const container = document.getElementById("aiSuggestions");
+    if (!container) return;
+    const cleaned = (Array.isArray(actions) ? actions : [])
+        .map((item) => String(item ?? "").trim())
+        .filter((item) => item.length > 0);
+    if (cleaned.length === 0) {
+        clearActionSuggestions(false);
+        return;
+    }
+    const isOwner = ownerId === null || ownerId === undefined
+        || String(ownerId) === String(getCurrentUserId() ?? "");
+    container.innerHTML = "";
+    cleaned.forEach((action) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "btn btn-sm chat-suggestion-btn";
+        button.textContent = action;
+        if (isOwner) {
+            button.addEventListener("click", () => applyActionSuggestion(action));
+        } else {
+            button.disabled = true;
+            button.classList.add("chat-suggestion-btn-readonly");
+            button.title = "仅发起本次 AI 请求的玩家可以选择";
+        }
+        container.appendChild(button);
+    });
+    container.hidden = false;
+    activeSuggestions = cleaned;
+}
+
+function clearActionSuggestions(broadcast: boolean): void {
+    const container = document.getElementById("aiSuggestions");
+    if (container) {
+        container.innerHTML = "";
+        container.hidden = true;
+    }
+    const hadSuggestions = activeSuggestions !== null;
+    activeSuggestions = null;
+    if (broadcast && hadSuggestions) broadcastActionSuggestionsClear();
+}
+
+function applyActionSuggestion(action: string): void {
+    const chatInput = document.getElementById("chatInput") as HTMLInputElement | null;
+    const sendButton = document.getElementById("sendButton") as HTMLButtonElement | null;
+    if (!chatInput || !sendButton) return;
+    const wakeWord = aiRoles[0]?.wake_words?.[0] || "@KP";
+    chatInput.value = `${wakeWord} ${action}`;
+    clearActionSuggestions(true);
+    sendButton.click();
+}
+
+function broadcastActionSuggestions(actions: string[], ownerId: string | number | null): void {
+    if (!socket?.connected) return;
+    socket.emit("send_message", {
+        room_id: getCurrentRoom()?.id || null,
+        type: "ai_suggestions",
+        suggestions: actions,
+        ownerId,
+    });
+}
+
+function broadcastActionSuggestionsClear(): void {
+    if (!socket?.connected) return;
+    socket.emit("send_message", {
+        room_id: getCurrentRoom()?.id || null,
+        type: "ai_suggestions_clear",
+    });
+}
+
 function handleIncomingMessage(data: unknown): void {
     const incoming = normalizeIncomingMessage(data);
     if (!incoming) return;
@@ -1038,6 +1145,14 @@ function handleIncomingMessage(data: unknown): void {
     if (incoming.room_id && room?.id !== incoming.room_id) return;
     if (incoming.type === "ai_thinking_start" || incoming.type === "ai_thinking_stage" || incoming.type === "ai_thinking_end") {
         handleAIThinkingEvent(incoming);
+        return;
+    }
+    if (incoming.type === "ai_suggestions") {
+        showActionSuggestions(incoming.suggestions || [], incoming.ownerId ?? null);
+        return;
+    }
+    if (incoming.type === "ai_suggestions_clear") {
+        clearActionSuggestions(false);
         return;
     }
     if (incoming.message) {

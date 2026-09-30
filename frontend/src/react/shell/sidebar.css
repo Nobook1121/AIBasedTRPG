@@ -12,10 +12,31 @@
     top: 0;
     left: 0;
     z-index: 1000;
-    overflow-y: hidden;
+    /* 导航项过多或窗口较矮时允许下滑，避免菜单被裁掉且无法访问 */
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--theme-sidebar-active-bg) transparent;
     color: var(--theme-sidebar-text);
     background-color: var(--theme-sidebar-bg);
     transition: width 0.3s ease;
+}
+
+/* 侧栏滚动条跟随侧栏自身的配色，而非页面正文的滚动条配色 */
+#sidebar::-webkit-scrollbar {
+    width: 8px;
+}
+
+#sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#sidebar::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--theme-sidebar-text) 42%, transparent);
+    border-radius: var(--theme-radius-sm);
+}
+
+#sidebar::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--theme-sidebar-text) 68%, transparent);
 }
 
 #sidebar .nav-link {

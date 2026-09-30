@@ -9,6 +9,7 @@
 - `GET /assets/avatars/<path:filename>`：读取用户头像。
 - `GET /assets/scenario_covers/<path:filename>`：读取剧本封面。
 - `GET /assets/aiplatform/<path:filename>`：读取 AI 平台图标。
+- `GET /assets/theme/<path:filename>`：读取界面主题静态资源（如主题背景图）。
 - `GET /config/<path:filename>`：读取客户端配置文件。
 
 ## Scenarios
@@ -44,6 +45,13 @@
 - `POST /api/config/aiplatform/<platform>/test`：测试 AI 平台连接。
 - `POST /api/config/aimodel/save`：保存 AI 模型请求 JSON 配置。
 - `POST /api/config/aimodel/delete`：删除 AI 模型请求 JSON 配置。
+
+## Themes（无头主题 API）
+
+- `GET /api/themes`：只读主题目录与设计 token 契约，供第三方开发者为网页开发自定义主题与组件。
+  - 返回 `default_theme`、`selectors`（主题选择器值与对应主题 id，含 `system`）、`themes`（每个主题的 `id`、`label_key`、`body_classes`、`color_scheme` 与 `tokens`）。
+  - `token_contract.css_variables` 给出 token 键名到 CSS 变量的映射；组件只要使用这些 `--theme-*` 变量即可自动适配全部主题。
+  - 该接口为纯新增能力，不改变现有主题切换逻辑：运行时主题仍由 `body` 上的类名（`theme-light`、`theme-dark`、`theme-cyber-2`、`theme-tome`）决定。
 
 ## Chat
 

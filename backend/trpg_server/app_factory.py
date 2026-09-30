@@ -12,7 +12,7 @@ from pathlib import Path
 from trpg_server.logging_config import configure_logging
 from trpg_server.security import register_session_guard
 from trpg_server.socket_events import register_socket_events
-from trpg_server.settings import LOGS_DIR, SECRET_KEY, SESSION_COOKIE_SECURE, USERS_DIR, WEAPONS_DIR
+from trpg_server.settings import LOGS_DIR, SECRET_KEY, SESSION_COOKIE_SECURE, USERS_DIR, WEAPONS_DIR, ROOM_ARCHIVES_DIR
 from trpg_server.settings import SCENARIO_IMPORTS_DIR, SCENARIO_IMPORT_MAX_BYTES, SCENARIO_IMPORT_WORKERS
 from trpg_server.settings import VECTOR_DB_URL, VECTOR_DB_PATH, VECTOR_DB_API_KEY, VECTOR_BACKEND, VECTOR_BACKEND_EXPLICIT, EMBEDDED_VECTOR_DB_PATH, SCENARIOS_DIR, EMBEDDING_BASE_URL, EMBEDDING_API_KEY, EMBEDDING_MODEL, EMBEDDING_DIMENSIONS, OCR_ENABLED, OCR_LANG, LOCAL_EMBEDDING_MODEL_PATH, PADDLEOCR_HOME, AI_PLATFORM_SECRET_DIR, CONFIG_DIR
 from trpg_server.agents.vector_store import create_vector_store
@@ -42,6 +42,7 @@ def create_app(config=None):
         USERS_FILE=USERS_DIR / "users.json",
         USER_IP_CONFIG_DIR=USERS_DIR / "ip_configs",
         WEAPONS_DIR=WEAPONS_DIR,
+        ROOM_ARCHIVES_DIR=ROOM_ARCHIVES_DIR,
         SCENARIO_IMPORTS_DIR=SCENARIO_IMPORTS_DIR,
         SCENARIO_IMPORT_MAX_BYTES=SCENARIO_IMPORT_MAX_BYTES,
         SCENARIO_IMPORT_WORKERS=SCENARIO_IMPORT_WORKERS,
@@ -57,7 +58,7 @@ def create_app(config=None):
     # Scenario imports support the larger limit declared by the import
     # validator.  Ruleset uploads still enforce their own smaller limit inside
     # the route, but Flask must not reject them first with an HTML 413 page.
-    configure_logging(app.config.get("LOGS_DIR", LOGS_DIR))
+    configure_logging(app.config.get("LOGS_DIR", LOGS_DIR), app.config.get("CONFIG_DIR", CONFIG_DIR))
     if "USER_MANAGER" not in app.config:
         _configure_user_service(app)
     CORS(app)
@@ -224,9 +225,11 @@ def register_blueprints(app):
     from trpg_server.routes.pages import bp as pages_bp
     from trpg_server.routes.rooms import bp as rooms_bp
     from trpg_server.routes.scenarios import bp as scenarios_bp
+    from trpg_server.routes.setup import bp as setup_bp
     from trpg_server.routes.scenario_imports import bp as scenario_imports_bp
     from trpg_server.routes.vector_health import bp as vector_health_bp
     from trpg_server.routes.telemetry import bp as telemetry_bp
+    from trpg_server.routes.themes import bp as themes_bp
     from trpg_server.routes.triggers import bp as triggers_bp
     from trpg_server.routes.users import bp as users_bp
 
@@ -239,9 +242,11 @@ def register_blueprints(app):
     app.register_blueprint(users_bp)
     app.register_blueprint(chat_bp)
     app.register_blueprint(config_bp)
+    app.register_blueprint(setup_bp)
     app.register_blueprint(rooms_bp)
     app.register_blueprint(network_bp)
     app.register_blueprint(knowledge_bases_bp)
     app.register_blueprint(pages_bp)
     app.register_blueprint(telemetry_bp)
+    app.register_blueprint(themes_bp)
     app.register_blueprint(triggers_bp)

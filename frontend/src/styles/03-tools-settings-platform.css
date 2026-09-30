@@ -1,4 +1,4 @@
-﻿/* 小工具样式 */
+/* 小工具样式 */
 .tool-tabs {
     display: flex;
     border-bottom: 1px solid var(--border-subtle);
@@ -931,23 +931,5 @@
         margin-left: 0;
         width: 100%;
     }
-}
-
-/* 滚动条样式 */
-::-webkit-scrollbar {
-    width: 8px;
-}
-
-::-webkit-scrollbar-track {
-    background: var(--theme-scrollbar-track);
-}
-
-::-webkit-scrollbar-thumb {
-    background: var(--theme-scrollbar-thumb);
-    border-radius: var(--theme-radius-sm);
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: var(--theme-scrollbar-thumb-hover);
 }
 

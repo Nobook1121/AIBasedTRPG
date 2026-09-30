@@ -67,6 +67,8 @@ ALLOWED_STATE_FIELDS = {
     "quests",
     "timeline",
     "rolling_summary",
+    "completed",
+    "ending_reached",
 }
 
 KP_RESPONSE_SCHEMA = {
@@ -194,6 +196,8 @@ def validate_state_updates(
                 result[key] = {str(k)[:100]: str(v)[:200] for k, v in value.items() if not allowed or str(k) in allowed}
         elif key == "rolling_summary":
             result[key] = str(value or "")[:4000]
+        elif key in {"completed", "ending_reached"}:
+            result[key] = bool(value)
         elif isinstance(value, list):
             allowed = entity_ids.get(key, set())
             result[key] = [item for item in value[:50] if not allowed or str(item) in allowed]

@@ -17,6 +17,7 @@
     <div class="card save-card h-100 {{ activeClass }}" data-room-id="{{ roomId }}">
         {{{ activeHeaderHtml }}}
         <div class="card-body">
+            {{{ archivedBadgeHtml }}}
             <h5 class="card-title" data-user-content="true">{{ name }}</h5>
             <p class="card-text mb-2">
                 <small class="text-muted">房间码：<span data-user-content="true">{{ roomCode }}</span></small><br>
@@ -33,6 +34,12 @@
 
 <template id="room-active-header">
 <div class="card-header bg-primary text-white text-center py-2"><small><i class="fa fa-check-circle"></i> 当前房间</small></div>
+</template>
+
+<template id="room-archived-badge">
+<div class="d-inline-flex align-items-center gap-1 text-muted mb-1">
+    <span class="badge bg-secondary"><i class="fa fa-archive"></i> 已归档</span>
+</div>
 </template>
 
 <template id="room-character-empty">

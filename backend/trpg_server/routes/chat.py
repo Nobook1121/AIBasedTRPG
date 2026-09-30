@@ -1,4 +1,4 @@
-﻿import json
+import json
 import logging
 import re
 import time
@@ -11,7 +11,7 @@ from flask import Blueprint, current_app, request, session
 from trpg_server.ai_platform_config import load_platform_config
 from trpg_server.agents.config import load_ai_runtime_config
 from trpg_server.agents.context import build_agent_context
-from trpg_server.agents.profiles import resolve_agent_profile
+from trpg_server.agents.profiles import AgentProfile, resolve_agent_profile
 from trpg_server.agents.runtime import run_agent_completion
 from trpg_server.agents.structured_output import apply_state_updates, parse_kp_response, validate_state_updates, validate_structured_response
 from trpg_server.agents.telemetry import build_provider_cache_key, calculate_cache_hit_rate, record_ai_usage
@@ -25,7 +25,7 @@ from trpg_server.agents.memory import remember_room_fact
 from trpg_server.agents.room_state import append_room_event, project_room_state
 from trpg_server.agents.trigger_system import find_trigger_definition, record_trigger, validate_trigger
 from trpg_server.json_store import read_json, write_json_atomic
-from trpg_server.logging_config import log_user_action, redact_sensitive, user_action_text
+from trpg_server.logging_config import log_access_denied, log_user_action, redact_sensitive, user_action_text
 from trpg_server.responses import error_response, success_response
 from trpg_server.role_config import load_roles, provider_small_model_config, select_role_for_content
 from trpg_server.settings import (
@@ -45,6 +45,32 @@ _EXACT_CACHE = ExactResponseCache(default_ttl=300)
 _SEMANTIC_CACHE = SemanticCache(default_ttl=120)
 _HISTORY_SAFE_RE = re.compile(r"[^A-Za-z0-9_.-]+")
 HISTORY_COMPACT_CHAR_THRESHOLD = 12000
+
+
+def _profile_for_request(profile, tool_state, enable_suggestions=True):
+    """Keep the complete KP capability set while removing schema aliases.
+
+    Alias tools execute the same handler and only exist for compatibility with
+    older callers. Advertising both names to the model increases ambiguity and
+    schema tokens without adding a capability. Request-time safety remains in
+    each tool handler; no legitimate tool chain is disabled here.
+
+    ``room.suggest_actions`` is dropped unless the room house rules enable
+    action suggestions, so a disabled feature costs no schema tokens.
+    """
+    names = list(profile.tool_names or [])
+    aliases = {"dice.roll_dice", "sanity.roll_sanity_check"}
+    gated = set() if enable_suggestions else {"room.suggest_actions"}
+    filtered = [name for name in names if name not in aliases and name not in gated]
+    return AgentProfile(
+        id=profile.id,
+        name=profile.name,
+        prompt=profile.prompt,
+        provider=profile.provider,
+        wake_words=profile.wake_words,
+        tool_names=filtered,
+        context_providers=profile.context_providers,
+    )
 
 
 def _timestamp():
@@ -208,6 +234,31 @@ def _mark_scenario_started(room_dir, user_id):
     room_info["scenario_started_by"] = user_id
     write_json_atomic(info_path, room_info)
     return started_at
+
+
+def _sync_room_active_scene(room_dir, scene_id, scenario):
+    """Mirror a state-update scene transition into ``info.json``.
+
+    Structured KP responses persist ``active_scene_id`` into ``state.json``,
+    while the room snapshot, scenario tools and archive checks read the pointer
+    from ``info.json`` (which ``room.activate_scenario_scene`` writes). Keeping
+    both in sync avoids the model receiving two different "current scenes".
+    """
+    if not room_dir or scene_id in (None, ""):
+        return
+    info_path = Path(room_dir) / "info.json"
+    info = read_json(info_path, default={})
+    if not isinstance(info, dict) or str(info.get("active_scene_id") or "") == str(scene_id):
+        return
+    info["active_scene_id"] = str(scene_id)
+    manifest = scenario.get("scene_manifest") if isinstance(scenario, dict) and isinstance(scenario.get("scene_manifest"), list) else []
+    module = next(
+        (item for item in manifest if isinstance(item, dict) and str(item.get("id") or item.get("module_id")) == str(scene_id)),
+        None,
+    )
+    if module:
+        info["active_scene_title"] = module.get("title")
+    write_json_atomic(info_path, info)
 
 
 def _json_for_log(value):
@@ -502,15 +553,42 @@ def _compact_character_state(character_state):
     return compact or None
 
 
-def _compact_room_snapshot(snapshot):
+def _bounded_manifest_entries(items, max_count, char_cap, text_keys=("summary", "description", "content")):
+    """Bound total entry count and per-entry text length of a manifest list."""
+    if not isinstance(items, list):
+        return []
+    result = []
+    for item in items:
+        if len(result) >= max_count:
+            break
+        if not isinstance(item, dict):
+            result.append(item)
+            continue
+        bounded = dict(item)
+        if char_cap:
+            for key in text_keys:
+                value = bounded.get(key)
+                if isinstance(value, str) and value:
+                    bounded[key] = value[:char_cap]
+        result.append(bounded)
+    return result
+
+
+def _compact_room_snapshot(snapshot, runtime_config=None):
     if not isinstance(snapshot, dict):
         return {}
+    scene_manifest_cap = getattr(runtime_config, "max_snapshot_scene_manifest", None)
+    if scene_manifest_cap is None:
+        scene_manifest_cap = 30
+    char_cap = getattr(runtime_config, "snapshot_manifest_summary_cap", None)
+    include_entity = getattr(runtime_config, "snapshot_include_entity_manifest", False)
 
     scenario = snapshot.get("scenario")
     if isinstance(scenario, dict):
         available_sections = scenario.get("available_sections")
         if not isinstance(available_sections, dict):
             available_sections = {}
+        entity_manifest = (scenario.get("entity_manifest", []) if isinstance(scenario.get("entity_manifest", []), list) else [])
         compact_scenario = {
             "id": scenario.get("id"),
             "title": scenario.get("title"),
@@ -521,11 +599,23 @@ def _compact_room_snapshot(snapshot):
             "module_count": scenario.get("module_count"),
             "trigger_count": scenario.get("trigger_count"),
             "active_scene_id": scenario.get("active_scene_id"),
-            "scene_manifest": (scenario.get("scene_manifest", []) if isinstance(scenario.get("scene_manifest", []), list) else [])[:40],
-            "global_manifest": (scenario.get("global_manifest", []) if isinstance(scenario.get("global_manifest", []), list) else [])[:12],
-            "entity_manifest": (scenario.get("entity_manifest", []) if isinstance(scenario.get("entity_manifest", []), list) else [])[:80],
-            "opening": scenario.get("opening"),
+            "scene_manifest": _bounded_manifest_entries(
+                (scenario.get("scene_manifest", []) if isinstance(scenario.get("scene_manifest", []), list) else []),
+                scene_manifest_cap,
+                char_cap,
+            ),
+            "global_manifest": _bounded_manifest_entries(
+                (scenario.get("global_manifest", []) if isinstance(scenario.get("global_manifest", []), list) else []),
+                12,
+                char_cap,
+            ),
         }
+        if include_entity and entity_manifest:
+            compact_scenario["entity_manifest"] = _bounded_manifest_entries(entity_manifest, scene_manifest_cap, char_cap)
+        opening = scenario.get("opening")
+        if isinstance(opening, str) and opening and char_cap:
+            opening = opening[:char_cap]
+        compact_scenario["opening"] = opening
     else:
         compact_scenario = scenario
 
@@ -552,17 +642,22 @@ def _compact_room_snapshot(snapshot):
             {**item, "content": str(item.get("content") or "")[:240]}
             for item in memory["items"][:8] if isinstance(item, dict)
         ]}
+    triggers = snapshot.get("triggers", [])
+    if isinstance(triggers, list):
+        triggers = _bounded_manifest_entries(triggers, scene_manifest_cap, char_cap)
+    else:
+        triggers = snapshot.get("triggers", [])
     return {
         "room": snapshot.get("room"),
         "scenario": compact_scenario,
         "members": members,
         "memory": memory,
-        "triggers": snapshot.get("triggers", []),
+        "triggers": triggers,
     }
 
 
-def _room_snapshot_system_message(snapshot, room_state=None):
-    compact_snapshot = _compact_room_snapshot(snapshot)
+def _room_snapshot_system_message(snapshot, room_state=None, runtime_config=None):
+    compact_snapshot = _compact_room_snapshot(snapshot, runtime_config)
     if room_state is not None:
         compact_snapshot["state"] = project_room_state(room_state, snapshot)
     return (
@@ -571,7 +666,7 @@ def _room_snapshot_system_message(snapshot, room_state=None):
         "不要复用其他房间的剧本、角色或记忆资料。\n"
         "注入的上下文是精简版，不包含完整场景文本或完整角色详情。\n"
         "需要详细剧本模块或触发器内容时，调用相应的房间或触发器工具。\n"
-        "需要剧本摘要时先调用 `room.get_scenario_context`，需要完整模块内容时调用 `room.get_scenario_module`。\n"
+        "需要剧本摘要时先调用 `room.get_scenario_context`；只有检索片段不足以回答时，才调用 `room.get_scenario_module` 读取有界原文片段。\n"
         "scene_manifest 是剧本提供的唯一场景索引；global_manifest 是背景/公开信息/时间线的短摘要。"
         "若 scenario.sequential=true，优先按照 scene_manifest 的 order 顺序加载模块；否则按玩家当前需求检索。"
         "summary 仅用于检索，不能替代原文，也不能据此推断未写出的设施。\n"
@@ -683,6 +778,20 @@ def chat():
             )
 
         room_id = message_data.get("room_id")
+        if room_id:
+            _room_archived_check = read_json(
+                Path(current_app.config.get("ROOMS_DIR", ROOMS_DIR)) / str(room_id) / "info.json",
+                default={},
+            )
+            if isinstance(_room_archived_check, dict) and _room_archived_check.get("archived"):
+                log_access_denied(
+                    logger,
+                    user_action_text(session.get("username"), "访问房间被拒绝"),
+                    用户ID=session.get("user_id"),
+                    房间ID=room_id,
+                    原因="房间已归档",
+                )
+                return error_response("Room is archived", 403, "归档房间已关闭 AI，无法继续调用；仍可使用骰娘与其他房间工具")
         scenario_start = message_data.get("scenario_start") is True
         if scenario_start and agent_profile.id != "kp":
             return error_response("Scenario start must use the KP agent", 400, "KP agent required")
@@ -744,16 +853,26 @@ def chat():
             agent_context.tool_state["thinking_stage_callback"] = lambda stage, label: _emit_thinking_stage(
                 room_id, ai_request_id, stage, label
             )
+        runtime_config = load_ai_runtime_config(_get_config_dir())
         room_snapshot_message = None
         room_snapshot = None
+        # Action suggestions are gated by the global hint switch (authoritative)
+        # AND the per-room house rule, which defaults to off.
+        house_rules = agent_context.room_info().get("house_rules") if room_id else {}
+        house_rules = house_rules if isinstance(house_rules, dict) else {}
+        effective_suggestions = bool(runtime_config.show_ai_hints) and bool(
+            house_rules.get("action_suggestions_enabled")
+        )
+        if room_id:
+            agent_context.tool_state["allow_action_suggestions"] = effective_suggestions
+        request_profile = _profile_for_request(
+            agent_profile,
+            agent_context.tool_state,
+            enable_suggestions=effective_suggestions,
+        )
         if room_id:
             room_snapshot = get_room_snapshot({}, agent_context)
-            room_snapshot_message = _room_snapshot_system_message(
-                room_snapshot,
-                agent_context.room_state(),
-            )
-
-        runtime_config = load_ai_runtime_config(_get_config_dir())
+            room_snapshot_message = _room_snapshot_system_message(room_snapshot, None, runtime_config)
         model = _select_model(platform_config)
         small_model = str(provider_small_model_config(platform_config, "summarization").get("id") or model)
         headers = {
@@ -801,6 +920,11 @@ def chat():
                 "不得创造剧本未写出的地点、设施、NPC、道具或触发器内容；未提供就明确说明。"
                 "剧本、房间快照、角色卡和工具返回值是唯一事实来源；不得把猜测写成既定事实。"
                 "不要因问候、摘要或关键词自动检定/揭示/记忆；工具完成后立即简短叙事回复。"
+                "本轮已注入房间快照、动态状态和剧本知识库检索结果，不要重复调用 room.get_room_snapshot；"
+                "检索结果足够回答时不要再调用 room.get_scenario_context 或 room.get_scenario_module。"
+                "明确检定时直接调用对应检定工具；得到结果后直接生成最终叙事，除非已知触发条件要求继续调用触发器。"
+                "禁止使用相同参数重复调用同一工具；互不依赖的工具应在同一轮并行调用。"
+                "只有明确到达结局或满足剧本结束条件时，才在 state_updates 中设置 completed 或 ending_reached 为 true。"
             )
 
         prompt_history = _history_for_request(history)
@@ -828,11 +952,18 @@ def chat():
             except (OSError, ValueError):
                 logger.exception("Scenario retrieval failed")
         rules_version = str((agent_context.room_info().get("rulesets") or {}).get("coc7") or "1") if room_id else "1"
+        projected_state = project_room_state(agent_context.room_state(), room_snapshot) if room_id else {}
+        if effective_suggestions and isinstance(projected_state, dict):
+            # Only AI-relevant active house rules reach the prompt, injected into
+            # the dynamic room-state layer so the static prefix stays cacheable.
+            projected_state["house_rules"] = {
+                "ai_next_step_hints": "用 room.suggest_actions 返回；不要在正文列出选项"
+            }
         prompt_layers = build_prompt_layers(
             global_rules=system_prompt,
             scenario=(room_snapshot or {}).get("scenario") if isinstance(room_snapshot, dict) else None,
             scene=scene_static,
-            room_state=agent_context.room_state() if room_id else {},
+            room_state=projected_state,
             history=prompt_history,
             user_input=user_content,
             rules_version=rules_version,
@@ -928,20 +1059,21 @@ def chat():
 
         log_user_action(
             logger,
-            user_action_text(session.get("username") or user_id, "Started AI chat"),
-            user_id=session.get("user_id") or user_id,
-            role=role_config.get("id"),
-            platform=selected_platform,
-            model=request_data["model"],
-            content_length=len(content),
+            user_action_text(session.get("username") or user_id, "开始 AI 对话"),
+            用户ID=session.get("user_id") or user_id,
+            角色=role_config.get("id"),
+            平台=selected_platform,
+            模型=request_data["model"],
+            内容长度=len(content),
         )
         started_at = time.perf_counter()
         result = run_agent_completion(
             requester=requester,
             base_payload=request_data,
-            profile=agent_profile,
+            profile=request_profile,
             registry=default_tool_registry(),
             context=agent_context,
+            max_tool_result_chars=runtime_config.max_tool_result_chars,
         )
         elapsed_ms = round((time.perf_counter() - started_at) * 1000, 2)
         if result.error:
@@ -991,6 +1123,8 @@ def chat():
                 "retrieval_latency_ms": ruleset_metrics["latency_ms"],
                 "retrieval_citations": knowledge_usage["ruleset"]["citations"],
                 "scenario_retrieval_chunk_count": knowledge_usage["scenario"]["chunks"],
+                "agent_request_rounds": int(agent_context.tool_state.get("agent_request_rounds") or 0),
+                "agent_tool_calls": list(agent_context.tool_state.get("tool_call_trace") or []),
             },
         )
 
@@ -1001,11 +1135,20 @@ def chat():
         if direct_message and not direct_messages:
             direct_messages = [direct_message]
 
+        # Action options staged by the KP via room.suggest_actions. These are
+        # rendered as buttons in the chat UI (owner-interactive, read-only for
+        # other room members) and never persisted as room messages.
+        suggestions = []
+        staged_suggestions = agent_context.tool_state.get("suggested_actions")
+        if isinstance(staged_suggestions, list):
+            suggestions = [str(item) for item in staged_suggestions if str(item).strip()]
+
         structured = parse_kp_response(result.content)
         if structured:
             structured = validate_structured_response(structured, (room_snapshot or {}).get("scenario") if isinstance(room_snapshot, dict) else {})
         validated_updates = {}
         delivered_structured_triggers = []
+        ending_reached = False
         if structured:
             ai_response = structured.narration
             if room_id and structured.state_updates:
@@ -1031,6 +1174,27 @@ def chat():
                 if next_updates:
                     apply_state_updates(agent_context.room_dir, next_updates)
                     validated_updates.update(next_updates)
+            if room_id and validated_updates.get("active_scene_id"):
+                _sync_room_active_scene(
+                    agent_context.room_dir,
+                    validated_updates["active_scene_id"],
+                    (room_snapshot or {}).get("scenario") if isinstance(room_snapshot, dict) else None,
+                )
+            # Reaching an ending is the only automatic completion signal.  It
+            # enables the manager-facing archive action without deleting a
+            # still-running room.
+            if room_id and agent_context.room_dir:
+                ending_id = validated_updates.get("active_scene_id") or structured.next_scene
+                scenario_for_completion = (room_snapshot or {}).get("scenario") if isinstance(room_snapshot, dict) else {}
+                manifest = scenario_for_completion.get("scene_manifest", []) if isinstance(scenario_for_completion, dict) else []
+                if validated_updates.get("completed") or validated_updates.get("ending_reached") or (ending_id and any(isinstance(item, dict) and str(item.get("id") or item.get("module_id")) == str(ending_id) and str(item.get("type") or "").lower() == "ending" for item in manifest)):
+                    ending_reached = True
+                    room_info_path = agent_context.room_dir / "info.json"
+                    room_info = read_json(room_info_path, default={})
+                    if isinstance(room_info, dict) and not room_info.get("completed_at"):
+                        room_info["completed_at"] = _timestamp()
+                        room_info["completed_by"] = "ai"
+                        write_json_atomic(room_info_path, room_info)
             if structured.triggered_files and agent_context.room_dir:
                 scenario_data = (room_snapshot or {}).get("scenario") if isinstance(room_snapshot, dict) else {}
                 room_info = (room_snapshot or {}).get("room") if isinstance(room_snapshot, dict) and isinstance((room_snapshot or {}).get("room"), dict) else {}
@@ -1048,6 +1212,8 @@ def chat():
         # return a normal chat response instead of surfacing a false failure.
         if not ai_response and (result.direct_messages or result.tool_messages):
             ai_response = "已完成检定/场景处理，详情见上方记录。"
+        if not ai_response and suggestions:
+            ai_response = "请从下方选择你的行动。"
         if not ai_response:
             return error_response(
                 "AI platform did not return a response",
@@ -1056,24 +1222,24 @@ def chat():
             )
         log_user_action(
             logger,
-            user_action_text(session.get("username") or user_id, "Received AI chat response"),
-            user_id=session.get("user_id") or user_id,
-            platform=selected_platform,
-            model=request_data["model"],
-            response_length=len(ai_response),
-            token_count=token_count,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            cached_tokens=cached_tokens,
-            cache_hit_rate=cache_hit_rate,
-            elapsed_ms=elapsed_ms,
+            user_action_text(session.get("username") or user_id, "收到 AI 回复"),
+            用户ID=session.get("user_id") or user_id,
+            平台=selected_platform,
+            模型=request_data["model"],
+            回复长度=len(ai_response),
+            Token数=token_count,
+            输入Token=prompt_tokens,
+            输出Token=completion_tokens,
+            缓存Token=cached_tokens,
+            缓存命中率=cache_hit_rate,
+            耗时毫秒=elapsed_ms,
         )
 
         user_history_item = {"role": "system" if scenario_start else "user", "content": content}
         if speaker:
             user_history_item["speaker"] = speaker
         history.extend([user_history_item, {"role": "assistant", "content": ai_response}])
-        if not result.tool_messages and not direct_messages and not validated_updates and structured is None:
+        if not result.tool_messages and not direct_messages and not validated_updates and structured is None and not suggestions:
             cache_value = {"content": ai_response, "token_count": token_count, "structured_output": None, "knowledge_usage": knowledge_usage}
             if room_id:
                 _SEMANTIC_CACHE.set(content, semantic_state, cache_value)
@@ -1102,6 +1268,8 @@ def chat():
             direct_message=direct_messages[0] if direct_messages else None,
             direct_messages=direct_messages,
             tool_messages=result.tool_messages or [],
+            suggestions=suggestions,
+            suggestions_owner=user_id if suggestions else None,
             prompt_tokens=usage_record["prompt_tokens"],
             completion_tokens=usage_record["completion_tokens"],
             cached_tokens=usage_record["cached_tokens"],
@@ -1111,6 +1279,7 @@ def chat():
             prefix_cache_hit=prefix_cache_hit,
             knowledge_usage=knowledge_usage,
             scenario_started_at=scenario_started_at,
+            ending_reached=ending_reached,
             structured_output=(
                 {
                     "options": structured.options,
@@ -1153,9 +1322,9 @@ def send_home_message():
 
         log_user_action(
             logger,
-            user_action_text(session.get("username") or user_id, "Sent a home message"),
-            user_id=session.get("user_id") or user_id,
-            content_length=len(message_content),
+            user_action_text(session.get("username") or user_id, "发送了首页消息"),
+            用户ID=session.get("user_id") or user_id,
+            内容长度=len(message_content),
         )
         return _message_response(user_id, message_content, "Message sent successfully")
     except Exception as exc:
@@ -1181,10 +1350,10 @@ def send_message(script_id):
 
         log_user_action(
             logger,
-            user_action_text(session.get("username") or user_id, "Sent a scenario message"),
-            user_id=session.get("user_id") or user_id,
-            scenario_id=script_id,
-            content_length=len(message_content),
+            user_action_text(session.get("username") or user_id, "发送了剧本消息"),
+            用户ID=session.get("user_id") or user_id,
+            剧本ID=script_id,
+            内容长度=len(message_content),
         )
         return _message_response(
             user_id,

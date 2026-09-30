@@ -13,6 +13,7 @@ from trpg_server.settings import (
     CONFIG_DIR,
     SCENARIO_COVERS_DIR,
     SCENARIOS_DIR,
+    THEME_ASSETS_DIR,
     TOOLS_DIR,
     VENDOR_ASSETS_DIR,
 )
@@ -58,6 +59,11 @@ def serve_aiplatform_icon(filename):
 @bp.route("/assets/vendor/<path:filename>")
 def serve_vendor_asset(filename):
     return send_from_directory(VENDOR_ASSETS_DIR, filename)
+
+
+@bp.route("/assets/theme/<path:filename>")
+def serve_theme_asset(filename):
+    return send_from_directory(THEME_ASSETS_DIR, filename)
 
 
 @bp.route("/config/<path:filename>")

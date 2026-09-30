@@ -43,9 +43,18 @@ interface Room {
     scenario_started_at?: string;
     scenario_started_by?: string | number;
     invisible_view?: boolean;
+    archived?: boolean;
+    completed_at?: string;
+    archived_at?: string;
     members?: RoomMember[];
     messages?: ChatMessage[];
+    ai_history?: ChatMessage[];
+    house_rules?: RoomHouseRules;
     saves?: Array<{ filename: string; title?: string; created_at?: string }>;
+}
+
+interface RoomHouseRules {
+    action_suggestions_enabled?: boolean;
 }
 
 interface ChatMessage {

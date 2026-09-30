@@ -20,7 +20,9 @@ from trpg_server.routes.chat import (
     _speaker_for_user,
     _strip_compact_command,
     _mark_scenario_started,
+    _profile_for_request,
 )
+from trpg_server.agents.profiles import AgentProfile
 from trpg_server.routes.characters import _runtime_to_test_character, _test_character_to_runtime
 from trpg_server.socket_events import register_socket_events
 from trpg_server.routes.rooms import create_room_message
@@ -29,6 +31,17 @@ from trpg_server.routes.rooms import create_room_message
 def test_history_filename_is_room_scoped_when_room_is_available():
     assert _history_filename("user-1", "room-alpha", "kp") == "room-room-alpha-kp.json"
     assert _history_filename("user-1", "room-beta", "kp") == "room-room-beta-kp.json"
+
+
+def test_request_profile_keeps_capabilities_and_removes_only_alias_schemas():
+    profile = AgentProfile(
+        id="kp",
+        name="KP",
+        prompt="prompt",
+        tool_names=["room.get_scenario_module", "check.roll_room_check", "dice.roll", "dice.roll_dice", "san.roll_sanity_check", "sanity.roll_sanity_check"],
+    )
+    selected = _profile_for_request(profile, {"allow_checks": False})
+    assert selected.tool_names == ["room.get_scenario_module", "check.roll_room_check", "dice.roll", "san.roll_sanity_check"]
 
 
 def test_knowledge_usage_distinguishes_ruleset_tool_from_scenario_retrieval():
@@ -339,7 +352,7 @@ def test_post_ai_request_retries_json_object_when_provider_requires_json(monkeyp
     assert "retry" in "\n".join(record.getMessage() for record in caplog.records).lower()
 
 
-def test_room_message_logs_display_name_and_full_content(monkeypatch, caplog):
+def test_room_message_logs_display_name_without_content(monkeypatch, caplog):
     room_info = {
         "members": [
             {
@@ -377,11 +390,13 @@ def test_room_message_logs_display_name_and_full_content(monkeypatch, caplog):
     assert status == 201
     assert response.get_json()["data"]["content"] == "hello from player"
     log_text = "\n".join(record.getMessage() for record in caplog.records)
-    assert "alice:hello from player" in log_text
-    assert "用户ID" not in log_text
-    assert "房间ID" not in log_text
-    assert "消息类型" not in log_text
-    assert "内容长度" not in log_text
+    # 房间消息日志与其他房间接口一致：只记录操作者与结构化元数据，不记录聊天正文
+    assert "alice" in log_text
+    assert "发送了房间消息" in log_text
+    assert "用户ID" in log_text
+    assert "房间ID" in log_text
+    assert "内容长度" in log_text
+    assert "hello from player" not in log_text
 
 
 def test_socket_broadcast_does_not_log_persisted_room_message(monkeypatch, caplog):

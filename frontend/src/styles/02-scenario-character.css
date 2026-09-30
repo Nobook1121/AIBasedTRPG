@@ -1,4 +1,4 @@
-﻿/* 剧本管理样式 */
+/* 剧本管理样式 */
 .scenario-list {
     display: grid;
     grid-template-columns: repeat(auto-fill, 250px);
@@ -572,9 +572,43 @@
 }
 
 .home-room-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
     margin: 6px 0 0;
     color: var(--color-muted);
     font-size: 0.95rem;
+}
+
+.home-room-scenario {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    color: var(--color-muted);
+}
+
+.home-room-scenario[hidden] {
+    display: none;
+}
+
+.home-room-scenario i {
+    color: var(--color-primary);
+}
+
+.home-room-scenario strong {
+    color: var(--color-text);
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.home-room-scenario::after {
+    content: "·";
+    margin-left: 2px;
+    color: var(--color-muted);
 }
 
 .character-kicker {

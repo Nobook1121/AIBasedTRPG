@@ -2,6 +2,7 @@ import json
 from typing import Any
 
 from trpg_server.agents.memory import read_room_memory, remember_room_fact
+from trpg_server.agents.room_state import load_room_state, save_room_state
 from trpg_server.agents.tools.base import AgentTool
 from trpg_server.scenario_store import build_trigger_message, iter_scenario_trigger_catalog, load_scenario_by_id
 from trpg_server.json_store import write_json_atomic
@@ -219,12 +220,26 @@ def get_room_scenario_module(arguments: dict[str, Any], context: Any) -> dict[st
     if not module:
         return {"error": "scenario module was not found"}
 
+    # A source module can be tens of thousands of characters. Returning it in
+    # one tool result makes every later tool round resend that entire text.
+    # Provide a bounded, pageable excerpt while retaining all structured fields.
+    offset = max(0, int(arguments.get("offset") or 0))
+    max_chars = max(1000, min(8000, int(arguments.get("max_chars") or 5000)))
+    content = str(module.get("content") or "")
+    module_payload = {key: value for key, value in module.items() if key != "content"}
+    module_payload["content"] = content[offset : offset + max_chars]
+    module_payload["content_offset"] = offset
+    module_payload["content_length"] = len(content)
+    module_payload["content_truncated"] = offset + max_chars < len(content)
+    if module_payload["content_truncated"]:
+        module_payload["next_offset"] = offset + max_chars
+
     return {
         "scenario": {
             "id": scenario.get("id"),
             "title": scenario.get("title"),
         },
-        "module": module,
+        "module": module_payload,
     }
 
 
@@ -256,6 +271,13 @@ def activate_scenario_scene(arguments: dict[str, Any], context: Any) -> dict[str
     info["active_scene_id"] = str(module.get("scene_id") or module.get("id"))
     info["active_scene_title"] = module.get("title")
     write_json_atomic(context.room_dir / "info.json", info)
+    # Retrieval (KnowledgeBaseService._room_info) and the runtime snapshot both
+    # prefer state.json.active_scene_id, so a stale value there would override
+    # the scene this tool just persisted. Mirror the pointer into state.json.
+    state = load_room_state(context.room_dir)
+    if str(state.get("active_scene_id") or "") != info["active_scene_id"]:
+        state["active_scene_id"] = info["active_scene_id"]
+        save_room_state(context.room_dir, state)
     context.tool_state["active_scene_id"] = info["active_scene_id"]
     return {"activated": True, "active_scene_id": info["active_scene_id"],
             "module": _summarize_module(module, include_content=False)}
@@ -414,13 +436,15 @@ GET_SCENARIO_CONTEXT_TOOL = AgentTool(
 
 GET_SCENARIO_MODULE_TOOL = AgentTool(
     name="room.get_scenario_module",
-    description="Load the full content of one scenario module by module id, scene id, or module type.",
+    description="Load one bounded scenario-module excerpt by id/type/scene. Use offset only when the first excerpt is insufficient; do not load every page preemptively.",
     parameters={
         "type": "object",
         "properties": {
             "module_id": {"type": "string"},
             "module_type": {"type": "string"},
             "scene_id": {"type": "string"},
+            "offset": {"type": "integer", "minimum": 0},
+            "max_chars": {"type": "integer", "minimum": 1000, "maximum": 8000},
         },
     },
     handler=get_room_scenario_module,

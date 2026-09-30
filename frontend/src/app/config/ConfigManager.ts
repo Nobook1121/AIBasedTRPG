@@ -1,6 +1,8 @@
 class ConfigManager {
     private readonly configs: Record<string, TomlConfig> = {};
     private readonly configPath = "config";
+    private themeInitialized = false;
+    private themeTransitionTimer: number | null = null;
 
     async loadConfig(configName: string): Promise<TomlConfig | null> {
         try {
@@ -128,20 +130,38 @@ class ConfigManager {
 
     applyTheme(): void {
         const theme = this.getEffectiveTheme();
-        const themeClassNames = ["theme-light", "theme-dark", "theme-cyber-2", "light-theme", "dark-theme"];
-        document.body.classList.remove(...themeClassNames);
+        const themeClassNames = ["theme-light", "theme-dark", "theme-cyber-2", "theme-tome", "light-theme", "dark-theme"];
+        const body = document.body;
+        body.classList.remove(...themeClassNames);
+
+        // 仅在运行时切换主题时启用过渡，避免首屏加载出现闪烁
+        if (this.themeInitialized) this.startThemeTransition();
 
         if (theme === "pattern_cyber_2") {
-            document.body.classList.add("theme-cyber-2");
+            body.classList.add("theme-cyber-2");
+        } else if (theme === "pattern_tome") {
+            body.classList.add("theme-tome");
         } else if (theme === "dark") {
-            document.body.classList.add("theme-dark", "dark-theme");
+            body.classList.add("theme-dark", "dark-theme");
         } else if (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches) {
-            document.body.classList.add("theme-dark", "dark-theme");
+            body.classList.add("theme-dark", "dark-theme");
         } else {
-            document.body.classList.add("theme-light", "light-theme");
+            body.classList.add("theme-light", "light-theme");
         }
 
+        this.themeInitialized = true;
         console.log(`主题已应用: ${theme}`);
+    }
+
+    private startThemeTransition(): void {
+        document.body.classList.add("theme-transition");
+        if (this.themeTransitionTimer !== null) {
+            window.clearTimeout(this.themeTransitionTimer);
+        }
+        this.themeTransitionTimer = window.setTimeout(() => {
+            document.body.classList.remove("theme-transition");
+            this.themeTransitionTimer = null;
+        }, 420);
     }
 
     initThemeSystem(): void {

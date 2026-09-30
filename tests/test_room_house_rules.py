@@ -1,0 +1,154 @@
+import json
+
+from trpg_server.app_factory import create_app
+
+
+class FakeManager:
+    def __init__(self, role="ADMIN"):
+        self.role = role
+
+    def is_session_current(self, user_id, token):
+        return True
+
+    def get_user_by_id(self, user_id):
+        return {"id": user_id, "username": "tester", "role": self.role}
+
+
+def _app(tmp_path, role="ADMIN"):
+    return create_app({
+        "TESTING": True,
+        "USER_MANAGER": FakeManager(role),
+        "CONFIG_DIR": tmp_path / "config",
+        "ROOMS_DIR": tmp_path / "rooms",
+        "SCENARIOS_DIR": tmp_path / "scenarios",
+        "CHARACTERS_DIR": tmp_path / "characters",
+        "ROOM_ARCHIVES_DIR": tmp_path / "room-archives",
+        "HISTORY_DIR": tmp_path / "history",
+    })
+
+
+def _login(client, role="ADMIN", user_id=1):
+    with client.session_transaction() as session:
+        session.update(user_id=user_id, username="tester", role=role, session_token="token", csrf_token="csrf")
+
+
+def _write_room(tmp_path, room_id="r-1", **extra):
+    room_dir = tmp_path / "rooms" / room_id
+    room_dir.mkdir(parents=True, exist_ok=True)
+    info = {
+        "id": room_id,
+        "name": "Test Room",
+        "creator_id": 1,
+        "members": [
+            {"user_id": 1, "username": "tester", "role": "ADMIN", "status": "active", "is_active": True, "room_role": "admin"},
+        ],
+    }
+    info.update(extra)
+    (room_dir / "info.json").write_text(json.dumps(info, ensure_ascii=False), encoding="utf-8")
+    return room_dir, info
+
+
+def _read_room_info(tmp_path, room_id="r-1"):
+    return json.loads((tmp_path / "rooms" / room_id / "info.json").read_text(encoding="utf-8"))
+
+
+def _disable_global_hints(tmp_path):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    (config_dir / "general.toml").write_text("[ai]\nshow_ai_hints = false\n", encoding="utf-8")
+
+
+def test_house_rules_default_off_and_exposed_in_room_summary(tmp_path):
+    _write_room(tmp_path)
+    app = _app(tmp_path)
+    client = app.test_client()
+    _login(client)
+
+    response = client.get("/api/rooms/r-1/house-rules", headers={"X-CSRF-Token": "csrf"})
+
+    assert response.status_code == 200
+    data = response.get_json()["data"]
+    assert data["house_rules"]["action_suggestions_enabled"] is False
+    assert data["global_hints_enabled"] is True
+
+    detail = client.get("/api/rooms/r-1", headers={"X-CSRF-Token": "csrf"})
+    assert detail.status_code == 200
+    assert detail.get_json()["data"]["house_rules"]["action_suggestions_enabled"] is False
+
+
+def test_put_house_rules_enables_and_reads_back(tmp_path):
+    _write_room(tmp_path)
+    app = _app(tmp_path)
+    client = app.test_client()
+    _login(client)
+
+    response = client.put(
+        "/api/rooms/r-1/house-rules",
+        json={"house_rules": {"action_suggestions_enabled": True}},
+        headers={"X-CSRF-Token": "csrf"},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["data"]["house_rules"]["action_suggestions_enabled"] is True
+    assert _read_room_info(tmp_path)["house_rules"]["action_suggestions_enabled"] is True
+
+
+def test_put_rejects_enabling_when_global_hints_disabled(tmp_path):
+    _write_room(tmp_path)
+    _disable_global_hints(tmp_path)
+    app = _app(tmp_path)
+    client = app.test_client()
+    _login(client)
+
+    response = client.put(
+        "/api/rooms/r-1/house-rules",
+        json={"house_rules": {"action_suggestions_enabled": True}},
+        headers={"X-CSRF-Token": "csrf"},
+    )
+
+    assert response.status_code == 400
+    stored = _read_room_info(tmp_path)
+    assert stored.get("house_rules", {}).get("action_suggestions_enabled") is not True
+
+
+def test_put_rejects_unknown_house_rule_key(tmp_path):
+    _write_room(tmp_path)
+    app = _app(tmp_path)
+    client = app.test_client()
+    _login(client)
+
+    response = client.put(
+        "/api/rooms/r-1/house-rules",
+        json={"house_rules": {"unknown_rule": True}},
+        headers={"X-CSRF-Token": "csrf"},
+    )
+
+    assert response.status_code == 400
+
+
+def test_house_rules_require_room_access_and_manage_permission(tmp_path):
+    _write_room(tmp_path)
+    app = _app(tmp_path, "USER")
+    client = app.test_client()
+    _login(client, "USER", user_id=99)
+
+    assert client.get("/api/rooms/r-1/house-rules", headers={"X-CSRF-Token": "csrf"}).status_code == 403
+    assert client.put(
+        "/api/rooms/r-1/house-rules",
+        json={"house_rules": {"action_suggestions_enabled": True}},
+        headers={"X-CSRF-Token": "csrf"},
+    ).status_code == 403
+
+
+def test_archive_removes_house_rules(tmp_path):
+    _write_room(tmp_path, completed_at="2026-01-01 00:00:00", house_rules={"action_suggestions_enabled": True})
+    app = _app(tmp_path)
+    client = app.test_client()
+    _login(client)
+
+    response = client.post("/api/rooms/r-1/archive", headers={"X-CSRF-Token": "csrf"})
+
+    assert response.status_code == 200
+    stored = _read_room_info(tmp_path)
+    assert stored["archived"] is True
+    assert "house_rules" not in stored

@@ -18,17 +18,10 @@ const primaryLinks: NavLinkItem[] = [
     { href: "#home", tab: "home", label: "主页", labelKey: "nav.home", active: true },
     { href: "#character", tab: "character", label: "角色卡", labelKey: "nav.character" },
     { href: "#save", tab: "save", label: "房间", labelKey: "nav.rooms" },
+    { href: "#tools", tab: "tools", label: "小工具", labelKey: "nav.tools" },
 ];
 
 const groupedLinks: NavGroup[] = [
-    {
-        label: "小工具",
-        labelKey: "nav.tools",
-        links: [
-            { href: "#tools-dice", tab: "tools", label: "骰子工具", labelKey: "nav.dice" },
-            { href: "#tools-other", tab: "tools", label: "其他工具", labelKey: "nav.other_tools" },
-        ],
-    },
     {
         label: "探索发现",
         labelKey: "nav.explore",
@@ -37,18 +30,15 @@ const groupedLinks: NavGroup[] = [
             { href: "#character-gallery", tab: "character-gallery", label: "角色卡广场", labelKey: "nav.character_gallery" },
         ],
     },
-    {
-        label: "设置",
-        labelKey: "nav.settings",
-        adminOnly: true,
-        links: [
-            { href: "#settings-general", tab: "settings", label: "常规设置", labelKey: "nav.general" },
-            { href: "#settings-model", tab: "settings", label: "模型设置", labelKey: "nav.model" },
-            { href: "#settings-network", tab: "settings", label: "网络配置", labelKey: "nav.network" },
-            { href: "#settings-about", tab: "settings", label: "关于应用", labelKey: "nav.about" },
-        ],
-    },
 ];
+
+const settingsLink: NavLinkItem = {
+    href: "#settings",
+    tab: "settings",
+    label: "设置",
+    labelKey: "nav.settings",
+    adminOnly: true,
+};
 
 function NavLink({ href, tab, label, labelKey, active = false, adminOnly = false }: NavLinkItem) {
     return (
@@ -104,6 +94,9 @@ export function Sidebar() {
                     {groupedLinks.map((group) => (
                         <NavGroupSection key={group.label} group={group} />
                     ))}
+                    <li className="nav-item" data-admin-only="true">
+                        <NavLink {...settingsLink} />
+                    </li>
                 </ul>
                 <div className="user-info mt-auto" id="userInfo" role="button" tabIndex={0} aria-label="打开用户设置" data-i18n-aria-label="nav.open_user_settings">
                     <div className="user-avatar" id="userAvatar">

@@ -55,6 +55,26 @@ def test_runtime_executes_enabled_tool_and_finishes():
     assert requester.calls[1]["messages"][-1]["role"] == "tool"
 
 
+def test_runtime_records_request_rounds_and_tool_trace():
+    tool = AgentTool(
+        name="test.echo",
+        description="Echo value",
+        parameters={"type": "object", "properties": {"value": {"type": "string"}}},
+        handler=lambda arguments, context: {"echo": arguments["value"]},
+    )
+    context = AgentRequestContext(room_id="room-1")
+    result = run_agent_completion(
+        requester=FakeRequester(),
+        base_payload={"model": "fake-model", "messages": [{"role": "user", "content": "hi"}]},
+        profile=AgentProfile(id="kp", name="KP", prompt="prompt", tool_names=["test.echo"]),
+        registry=ToolRegistry([tool]),
+        context=context,
+    )
+    assert result.content == "final answer"
+    assert context.tool_state["agent_request_rounds"] == 2
+    assert context.tool_state["tool_call_trace"] == ["test.echo"]
+
+
 def test_runtime_reports_tool_stage_through_context_callback():
     stages = []
     tool = AgentTool(

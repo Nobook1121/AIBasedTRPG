@@ -1,4 +1,4 @@
-﻿interface RoomNode {
+interface RoomNode {
     filename: string;
     created_at?: string;
     message_count?: number;
@@ -53,6 +53,15 @@ function initRoomManagement(): void {
     document.getElementById("backToSaveList")?.addEventListener("click", showRoomListView);
     document.getElementById("deleteSave")?.addEventListener("click", () => {
         void deleteCurrentRoom();
+    });
+    document.getElementById("archiveRoom")?.addEventListener("click", () => {
+        void archiveCurrentRoom();
+    });
+    document.getElementById("editHouseRules")?.addEventListener("click", () => {
+        void openHouseRulesModal();
+    });
+    document.getElementById("saveHouseRules")?.addEventListener("click", () => {
+        void saveHouseRules();
     });
     document.getElementById("startScenario")?.addEventListener("click", () => {
         void window.startScenario?.();
@@ -339,7 +348,17 @@ async function joinRoomByCodeUnlocked(): Promise<void> {
 async function loadRoomsList(): Promise<void> {
     try {
         const data = await TrpgApi.get<ApiResponse<Room[]>>("/api/rooms");
-        if (data.success && data.data) renderRoomsList(data.data);
+        if (data.success && data.data) {
+            // Archived rooms are kept in place (still returned by /api/rooms with
+            // archived=true), so only add legacy archive-only entries that are not
+            // already present to avoid duplicates.
+            const roomIds = new Set(data.data.map((room) => room.id));
+            const archives = await TrpgApi.get<ApiResponse<Room[]>>("/api/room-archives");
+            const archived = (archives.success ? archives.data || [] : [])
+                .filter((item) => !roomIds.has(item.id))
+                .map((item) => ({ ...item, archived: true, invisible_view: true, members: [] } as Room));
+            renderRoomsList([...data.data, ...archived]);
+        }
     } catch (error) {
         console.error("加载房间列表失败:", error);
     }
@@ -374,6 +393,7 @@ function renderRoomCard(room: Room): string {
         roomId: room.id,
         activeClass: isActive ? "border-primary border-2 shadow-lg" : "",
         activeHeaderHtml: isActive ? window.TrpgTemplates.render("room-active-header") : "",
+        archivedBadgeHtml: room.archived || room.archived_at ? window.TrpgTemplates.render("room-archived-badge", { archivedAt: room.archived_at || "" }) : "",
         name: room.name,
         roomCode: room.room_code || room.code || "-",
         scenarioTitle: room.scenario_title || "未知",
@@ -384,8 +404,18 @@ function renderRoomCard(room: Room): string {
 
 async function openRoomDetail(roomId: string): Promise<void> {
     try {
+        // Prefer the live room so that archived rooms (kept in place) retain all
+        // non-AI features (dice, history, tools). Fall back to the archive
+        // snapshot only for legacy rooms that were moved/removed.
         const data = await TrpgApi.get<ApiResponse<Room>>(`/api/rooms/${roomId}`);
         if (!data.success || !data.data) {
+            const archiveResponse = await TrpgApi.get<ApiResponse<Room>>(`/api/room-archives/${encodeURIComponent(roomId)}`);
+            if (archiveResponse.success && archiveResponse.data) {
+                const legacyArchive = { ...archiveResponse.data, archived: true, invisible_view: true } as Room;
+                if (archiveResponse.data.archived_at) legacyArchive.archived_at = archiveResponse.data.archived_at;
+                await enterRoom(legacyArchive);
+                return;
+            }
             showNotification(`加载房间失败: ${data.message || data.error || "未知错误"}`, "error");
             return;
         }
@@ -461,7 +491,7 @@ async function enterRoom(room: Room): Promise<void> {
 
     showRoomDetailView();
     updateRoomDetail(room);
-    updateRoomStatusBar(room);
+    updateHomeRoomMeta();
     const messages = Array.isArray(room.messages)
         ? room.messages
         : window.getCurrentChatMessages?.() || [];
@@ -490,7 +520,7 @@ function applyInvisibleRoomView(invisible: boolean): void {
     });
     const onlineCount = document.getElementById("homeRoomOnlineCount") as HTMLElement | null;
     if (onlineCount) onlineCount.hidden = invisible;
-    setDisplay("saveStatusBar", invisible ? "none" : "block");
+    updateHomeRoomMeta();
     const deleteButton = document.getElementById("deleteSave") as HTMLButtonElement | null;
     const createNodeButton = document.getElementById("createSaveNode") as HTMLButtonElement | null;
     if (deleteButton) deleteButton.hidden = invisible;
@@ -518,6 +548,95 @@ function updateRoomDetail(room: Room): void {
     setText("homeRoomOnlineCount", formatRoomOnlineCount(room));
     renderRoomCharacterBindings(room);
     updateStartScenarioButton(room);
+    const archiveButton = document.getElementById("archiveRoom") as HTMLButtonElement | null;
+    if (archiveButton) {
+        archiveButton.hidden = Boolean(room.archived || !room.completed_at || !canManageRoom(room));
+        archiveButton.textContent = "归档房间";
+    }
+    const houseRulesButton = document.getElementById("editHouseRules") as HTMLButtonElement | null;
+    if (houseRulesButton) houseRulesButton.hidden = Boolean(room.archived) || !canManageRoom(room);
+    const deleteButton = document.getElementById("deleteSave") as HTMLButtonElement | null;
+    if (deleteButton) deleteButton.hidden = Boolean(room.archived);
+    const archivedBadge = document.getElementById("roomDetailArchivedBadge") as HTMLElement | null;
+    if (archivedBadge) archivedBadge.style.display = room.archived ? "inline-block" : "none";
+}
+
+window.refreshRoomArchiveUi = (): void => {
+    if (currentRoom) updateRoomDetail(currentRoom);
+};
+
+function canManageRoom(room: Room): boolean {
+    if (isElevatedUser()) return true;
+    const self = activeRoomMembers(room).find((member) => String(member.user_id) === String(window.currentUser?.user_id));
+    return Boolean(self && (self.room_role === "owner" || self.room_role === "admin"));
+}
+
+async function archiveCurrentRoom(): Promise<void> {
+    if (!currentRoom?.id || currentRoom.archived) return;
+    if (!window.confirm("归档后房间将关闭 AI，但仍保留在房间管理列表中，可继续使用骰娘等工具并查看历史记录。继续吗？")) return;
+    try {
+        const response = await TrpgApi.post<ApiResponse<{ archived_at?: string }>>(`/api/rooms/${encodeURIComponent(currentRoom.id)}/archive`, {});
+        if (!response.success) throw new Error(response.message || response.error || "归档失败");
+        currentRoom.archived = true;
+        const archivedAt = response.data?.archived_at;
+        if (archivedAt) currentRoom.archived_at = archivedAt;
+        currentRoom.completed_at = currentRoom.completed_at || currentRoom.archived_at || new Date().toISOString();
+        updateRoomDetail(currentRoom);
+        applyInvisibleRoomView(false);
+        await loadRoomsList();
+        showNotification("房间已归档，仍停留在房间内；AI 已关闭，骰娘等工具可继续使用", "success");
+    } catch (error) {
+        showNotification(`归档失败：${roomErrorMessage(error)}`, "error");
+    }
+}
+
+interface RoomHouseRulesPayload {
+    house_rules: RoomHouseRules;
+    global_hints_enabled: boolean;
+}
+
+async function openHouseRulesModal(): Promise<void> {
+    if (!currentRoom?.id) return;
+    const modalElement = document.getElementById("roomHouseRulesModal");
+    const checkbox = document.getElementById("houseRuleActionSuggestions") as HTMLInputElement | null;
+    const globalHint = document.getElementById("houseRuleGlobalHint") as HTMLElement | null;
+    if (!modalElement) return;
+    try {
+        const response = await TrpgApi.get<ApiResponse<RoomHouseRulesPayload>>(`/api/rooms/${encodeURIComponent(currentRoom.id)}/house-rules`);
+        if (!response.success || !response.data) {
+            showNotification(response.message || response.error || "加载房规失败", "error");
+            return;
+        }
+        const globalEnabled = response.data.global_hints_enabled !== false;
+        if (checkbox) {
+            checkbox.checked = Boolean(response.data.house_rules?.action_suggestions_enabled);
+            checkbox.disabled = !globalEnabled;
+        }
+        if (globalHint) globalHint.hidden = globalEnabled;
+        new bootstrap.Modal(modalElement).show();
+    } catch (error) {
+        showNotification(`加载房规失败：${roomErrorMessage(error)}`, "error");
+    }
+}
+
+async function saveHouseRules(): Promise<void> {
+    if (!currentRoom?.id) return;
+    const checkbox = document.getElementById("houseRuleActionSuggestions") as HTMLInputElement | null;
+    if (!checkbox) return;
+    try {
+        const response = await TrpgApi.put<ApiResponse<RoomHouseRulesPayload>>(`/api/rooms/${encodeURIComponent(currentRoom.id)}/house-rules`, {
+            house_rules: { action_suggestions_enabled: checkbox.checked },
+        });
+        if (!response.success || !response.data) {
+            showNotification(response.message || response.error || "保存房规失败", "error");
+            return;
+        }
+        currentRoom.house_rules = response.data.house_rules;
+        bootstrap.Modal.getInstance(document.getElementById("roomHouseRulesModal"))?.hide();
+        showNotification("房规已保存", "success");
+    } catch (error) {
+        showNotification(`保存房规失败：${roomErrorMessage(error)}`, "error");
+    }
 }
 
 function canStartRoomScenario(room: Room): boolean {
@@ -729,12 +848,12 @@ async function deleteCharacterRecord(recordId: string): Promise<void> {
     await openRoomDetail(currentRoom.id);
 }
 
-function updateRoomStatusBar(room: Room): void {
-    const statusBar = document.getElementById("saveStatusBar") as HTMLElement | null;
-    if (!statusBar) return;
-    statusBar.style.display = "block";
-    setText("saveStatusName", room.name);
-    setText("saveStatusScenario", room.scenario_title || "-");
+function updateHomeRoomMeta(): void {
+    const scenario = document.getElementById("homeRoomScenario") as HTMLElement | null;
+    if (!scenario) return;
+    const inRoom = Boolean(currentRoom) && currentRoom?.invisible_view !== true;
+    scenario.hidden = !inRoom;
+    setText("saveStatusScenario", currentRoom?.scenario_title || "-");
 }
 
 async function deleteCurrentRoom(): Promise<void> {
@@ -927,7 +1046,6 @@ function clearCurrentRoom(): void {
     stopAutosaveTimer();
     window.setChatReadOnly?.(false);
     applyInvisibleRoomView(false);
-    setDisplay("saveStatusBar", "none");
     setText("homeRoomTitle", "未加入房间");
     setText("homeRoomOnlineCount", "在线玩家 0/0");
     showRoomListView();
@@ -986,7 +1104,6 @@ function setText(id: string, value: string): void {
     const fallbackKeys: Record<string, [string, string]> = {
         homeRoomTitle: ["home.not_joined", "未加入房间"],
         homeRoomOnlineCount: ["room.status.online_players", "在线玩家 0/0"],
-        saveStatusName: ["room.status.not_joined", "未加入"],
     };
     const fallback = fallbackKeys[id];
     const nextValue = fallback && value === fallback[1]

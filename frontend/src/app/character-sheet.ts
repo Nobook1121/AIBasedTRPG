@@ -1,4 +1,4 @@
-﻿type COC7CoreAttributeKey = "STR" | "DEX" | "SIZ" | "APP" | "CON" | "INT" | "POW" | "EDU" | "LUC";
+type COC7CoreAttributeKey = "STR" | "DEX" | "SIZ" | "APP" | "CON" | "INT" | "POW" | "EDU" | "LUC";
 type COC7AttributeKey = COC7CoreAttributeKey | "AGE";
 type SkillCategory = "特殊" | "探索" | "社交" | "战斗" | "医疗" | "运动" | "知识" | "技术" | "操纵" | "其他";
 type InvestigatorGender = "male" | "female" | "unknown";
@@ -126,6 +126,10 @@ interface COC7Relationship {
 interface COC7ExperiencedScenario {
     name: string;
     experience: string;
+    sanChange?: string;
+    otherChanges?: string;
+    san_change?: string;
+    other_changes?: string;
 }
 
 interface COC7Background {
@@ -1165,7 +1169,9 @@ interface Window {
     function normalizeExperiencedScenarios(scenarios?: COC7ExperiencedScenario[]): COC7ExperiencedScenario[] {
         return (scenarios || []).map((item) => ({
             name: item.name || "",
-            experience: item.experience || ""
+            experience: item.experience || "",
+            ...(item.sanChange || item.san_change ? { sanChange: item.sanChange || item.san_change } : {}),
+            ...(item.otherChanges || item.other_changes ? { otherChanges: item.otherChanges || item.other_changes } : {})
         }));
     }
 
@@ -3166,7 +3172,15 @@ interface Window {
     }
 
     function renderExperiencedScenarioDetail(item: COC7ExperiencedScenario): string {
-        return backgroundNote(item.name || "未命名模组", item.experience);
+        const lines = [item.name || "未命名模组"];
+        const sanLine = item.sanChange || item.san_change || "";
+        const otherLine = item.otherChanges || item.other_changes || "";
+        if (item.experience && !sanLine && !otherLine) lines.push(item.experience);
+        if (sanLine) lines.push(sanLine);
+        if (otherLine) lines.push(otherLine);
+        const name = escapeHtml(lines.shift() || "");
+        const body = lines.filter(Boolean).map((part) => escapeHtml(part || "")).join("<br>");
+        return `<div class="background-note"><strong>${name}</strong><p>${body || "未填写"}</p></div>`;
     }
 
     async function deleteCard(id: string): Promise<void> {
@@ -3484,7 +3498,7 @@ interface Window {
                 magics: card.background.spells,
                 touches: card.background.encounters
             },
-            experiencedModules: jsonArrayText(card.experiencedScenarios.map((item) => ({ name: item.name, experience: item.experience }))),
+            experiencedModules: jsonArrayText(card.experiencedScenarios.map((item) => ({ name: item.name, experience: item.experience, san_change: item.sanChange || item.san_change, other_changes: item.otherChanges || item.other_changes }))),
             friends: jsonArrayText(card.relationships.map((item) => ({ character: item.name, relationship: item.description, player: item.player }))),
             skillGroups,
             isEditable: true,
@@ -3623,7 +3637,9 @@ interface Window {
             })),
             experiencedScenarios: jsonArrayField(payload.experiencedModules).map((item) => ({
                 name: stringField(item.name),
-                experience: stringField(item.experience)
+                experience: stringField(item.experience),
+                sanChange: stringField(item.san_change || item.sanChange),
+                otherChanges: stringField(item.other_changes || item.otherChanges)
             })),
             ...(payload.createdAt ? { createdAt: payload.createdAt } : {}),
             ...(payload.updatedAt ? { updatedAt: payload.updatedAt } : {})

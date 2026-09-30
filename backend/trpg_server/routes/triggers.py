@@ -14,6 +14,7 @@ from trpg_server.agents.trigger_system import (
     trigger_cards,
 )
 from trpg_server.json_store import read_json
+from trpg_server.logging_config import log_access_denied, log_user_action, user_action_text
 from trpg_server.responses import error_response, success_response
 from trpg_server.scenario_store import load_scenario_by_id, load_scenario_record, save_scenario_record, scenario_descriptor_paths
 from trpg_server.settings import ROOMS_DIR, SCENARIOS_DIR
@@ -46,6 +47,15 @@ def _can_edit(value: dict) -> bool:
     return role in {"ADMIN", "OWNER"} or str(value.get("owner_id")) == str(session.get("user_id"))
 
 
+def _log_denied(script_id):
+    log_access_denied(
+        logger,
+        user_action_text(session.get("username"), "访问剧本被拒绝"),
+        用户ID=session.get("user_id"),
+        剧本ID=script_id,
+    )
+
+
 def _save_scenario(descriptor, scenario):
     return save_scenario_record(
         _scenario_dir(), scenario, existing_descriptor=descriptor,
@@ -75,6 +85,7 @@ def upload_assets(script_id):
     if not descriptor or not scenario:
         return error_response("Scenario not found", 404, "Scenario not found")
     if not _can_edit(scenario):
+        _log_denied(script_id)
         return error_response("Permission denied", 403, "Permission denied")
     uploads = request.files.getlist("files") or request.files.getlist("file")
     if not uploads:
@@ -89,6 +100,13 @@ def upload_assets(script_id):
             results.append(persist_uploaded_resource(_storage_root(descriptor), script_id, uploaded, alt, request.form.get("type")))
     except ValueError as exc:
         return error_response(str(exc), 400, "Invalid resource")
+    log_user_action(
+        logger,
+        user_action_text(session.get("username"), "上传了触发器资源"),
+        用户ID=session.get("user_id"),
+        剧本ID=script_id,
+        资源数=len(results),
+    )
     return success_response(results, "Resources uploaded successfully", 201)
 
 
@@ -100,6 +118,7 @@ def update_asset(script_id, asset_id):
     if not descriptor or not scenario:
         return error_response("Scenario not found", 404, "Scenario not found")
     if not _can_edit(scenario):
+        _log_denied(script_id)
         return error_response("Permission denied", 403, "Permission denied")
     payload = request.get_json(silent=True) or {}
     resources = load_resources(_storage_root(descriptor), script_id)
@@ -129,9 +148,17 @@ def remove_asset(script_id, asset_id):
     if not descriptor or not scenario:
         return error_response("Scenario not found", 404, "Scenario not found")
     if not _can_edit(scenario):
+        _log_denied(script_id)
         return error_response("Permission denied", 403, "Permission denied")
     if not delete_resource(_storage_root(descriptor), script_id, asset_id):
         return error_response("Resource not found", 404, "Resource not found")
+    log_user_action(
+        logger,
+        user_action_text(session.get("username"), "删除了触发器资源"),
+        用户ID=session.get("user_id"),
+        剧本ID=script_id,
+        文件=asset_id,
+    )
     return success_response(message="Resource deleted successfully")
 
 
@@ -162,6 +189,7 @@ def remove_attachment(script_id, card_id, trigger_id):
         return error
     descriptor, scenario = _scenario(script_id)
     if not descriptor or not scenario or not _can_edit(scenario):
+        _log_denied(script_id)
         return error_response("Permission denied", 403, "Permission denied")
     attachments = _find_card_attachment(scenario, card_id)
     if attachments is None:
@@ -181,6 +209,7 @@ def _attachment_mutation(script_id, card_id, trigger_id, method):
     if not descriptor or not scenario:
         return error_response("Scenario not found", 404, "Scenario not found")
     if not _can_edit(scenario):
+        _log_denied(script_id)
         return error_response("Permission denied", 403, "Permission denied")
     attachments = _find_card_attachment(scenario, card_id)
     if attachments is None:
@@ -213,6 +242,7 @@ def manage_trigger_cards(script_id):
     if request.method == "GET":
         return success_response(trigger_cards(scenario))
     if not _can_edit(scenario):
+        _log_denied(script_id)
         return error_response("Permission denied", 403, "Permission denied")
     payload = request.get_json(silent=True) or {}
     attachments = []
@@ -237,6 +267,13 @@ def manage_trigger_cards(script_id):
     }
     scenario.setdefault("trigger_cards", []).append(card)
     _save_scenario(descriptor, scenario)
+    log_user_action(
+        logger,
+        user_action_text(session.get("username"), "创建了触发器卡"),
+        用户ID=session.get("user_id"),
+        剧本ID=script_id,
+        触发器ID=card["id"],
+    )
     return success_response(card, "Trigger card created successfully", 201)
 
 
@@ -246,6 +283,7 @@ def update_trigger_card(script_id, trigger_id):
         return error
     descriptor, scenario = _scenario(script_id)
     if not descriptor or not scenario or not _can_edit(scenario):
+        _log_denied(script_id)
         return error_response("Permission denied", 403, "Permission denied")
     cards = scenario.get("trigger_cards") if isinstance(scenario.get("trigger_cards"), list) else []
     card = next((item for item in cards if isinstance(item, dict) and str(item.get("id")) == str(trigger_id)), None)
@@ -261,6 +299,13 @@ def update_trigger_card(script_id, trigger_id):
         if key in payload:
             card[key] = payload[key]
     _save_scenario(descriptor, scenario)
+    log_user_action(
+        logger,
+        user_action_text(session.get("username"), "更新了触发器卡"),
+        用户ID=session.get("user_id"),
+        剧本ID=script_id,
+        触发器ID=trigger_id,
+    )
     return success_response(card, "Trigger card updated successfully")
 
 

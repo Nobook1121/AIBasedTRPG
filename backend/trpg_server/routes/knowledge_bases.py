@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import logging
 
-from flask import Blueprint, current_app, request
+from flask import Blueprint, current_app, request, session
 from pathlib import Path
 
 from trpg_server.agents.ruleset_knowledge import RulesetKnowledgeStore
+from trpg_server.logging_config import log_user_action, user_action_text
 from trpg_server.responses import error_response, success_response
 from trpg_server.security import is_allowed_upload, require_permission_node
 from trpg_server.settings import KNOWLEDGE_BASES_DIR, ROOMS_DIR, SCENARIOS_DIR, EMBEDDED_VECTOR_DB_PATH
@@ -91,6 +92,13 @@ def delete_scenario_knowledge(scenario_id: int):
             index_dir.rmdir()
         except OSError:
             pass
+    log_user_action(
+        logger,
+        user_action_text(session.get("username"), "删除了知识库源文件"),
+        用户ID=session.get("user_id"),
+        剧本ID=scenario_id,
+        文件数=deleted_files,
+    )
     return success_response(data={"scenario_id": scenario_id, "deleted_vectors": deleted_vectors, "deleted_files": deleted_files})
 
 
@@ -119,6 +127,12 @@ def upload_source(ruleset_id):
     try:
         source = _store().upload_source(ruleset_id, uploaded.filename, raw, request.form.get("locale", "zh-CN"))
         result = _store().reindex(ruleset_id)
+        log_user_action(
+            logger,
+            user_action_text(session.get("username"), "上传了知识库源文件"),
+            用户ID=session.get("user_id"),
+            文件名=uploaded.filename,
+        )
         return success_response(data={"source": source, "version": result}, status=201)
     except (ValueError, OSError) as exc:
         return error_response(str(exc), 400)

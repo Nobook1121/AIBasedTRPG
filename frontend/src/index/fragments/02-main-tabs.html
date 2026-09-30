@@ -1,4 +1,4 @@
-﻿            <div class="col-10" id="mainContent">
+            <div class="col-10" id="mainContent">
                 <!-- 主页内容 -->
                 <div id="home" class="tab-content active" data-page-header="chat">
                     <div id="react-home-root"></div>
@@ -166,11 +166,14 @@
                                         <i class="fa fa-arrow-left"></i> <span data-i18n="room.action.back_to_list">返回房间列表</span>
                                     </button>
                                     <h2 id="saveDetailTitle" data-i18n="room.detail.title">房间详情</h2>
+                                    <span id="roomDetailArchivedBadge" class="badge bg-secondary mt-1" style="display:none;"><i class="fa fa-archive"></i> 已归档（AI 已关闭，骰娘等工具仍可用，可查看历史记录）</span>
                                 </div>
                                 <div class="d-flex gap-2">
                                     <button class="btn btn-primary" id="startScenario" hidden>
                                         <i class="fa fa-play" aria-hidden="true"></i> 开启剧本
                                     </button>
+                                    <button class="btn btn-outline-secondary" id="editHouseRules" hidden data-i18n="room.house_rules.button">房间规则</button>
+                                    <button class="btn btn-warning" id="archiveRoom" hidden>归档房间</button>
                                     <button class="btn btn-danger" id="deleteSave" data-i18n="room.action.delete">删除房间</button>
                                 </div>
                             </div>

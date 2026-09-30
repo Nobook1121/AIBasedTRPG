@@ -1,17 +1,20 @@
+import json
 import logging
 import tomllib
 import time
+from pathlib import Path
 from uuid import uuid4
 
 from flask import Blueprint, current_app, request, session
 
 from trpg_server.json_store import read_json, write_json_atomic
-from trpg_server.logging_config import log_user_action, user_action_text
+from trpg_server.logging_config import log_access_denied, log_user_action, user_action_text
 from trpg_server.permission_config import is_role_allowed, permission_config_path
 from trpg_server.responses import error_response, success_response
 from trpg_server.role_config import load_roles
 from trpg_server.security import is_socket_user_online, safe_join
-from trpg_server.settings import CONFIG_DIR, ROOMS_DIR, SCENARIOS_DIR
+from trpg_server.settings import CONFIG_DIR, ROOMS_DIR, SCENARIOS_DIR, ROOM_ARCHIVES_DIR, CHARACTERS_DIR, HISTORY_DIR
+from trpg_server.agents.config import load_ai_runtime_config
 from trpg_server.agents.versioning import migrate_room_binding
 from trpg_server.agents.trigger_system import find_trigger_definition, record_trigger, validate_trigger
 from trpg_server.scenario_store import load_scenario_by_id
@@ -27,9 +30,21 @@ ROOM_MEMBER_ACTIVE = "active"
 ROOM_MEMBER_REMOVED = "removed"
 DEFAULT_AUTOSAVE_NODE_LIMIT = 3
 
+# Structured per-room house rules. Only rules flagged ``ai_prompt`` are ever
+# injected into the KP prompt (and only when active), keeping prompt tokens low;
+# future non-AI rules can be registered here without prompt cost.
+HOUSE_RULE_DEFINITIONS = {
+    "action_suggestions_enabled": {"type": "boolean", "default": False, "ai_prompt": True},
+}
+DEFAULT_ROOM_HOUSE_RULES = {key: spec["default"] for key, spec in HOUSE_RULE_DEFINITIONS.items()}
+
 
 def _get_rooms_dir():
     return current_app.config.get("ROOMS_DIR", ROOMS_DIR)
+
+
+def _get_archives_dir():
+    return current_app.config.get("ROOM_ARCHIVES_DIR", ROOM_ARCHIVES_DIR)
 
 
 def _get_config_dir():
@@ -74,6 +89,16 @@ def _is_elevated():
     return is_role_allowed(session.get("role", "USER"), "rooms.manage_members", config_path)
 
 
+def _denied(room_ref=None):
+    log_access_denied(
+        logger,
+        user_action_text(session.get("username"), "访问房间被拒绝"),
+        用户ID=session.get("user_id"),
+        房间ID=room_ref,
+    )
+    return error_response("Permission denied", 403, "Permission denied")
+
+
 def _iter_room_dirs():
     rooms_dir = _get_rooms_dir()
     if not rooms_dir.exists():
@@ -88,6 +113,28 @@ def _read_room(room_dir):
 def _write_room(room_dir, info):
     info["updated_at"] = _timestamp()
     write_json_atomic(room_dir / "info.json", info)
+
+
+def _global_hints_enabled():
+    """Global admin switch. When off, no room may enable action suggestions."""
+    return bool(load_ai_runtime_config(_get_config_dir()).show_ai_hints)
+
+
+def _room_house_rules(info):
+    """Normalize stored house rules against ``HOUSE_RULE_DEFINITIONS``.
+
+    Missing keys fall back to defaults and wrong types are coerced, so a room
+    written by an older version always yields a complete, well-typed dict.
+    """
+    stored = info.get("house_rules") if isinstance(info, dict) else None
+    stored = stored if isinstance(stored, dict) else {}
+    normalized = {}
+    for key, spec in HOUSE_RULE_DEFINITIONS.items():
+        value = stored.get(key, spec["default"])
+        if spec["type"] == "boolean":
+            value = bool(value)
+        normalized[key] = value
+    return normalized
 
 
 def _room_dir(room_id):
@@ -139,7 +186,36 @@ def _can_access(info):
 
 
 def _can_manage(info):
-    return _is_elevated() or info.get("creator_id") == session.get("user_id")
+    if _is_elevated() or str(info.get("creator_id")) == str(session.get("user_id")):
+        return True
+    member = _find_member(info, user_id=session.get("user_id"), active_only=True)
+    return _room_permission(member, info) in {ROOM_ROLE_OWNER, ROOM_ROLE_ADMIN}
+
+
+def _archive_visible(archive):
+    if _is_elevated():
+        return True
+    user_id = str(session.get("user_id"))
+    return any(str(member.get("user_id")) == user_id for member in archive.get("members", []) if isinstance(member, dict))
+
+
+def _scenario_finished(info, state=None):
+    if info.get("completed_at") or info.get("ended_at"):
+        return True
+    scene_id = str(info.get("active_scene_id") or ((state or {}).get("active_scene_id") if isinstance(state, dict) else "") or "")
+    if isinstance(state, dict) and (state.get("completed_at") or state.get("completed") or state.get("ending_reached")):
+        return True
+    if not scene_id:
+        return False
+    _, scenario = load_scenario_by_id(_get_scenarios_dir(), info.get("scenario_id"), scenario_version=info.get("scenario_version"))
+    for module in (scenario or {}).get("modules", []):
+        if isinstance(module, dict) and str(module.get("scene_id") or module.get("id")) == scene_id:
+            return str(module.get("module_type") or module.get("type") or "").lower() == "ending"
+    return False
+
+
+def _get_scenarios_dir():
+    return current_app.config.get("SCENARIOS_DIR", SCENARIOS_DIR)
 
 
 def _current_member(character_card=None):
@@ -215,6 +291,8 @@ def _initial_character_state(character_card):
         "current_san": max_san,
         "injury_records": [],
         "sanity_records": [],
+        "skill_changes": [],
+        "item_changes": [],
     }
 
 
@@ -224,6 +302,8 @@ def _ensure_character_state(member):
     state = member["character_state"]
     state.setdefault("injury_records", [])
     state.setdefault("sanity_records", [])
+    state.setdefault("skill_changes", [])
+    state.setdefault("item_changes", [])
     state["max_hp"] = _bounded_int(state.get("max_hp"), 1, 999, 1)
     state["current_hp"] = _bounded_int(state.get("current_hp"), 0, state["max_hp"], state["max_hp"])
     state["max_san"] = _bounded_int(state.get("max_san"), 0, 999, 0)
@@ -313,6 +393,138 @@ def _write_messages(room_dir, messages):
     write_json_atomic(_messages_file(room_dir), messages)
 
 
+def _character_delta(member):
+    """Return ``(san_change_text, other_changes_text)`` for a room member.
+
+    ``other_changes_text`` aggregates HP/injury/skill/item changes so it can be
+    rendered as the third line of a "参与过的模组" record.
+    """
+    state = member.get("character_state") if isinstance(member, dict) else {}
+    state = state if isinstance(state, dict) else {}
+    max_san = int(state.get("max_san") or 0)
+    current_san = int(state.get("current_san") if state.get("current_san") is not None else max_san)
+    max_hp = int(state.get("max_hp") or 0)
+    current_hp = int(state.get("current_hp") if state.get("current_hp") is not None else max_hp)
+    san_change = current_san - max_san
+    other = []
+    if current_hp != max_hp:
+        other.append(f"HP {max_hp}->{current_hp}")
+    for record in (state.get("injury_records") or [])[:20]:
+        if isinstance(record, dict) and record.get("reason"):
+            other.append(str(record["reason"])[:120])
+    for record in (state.get("skill_changes") or [])[:20]:
+        text = _change_record_text(record)
+        if text:
+            other.append(text)
+    for record in (state.get("item_changes") or [])[:20]:
+        text = _change_record_text(record)
+        if text:
+            other.append(text)
+    san_text = f"SAN {san_change:+d}" if san_change else "SAN 无变化"
+    return san_text, "；".join(dict.fromkeys(other))
+
+
+def _change_record_text(record):
+    """Format a structured skill/item change record into a short line."""
+    if not isinstance(record, dict):
+        return ""
+    change_type = str(record.get("type") or "")
+    target = str(record.get("target") or record.get("name") or record.get("item") or "").strip()
+    if not target:
+        return ""
+    verb = record.get("change") or record.get("operation") or record.get("action") or "变化"
+    amount = record.get("amount")
+    if amount is None and record.get("value") is not None:
+        amount = record["value"]
+    reason = str(record.get("reason") or "").strip()
+    prefix = "技能" if change_type == "skill" else "物品" if change_type == "item" else "变更"
+    if amount is not None:
+        try:
+            amount_signed = f"{int(amount):+d}"
+        except (TypeError, ValueError):
+            amount_signed = str(amount)
+        line = f"{prefix} {target} {verb} {amount_signed}".strip() + (f"（{reason}）" if reason else "")
+    else:
+        line = f"{prefix} {target} {verb}".strip() + (f"（{reason}）" if reason else "")
+    return line[:160]
+
+
+def _append_character_archive_records(info):
+    """Copy the finished room outcome to each participating character card.
+
+    Each entry is stored with ``name`` (module/scenario name), ``san_change``
+    and ``other_changes`` so UIs can render the required three-line format:
+    参与过的模组名 / SAN 值变化 / 其他变化.
+    """
+    scenario_name = str(info.get("scenario_title") or info.get("name") or "未命名剧本").strip()
+    for member in info.get("members", []):
+        card = member.get("character_card") if isinstance(member, dict) else None
+        card_id = str((card or {}).get("id") or "").strip()
+        if not card_id:
+            continue
+        path = Path(current_app.config.get("CHARACTERS_DIR", CHARACTERS_DIR)) / f"{card_id}.json"
+        if not path.exists():
+            continue
+        stored = read_json(path, default={})
+        if not isinstance(stored, dict):
+            continue
+        san_change, other_changes = _character_delta(member)
+        entry = {
+            "name": scenario_name,
+            "san_change": san_change,
+            "other_changes": other_changes,
+            "experience": f"{san_change}" + (f"；{other_changes}" if other_changes else ""),
+        }
+        existing = stored.get("experiencedModules")
+        if isinstance(existing, str):
+            try:
+                existing = json.loads(existing)
+            except (TypeError, ValueError):
+                existing = []
+        if not isinstance(existing, list):
+            # Runtime-shaped character cards use experiencedScenarios.
+            existing = stored.get("experiencedScenarios") if isinstance(stored.get("experiencedScenarios"), list) else []
+        # One immutable outcome entry per archived room/scenario.
+        if not any(isinstance(item, dict) and item.get("name") == scenario_name and item.get("experience") == entry["experience"] for item in existing):
+            existing.append(entry)
+        if "experiencedModules" in stored or "experiencedScenarios" not in stored:
+            stored["experiencedModules"] = json.dumps(existing[-100:], ensure_ascii=False)
+        else:
+            stored["experiencedScenarios"] = existing[-100:]
+        write_json_atomic(path, stored)
+
+
+def _build_room_archive(room_dir, info):
+    """Build the room archive snapshot. Rooms are archived in place (kept usable
+    for dice and history) rather than deleted/moved; the archive JSON is retained
+    as an immutable history copy and participating players' character cards are
+    updated with a three-line "参与过的模组" record."""
+    archive = {
+        "id": info.get("id"),
+        "name": info.get("name"),
+        "scenario_id": info.get("scenario_id"),
+        "scenario_title": info.get("scenario_title"),
+        "scenario_version": info.get("scenario_version"),
+        "created_at": info.get("created_at"),
+        "completed_at": info.get("completed_at") or _timestamp(),
+        "archived_at": info.get("archived_at") or _timestamp(),
+        "archived": True,
+        "creator_id": info.get("creator_id"),
+        "members": info.get("members", []),
+        "messages": _read_messages(room_dir),
+    }
+    history_dir = current_app.config.get("HISTORY_DIR", HISTORY_DIR)
+    if history_dir:
+        history_file = Path(history_dir) / f"room-{info.get('id')}-kp.json"
+        archive["ai_history"] = read_json(history_file, default=[])
+    archive_dir = _get_archives_dir()
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    archive_path = archive_dir / f"{info.get('id')}.json"
+    write_json_atomic(archive_path, archive)
+    _append_character_archive_records(info)
+    return archive
+
+
 def _configured_role(role_id="kp"):
     roles = load_roles(_get_role_config_file(), _get_kp_prompt_file(), _get_ai_platform_dir())
     expected = str(role_id or "kp")
@@ -362,6 +574,9 @@ def _room_summary(info):
         "scenario_title": info.get("scenario_title"),
         "scenario_started_at": info.get("scenario_started_at"),
         "scenario_started_by": info.get("scenario_started_by"),
+        "archived": bool(info.get("archived")),
+        "archived_at": info.get("archived_at"),
+        "completed_at": info.get("completed_at"),
         "creator_id": info.get("creator_id"),
         "creator_name": info.get("creator_name"),
         "members": [
@@ -373,6 +588,7 @@ def _room_summary(info):
             }
             for member in info.get("members", [])
         ],
+        "house_rules": _room_house_rules(info),
         "created_at": info.get("created_at"),
         "updated_at": info.get("updated_at"),
     }
@@ -485,7 +701,7 @@ def spectate_room_by_code():
     if login_error:
         return login_error
     if not _is_elevated():
-        return error_response("Permission denied", 403, "Permission denied")
+        return _denied()
 
     data = request.get_json(silent=True) or {}
     room_dir, info = _find_room_by_code(data.get("room_code"))
@@ -553,18 +769,18 @@ def bind_room_member_character(room_id, user_id):
     if not room_dir:
         return error_response("Room not found", 404, "Room not found")
     if not _can_access(info):
-        return error_response("Permission denied", 403, "Permission denied")
+        return _denied(room_id)
 
     target = _find_member(info, user_id=user_id, active_only=True)
     if not target:
         return error_response("Player not found in room", 404, "Player not found in room")
     if str(target.get("user_id")) != str(session["user_id"]) and not _can_manage_members(info):
-        return error_response("Permission denied", 403, "Permission denied")
+        return _denied(room_id)
 
     data = request.get_json(silent=True) or {}
     character_card = data.get("character_card")
     if not _can_bind_character_card(character_card, target):
-        return error_response("Permission denied", 403, "Permission denied")
+        return _denied(room_id)
     if not _bind_character(target, character_card):
         return error_response("Character card is required", 400, "Character card is required")
     _write_room(room_dir, info)
@@ -592,7 +808,7 @@ def delete_room_member(room_id, user_id):
     if not room_dir:
         return error_response("Room not found", 404, "Room not found")
     if not _can_manage_members(info):
-        return error_response("Permission denied", 403, "Permission denied")
+        return _denied(room_id)
     if str(user_id) == str(info.get("creator_id")):
         return error_response("Room owner cannot be removed", 400, "Room owner cannot be removed")
 
@@ -626,7 +842,7 @@ def update_room_member_role(room_id, user_id):
     if not room_dir:
         return error_response("Room not found", 404, "Room not found")
     if not _can_manage_members(info):
-        return error_response("Permission denied", 403, "Permission denied")
+        return _denied(room_id)
     if str(user_id) == str(info.get("creator_id")):
         return error_response("Room owner role cannot be changed", 400, "Room owner role cannot be changed")
 
@@ -660,7 +876,7 @@ def get_room(room_id):
     if not room_dir:
         return error_response("Room not found", 404, "Room not found")
     if not _can_access(info):
-        return error_response("Permission denied", 403, "Permission denied")
+        return _denied(room_id)
 
     data = _room_summary(info)
     data["messages"] = _read_messages(room_dir)
@@ -676,7 +892,7 @@ def migrate_room_scenario(room_id):
     if not room_dir:
         return error_response("Room not found", 404, "Room not found")
     if not _can_manage(info):
-        return error_response("Permission denied", 403, "Permission denied")
+        return _denied(room_id)
     payload = request.get_json(silent=True) or {}
     target_version = payload.get("scenario_version")
     _, target = load_scenario_by_id(
@@ -708,7 +924,7 @@ def spectate_room(room_id):
     if login_error:
         return login_error
     if not _is_elevated():
-        return error_response("Permission denied", 403, "Permission denied")
+        return _denied(room_id)
 
     room_dir, info = _find_room(room_id)
     if not room_dir:
@@ -726,7 +942,9 @@ def delete_room(room_id):
     if not room_dir:
         return error_response("Room not found", 404, "Room not found")
     if not _can_manage(info):
-        return error_response("Permission denied", 403, "Permission denied")
+        return _denied(room_id)
+    if info.get("completed_at") and not info.get("archived"):
+        return error_response("Please archive the completed room first", 409, "Completed rooms must be archived so their messages are preserved")
 
     import shutil
 
@@ -741,6 +959,142 @@ def delete_room(room_id):
     return success_response(message="Room deleted successfully")
 
 
+@bp.route("/api/rooms/<room_id>/archive", methods=["POST"])
+def archive_room(room_id):
+    login_error = _require_login()
+    if login_error:
+        return login_error
+    room_dir, info = _find_room(room_id)
+    if not room_dir:
+        return error_response("Room not found", 404, "Room not found")
+    if not _can_manage(info):
+        return _denied(room_id)
+    if info.get("archived"):
+        return error_response("Room already archived", 409, "Room already archived")
+    state = read_json(room_dir / "state.json", default={})
+    if not _scenario_finished(info, state):
+        return error_response("Room is not finished", 409, "Room must reach an ending before archiving")
+    now = _timestamp()
+    info["completed_at"] = info.get("completed_at") or now
+    info["archived_at"] = now
+    info["archived"] = True
+    # House rules are scoped to an active room; an archived room no longer needs
+    # them (the immutable archive snapshot is built from a fixed field whitelist).
+    info.pop("house_rules", None)
+    _write_room(room_dir, info)
+    archive = _build_room_archive(room_dir, info)
+    log_user_action(logger, user_action_text(session.get("username"), "归档了房间"), 用户ID=session.get("user_id"), 房间ID=room_id, 房间名=info.get("name"))
+    return success_response({"id": archive["id"], "name": archive["name"], "archived_at": archive["archived_at"]}, "Room archived successfully")
+
+
+@bp.route("/api/rooms/<room_id>/house-rules", methods=["GET"])
+def get_room_house_rules(room_id):
+    login_error = _require_login()
+    if login_error:
+        return login_error
+    _path, info = _find_room(room_id)
+    if not info:
+        return error_response("Room not found", 404, "Room not found")
+    if not _can_access(info):
+        return _denied(room_id)
+    return success_response(
+        {
+            "house_rules": _room_house_rules(info),
+            "definitions": HOUSE_RULE_DEFINITIONS,
+            "global_hints_enabled": _global_hints_enabled(),
+        },
+        "House rules loaded successfully",
+    )
+
+
+@bp.route("/api/rooms/<room_id>/house-rules", methods=["PUT"])
+def update_room_house_rules(room_id):
+    login_error = _require_login()
+    if login_error:
+        return login_error
+    room_dir, info = _find_room(room_id)
+    if not room_dir:
+        return error_response("Room not found", 404, "Room not found")
+    if not _can_manage(info):
+        return _denied(room_id)
+
+    payload = request.get_json(silent=True) or {}
+    updates = payload.get("house_rules", payload)
+    if not isinstance(updates, dict):
+        return error_response("Invalid house rules payload", 400, "house_rules must be an object")
+
+    current = _room_house_rules(info)
+    for key, value in updates.items():
+        spec = HOUSE_RULE_DEFINITIONS.get(key)
+        if not spec:
+            return error_response(f"Unknown house rule: {key}", 400, "Unknown house rule")
+        if spec["type"] == "boolean":
+            if not isinstance(value, bool):
+                return error_response(f"House rule {key} must be a boolean", 400, "Invalid house rule type")
+            current[key] = value
+        else:
+            current[key] = value
+
+    enabled_by_request = {
+        key for key, spec in HOUSE_RULE_DEFINITIONS.items()
+        if spec.get("ai_prompt") and current.get(key) and updates.get(key)
+    }
+    if enabled_by_request and not _global_hints_enabled():
+        return error_response(
+            "全局 AI 提示开关已关闭，无法开启该房规",
+            400,
+            "Global AI hints are disabled",
+        )
+
+    info["house_rules"] = current
+    _write_room(room_dir, info)
+    log_user_action(
+        logger,
+        user_action_text(session.get("username"), "更新了房间房规"),
+        用户ID=session.get("user_id"),
+        房间ID=room_id,
+        房间名=info.get("name"),
+    )
+    return success_response(
+        {
+            "house_rules": _room_house_rules(info),
+            "definitions": HOUSE_RULE_DEFINITIONS,
+            "global_hints_enabled": _global_hints_enabled(),
+        },
+        "House rules updated successfully",
+    )
+
+
+@bp.route("/api/room-archives", methods=["GET"])
+@bp.route("/api/rooms/archives", methods=["GET"])
+def list_room_archives():
+    login_error = _require_login()
+    if login_error:
+        return login_error
+    archives = []
+    archive_dir = _get_archives_dir()
+    for path in archive_dir.glob("*.json") if archive_dir.exists() else []:
+        archive = read_json(path, default={})
+        if isinstance(archive, dict) and _archive_visible(archive):
+            archives.append({key: archive.get(key) for key in ("id", "name", "scenario_title", "archived_at", "completed_at")})
+    archives.sort(key=lambda item: str(item.get("archived_at") or ""), reverse=True)
+    return success_response(archives, "Room archives loaded successfully")
+
+
+@bp.route("/api/room-archives/<room_id>", methods=["GET"])
+@bp.route("/api/rooms/<room_id>/archive", methods=["GET"])
+def get_room_archive(room_id):
+    login_error = _require_login()
+    if login_error:
+        return login_error
+    archive = read_json(_get_archives_dir() / f"{room_id}.json", default={})
+    if not isinstance(archive, dict) or not archive:
+        return error_response("Room archive not found", 404, "Room archive not found")
+    if not _archive_visible(archive):
+        return _denied(room_id)
+    return success_response(archive, "Room archive loaded successfully")
+
+
 @bp.route("/api/rooms/<room_id>/messages", methods=["GET"])
 def get_room_messages(room_id):
     login_error = _require_login()
@@ -751,7 +1105,7 @@ def get_room_messages(room_id):
     if not room_dir:
         return error_response("Room not found", 404, "Room not found")
     if not _can_access(info):
-        return error_response("Permission denied", 403, "Permission denied")
+        return _denied(room_id)
 
     return success_response(_read_messages(room_dir), "Room messages loaded successfully")
 
@@ -766,7 +1120,7 @@ def create_room_message(room_id):
     if not room_dir:
         return error_response("Room not found", 404, "Room not found")
     if not _can_access(info):
-        return error_response("Permission denied", 403, "Permission denied")
+        return _denied(room_id)
 
     data = request.get_json(silent=True) or {}
     content = str(data.get("content", "")).strip()
@@ -775,7 +1129,7 @@ def create_room_message(room_id):
 
     member = _find_member(info, user_id=session["user_id"], active_only=True)
     if not member:
-        return error_response("Permission denied", 403, "Permission denied")
+        return _denied(room_id)
     message = {
         "id": uuid4().hex,
         "type": data.get("type", "player"),
@@ -812,7 +1166,11 @@ def create_room_message(room_id):
 
     log_user_action(
         logger,
-        f"{message['sender_name']}:{content}",
+        user_action_text(session.get("username"), "发送了房间消息"),
+        用户ID=session.get("user_id"),
+        房间ID=room_id,
+        类型=message["type"],
+        内容长度=len(content),
     )
     return success_response(message, "Room message saved successfully", 201)
 
@@ -827,9 +1185,9 @@ def trigger_room_scenario(room_id):
     if not room_dir:
         return error_response("Room not found", 404, "Room not found")
     if not _can_access(info):
-        return error_response("Permission denied", 403, "Permission denied")
+        return _denied(room_id)
     if not _can_manage_members(info):
-        return error_response("Permission denied", 403, "Permission denied")
+        return _denied(room_id)
 
     data = request.get_json(silent=True) or {}
     trigger_id = data.get("trigger_id")
@@ -901,7 +1259,7 @@ def create_character_record(room_id):
     if not room_dir:
         return error_response("Room not found", 404, "Room not found")
     if not _can_access(info):
-        return error_response("Permission denied", 403, "Permission denied")
+        return _denied(room_id)
 
     return _create_character_record_for_room(room_dir, info)
 
@@ -909,7 +1267,7 @@ def create_character_record(room_id):
 def _create_character_record_for_room(room_dir, info):
     data = request.get_json(silent=True) or {}
     record_type = str(data.get("type", "")).strip().lower()
-    if record_type not in {"damage", "san"}:
+    if record_type not in {"damage", "san", "skill", "item"}:
         return error_response("Invalid record type", 400, "Invalid record type")
 
     target = _find_member(info, user_id=data.get("user_id"), username=data.get("username"), active_only=True)
@@ -935,13 +1293,21 @@ def _create_character_record_for_room(room_dir, info):
         state["current_hp"] = max(0, state["current_hp"] - value)
         record["hp_after"] = state["current_hp"]
         state["injury_records"].insert(0, record)
-    else:
+    elif record_type == "san":
         state["current_san"] = max(0, state["current_san"] - value)
         if isinstance(target.get("character_card"), dict):
             target["character_card"]["currentSan"] = state["current_san"]
             target["character_card"]["current_san"] = state["current_san"]
         record["san_after"] = state["current_san"]
         state["sanity_records"].insert(0, record)
+    else:
+        # skill / item change records (e.g. 技能增减、获得物品) feed the
+        # "其他变化" line of the participating-module record on the player card.
+        record["target"] = str(data.get("target") or record.get("name") or "").strip()[:80]
+        record["change"] = str(data.get("change") or data.get("operation") or data.get("action") or "").strip()[:40] or "变化"
+        record["amount"] = data.get("amount")
+        collection = "skill_changes" if record_type == "skill" else "item_changes"
+        state.setdefault(collection, []).insert(0, record)
 
     _write_room(room_dir, info)
     log_user_action(
@@ -979,13 +1345,13 @@ def delete_character_record(room_id, record_id):
     if not room_dir:
         return error_response("Room not found", 404, "Room not found")
     if not _can_access(info):
-        return error_response("Permission denied", 403, "Permission denied")
+        return _denied(room_id)
     if not _is_elevated():
-        return error_response("Permission denied", 403, "Permission denied")
+        return _denied(room_id)
 
     for member in info.get("members", []):
         state = _ensure_character_state(member)
-        for collection_name in ("injury_records", "sanity_records"):
+        for collection_name in ("injury_records", "sanity_records", "skill_changes", "item_changes"):
             records = state.get(collection_name, [])
             next_records = [record for record in records if record.get("id") != record_id]
             if len(next_records) != len(records):
@@ -1014,7 +1380,7 @@ def list_room_nodes(room_id):
     if not room_dir:
         return error_response("Room not found", 404, "Room not found")
     if not _can_access(info):
-        return error_response("Permission denied", 403, "Permission denied")
+        return _denied(room_id)
 
     nodes_dir = room_dir / "nodes"
     nodes = []
@@ -1044,7 +1410,7 @@ def create_room_node(room_id):
     if not room_dir:
         return error_response("Room not found", 404, "Room not found")
     if not _can_access(info):
-        return error_response("Permission denied", 403, "Permission denied")
+        return _denied(room_id)
 
     timestamp = int(time.time() * 1000)
     node = {
@@ -1074,7 +1440,7 @@ def get_room_node(room_id, node_filename):
     if not room_dir:
         return error_response("Room not found", 404, "Room not found")
     if not _can_access(info):
-        return error_response("Permission denied", 403, "Permission denied")
+        return _denied(room_id)
 
     node_file = safe_join(room_dir / "nodes", node_filename)
     if not node_file.exists():
@@ -1092,7 +1458,7 @@ def restore_room_node(room_id, node_filename):
     if not room_dir:
         return error_response("Room not found", 404, "Room not found")
     if not _can_access(info):
-        return error_response("Permission denied", 403, "Permission denied")
+        return _denied(room_id)
 
     node_file = safe_join(room_dir / "nodes", node_filename)
     if not node_file.exists():
@@ -1121,7 +1487,7 @@ def delete_room_node(room_id, node_filename):
     if not room_dir:
         return error_response("Room not found", 404, "Room not found")
     if not _can_manage(info):
-        return error_response("Permission denied", 403, "Permission denied")
+        return _denied(room_id)
 
     node_file = safe_join(room_dir / "nodes", node_filename)
     if node_file.exists():
@@ -1146,7 +1512,7 @@ def save_room_autosave(room_id):
     if not room_dir:
         return error_response("Room not found", 404, "Room not found")
     if not _can_access(info):
-        return error_response("Permission denied", 403, "Permission denied")
+        return _denied(room_id)
 
     timestamp = int(time.time() * 1000)
     autosave = {
@@ -1188,7 +1554,7 @@ def load_room_autosave(room_id):
     if not room_dir:
         return error_response("Room not found", 404, "Room not found")
     if not _can_access(info):
-        return error_response("Permission denied", 403, "Permission denied")
+        return _denied(room_id)
 
     autosave = read_json(room_dir / "autosave.json", default={"messages": []})
     return success_response(autosave, "Room autosave loaded successfully")

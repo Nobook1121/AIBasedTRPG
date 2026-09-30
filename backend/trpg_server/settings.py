@@ -15,8 +15,10 @@ SCENARIO_COVERS_DIR = DATA_DIR / "assets" / "scenario_covers"
 AVATARS_DIR = DATA_DIR / "assets" / "avatars"
 AI_PLATFORM_ASSETS_DIR = DATA_DIR / "assets" / "aiplatform"
 VENDOR_ASSETS_DIR = DATA_DIR / "assets" / "vendor"
+THEME_ASSETS_DIR = DATA_DIR / "assets" / "theme"
 TOOLS_DIR = FRONTEND_DIST_DIR / "data" / "tools"
 ROOMS_DIR = RUNTIME_DIR / "rooms"
+ROOM_ARCHIVES_DIR = RUNTIME_DIR / "room_archives"
 CONFIG_DIR = DATA_DIR / "config"
 DEBUG_KP_PROMPT_FILE = CONFIG_DIR / "roles" / "debug-kp.md"
 AI_PLATFORM_SECRET_DIR = RUNTIME_DIR / "config" / "aiplatform"
@@ -46,6 +48,7 @@ PADDLEOCR_HOME = Path(os.environ.get("PADDLE_PDX_CACHE_HOME", str(RUNTIME_DIR / 
 
 NETWORK_CONFIG_FILE = CONFIG_DIR / "network.json"
 PENETRATION_CONFIG_FILE = CONFIG_DIR / "penetration.json"
+SITE_CONFIG_FILE = CONFIG_DIR / "site.json"
 
 DEFAULT_PORT = 8086
 PORT_RETRY_COUNT = 5

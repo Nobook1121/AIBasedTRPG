@@ -25,13 +25,21 @@ def _versioned_id(value: dict[str, Any] | None, fallback: str) -> tuple[str, str
 
 def _scenario_static_content(scenario: dict[str, Any] | None) -> dict[str, Any]:
     data = scenario if isinstance(scenario, dict) else {}
+    def _bounded(value: Any, limit: int = 2400):
+        if isinstance(value, str):
+            return value[:limit]
+        if isinstance(value, list):
+            return value[:20]
+        if isinstance(value, dict):
+            return {str(key): _bounded(item, 600) for key, item in list(value.items())[:30]}
+        return value
     return {
         "id": data.get("id"),
         "version": data.get("scenario_version") or data.get("version") or data.get("version_id") or "1",
-        "core": data.get("core") or data.get("description") or data.get("notes") or "",
-        "facts": data.get("facts") or data.get("core_facts") or [],
-        "npcs": data.get("npcs") or data.get("key_npcs") or [],
-        "rules": data.get("rules") or data.get("core_rules") or [],
+        "core": _bounded(data.get("core") or data.get("description") or data.get("notes") or ""),
+        "facts": _bounded(data.get("facts") or data.get("core_facts") or []),
+        "npcs": _bounded(data.get("npcs") or data.get("key_npcs") or []),
+        "rules": _bounded(data.get("rules") or data.get("core_rules") or []),
     }
 
 

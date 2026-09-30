@@ -2,18 +2,14 @@
 from __future__ import annotations
 
 import hashlib
-import re
 import time
 from pathlib import Path
 from typing import Any
 
+from trpg_server.agents.knowledge_base import lexical_match_score
 from trpg_server.agents.ruleset_adapters import RulesetChunk, RulesetRegistry
 from trpg_server.json_store import read_json, write_json_atomic
 from trpg_server.scenario_importer import extract_script_text
-
-
-def _tokens(value: str) -> list[str]:
-    return [item for item in re.findall(r"[\w\u4e00-\u9fff]+", str(value).casefold()) if item]
 
 
 class RulesetKnowledgeStore:
@@ -90,11 +86,13 @@ class RulesetKnowledgeStore:
         meta = self._meta(ruleset_id); selected = str(version or meta.get("active_version") or "")
         if not selected or meta.get("enabled") is False: return []
         values = read_json(self._base(ruleset_id) / "indexes" / f"{selected}.json", default=[])
-        query_tokens = _tokens(query); result = []
+        result = []
         for item in values if isinstance(values, list) else []:
-            if not isinstance(item, dict) or (topic and item.get("topic") != topic): continue
-            haystack = _tokens(f"{item.get('title','')} {item.get('text','')} {item.get('topic','')}" ); score = sum(haystack.count(token) for token in query_tokens) if query_tokens else 1
-            if score: result.append((score, item))
+            if not isinstance(item, dict) or (topic and item.get("topic") != topic):
+                continue
+            score = lexical_match_score(f"{item.get('title','')} {item.get('text','')} {item.get('topic','')}", query)
+            if score:
+                result.append((score, item))
         result.sort(key=lambda pair: (-pair[0], -int(pair[1].get("priority", 0)), pair[1].get("chunk_id", "")))
         return [{**item, "score": score} for score, item in result[:max(1, min(int(top_k), 20))]]
 

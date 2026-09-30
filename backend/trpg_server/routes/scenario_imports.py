@@ -1,7 +1,9 @@
 from __future__ import annotations
 import json, time
+import logging
 from pathlib import Path
 from flask import Blueprint, Response, current_app, request, session
+from trpg_server.logging_config import log_user_action, user_action_text
 from trpg_server.responses import error_response, success_response
 from trpg_server.scenario_import_jobs import public_job_payload, submit_import_job
 from trpg_server.scenario_documents import validate_scenario_upload, ScenarioDocumentError
@@ -9,6 +11,7 @@ from trpg_server.scenario_store import load_scenario_record, save_scenario_recor
 from trpg_server.agents.knowledge_base import persist_knowledge_index, KnowledgeBaseService
 
 bp = Blueprint("scenario_imports", __name__)
+logger = logging.getLogger(__name__)
 
 def _store(): return current_app.extensions["scenario_import_store"]
 def _job(job_id):
@@ -94,6 +97,12 @@ def publish_import(script_id):
         embedding_provider=current_app.extensions.get("embedding_provider"),
     )
     _store().update(job["id"], status="published", progress=100)
+    log_user_action(
+        logger,
+        user_action_text(session.get("username"), "发布了导入任务"),
+        用户ID=session.get("user_id"),
+        剧本ID=script_id,
+    )
     return success_response(load_scenario_record(descriptor, SCENARIOS_DIR), "Published", 201)
 
 @bp.get("/api/scripts/<int:script_id>/versions")

@@ -19,6 +19,7 @@ DEFAULT_KP_TOOLS = [
     "sanity.roll_sanity_check",
     "trigger.reveal_scenario_trigger",
     "knowledge.search_ruleset",
+    "room.suggest_actions",
 ]
 
 

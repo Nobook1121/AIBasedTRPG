@@ -54,6 +54,8 @@
 
     --theme-font-family-base: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
     --theme-font-family-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    --theme-font-family-display: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    --theme-font-family-prose: var(--theme-font-family-base);
     --theme-font-size-2xs: 0.68rem;
     --theme-font-size-xs: 0.72rem;
     --theme-font-size-sm: 0.78rem;
@@ -62,6 +64,8 @@
     --theme-font-size-lg: 1.2rem;
     --theme-font-size-xl: 1.5rem;
     --theme-font-size-page-title: 1.9rem;
+    --theme-line-height-base: 1.6;
+    --theme-line-height-tight: 1.25;
 
     --theme-radius-xs: 3px;
     --theme-radius-sm: 4px;
@@ -89,6 +93,8 @@
 
     --theme-cyber-grid-display: none;
     --theme-cyber-grid-opacity: 0;
+    --theme-cyber-rain-display: none;
+    --theme-cyber-rain-opacity: 0;
 }
 
 body.theme-dark,
@@ -162,6 +168,11 @@ body.dark-theme {
 body.theme-cyber-2 {
     color-scheme: dark;
 
+    /* 让 body 成为层叠上下文。网格与字母雨都是 z-index:-1 的负层级背景层，
+       只有当 body 自身构成层叠上下文时，它们才会绘制在 body 背景之上、正文内容之下；
+       否则按 CSS 绘制顺序会被 body 不透明的主题背景整层遮住（字母雨“看不见”的根因）。 */
+    isolation: isolate;
+
     --theme-bg-page:
         linear-gradient(135deg, rgba(8, 19, 25, 0.96), rgba(11, 35, 38, 0.94)),
         radial-gradient(circle at 85% 8%, rgba(37, 170, 121, 0.22), transparent 30%),
@@ -230,6 +241,9 @@ body.theme-cyber-2 {
 
     --theme-cyber-grid-display: block;
     --theme-cyber-grid-opacity: 0.22;
+    --theme-cyber-rain-display: block;
+    /* 低密度字母雨：保持克制，只作为背景氛围，不干扰正文阅读 */
+    --theme-cyber-rain-opacity: 0.62;
 }
 
 :root,
@@ -278,6 +292,372 @@ body.theme-cyber-2::before {
         linear-gradient(90deg, rgba(101, 255, 190, 0.13) 1px, transparent 1px);
     background-size: 28px 28px;
     mask-image: linear-gradient(to bottom, black, transparent 92%);
+}
+
+/* 赛博档案主题：背景层“矩阵字母雨”（由 js/themes/matrix-rain.js 逐帧绘制）
+   纯装饰层，位于 body 背景之上、正文内容之下，不接收指针事件，也不参与任何交互。
+   依赖 body.theme-cyber-2 的 isolation:isolate 才能出现在 body 背景之上。 */
+.theme-matrix-rain {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    display: var(--theme-cyber-rain-display);
+    width: 100%;
+    height: 100%;
+    opacity: var(--theme-cyber-rain-opacity);
+    pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .theme-matrix-rain {
+        display: none;
+    }
+}
+
+/* ==========================================================================
+   「秘典·羊皮纸」主题 — 暖调古籍风格
+   独立模块：全部声明收敛于 body.theme-tome 作用域内，与其它主题互不干扰。
+   ========================================================================== */
+body.theme-tome {
+    color-scheme: light;
+
+    --theme-bg-page: #ece3d1;
+    --theme-bg-page-layer: #e2d7bf;
+    --theme-bg-panel: #faf5e9;
+    --theme-bg-panel-muted: #f0e7d3;
+    --theme-bg-elevated: #fffdf6;
+    --theme-bg-overlay: rgba(60, 42, 24, 0.5);
+
+    --theme-text-primary: #3c2b1e;
+    --theme-text-secondary: #58442f;
+    --theme-text-muted: #8a7358;
+    --theme-text-inverse: #fdf9ee;
+    --theme-text-link: #a23e2e;
+
+    --theme-border-subtle: #d8c9a8;
+    --theme-border-strong: #c0a87e;
+    --theme-focus-ring: rgba(176, 83, 49, 0.3);
+
+    --theme-accent-primary: #a6543c;
+    --theme-accent-primary-hover: #8f422d;
+    --theme-accent-secondary: #b07a45;
+    --theme-accent-soft: rgba(166, 84, 60, 0.13);
+    --theme-danger: #a23e2e;
+    --theme-danger-soft: #f6e3da;
+    --theme-success: #5d7a4a;
+    --theme-success-soft: #e9efe1;
+    --theme-warning: #d9a441;
+    --theme-warning-soft: #f9efd2;
+
+    --theme-chat-other-bg: #fffaf0;
+    --theme-chat-other-text: var(--theme-text-primary);
+    --theme-chat-player-bg: #a6543c;
+    --theme-chat-player-text: #fdf9ee;
+    --theme-chat-kp-bg: rgba(229, 214, 183, 0.62);
+    --theme-chat-kp-text: var(--theme-text-primary);
+    --theme-chat-dice-bg: rgba(217, 164, 65, 0.22);
+    --theme-chat-dice-text: var(--theme-text-primary);
+    --theme-chat-shadow: 0 1px 2px rgba(95, 68, 38, 0.16), 0 2px 10px rgba(95, 68, 38, 0.07);
+
+    --theme-sidebar-bg: #55402a;
+    --theme-sidebar-surface: #634b31;
+    --theme-sidebar-text: #e3d3b4;
+    --theme-sidebar-text-active: #fff6e2;
+    --theme-sidebar-hover-bg: rgba(255, 255, 255, 0.09);
+    --theme-sidebar-active-bg: rgba(216, 163, 90, 0.3);
+
+    --theme-markdown-border: #e3d6ba;
+    --theme-markdown-muted: #8a7358;
+    --theme-markdown-code-bg: rgba(166, 84, 60, 0.1);
+    --theme-markdown-pre-bg: #f4ecdb;
+    --theme-markdown-table-alt-bg: rgba(166, 84, 60, 0.05);
+
+    /* 字体：以真实 Web 字体（EB Garamond / Noto Serif SC）替换全站字体，而非依赖本机可能缺失的衬线字体 */
+    --theme-font-family-base: "EB Garamond", "Noto Serif SC", "Songti SC", "STSong", "SimSun", Georgia, "Times New Roman", serif;
+    --theme-font-family-prose: "EB Garamond", "Noto Serif SC", "Songti SC", "STSong", "SimSun", Georgia, serif;
+    --theme-font-family-display: "EB Garamond", "Noto Serif SC", "Songti SC", "STSong", "SimSun", Georgia, serif;
+    --theme-font-family-mono: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+    --theme-font-size-sm: 0.82rem;
+    --theme-font-size-md: 0.96rem;
+    --theme-line-height-base: 1.72;
+    --theme-line-height-tight: 1.32;
+
+    --theme-radius-xs: 4px;
+    --theme-radius-sm: 7px;
+    --theme-radius-md: 12px;
+    --theme-radius-pill: 999px;
+    --theme-radius-round: 50%;
+
+    --theme-shadow-sm: 0 1px 2px rgba(95, 68, 38, 0.12);
+    --theme-shadow-md: 0 8px 24px rgba(95, 68, 38, 0.18);
+    --theme-shadow-lg: 0 18px 50px rgba(95, 68, 38, 0.24);
+
+    --theme-scrollbar-track: #e8ddc4;
+    --theme-scrollbar-thumb: #b99a6e;
+    --theme-scrollbar-thumb-hover: #a17f53;
+
+    --theme-input-bg: #fffdf6;
+    --theme-input-text: var(--theme-text-primary);
+    --theme-input-border: #d8c9a8;
+
+    --theme-tome-ambient-display: block;
+    /* 环境光只做“呼吸感”，透明度压低以避免冲淡羊皮纸照片底纹 */
+    --theme-tome-ambient-opacity: 0.2;
+
+    /* 纸张纤维颗粒：无缝拼接的 SVG 噪声，分辨率无关，任意窗口尺寸下均保持清晰 */
+    --theme-tome-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch' seed='11'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='320' height='320' filter='url(%23g)'/%3E%3C/svg%3E");
+
+    /* 羊皮纸底纹照片（真实纸张摄影，非矢量绘制）
+       素材：File:Parchment.00.jpg — 作者 Caleb Kimbrough，授权 CC BY 2.0
+       来源：https://commons.wikimedia.org/wiki/File:Parchment.00.jpg
+       存放：data/assets/theme/parchment.jpg（版本化静态资源，由 /assets/theme/ 路由提供） */
+    --theme-tome-paper: url("/assets/theme/parchment.jpg");
+}
+
+/* —— 羊皮纸底纹：真实纸张照片为主体，仅叠加极轻的折痕、暗角与纤维颗粒
+       设计原则：照片底纹必须可见且占主导，罩染只做色温微调，不再压平照片层次 —— */
+body.theme-tome::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    display: var(--theme-tome-ambient-display);
+    pointer-events: none;
+    background-color: #e9dcc0;
+    background-image:
+        /* 折痕：极淡的明暗斜线，模拟纸张折叠痕迹 */
+        linear-gradient(102deg, transparent 46.6%, rgba(255, 250, 236, 0.28) 47.4%, rgba(150, 120, 74, 0.08) 48%, transparent 48.8%),
+        linear-gradient(174deg, transparent 62.2%, rgba(255, 250, 236, 0.22) 62.9%, rgba(150, 120, 74, 0.06) 63.4%, transparent 64.2%),
+        /* 陈旧斑点 / 局部泛黄：只做轻微不均匀感，不遮盖纸纹 */
+        radial-gradient(38% 30% at 18% 24%, rgba(150, 100, 52, 0.07), transparent 70%),
+        radial-gradient(30% 26% at 82% 16%, rgba(160, 112, 58, 0.06), transparent 72%),
+        radial-gradient(42% 34% at 68% 84%, rgba(146, 98, 50, 0.065), transparent 74%),
+        /* 四角暗角：显著减弱，避免把照片压成纯渐变观感 */
+        radial-gradient(150% 130% at 50% 50%, transparent 68%, rgba(122, 92, 50, 0.14) 100%),
+        /* 纤维颗粒：以柔光叠加，仅弱化照片噪点，不改变照片本身的纸纹结构 */
+        var(--theme-tome-grain),
+        /* 暖调罩染：极低透明度，仅统一色温，照片纹理完全透出 */
+        linear-gradient(165deg, rgba(250, 244, 231, 0.16), rgba(238, 227, 204, 0.11) 52%, rgba(222, 204, 171, 0.14)),
+        /* 真实羊皮纸摄影底纹（背景主体） */
+        var(--theme-tome-paper);
+    background-size: cover, cover, cover, cover, cover, cover, 320px 320px, cover, cover;
+    background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, repeat, no-repeat, no-repeat;
+    background-blend-mode: normal, normal, normal, normal, normal, normal, soft-light, normal, normal;
+    background-position: center center;
+}
+
+/* 主内容列置于纸张底纹之上 */
+body.theme-tome .col-10 {
+    position: relative;
+    z-index: 1;
+}
+
+/* —— 环境光与浮尘：缓慢漂移的柔光与光尘，赋予纸张“呼吸感” —— */
+body.theme-tome::after {
+    content: "";
+    position: fixed;
+    inset: -12%;
+    z-index: 0;
+    display: var(--theme-tome-ambient-display);
+    pointer-events: none;
+    opacity: var(--theme-tome-ambient-opacity);
+    background-image:
+        radial-gradient(ellipse 58% 42% at 28% 20%, rgba(255, 238, 196, 0.55), transparent 70%),
+        radial-gradient(circle 2px at 12% 22%, rgba(255, 236, 190, 0.85), transparent 100%),
+        radial-gradient(circle 1.6px at 68% 16%, rgba(255, 240, 200, 0.65), transparent 100%),
+        radial-gradient(circle 1.4px at 33% 62%, rgba(255, 226, 165, 0.6), transparent 100%),
+        radial-gradient(circle 1.8px at 84% 48%, rgba(255, 236, 190, 0.7), transparent 100%),
+        radial-gradient(circle 1.4px at 55% 78%, rgba(255, 226, 165, 0.55), transparent 100%),
+        radial-gradient(circle 1.8px at 25% 88%, rgba(255, 236, 190, 0.6), transparent 100%);
+    animation: tomeSheen 24s ease-in-out infinite alternate;
+}
+
+@keyframes tomeSheen {
+    from {
+        transform: translate3d(-2%, -1.5%, 0);
+    }
+    to {
+        transform: translate3d(2.4%, 1.6%, 0);
+    }
+}
+
+/* —— 纸片质感：面板叠加纤维颗粒 + 边角卷曲阴影 —— */
+body.theme-tome .card,
+body.theme-tome .modal-content,
+body.theme-tome .tool-panel {
+    background-color: var(--theme-bg-panel);
+    background-image: var(--theme-tome-grain);
+    background-size: 320px 320px;
+    background-blend-mode: soft-light;
+    border: 1px solid var(--theme-border-subtle);
+    border-radius: var(--theme-radius-md);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.55),
+        inset 0 -1px 0 rgba(150, 120, 74, 0.12),
+        0 18px 30px -22px rgba(86, 60, 28, 0.62),
+        -7px 11px 20px -18px rgba(86, 60, 28, 0.5),
+        0 4px 10px -6px rgba(86, 60, 28, 0.34);
+}
+
+/* —— 按钮：平铺展开的羊皮纸片（真实纸纹 + 平整轮廓 + 轻抬交互，不使用任何矢量装饰） —— */
+body.theme-tome .btn {
+    position: relative;
+    border: 1px solid rgba(138, 106, 58, 0.42);
+    border-radius: var(--theme-radius-sm);
+    color: #3c2b1e;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+    background-color: #f4e8cd;
+    background-image:
+        var(--theme-tome-grain),
+        linear-gradient(180deg, #fdf9ee, #f2e7cd 58%, #e7d6b4);
+    background-repeat: repeat, no-repeat;
+    background-size: 220px 220px, 100% 100%;
+    background-blend-mode: soft-light, normal;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.68),
+        inset 0 -2px 6px rgba(122, 90, 46, 0.16),
+        0 6px 13px -9px rgba(86, 60, 28, 0.66),
+        0 1px 2px rgba(86, 60, 28, 0.28);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease, background-color 0.2s ease;
+}
+
+body.theme-tome .btn:not(:disabled):hover {
+    transform: translateY(-1px);
+    color: #3c2b1e;
+    background-color: #f9f0dd;
+    filter: saturate(1.02) brightness(1.015);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.76),
+        inset 0 -2px 7px rgba(122, 90, 46, 0.18),
+        0 11px 20px -12px rgba(86, 60, 28, 0.7),
+        0 2px 4px rgba(86, 60, 28, 0.3);
+}
+
+body.theme-tome .btn:not(:disabled):active {
+    transform: translateY(0) scale(0.99);
+    box-shadow: inset 0 2px 7px rgba(86, 60, 28, 0.34);
+}
+
+/* 主操作按钮：深绛色晕染的羊皮纸，保持同一纸纹与平整轮廓 */
+body.theme-tome .btn-primary {
+    color: #fdf7e8;
+    border-color: rgba(92, 40, 24, 0.55);
+    text-shadow: 0 1px 1px rgba(60, 20, 10, 0.4);
+    background-color: #a6543c;
+    background-image:
+        var(--theme-tome-grain),
+        linear-gradient(180deg, #bf6a4d, #a0503a 58%, #8a442f);
+    background-repeat: repeat, no-repeat;
+    background-size: 220px 220px, 100% 100%;
+    background-blend-mode: soft-light, normal;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 214, 182, 0.3),
+        inset 0 -2px 7px rgba(58, 22, 12, 0.28),
+        0 8px 16px -9px rgba(92, 36, 22, 0.72),
+        0 1px 2px rgba(92, 36, 22, 0.32);
+}
+
+/* 轮廓按钮：描边色映射到主题色，其上仅叠加一层薄羊皮纸质感 */
+body.theme-tome .btn-outline-primary { --tome-outline-color: var(--theme-accent-primary); }
+body.theme-tome .btn-outline-secondary { --tome-outline-color: var(--theme-text-secondary); }
+body.theme-tome .btn-outline-success { --tome-outline-color: var(--theme-success); }
+body.theme-tome .btn-outline-warning { --tome-outline-color: var(--theme-warning); }
+body.theme-tome .btn-outline-danger { --tome-outline-color: var(--theme-danger); }
+
+body.theme-tome .btn-outline-primary,
+body.theme-tome .btn-outline-secondary,
+body.theme-tome .btn-outline-success,
+body.theme-tome .btn-outline-warning,
+body.theme-tome .btn-outline-danger {
+    color: var(--tome-outline-color);
+    border-color: color-mix(in srgb, var(--tome-outline-color) 62%, transparent);
+    background-color: rgba(253, 249, 238, 0.62);
+    background-image: var(--theme-tome-grain);
+    background-repeat: repeat;
+    background-size: 220px 220px;
+    background-blend-mode: soft-light;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.5),
+        0 3px 8px -6px rgba(86, 60, 28, 0.55);
+}
+
+body.theme-tome .btn-outline-primary:not(:disabled):hover,
+body.theme-tome .btn-outline-secondary:not(:disabled):hover,
+body.theme-tome .btn-outline-success:not(:disabled):hover,
+body.theme-tome .btn-outline-warning:not(:disabled):hover,
+body.theme-tome .btn-outline-danger:not(:disabled):hover {
+    color: var(--tome-outline-color);
+    border-color: color-mix(in srgb, var(--tome-outline-color) 88%, transparent);
+    background-color: rgba(253, 249, 238, 0.8);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body.theme-tome::after {
+        animation: none;
+        transform: none;
+    }
+
+    body.theme-tome .btn {
+        transition: none;
+    }
+
+    body.theme-tome .btn:not(:disabled):hover {
+        transform: none;
+    }
+}
+
+/* —— 古籍细节：标题衬线 + 装饰性分隔线 —— */
+body.theme-tome .page-command-header h2,
+body.theme-tome .character-command-header h2,
+body.theme-tome .sidebar-title {
+    letter-spacing: 0.02em;
+}
+
+body.theme-tome .page-command-header h2::after,
+body.theme-tome .character-command-header h2::after {
+    content: "";
+    display: block;
+    width: 68px;
+    height: 2px;
+    margin-top: 10px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--theme-accent-primary), transparent);
+}
+
+body.theme-tome .page-kicker,
+body.theme-tome .character-kicker {
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--theme-accent-primary);
+}
+
+/* —— 正文排版：复古衬线、舒展行高与字距，提升长篇阅读的可读性 —— */
+body.theme-tome {
+    font-kerning: normal;
+    font-variant-ligatures: common-ligatures;
+}
+
+body.theme-tome .markdown-body {
+    line-height: 1.78;
+    letter-spacing: 0.004em;
+}
+
+body.theme-tome .markdown-body h1,
+body.theme-tome .markdown-body h2,
+body.theme-tome .markdown-body h3 {
+    letter-spacing: 0.015em;
+}
+
+/* 侧栏激活项以描金呈现 */
+body.theme-tome #sidebar .nav-link.active,
+body.theme-tome #sidebar .dropdown-btn.active {
+    border-left-color: var(--theme-accent-secondary);
+}
+
+/* 主要滚动区透出背景环境光，使光尘在醒目区域可见 */
+body.theme-tome .chat-history,
+body.theme-tome .character-workspace {
+    background-color: transparent;
 }
 
 .card,
@@ -342,6 +722,12 @@ select:focus {
     color: var(--theme-text-inverse);
     background-color: var(--theme-accent-primary);
     border-color: var(--theme-accent-primary);
+    background-image: linear-gradient(180deg,
+        color-mix(in srgb, var(--theme-accent-primary) 88%, white),
+        var(--theme-accent-primary));
+    box-shadow:
+        var(--theme-shadow-sm),
+        0 2px 10px color-mix(in srgb, var(--theme-accent-primary) 32%, transparent);
 }
 
 .btn-primary:hover,
@@ -349,12 +735,28 @@ select:focus {
     color: var(--theme-text-inverse);
     background-color: var(--theme-accent-primary-hover);
     border-color: var(--theme-accent-primary-hover);
+    background-image: linear-gradient(180deg,
+        color-mix(in srgb, var(--theme-accent-primary-hover) 88%, white),
+        var(--theme-accent-primary-hover));
+    box-shadow:
+        var(--theme-shadow-md),
+        0 6px 18px color-mix(in srgb, var(--theme-accent-primary) 40%, transparent);
+}
+
+.btn-primary:active {
+    background-image: none;
+    box-shadow:
+        inset 0 2px 6px color-mix(in srgb, black 22%, transparent),
+        0 1px 2px color-mix(in srgb, var(--theme-accent-primary) 30%, transparent);
 }
 
 .btn-secondary {
     color: var(--theme-text-primary);
     background-color: var(--theme-bg-panel-muted);
     border-color: var(--theme-border-subtle);
+    background-image: linear-gradient(180deg,
+        color-mix(in srgb, var(--theme-bg-elevated) 92%, transparent),
+        var(--theme-bg-panel-muted));
 }
 
 .btn-secondary:hover,
@@ -378,6 +780,14 @@ hr {
     border-color: var(--theme-border-subtle);
 }
 
+/* 全局滚动条：颜色统一走主题变量，保证四个主题下观感一致。
+   主题类挂在 body 上，因此这里也写在 body 上（scrollbar-color / scrollbar-width 可继承），
+   Firefox 使用 scrollbar-* 属性，WebKit/Chromium 使用 ::-webkit-scrollbar 伪元素。 */
+body {
+    scrollbar-width: thin;
+    scrollbar-color: var(--theme-scrollbar-thumb) var(--theme-scrollbar-track);
+}
+
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -394,6 +804,39 @@ hr {
 
 ::-webkit-scrollbar-thumb:hover {
     background: var(--theme-scrollbar-thumb-hover);
+}
+
+/* 主题切换平滑过渡：仅在切换瞬间由 JS 短暂挂载 .theme-transition，避免常驻过渡造成性能损耗 */
+body.theme-transition,
+body.theme-transition .card,
+body.theme-transition .list-group-item,
+body.theme-transition .dropdown-menu,
+body.theme-transition .modal-content,
+body.theme-transition .tool-panel,
+body.theme-transition .message-content,
+body.theme-transition .form-control,
+body.theme-transition .form-select,
+body.theme-transition .btn,
+body.theme-transition #sidebar,
+body.theme-transition .nav-link,
+body.theme-transition .dropdown-btn,
+body.theme-transition .settings-tab,
+body.theme-transition .tool-tab,
+body.theme-transition .tab-content,
+body.theme-transition .chat-history,
+body.theme-transition .page-command-header h2,
+body.theme-transition .markdown-body {
+    transition:
+        background-color 0.4s ease,
+        background-image 0.4s ease,
+        border-color 0.4s ease,
+        color 0.4s ease,
+        box-shadow 0.4s ease !important;
+}
+
+body.theme-transition::before,
+body.theme-transition::after {
+    transition: opacity 0.4s ease, background-color 0.4s ease, background-image 0.4s ease !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

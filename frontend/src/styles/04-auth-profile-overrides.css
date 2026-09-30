@@ -1,4 +1,4 @@
-﻿/* 登录/注册弹窗样式 */
+/* 登录/注册弹窗样式 */
 .auth-modal {
     position: fixed;
     top: 0;
@@ -6,7 +6,9 @@
     width: 100%;
     height: 100%;
     background-color: var(--theme-bg-overlay);
-    display: flex;
+    /* 默认隐藏，由脚本在确认需要登录后通过 showAuthModal() 显示；
+       这样首次部署引导期间不会提前弹出登录弹窗。 */
+    display: none;
     justify-content: center;
     align-items: center;
     z-index: 10000;
@@ -64,47 +66,6 @@
 
 .auth-view {
     display: none;
-}
-
-.save-status-bar {
-    padding: 10px 14px;
-    border-bottom: 1px solid var(--border-subtle);
-    background: var(--theme-bg-panel);
-}
-
-.save-status-content {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-width: 0;
-}
-
-.save-status-pill,
-.save-status-script {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-    max-width: 100%;
-    padding: 7px 10px;
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-sm);
-    background: var(--color-panel);
-    color: var(--color-text-muted);
-    box-shadow: var(--shadow-sm);
-}
-
-.save-status-pill strong,
-.save-status-script strong {
-    color: var(--color-text);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.save-status-pill i,
-.save-status-script i {
-    color: var(--color-primary);
 }
 
 .auth-view.active {
@@ -908,104 +869,102 @@
     user-select: none;
 }
 
-/* 存档状态栏样式 */
-.save-status-bar {
-    background-color: var(--theme-bg-panel);
-    color: var(--theme-text-secondary);
-    padding: 6px 16px;
-    font-size: var(--theme-font-size-xs);
-    border-bottom: 1px solid var(--theme-border-subtle);
-    border-left: 3px solid var(--theme-accent-primary);
-    display: flex;
-    align-items: center;
-    animation: slideDown 0.3s ease;
-}
-
-.save-status-content {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.save-status-content .fa-save {
-    font-size: var(--theme-font-size-xs);
-    color: var(--theme-accent-primary);
-}
-
-.save-status-label {
-    color: var(--theme-text-muted);
-}
-
-.save-status-name {
-    font-weight: 600;
-    color: var(--theme-text-primary);
-}
-
-.save-status-divider {
-    color: var(--theme-border-strong);
-}
-
-.save-status-scenario {
-    color: var(--theme-text-muted);
-}
-
-/* AI思考中动画样式 */
+/* AI回复中动画：柔和的三点波动 + 文字流光，克制而不张扬 */
 .thinking-content {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     padding: 10px 14px;
 }
 
 .thinking-animation {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 5px;
+    height: 18px;
 }
 
 .thinking-dot {
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
     background-color: var(--theme-accent-primary);
     border-radius: var(--theme-radius-round);
     display: inline-block;
-    animation: thinkingBounce 1.4s ease-in-out infinite both;
+    animation: thinkingWave 1.8s ease-in-out infinite both;
 }
 
 .thinking-dot:nth-child(1) {
-    animation-delay: -0.32s;
+    animation-delay: -0.3s;
 }
 
 .thinking-dot:nth-child(2) {
-    animation-delay: -0.16s;
+    animation-delay: -0.15s;
 }
 
 .thinking-dot:nth-child(3) {
     animation-delay: 0s;
 }
 
-@keyframes thinkingBounce {
-    0%, 80%, 100% {
-        transform: scale(0.6);
-        opacity: 0.4;
+@keyframes thinkingWave {
+    0%, 100% {
+        opacity: 0.35;
+        transform: translateY(0) scale(0.9);
+        box-shadow: 0 0 0 0 transparent;
     }
-    40% {
-        transform: scale(1);
+    45% {
         opacity: 1;
+        transform: translateY(-3px) scale(1);
+        box-shadow: 0 0 10px 1px color-mix(in srgb, var(--theme-accent-primary) 45%, transparent);
     }
 }
 
 .thinking-text {
-    color: var(--theme-text-muted);
     font-size: var(--theme-font-size-md);
-    font-style: italic;
+    font-style: normal;
+    letter-spacing: 0.01em;
+    color: var(--theme-text-muted);
+}
+
+/* 支持 background-clip 的浏览器启用文字流光，否则保持静默文字色 */
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+    .thinking-text {
+        background-image: linear-gradient(90deg,
+            var(--theme-text-muted) 0%,
+            var(--theme-text-muted) 38%,
+            var(--theme-accent-primary) 50%,
+            var(--theme-text-muted) 62%,
+            var(--theme-text-muted) 100%);
+        background-size: 220% 100%;
+        background-position: 120% 0;
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        -webkit-text-fill-color: transparent;
+        animation: thinkingShimmer 2.6s linear infinite;
+    }
+}
+
+@keyframes thinkingShimmer {
+    from {
+        background-position: 120% 0;
+    }
+    to {
+        background-position: -120% 0;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
     .thinking-dot {
         animation: none;
         opacity: 0.7;
-        transform: scale(0.8);
+        transform: none;
+    }
+
+    .thinking-text {
+        animation: none;
+        color: var(--theme-text-muted);
+        -webkit-text-fill-color: var(--theme-text-muted);
+        background: none;
     }
 }
 

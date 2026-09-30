@@ -105,6 +105,28 @@ def _tokens(value: str) -> list[str]:
     return [token for token in re.findall(r"[\w\u4e00-\u9fff]+", value.casefold()) if token]
 
 
+def lexical_match_score(haystack: str, query: str) -> float:
+    """Deterministic lexical score shared by scenario and ruleset retrieval.
+
+    Latin tokens are matched as whole words, but CJK text cannot be split on
+    whitespace: tokenising ``走进图书馆`` as a single run means an exact token
+    comparison never matches a query such as ``图书馆``. Overlapping character
+    bigrams let a CJK query match an occurrence inside a longer run while
+    keeping the scorer dependency-free.
+    """
+    hay = str(haystack or "").casefold()
+    query_tokens = _tokens(query)
+    if not query_tokens:
+        return 1.0
+    score = 0.0
+    for token in query_tokens:
+        if token.isascii() or len(token) < 2:
+            score += hay.count(token)
+            continue
+        score += sum(hay.count(token[index : index + 2]) for index in range(len(token) - 1))
+    return score
+
+
 class KnowledgeBaseService:
     """Room-aware retrieval facade; callers never access the index directly."""
 
@@ -126,7 +148,12 @@ class KnowledgeBaseService:
     def _room_info(self, room_id: str) -> dict[str, Any]:
         if not self.rooms_dir:
             return {}
-        return read_json(self.rooms_dir / str(room_id) / "info.json", default={})
+        room_dir = self.rooms_dir / str(room_id)
+        info = read_json(room_dir / "info.json", default={})
+        state = read_json(room_dir / "state.json", default={})
+        if isinstance(info, dict) and isinstance(state, dict) and state.get("active_scene_id") not in (None, ""):
+            info = {**info, "active_scene_id": state["active_scene_id"]}
+        return info
 
     def _scenario(self, scenario_id: Any, scenario_version: Any = None) -> dict[str, Any] | None:
         if scenario_id in (None, ""):
@@ -211,8 +238,9 @@ class KnowledgeBaseService:
 
         candidates: list[tuple[float, KnowledgeChunk, float, float]] = []
         for chunk in filtered:
-            haystack = _tokens(f"{chunk.text} {chunk.card_type} {chunk.unlock_condition or ''}")
-            lexical = float(sum(haystack.count(token) for token in query_tokens) if query_tokens else 1)
+            lexical = lexical_match_score(
+                f"{chunk.text} {chunk.card_type} {chunk.unlock_condition or ''}", query
+            )
             vector = vector_scores.get(chunk.chunk_id, 0.0)
             if not vector and chunk.embedding:
                 qv = query_vector if query_vector and len(query_vector) == len(chunk.embedding) else [0.0] * len(chunk.embedding)

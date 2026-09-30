@@ -1,4 +1,4 @@
-﻿:root {
+:root {
     --color-bg: var(--theme-bg-page);
     --color-panel: var(--theme-bg-panel);
     --color-panel-muted: var(--theme-bg-panel-muted);
@@ -81,6 +81,20 @@ body, html {
     background: var(--color-bg);
 }
 
+body {
+    line-height: var(--theme-line-height-base);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+}
+
+/* 标题统一使用主题展示字体与紧凑行高，正文保持舒适行高 */
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--theme-font-family-display);
+    line-height: var(--theme-line-height-tight);
+    letter-spacing: -0.004em;
+}
+
 :where(button, a, input, select, textarea):focus-visible {
     outline: 2px solid var(--color-primary);
     outline-offset: 2px;
@@ -88,7 +102,23 @@ body, html {
 
 .btn {
     min-height: 36px;
-    border-radius: var(--radius-sm);
+    border-radius: var(--theme-radius-md);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    transition:
+        transform 0.16s ease,
+        box-shadow 0.2s ease,
+        background-color 0.2s ease,
+        border-color 0.2s ease,
+        color 0.2s ease;
+}
+
+.btn:not(:disabled):hover {
+    transform: translateY(-1px);
+}
+
+.btn:not(:disabled):active {
+    transform: translateY(0) scale(0.985);
 }
 
 .btn-sm {
@@ -114,6 +144,26 @@ body, html {
 
 .tab-content.active {
     display: flex;
+    animation: pageViewEnter 0.3s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* 除主页（聊天区自带滚动容器）外，其余标签页由直接子容器负责滚动。
+   这样内容超出一屏时会出现滚轮可下滑的滚动条，而不是被 .col-10 的 overflow:hidden 裁掉。 */
+.tab-content > *:not(#react-home-root) {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+@keyframes pageViewEnter {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
 }
 
 /* 主页样式 */
@@ -141,6 +191,18 @@ body, html {
     margin-bottom: 15px;
     display: flex;
     max-width: 70%;
+    animation: messageEnter 0.28s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@keyframes messageEnter {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
 }
 
 .message.other-message {
@@ -170,8 +232,8 @@ body, html {
 
 /* Markdown样式 */
 .markdown-body {
-    font-family: var(--theme-font-family-base);
-    line-height: 1.4;
+    font-family: var(--theme-font-family-prose);
+    line-height: 1.52;
     color: var(--theme-text-primary);
 }
 
@@ -607,6 +669,28 @@ body, html {
     background-color: var(--color-panel);
 }
 
+.chat-suggestions {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 16px 0;
+    background-color: var(--color-panel);
+}
+
+.chat-suggestions[hidden] {
+    display: none;
+}
+
+.chat-suggestion-btn {
+    cursor: pointer;
+}
+
+.chat-suggestion-btn-readonly {
+    cursor: default;
+    opacity: 0.65;
+}
+
 .input-group {
     position: relative;
 }
@@ -635,5 +719,44 @@ body, html {
     flex: 0 0 auto;
     color: var(--color-primary);
     font-weight: 700;
+}
+
+/* ==========================================================================
+   微交互增强：聚焦 / 悬停 / 按压的平滑反馈
+   ========================================================================== */
+
+/* 表单控件：聚焦时边框与光晕平滑过渡，避免生硬跳变 */
+.form-control,
+.form-select,
+textarea,
+input[type="text"],
+input[type="password"],
+input[type="number"],
+input[type="email"],
+input[type="search"] {
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease,
+        background-color 0.2s ease;
+}
+
+/* 工具面板：悬停时轻微抬升，强化可交互感知 */
+.tool-panel {
+    transition:
+        transform 0.22s ease,
+        box-shadow 0.22s ease,
+        border-color 0.22s ease;
+}
+
+.tool-panel:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--theme-shadow-md);
+    border-color: var(--theme-border-strong);
+}
+
+/* 列表 / 预览项：悬停底色过渡 */
+.preview-message,
+.list-group-item {
+    transition: background-color 0.18s ease, border-color 0.18s ease;
 }
 

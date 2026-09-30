@@ -13,6 +13,7 @@ from trpg_server.agents.tools.room import (
     get_room_snapshot,
 )
 from trpg_server.agents.tools.knowledge import search_ruleset_knowledge
+from trpg_server.agents.tools.suggest import suggest_actions
 
 
 def test_coc_check_regular_success_with_fixed_rng():
@@ -164,6 +165,64 @@ def test_kp_default_tools_include_room_check_function():
     assert registry.get("check.roll_room_check") is not None
 
 
+def test_kp_default_tools_include_suggest_actions_function():
+    registry = default_tool_registry()
+
+    assert "room.suggest_actions" in DEFAULT_KP_TOOLS
+    assert registry.get("room.suggest_actions") is not None
+
+
+def test_suggest_actions_blocked_when_gate_disabled(tmp_path):
+    context = AgentRequestContext(
+        room_id="room-1",
+        room_dir=tmp_path,
+        tool_state={"allow_action_suggestions": False},
+    )
+
+    result = suggest_actions({"actions": ["\u56db\u5904\u8d70\u52a8"]}, context)
+
+    assert "error" in result
+    assert "suggested_actions" not in context.tool_state
+
+
+def test_suggest_actions_cleans_and_stages_when_enabled(tmp_path):
+    context = AgentRequestContext(
+        room_id="room-1",
+        room_dir=tmp_path,
+        user_id=7,
+        tool_state={"allow_action_suggestions": True},
+    )
+
+    result = suggest_actions(
+        {"actions": ["\u56db\u5904\u8d70\u52a8", " \u56db\u5904\u8d70\u52a8 ", "", "\u770b\u770b\u5468\u56f4", "x" * 200, "a", "b"]},
+        context,
+    )
+
+    assert result["status"] == "displayed_to_players"
+    assert context.tool_state["suggested_actions"] == [
+        "\u56db\u5904\u8d70\u52a8",
+        "\u770b\u770b\u5468\u56f4",
+        "x" * 80,
+        "a",
+        "b",
+    ]
+    assert context.tool_state["suggested_actions_owner"] == 7
+
+
+def test_suggest_actions_falls_back_to_room_house_rule_without_chat_gate(tmp_path):
+    room_dir = tmp_path / "rooms" / "room-1"
+    room_dir.mkdir(parents=True)
+    (room_dir / "info.json").write_text(
+        json.dumps({"id": "room-1", "house_rules": {"action_suggestions_enabled": True}}),
+        encoding="utf-8",
+    )
+    context = AgentRequestContext(room_id="room-1", room_dir=room_dir)
+
+    result = suggest_actions({"actions": ["\u56db\u5904\u8d70\u52a8"]}, context)
+
+    assert result["status"] == "displayed_to_players"
+
+
 def test_ruleset_knowledge_tool_limits_context_and_reports_usage(tmp_path):
     room_dir = tmp_path / "rooms" / "room-1"
     room_dir.mkdir(parents=True)
@@ -238,6 +297,27 @@ def test_room_scenario_context_loads_current_room_scenario(tmp_path):
 
     assert result["scenario"]["title"] == "雨夜来客"
     assert result["matches"][0]["title"] == "门厅"
+
+
+def test_room_scenario_module_returns_page_instead_of_unbounded_content(tmp_path):
+    scenarios_dir = tmp_path / "scenarios"
+    scenarios_dir.mkdir()
+    (scenarios_dir / "7.json").write_text(
+        json.dumps({"id": 7, "modules": [{"id": "scene-long", "module_type": "scene", "scene_id": "1", "content": "x" * 12000}]}),
+        encoding="utf-8",
+    )
+    room_dir = tmp_path / "rooms" / "room-1"
+    room_dir.mkdir(parents=True)
+    (room_dir / "info.json").write_text(json.dumps({"id": "room-1", "scenario_id": 7}), encoding="utf-8")
+    context = AgentRequestContext(room_id="room-1", room_dir=room_dir, scenarios_dir=scenarios_dir)
+
+    result = get_room_scenario_module({"module_id": "scene-long", "offset": 5000, "max_chars": 2000}, context)
+
+    assert len(result["module"]["content"]) == 2000
+    assert result["module"]["content_offset"] == 5000
+    assert result["module"]["content_length"] == 12000
+    assert result["module"]["content_truncated"] is True
+    assert result["module"]["next_offset"] == 7000
 
 
 def test_room_character_cards_returns_active_bound_cards(tmp_path):

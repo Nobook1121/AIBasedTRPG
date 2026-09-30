@@ -13,7 +13,18 @@ ACTIVE_SESSION_REGISTRY_KEY = "ACTIVE_USER_SESSIONS"
 SESSION_TOKEN_KEY = "session_token"
 CSRF_SESSION_KEY = "csrf_token"
 IMPERSONATION_SESSION_PREFIX = "impersonation:"
-CSRF_EXEMPT_PATHS = {"/api/auth/login", "/api/auth/register"}
+CSRF_EXEMPT_PATHS = {
+    "/api/auth/login",
+    "/api/auth/register",
+    # 首次部署引导发生在登录之前，此时会话中还没有 CSRF token；
+    # 这些接口以“系统中不存在 OWNER”作为安全门闸，因此豁免 CSRF 与会话校验。
+    "/api/setup/status",
+    "/api/setup/dismiss",
+    "/api/setup/site",
+    "/api/setup/ai",
+    "/api/setup/ai/test",
+    "/api/setup/owner",
+}
 WINDOWS_RESERVED_FILENAMES = {
     "CON",
     "PRN",

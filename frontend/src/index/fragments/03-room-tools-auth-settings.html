@@ -1,4 +1,4 @@
-﻿                <!-- 创建房间模态框 -->
+                <!-- 创建房间模态框 -->
                 <div class="modal fade" id="createSaveModal" tabindex="-1" aria-labelledby="createSaveModalLabel" aria-hidden="true">
                     <div class="modal-dialog">
                         <div class="modal-content">
@@ -21,6 +21,28 @@
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
                                 <button type="button" class="btn btn-primary" id="confirmCreateSave">创建</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal fade" id="roomHouseRulesModal" tabindex="-1" aria-labelledby="roomHouseRulesModalLabel" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="roomHouseRulesModalLabel" data-i18n="room.house_rules.title">房间规则</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="houseRuleActionSuggestions">
+                                    <label class="form-check-label" for="houseRuleActionSuggestions" data-i18n="room.house_rules.action_suggestions">AI 可选行动提示（以按钮形式提供给触发 AI 的玩家）</label>
+                                </div>
+                                <p class="form-text mt-2" id="houseRuleGlobalHint" data-i18n="room.house_rules.global_disabled">全局 AI 提示开关已关闭，暂不可开启该房规。</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="common.cancel">取消</button>
+                                <button type="button" class="btn btn-primary" id="saveHouseRules" data-i18n="common.save">保存</button>
                             </div>
                         </div>
                     </div>
@@ -411,6 +433,7 @@
                                         <option value="light" data-i18n="profile.theme.light">浅色</option>
                                         <option value="dark" data-i18n="profile.theme.dark">深色</option>
                                         <option value="pattern_cyber_2" data-i18n="profile.theme.cyber">赛博档案</option>
+                                        <option value="pattern_tome" data-i18n="profile.theme.tome">秘典·羊皮纸</option>
                                         <option value="system" data-i18n="profile.theme.system">跟随系统</option>
                                     </select>
                                 </label>
@@ -486,6 +509,7 @@
                                         <option value="light" data-i18n="profile.theme.light">浅色</option>
                                         <option value="dark" data-i18n="profile.theme.dark">深色</option>
                                         <option value="pattern_cyber_2" data-i18n="profile.theme.cyber">赛博档案</option>
+                                        <option value="pattern_tome" data-i18n="profile.theme.tome">秘典·羊皮纸</option>
                                         <option value="system" data-i18n="profile.theme.system">跟随系统</option>
                                     </select>
                                 </div>

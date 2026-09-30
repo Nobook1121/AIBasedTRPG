@@ -68,14 +68,16 @@ function handleMainNavigationClick(
     targetTab.classList.add("active");
     console.log(`切换到标签页: ${tabId}`);
 
+    // 小工具与设置页各自在页面顶部提供完整的横向子标签，侧边栏只保留一级入口，
+    // 因此这里仅在 hash 明确指向某个子标签（tools-* / settings-*）时才切换。
     if (tabId === "settings") {
-        const settingsTab = link.hash.replace("#", "").replace("settings-", "");
-        if (settingsTab) switchSettingsTab(settingsTab);
+        const hash = link.hash.replace("#", "");
+        if (hash.startsWith("settings-")) switchSettingsTab(hash.slice("settings-".length));
     }
 
     if (tabId === "tools") {
-        const toolsTab = link.hash.replace("#", "");
-        if (toolsTab === "tools-dice") switchToolTab("dice");
+        const hash = link.hash.replace("#", "");
+        if (hash.startsWith("tools-")) switchToolTab(hash.slice("tools-".length));
     }
 }
 

@@ -340,10 +340,10 @@ def save_debug_prompt():
         prompt_path.write_text(content, encoding="utf-8")
         log_user_action(
             logger,
-            user_action_text(session.get("username"), "Updated AI debug prompt"),
-            user_id=session.get("user_id"),
-            file=prompt_path.name,
-            content_length=len(content),
+            user_action_text(session.get("username"), "更新了 AI 调试提示词"),
+            用户ID=session.get("user_id"),
+            文件名=prompt_path.name,
+            内容长度=len(content),
         )
         return success_response(message="Debug prompt saved successfully")
     except Exception as exc:

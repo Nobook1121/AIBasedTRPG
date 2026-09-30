@@ -1,0 +1,212 @@
+<!-- 首次部署引导向导：仅在系统中还没有 OWNER 账号时显示 -->
+    <div id="setupWizard" class="setup-wizard" hidden>
+        <style>
+            .setup-wizard {
+                position: fixed;
+                inset: 0;
+                z-index: 10050;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 24px;
+                background: radial-gradient(circle at top, rgba(60, 90, 160, 0.35), rgba(10, 14, 24, 0.92));
+                backdrop-filter: blur(6px);
+            }
+            .setup-wizard-card {
+                width: 100%;
+                max-width: 620px;
+                max-height: 92vh;
+                overflow-y: auto;
+                background: var(--surface-color, #1c2230);
+                color: var(--text-color, #e8ecf4);
+                border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+                border-radius: 16px;
+                padding: 28px 30px;
+                box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+            }
+            .setup-wizard-title {
+                margin: 0 0 4px;
+                font-size: 1.4rem;
+            }
+            .setup-wizard-subtitle {
+                margin: 0 0 20px;
+                color: var(--muted-text-color, #97a1b5);
+                font-size: 0.9rem;
+            }
+            .setup-progress {
+                display: flex;
+                gap: 8px;
+                margin-bottom: 24px;
+            }
+            .setup-progress-step {
+                flex: 1;
+                height: 6px;
+                border-radius: 999px;
+                background: rgba(255, 255, 255, 0.14);
+            }
+            .setup-progress-step.is-active,
+            .setup-progress-step.is-done {
+                background: var(--accent-color, #4f8cff);
+            }
+            .setup-panel {
+                display: none;
+            }
+            .setup-panel.is-active {
+                display: block;
+            }
+            .setup-panel h3 {
+                margin: 0 0 6px;
+                font-size: 1.08rem;
+            }
+            .setup-panel .setup-hint {
+                color: var(--muted-text-color, #97a1b5);
+                font-size: 0.85rem;
+                margin-bottom: 16px;
+            }
+            .setup-actions {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 10px;
+                margin-top: 26px;
+            }
+            .setup-actions-right {
+                display: flex;
+                gap: 10px;
+            }
+            .setup-actions-left {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+            .setup-skip-all {
+                color: var(--muted-text-color, #97a1b5);
+                font-size: 0.85rem;
+                padding: 0;
+            }
+            .setup-message {
+                min-height: 20px;
+                margin-top: 12px;
+                font-size: 0.85rem;
+            }
+            .setup-message.is-error {
+                color: #ff6b6b;
+            }
+            .setup-message.is-success {
+                color: #43c59e;
+            }
+            .setup-summary {
+                list-style: none;
+                padding: 0;
+                margin: 0 0 8px;
+            }
+            .setup-summary li {
+                display: flex;
+                justify-content: space-between;
+                gap: 12px;
+                padding: 10px 0;
+                border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+            }
+        </style>
+        <div class="setup-wizard-card" role="dialog" aria-modal="true" aria-labelledby="setupWizardTitle">
+            <h2 class="setup-wizard-title" id="setupWizardTitle" data-i18n="setup.title">欢迎，先完成初始化</h2>
+            <p class="setup-wizard-subtitle" data-i18n="setup.subtitle">这是首次部署，请按步骤完成基础配置，之后即可正常登录使用。</p>
+
+            <div class="setup-progress" aria-hidden="true">
+                <span class="setup-progress-step" data-step="1"></span>
+                <span class="setup-progress-step" data-step="2"></span>
+                <span class="setup-progress-step" data-step="3"></span>
+                <span class="setup-progress-step" data-step="4"></span>
+                <span class="setup-progress-step" data-step="5"></span>
+            </div>
+
+            <section class="setup-panel is-active" data-setup-step="1">
+                <h3 data-i18n="setup.ai.heading">1. 配置 AI API</h3>
+                <p class="setup-hint" data-i18n="setup.ai.hint">填写兼容 OpenAI 协议的接口地址、API Key 与模型名。API 地址需指向 chat completions 接口。</p>
+                <div class="mb-3">
+                    <label class="form-label" for="setupPlatform" data-i18n="setup.ai.platform">平台</label>
+                    <select class="form-select" id="setupPlatform">
+                        <option value="deepseek" data-base-url="https://api.deepseek.com/v1/chat/completions" data-model="deepseek-chat">DeepSeek</option>
+                        <option value="openai" data-base-url="https://api.openai.com/v1/chat/completions" data-model="gpt-4o-mini">OpenAI</option>
+                        <option value="aliyun" data-base-url="https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions" data-model="qwen-plus" data-i18n="setup.ai.platform_aliyun">阿里云百炼</option>
+                        <option value="siliconflow" data-base-url="https://api.siliconflow.cn/v1/chat/completions" data-model="deepseek-ai/DeepSeek-V3" data-i18n="setup.ai.platform_siliconflow">硅基流动</option>
+                        <option value="openrouter" data-base-url="https://openrouter.ai/api/v1/chat/completions" data-model="openai/gpt-4o-mini">OpenRouter</option>
+                        <option value="lmstudio" data-base-url="http://localhost:1234/v1/chat/completions" data-model="local-model" data-i18n="setup.ai.platform_lmstudio">LM Studio（本地）</option>
+                        <option value="custom" data-base-url="" data-model="" data-i18n="setup.ai.platform_custom">自定义</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="setupBaseUrl" data-i18n="setup.ai.base_url">API 地址</label>
+                    <input type="text" class="form-control" id="setupBaseUrl" placeholder="https://api.example.com/v1/chat/completions">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="setupApiKey" data-i18n="setup.ai.api_key">API Key</label>
+                    <input type="password" class="form-control" id="setupApiKey" placeholder="sk-...">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="setupModel" data-i18n="setup.ai.model">模型 ID</label>
+                    <input type="text" class="form-control" id="setupModel" placeholder="deepseek-chat">
+                </div>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="setupAiTestBtn" data-i18n="setup.ai.test">测试连接</button>
+            </section>
+
+            <section class="setup-panel" data-setup-step="2">
+                <h3 data-i18n="setup.site.heading">2. 为网站取名</h3>
+                <p class="setup-hint" data-i18n="setup.site.hint">这个名字会显示在浏览器标题栏和侧边栏。</p>
+                <div class="mb-3">
+                    <label class="form-label" for="setupSiteName" data-i18n="setup.site.name">网站名称</label>
+                    <input type="text" class="form-control" id="setupSiteName" maxlength="64" placeholder="AI TRPG">
+                </div>
+            </section>
+
+            <section class="setup-panel" data-setup-step="3">
+                <h3 data-i18n="setup.domain.heading">3. 绑定域名（可跳过）</h3>
+                <p class="setup-hint" data-i18n="setup.domain.hint">仅记录域名用于展示。实际的 DNS 解析与 HTTPS 需要由 Nginx/Caddy 等反向代理完成，可稍后再配置。</p>
+                <div class="mb-3">
+                    <label class="form-label" for="setupSiteDomain" data-i18n="setup.domain.label">域名</label>
+                    <input type="text" class="form-control" id="setupSiteDomain" maxlength="253" placeholder="trpg.example.com">
+                </div>
+            </section>
+
+            <section class="setup-panel" data-setup-step="4">
+                <h3 data-i18n="setup.owner.heading">4. 创建 Owner 账号</h3>
+                <p class="setup-hint" data-i18n="setup.owner.hint">这是最高权限账号，用于管理网站。用户名 3-32 位，密码至少 8 位。</p>
+                <div class="mb-3">
+                    <label class="form-label" for="setupOwnerUsername" data-i18n="setup.owner.username">用户名</label>
+                    <input type="text" class="form-control" id="setupOwnerUsername" autocomplete="username">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="setupOwnerEmail" data-i18n="setup.owner.email">邮箱</label>
+                    <input type="email" class="form-control" id="setupOwnerEmail" autocomplete="email">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="setupOwnerPassword" data-i18n="setup.owner.password">密码</label>
+                    <input type="password" class="form-control" id="setupOwnerPassword" autocomplete="new-password">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="setupOwnerConfirm" data-i18n="setup.owner.confirm">确认密码</label>
+                    <input type="password" class="form-control" id="setupOwnerConfirm" autocomplete="new-password">
+                </div>
+            </section>
+
+            <section class="setup-panel" data-setup-step="5">
+                <h3 data-i18n="setup.done.heading">5. 完成</h3>
+                <p class="setup-hint" data-i18n="setup.done.hint">初始化已完成，点击下方按钮进入系统。</p>
+                <ul class="setup-summary" id="setupSummary"></ul>
+            </section>
+
+            <div class="setup-message" id="setupMessage"></div>
+
+            <div class="setup-actions">
+                <div class="setup-actions-left">
+                    <button type="button" class="btn btn-link setup-skip-all" id="setupSkipAllBtn" data-i18n="setup.skip_all">跳过全部引导</button>
+                    <button type="button" class="btn btn-outline-secondary" id="setupPrevBtn" data-i18n="setup.prev">上一步</button>
+                </div>
+                <div class="setup-actions-right">
+                    <button type="button" class="btn btn-link" id="setupSkipBtn" data-i18n="setup.skip">跳过</button>
+                    <button type="button" class="btn btn-primary" id="setupNextBtn" data-i18n="setup.next">下一步</button>
+                    <button type="button" class="btn btn-primary" id="setupFinishBtn" hidden data-i18n="setup.finish">进入系统</button>
+                </div>
+            </div>
+        </div>
+    </div>
