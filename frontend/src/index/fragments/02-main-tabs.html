@@ -18,10 +18,19 @@
                                 <button class="btn btn-primary" id="createScenario" data-i18n="scenario.action.create">创建剧本</button>
                                 <button class="btn btn-outline-primary" id="importScenarioDocument" data-i18n="scenario.action.import_document">导入剧本文档</button>
                                 <button class="btn btn-secondary" id="importScenario" data-i18n="scenario.action.import">导入剧本</button>
+                                <button class="btn btn-outline-secondary" id="scenarioBatchToggle" type="button" data-i18n="common.batch.manage">批量管理</button>
                             </div>
                             <input type="file" id="importScenarioFile" accept=".json" style="display: none;" multiple>
                             <input type="file" id="importScenarioDocumentFile" accept=".docx,.pdf,.txt,.md,.markdown,.text" style="display: none;">
                         </header>
+                        <div class="batch-toolbar" id="scenarioBatchToolbar" hidden>
+                            <label class="batch-toolbar-select"><input type="checkbox" id="scenarioBatchSelectAll"> <span data-i18n="common.batch.select_all">全选</span></label>
+                            <span class="batch-toolbar-count" id="scenarioBatchCount" aria-live="polite"></span>
+                            <div class="batch-toolbar-actions">
+                                <button class="btn btn-sm btn-danger" id="scenarioBatchDelete" type="button" data-i18n="common.batch.delete_selected">删除选中</button>
+                                <button class="btn btn-sm btn-secondary" id="scenarioBatchExit" type="button" data-i18n="common.batch.exit">退出批量管理</button>
+                            </div>
+                        </div>
                         <div class="scenario-list" id="scenarioList">
                             <!-- 剧本卡片将在这里动态生成 -->
                         </div>
@@ -56,10 +65,22 @@
                                     <i class="fa fa-users" aria-hidden="true"></i>
                                     <span data-i18n="character.action.gallery">角色卡广场</span>
                                 </button>
+                                <button class="character-command-button secondary" id="characterBatchToggle" type="button" title="批量管理">
+                                    <i class="fa fa-check-square-o" aria-hidden="true"></i>
+                                    <span data-i18n="common.batch.manage">批量管理</span>
+                                </button>
                             </div>
                         </header>
 
                         <div class="character-list-view" id="character-list-view">
+                            <div class="batch-toolbar" id="characterBatchToolbar" hidden>
+                                <label class="batch-toolbar-select"><input type="checkbox" id="characterBatchSelectAll"> <span data-i18n="common.batch.select_all">全选</span></label>
+                                <span class="batch-toolbar-count" id="characterBatchCount" aria-live="polite"></span>
+                                <div class="batch-toolbar-actions">
+                                    <button class="btn btn-sm btn-danger" id="characterBatchDelete" type="button" data-i18n="common.batch.delete_selected">删除选中</button>
+                                    <button class="btn btn-sm btn-secondary" id="characterBatchExit" type="button" data-i18n="common.batch.exit">退出批量管理</button>
+                                </div>
+                            </div>
                             <div class="character-list" id="characterList" aria-live="polite"></div>
                         </div>
 
@@ -105,6 +126,10 @@
                                     <i class="fa fa-user-plus" aria-hidden="true"></i>
                                     <span>新建</span>
                                 </button>
+                                <button class="character-command-button secondary" id="characterGalleryBatchToggle" type="button" title="批量管理">
+                                    <i class="fa fa-check-square-o" aria-hidden="true"></i>
+                                    <span data-i18n="common.batch.manage">批量管理</span>
+                                </button>
                             </div>
                         </header>
                         <div class="character-gallery-toolbar">
@@ -112,6 +137,14 @@
                                 <i class="fa fa-search" aria-hidden="true"></i>
                                 <input type="search" id="characterGallerySearch" class="form-control" placeholder="搜索姓名、职业、居住地或 ID" data-i18n-placeholder="gallery.search.placeholder">
                             </label>
+                        </div>
+                        <div class="batch-toolbar" id="characterGalleryBatchToolbar" hidden>
+                            <label class="batch-toolbar-select"><input type="checkbox" id="characterGalleryBatchSelectAll"> <span data-i18n="common.batch.select_all">全选</span></label>
+                            <span class="batch-toolbar-count" id="characterGalleryBatchCount" aria-live="polite"></span>
+                            <div class="batch-toolbar-actions">
+                                <button class="btn btn-sm btn-danger" id="characterGalleryBatchDelete" type="button" data-i18n="common.batch.delete_selected">删除选中</button>
+                                <button class="btn btn-sm btn-secondary" id="characterGalleryBatchExit" type="button" data-i18n="common.batch.exit">退出批量管理</button>
+                            </div>
                         </div>
                         <div class="character-list" id="characterGalleryList" aria-live="polite"></div>
                     </div>
@@ -126,12 +159,41 @@
                                 <h2 data-i18n="profile.page.title">个人主页</h2>
                                 <p class="page-subtitle" data-i18n="profile.page.subtitle">查看当前账户信息、身份和在线状态。</p>
                             </div>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-outline-primary" id="personalHomeSettingsLink" type="button">
+                                    <i class="fa fa-cog" aria-hidden="true"></i> <span data-i18n="profile.action.open_settings">用户设置</span>
+                                </button>
+                            </div>
                         </header>
-                        <section class="personal-home-panel">
-                            <img id="personalHomeAvatar" src="/assets/avatars/default.jpg" alt="用户头像" width="72" height="72">
-                            <div>
-                                <h3 id="personalHomeName">未登录</h3>
-                                <p id="personalHomeMeta">USER</p>
+                        <section class="profile-hero">
+                            <img id="personalHomeAvatar" src="/assets/avatars/default.jpg" alt="用户头像" data-i18n-alt="nav.user_avatar" width="88" height="88">
+                            <div class="profile-hero-body">
+                                <div class="profile-hero-heading">
+                                    <h3 id="personalHomeName">未登录</h3>
+                                    <span class="profile-role-chip" id="personalHomeRole">USER</span>
+                                </div>
+                                <p class="profile-hero-meta" id="personalHomeMeta">USER</p>
+                                <div class="profile-hero-presence">
+                                    <i class="fa fa-circle presence-dot online" id="personalHomePresenceDot" aria-hidden="true"></i>
+                                    <span id="personalHomePresence">在线状态</span>
+                                </div>
+                            </div>
+                        </section>
+                        <section class="profile-quick-links">
+                            <h4 data-i18n="profile.home.quick_links">快捷入口</h4>
+                            <div class="profile-quick-link-grid">
+                                <button type="button" class="profile-quick-link" data-target-tab="scenario">
+                                    <i class="fa fa-book" aria-hidden="true"></i><span data-i18n="profile.home.quick.scenario">剧本管理</span>
+                                </button>
+                                <button type="button" class="profile-quick-link" data-target-tab="character">
+                                    <i class="fa fa-id-badge" aria-hidden="true"></i><span data-i18n="profile.home.quick.character">我的角色卡</span>
+                                </button>
+                                <button type="button" class="profile-quick-link" data-target-tab="character-gallery">
+                                    <i class="fa fa-users" aria-hidden="true"></i><span data-i18n="profile.home.quick.gallery">角色卡广场</span>
+                                </button>
+                                <button type="button" class="profile-quick-link" data-target-tab="save">
+                                    <i class="fa fa-server" aria-hidden="true"></i><span data-i18n="profile.home.quick.rooms">房间管理</span>
+                                </button>
                             </div>
                         </section>
                     </div>
@@ -190,7 +252,10 @@
                                         </div>
                                         <div class="col-md-4">
                                             <p><strong data-i18n="room.detail.participants">参与用户：</strong><span id="saveParticipants">-</span></p>
-                                            <p><strong data-i18n="room.detail.code">房间码：</strong><span id="roomDetailCode">-</span></p>
+                                            <p><strong data-i18n="room.detail.code">房间码：</strong><span id="roomDetailCode">-</span>
+                                                <button type="button" class="btn btn-link btn-sm p-0 align-baseline" id="copyRoomDetailCode" title="点击复制房间码" aria-label="复制房间码"><i class="fa fa-copy" aria-hidden="true"></i></button>
+                                                <span class="badge bg-secondary ms-1" id="roomDetailVisibility" style="display:none;"></span>
+                                            </p>
                                         </div>
                                     </div>
                                 </div>

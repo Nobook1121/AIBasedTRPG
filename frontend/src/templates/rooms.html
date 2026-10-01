@@ -18,9 +18,11 @@
         {{{ activeHeaderHtml }}}
         <div class="card-body">
             {{{ archivedBadgeHtml }}}
-            <h5 class="card-title" data-user-content="true">{{ name }}</h5>
+            <h5 class="card-title" data-user-content="true">{{ name }} {{{ visibilityBadgeHtml }}}</h5>
             <p class="card-text mb-2">
-                <small class="text-muted">房间码：<span data-user-content="true">{{ roomCode }}</span></small><br>
+                <small class="text-muted">房间码：<span data-user-content="true">{{ roomCode }}</span>
+                    <button type="button" class="btn btn-link btn-sm p-0 align-baseline room-code-copy" data-copy-room-code="{{ roomCode }}" title="点击复制房间码" aria-label="复制房间码"><i class="fa fa-copy" aria-hidden="true"></i></button>
+                </small><br>
                 <small class="text-muted">剧本：<span data-user-content="true">{{ scenarioTitle }}</span></small><br>
                 <small class="text-muted">成员：<span data-user-content="true">{{ members }}</span></small>
             </p>
@@ -71,6 +73,30 @@
         {{{ removeButtonHtml }}}
     </td>
 </tr>
+</template>
+
+<template id="room-member-group">
+<div class="home-room-member-group">
+    <p class="home-room-member-group-title">{{ title }}</p>
+    <ul class="home-room-member-items">{{{ itemsHtml }}}</ul>
+</div>
+</template>
+
+<template id="room-member-item">
+<li class="home-room-member{{ selfClass }}" data-user-id="{{ userId }}">
+    <span class="home-room-member-avatar">
+        <img src="{{ avatar }}" alt="">
+        <span class="home-room-member-presence {{ presenceClass }}" title="{{ presenceTitle }}" aria-hidden="true"></span>
+    </span>
+    <span class="home-room-member-body">
+        <span class="home-room-member-name{{ roleClass }}">
+            <span class="home-room-member-name-text">{{ username }}</span>
+            {{{ roleBadgeHtml }}}
+            {{{ selfBadgeHtml }}}
+        </span>
+        <span class="home-room-member-card{{ cardClass }}">{{ cardName }}</span>
+    </span>
+</li>
 </template>
 
 <template id="room-bind-character-button">

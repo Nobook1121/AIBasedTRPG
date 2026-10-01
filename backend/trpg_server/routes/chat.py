@@ -289,7 +289,7 @@ def _emit_thinking_stage(room_id, ai_request_id, stage, label):
         logger.debug("Unable to emit AI thinking stage", exc_info=True)
 
 
-def _post_ai_request(base_url, headers):
+def _post_ai_request(base_url, headers, timeout=300):
     def response_detail(response):
         try:
             detail = response.json()
@@ -307,9 +307,19 @@ def _post_ai_request(base_url, headers):
             and "json" in text
         )
 
+    def post(payload):
+        try:
+            return requests.post(base_url, headers=headers, json=payload, timeout=timeout)
+        except requests.exceptions.Timeout as exc:
+            logger.warning("AI API request timed out after %ss", timeout)
+            raise RuntimeError(f"AI 平台请求超时（等待 {timeout} 秒未响应）") from exc
+        except requests.exceptions.RequestException as exc:
+            logger.warning("AI API request failed: %s", exc)
+            raise RuntimeError(f"AI 平台连接失败：{exc}") from exc
+
     def requester(payload):
         logger.info("AI API request payload: %s", _json_for_log(payload))
-        response = requests.post(base_url, headers=headers, json=payload, timeout=300)
+        response = post(payload)
         if not response.ok:
             detail = response_detail(response)
             if provider_requires_json(response.status_code, detail):
@@ -325,7 +335,7 @@ def _post_ai_request(base_url, headers):
                 retry_payload["messages"] = retry_messages
                 logger.warning("AI API retry after provider JSON response_format validation failure")
                 logger.info("AI API retry request payload: %s", _json_for_log(retry_payload))
-                response = requests.post(base_url, headers=headers, json=retry_payload, timeout=300)
+                response = post(retry_payload)
                 if not response.ok:
                     detail = response_detail(response)
             if not response.ok:
@@ -803,6 +813,7 @@ def chat():
             user_id=user_id,
             agent_id=agent_profile.id,
             request_content=content,
+            config_dir=current_app.config.get("CONFIG_DIR", CONFIG_DIR),
         )
         if scenario_start:
             if not room_id or not agent_context.room_dir:
@@ -825,6 +836,7 @@ def chat():
                 user_id=session_user_id,
                 agent_id=agent_profile.id,
                 request_content=content,
+                config_dir=current_app.config.get("CONFIG_DIR", CONFIG_DIR),
             )
         agent_context.tool_state.update(
             {
@@ -879,7 +891,7 @@ def chat():
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
         }
-        requester = _post_ai_request(base_url, headers)
+        requester = _post_ai_request(base_url, headers, runtime_config.ai_request_timeout)
         history_file, history = _load_history(
             user_id,
             room_id=room_id,
@@ -909,8 +921,28 @@ def chat():
             if runtime_config.debug_mode
             else agent_profile.prompt or _load_kp_prompt()
         )
-        if not runtime_config.show_ai_hints:
-            system_prompt += "\n设置：禁止在回复结尾主动提供提示、选项、行动列表或下一步建议；仅在玩家明确询问时回答。"
+        # 常驻行为约束：写入系统提示的静态层（global_rules），随每次请求重新注入，
+        # 因此即便历史被压缩或截断，该设置也不会在多轮对话中丢失。
+        # 仅当「全局提示开关开启且房间房规显式启用行动建议」时才允许给出提示；
+        # 其余情况一律禁止主动提示、无故要求检定，以及“你要做什么：1…2…”式选项列表。
+        if not effective_suggestions:
+            system_prompt += (
+                "\n【常驻约束·优先级仅次于系统规则】除非玩家在本轮明确请求提示、可行行动选项或要求进行检定，"
+                "否则：不得主动提示、不得给出“你要做什么：1.… 2.…”这类行动列表或下一步建议；"
+                "不得主动要求玩家进行检定（例如“请你过一个侦查检定”）；不得在回复结尾追加引导。"
+                "只依据玩家已声明的行动进行叙事。"
+            )
+        # 兜底硬门控：房间已绑定剧本但尚未开始（房主/管理员未点击“开启剧本”）时，
+        # 禁止 KP 自行开场/导入/推进剧本，也不能调用场景与触发器工具；最多提醒房主开场。
+        # 正式开场（scenario_start=true）流程不受影响。
+        if agent_profile.id == "kp" and room_id and not scenario_start:
+            _start_gate_info = agent_context.room_info()
+            if _start_gate_info.get("scenario_id") not in (None, "") and not _start_gate_info.get("scenario_started_at"):
+                system_prompt += (
+                    "\n【常驻约束】本房间剧本尚未开始。禁止自行开场、导入或推进剧本内容；"
+                    "禁止调用场景工具（如 room.activate_scenario_scene）与触发器工具（trigger.reveal_scenario_trigger）；"
+                    "最多用一句话提醒房主或管理员点击“开启剧本”。"
+                )
         if room_id:
             system_prompt = (
                 f"{system_prompt}\n"
@@ -1073,12 +1105,27 @@ def chat():
             profile=request_profile,
             registry=default_tool_registry(),
             context=agent_context,
+            max_tool_rounds=runtime_config.max_tool_rounds,
             max_tool_result_chars=runtime_config.max_tool_result_chars,
         )
         elapsed_ms = round((time.perf_counter() - started_at) * 1000, 2)
         if result.error:
+            logger.warning(
+                "AI agent request failed room_id=%s user_id=%s error=%s",
+                room_id,
+                session.get("user_id"),
+                result.error,
+            )
             _emit_thinking_stage(room_id, ai_request_id, "error", "AI 请求失败")
-            return error_response("AI agent request failed", 500, result.error)
+            # 把具体原因（超时/连接失败等）作为 message 返回，前端会直接展示在聊天框内。
+            return error_response(result.error or "AI agent request failed", 500, "AI agent request failed")
+        if result.rounds_exhausted:
+            logger.warning(
+                "AI agent reached max tool rounds room_id=%s user_id=%s rounds=%s",
+                room_id,
+                session.get("user_id"),
+                runtime_config.max_tool_rounds,
+            )
 
         knowledge_usage = _build_knowledge_usage(result, scenario_results)
 
@@ -1214,6 +1261,10 @@ def chat():
             ai_response = "已完成检定/场景处理，详情见上方记录。"
         if not ai_response and suggestions:
             ai_response = "请从下方选择你的行动。"
+        # 非致命异常（达到最大工具轮数、请求中断）也要在聊天框内可见，
+        # 而不是让玩家面对一条没有任何说明的回复。
+        if result.notice:
+            ai_response = f"{ai_response}\n\n{result.notice}" if ai_response else result.notice
         if not ai_response:
             return error_response(
                 "AI platform did not return a response",

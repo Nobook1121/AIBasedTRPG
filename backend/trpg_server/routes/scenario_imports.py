@@ -8,7 +8,13 @@ from trpg_server.responses import error_response, success_response
 from trpg_server.scenario_import_jobs import public_job_payload, submit_import_job
 from trpg_server.scenario_documents import validate_scenario_upload, ScenarioDocumentError
 from trpg_server.scenario_store import load_scenario_record, save_scenario_record, scenario_descriptor_paths
-from trpg_server.agents.knowledge_base import persist_knowledge_index, KnowledgeBaseService
+from trpg_server.agents.knowledge_base import (
+    KnowledgeBaseService,
+    KnowledgeChunk,
+    index_knowledge_chunks,
+    persist_knowledge_index,
+    write_knowledge_index,
+)
 
 bp = Blueprint("scenario_imports", __name__)
 logger = logging.getLogger(__name__)
@@ -90,12 +96,24 @@ def publish_import(script_id):
     scenario["id"] = script_id; scenario["scenario_version"] = str(job.get("target_version") or "1.0.0"); scenario["owner_id"] = session["user_id"]
     from trpg_server.settings import SCENARIOS_DIR
     descriptor = save_scenario_record(SCENARIOS_DIR, scenario)
-    persist_knowledge_index(
-        descriptor,
-        load_scenario_record(descriptor, SCENARIOS_DIR),
-        vector_store=current_app.extensions.get("vector_store"),
-        embedding_provider=current_app.extensions.get("embedding_provider"),
-    )
+    stored = load_scenario_record(descriptor, SCENARIOS_DIR)
+    vector_store = current_app.extensions.get("vector_store")
+    provider = current_app.extensions.get("embedding_provider")
+    if str(scenario.get("import_mode") or "") == "direct":
+        # 直接导入的剧本没有场景卡，知识块在管线中已按标题切分并嵌入；这里把
+        # 这些块同时写入 JSON 索引，保证离线重建与检索仍然可用。
+        raw_chunks = _store().load_intermediate(job["id"], "knowledge", []) or []
+        chunks = []
+        for item in raw_chunks:
+            if isinstance(item, dict):
+                try:
+                    chunks.append(KnowledgeChunk(**item))
+                except TypeError:
+                    continue
+        chunks = index_knowledge_chunks(chunks, vector_store=vector_store, embedding_provider=provider)
+        write_knowledge_index(descriptor, stored.get("scenario_version") or scenario.get("scenario_version"), chunks)
+    else:
+        persist_knowledge_index(descriptor, stored, vector_store=vector_store, embedding_provider=provider)
     _store().update(job["id"], status="published", progress=100)
     log_user_action(
         logger,

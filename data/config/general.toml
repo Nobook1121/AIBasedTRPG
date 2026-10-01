@@ -19,17 +19,21 @@ message_font_size = 14
 max_history_messages = 1000
 
 [ai]
-stream_output = false
+stream_output = true
 debug_mode = false
 show_ai_hints = true
+dice_critical_threshold = 1
+dice_fumble_threshold = 96
+max_tool_rounds = 8
+ai_request_timeout = 300
 
-["\"\\\"ai.small_models\\\"\""]
+[ai.small_models]
 intent_classification = ""
 state_update = ""
 summarization = ""
 schema_repair = ""
 
-["\"\\\"ai.prompt\\\"\""]
+[ai.prompt]
 snapshot_manifest_summary_cap = 140
 max_snapshot_scene_manifest = 30
 snapshot_include_entity_manifest = false

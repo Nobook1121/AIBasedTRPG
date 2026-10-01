@@ -28,6 +28,15 @@ from trpg_server.socket_events import register_socket_events
 from trpg_server.routes.rooms import create_room_message
 
 
+def test_chat_blocks_kp_self_start_until_scenario_started():
+    # 兜底硬门控：剧本未开始时，非正式开场请求不得让 KP 自行开场/推进。
+    source = Path("backend/trpg_server/routes/chat.py").read_text(encoding="utf-8")
+
+    assert 'agent_profile.id == "kp" and room_id and not scenario_start' in source
+    assert 'not _start_gate_info.get("scenario_started_at")' in source
+    assert "本房间剧本尚未开始" in source
+
+
 def test_history_filename_is_room_scoped_when_room_is_available():
     assert _history_filename("user-1", "room-alpha", "kp") == "room-room-alpha-kp.json"
     assert _history_filename("user-1", "room-beta", "kp") == "room-room-beta-kp.json"

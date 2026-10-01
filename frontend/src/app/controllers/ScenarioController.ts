@@ -35,6 +35,7 @@ class ScenarioController {
             onEditScenario: (id) => this.onEditScenario(id),
             onPlayScenario: (id) => this.onPlayScenario(id),
             onDeleteScenario: (id) => this.onDeleteScenario(id),
+            onBatchDeleteScenarios: (ids) => this.onBatchDeleteScenarios(ids),
             onImportScenario: (files) => this.onImportScenario(files),
         });
     }
@@ -233,10 +234,17 @@ class ScenarioController {
         }
     }
 
-    private onEditScenario(id: number): void {
+    private async onEditScenario(id: number): Promise<void> {
         const scenario = this.model.getScenario(id);
         if (!scenario) {
             this.view.showMessage("剧本不存在", true);
+            return;
+        }
+
+        if (scenario.import_mode === "direct") {
+            // 直接导入的剧本没有场景卡，只提供只读查看并显示向量数量。
+            const stats = await this.model.getKnowledgeStats(id).catch(() => null);
+            this.view.openDirectImportInfo(scenario, stats?.vector_count ?? 0);
             return;
         }
 
@@ -247,29 +255,37 @@ class ScenarioController {
         if (!saveButton) return;
 
         saveButton.removeEventListener("click", this.view.saveScenarioHandler);
-        saveButton.onclick = async () => {
-            try {
-                const scenarioData = this.view.getFormData();
-                const tempScenario: Pick<Scenario, "id" | "cover" | "title"> = {
-                    id,
-                    title: scenarioData.title,
-                    cover: scenarioData.cover || DEFAULT_SCENARIO_COVER,
-                };
-                await this.renameScenarioCover(tempScenario, scenarioData.cover || "");
-                scenarioData.cover = tempScenario.cover || DEFAULT_SCENARIO_COVER;
+        const restoreCreateHandler = () => {
+            // 编辑流程结束后恢复“保存并发布”按钮的默认创建行为，避免残留的编辑
+            // 回调与新建监听器同时触发，导致一次点击被重复提交。
+            saveButton.onclick = null;
+            saveButton.addEventListener("click", this.view.saveScenarioHandler);
+        };
+        saveButton.onclick = () => {
+            void runSaveButtonCooldown(saveButton, async () => {
+                try {
+                    const scenarioData = this.view.getFormData();
+                    const tempScenario: Pick<Scenario, "id" | "cover" | "title"> = {
+                        id,
+                        title: scenarioData.title,
+                        cover: scenarioData.cover || DEFAULT_SCENARIO_COVER,
+                    };
+                    await this.renameScenarioCover(tempScenario, scenarioData.cover || "");
+                    scenarioData.cover = tempScenario.cover || DEFAULT_SCENARIO_COVER;
 
-                const updatedScenario = await this.model.updateScenario(id, scenarioData);
-                void updatedScenario;
+                    const updatedScenario = await this.model.updateScenario(id, scenarioData);
+                    void updatedScenario;
 
-                saveButton.addEventListener("click", this.view.saveScenarioHandler);
-                this.renderScenarioList();
-                this.view.closeModal();
-                this.view.showMessage("剧本更新成功");
-            } catch (error) {
-                console.error("更新剧本时出错:", error);
-                this.view.showMessage(scenarioErrorMessage(error), true);
-                saveButton.addEventListener("click", this.view.saveScenarioHandler);
-            }
+                    restoreCreateHandler();
+                    this.renderScenarioList();
+                    this.view.closeModal();
+                    this.view.showMessage("剧本更新成功");
+                } catch (error) {
+                    console.error("更新剧本时出错:", error);
+                    this.view.showMessage(scenarioErrorMessage(error), true);
+                    restoreCreateHandler();
+                }
+            });
         };
     }
 
@@ -288,6 +304,26 @@ class ScenarioController {
         } catch (error) {
             console.error("删除剧本时出错:", error);
             this.view.showMessage(`删除剧本失败: ${scenarioErrorMessage(error)}`, true);
+        }
+    }
+
+    private async onBatchDeleteScenarios(ids: number[]): Promise<void> {
+        let deleted = 0;
+        const failures: string[] = [];
+        for (const id of ids) {
+            try {
+                await this.model.deleteScenario(id);
+                deleted += 1;
+            } catch (error) {
+                failures.push(scenarioErrorMessage(error));
+                console.error(`批量删除剧本 ${id} 失败:`, error);
+            }
+        }
+        this.renderScenarioList();
+        if (failures.length === 0) {
+            this.view.showMessage(`已删除 ${deleted} 个剧本`);
+        } else {
+            this.view.showMessage(`已删除 ${deleted} 个剧本，${failures.length} 个失败。\n\n失败详情:\n${failures.join("\n")}`, true);
         }
     }
 

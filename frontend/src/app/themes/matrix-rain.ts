@@ -87,7 +87,9 @@ namespace ThemeMatrixRain {
 
     function createDrop(x: number, height: number, initial: boolean): Drop {
         const trail = MIN_TRAIL + Math.floor(Math.random() * (MAX_TRAIL - MIN_TRAIL + 1));
-        const y = initial ? -Math.random() * height : -Math.random() * FONT_SIZE * MAX_TRAIL;
+        // 首次构建（含刷新页面）时把字符头分散在整个视口高度内，让页面中部刷新后立刻就有字母雨；
+        // 后续重生时仍从视口上方错峰进入，避免同一瞬间整屏字符同时冒出。
+        const y = initial ? Math.random() * height : -Math.random() * FONT_SIZE * MAX_TRAIL;
         const glyphs: string[] = [];
         for (let index = 0; index < trail; index += 1) {
             glyphs.push(randomGlyph());

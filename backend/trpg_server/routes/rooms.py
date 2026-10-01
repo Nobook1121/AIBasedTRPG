@@ -29,12 +29,18 @@ ROOM_ROLE_MEMBER = "member"
 ROOM_MEMBER_ACTIVE = "active"
 ROOM_MEMBER_REMOVED = "removed"
 DEFAULT_AUTOSAVE_NODE_LIMIT = 3
+ROOM_VISIBILITY_PRIVATE = "private"
+ROOM_VISIBILITY_PUBLIC = "public"
+ROOM_VISIBILITIES = {ROOM_VISIBILITY_PRIVATE, ROOM_VISIBILITY_PUBLIC}
 
 # Structured per-room house rules. Only rules flagged ``ai_prompt`` are ever
 # injected into the KP prompt (and only when active), keeping prompt tokens low;
 # future non-AI rules can be registered here without prompt cost.
 HOUSE_RULE_DEFINITIONS = {
     "action_suggestions_enabled": {"type": "boolean", "default": False, "ai_prompt": True},
+    # 骰娘大成功/大失败阈值（全房间统一）。留空表示沿用管理员设置页配置的全局默认值。
+    "dice_critical_threshold": {"type": "nullable_integer", "default": None, "min": 0, "max": 100, "ai_prompt": False},
+    "dice_fumble_threshold": {"type": "nullable_integer", "default": None, "min": 0, "max": 100, "ai_prompt": False},
 }
 DEFAULT_ROOM_HOUSE_RULES = {key: spec["default"] for key, spec in HOUSE_RULE_DEFINITIONS.items()}
 
@@ -133,8 +139,39 @@ def _room_house_rules(info):
         value = stored.get(key, spec["default"])
         if spec["type"] == "boolean":
             value = bool(value)
+        elif spec["type"] == "nullable_integer":
+            value = _normalize_nullable_int(value, spec.get("min", 0), spec.get("max", 100))
         normalized[key] = value
     return normalized
+
+
+def _normalize_nullable_int(value, minimum, maximum):
+    """把房规中的可空整数字段规范化；空值表示沿用全局默认值。"""
+    if value is None or value == "":
+        return None
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return None
+    return max(minimum, min(maximum, number))
+
+
+def _admin_dice_thresholds():
+    """管理员设置页配置的骰娘默认阈值（general.toml 的 [ai] 段）。"""
+    config = load_ai_runtime_config(_get_config_dir())
+    return {"critical": config.dice_critical_threshold, "fumble": config.dice_fumble_threshold}
+
+
+def _room_dice_thresholds(info):
+    """房间生效阈值：房规内配置优先，未配置则回退到管理员默认值。"""
+    rules = _room_house_rules(info)
+    defaults = _admin_dice_thresholds()
+    critical = rules.get("dice_critical_threshold")
+    fumble = rules.get("dice_fumble_threshold")
+    return {
+        "critical": defaults["critical"] if critical is None else critical,
+        "fumble": defaults["fumble"] if fumble is None else fumble,
+    }
 
 
 def _room_dir(room_id):
@@ -563,6 +600,11 @@ def _is_member_online(member):
     return user_id is not None and is_socket_user_online(user_id)
 
 
+def _room_visibility(info):
+    value = str((info or {}).get("visibility") or ROOM_VISIBILITY_PRIVATE).strip().lower()
+    return value if value in ROOM_VISIBILITIES else ROOM_VISIBILITY_PRIVATE
+
+
 def _room_summary(info):
     _normalize_members(info)
     return {
@@ -572,6 +614,7 @@ def _room_summary(info):
         "scenario_id": info.get("scenario_id"),
         "scenario_version": info.get("scenario_version"),
         "scenario_title": info.get("scenario_title"),
+        "visibility": _room_visibility(info),
         "scenario_started_at": info.get("scenario_started_at"),
         "scenario_started_by": info.get("scenario_started_by"),
         "archived": bool(info.get("archived")),
@@ -589,6 +632,8 @@ def _room_summary(info):
             for member in info.get("members", [])
         ],
         "house_rules": _room_house_rules(info),
+        # 全房间统一的骰娘大成功/大失败阈值（房规优先，其次管理员默认值）。
+        "dice_thresholds": _room_dice_thresholds(info),
         "created_at": info.get("created_at"),
         "updated_at": info.get("updated_at"),
     }
@@ -616,7 +661,8 @@ def list_rooms():
     rooms = []
     for room_dir in _iter_room_dirs():
         info = _read_room(room_dir)
-        if _can_access(info):
+        # 公开房间展示给所有玩家；私人房间仅成员可访问。
+        if _can_access(info) or (_room_visibility(info) == ROOM_VISIBILITY_PUBLIC and not info.get("archived")):
             rooms.append(_room_summary(info))
     rooms.sort(key=lambda item: item.get("updated_at") or "", reverse=True)
     return success_response(rooms, "Rooms loaded successfully")
@@ -632,6 +678,10 @@ def create_room():
     name = str(data.get("name", "")).strip()
     scenario_id = data.get("scenario_id")
     scenario_title = str(data.get("scenario_title", "")).strip()
+    # 房间可见性默认为私人房间（仅能通过房间码加入）；公开房间会展示给所有玩家。
+    visibility = str(data.get("visibility", ROOM_VISIBILITY_PRIVATE)).strip().lower()
+    if visibility not in {ROOM_VISIBILITY_PUBLIC, ROOM_VISIBILITY_PRIVATE}:
+        visibility = ROOM_VISIBILITY_PRIVATE
     if not name:
         return error_response("Please enter room name", 400, "Room name is required")
     if scenario_id is None:
@@ -655,6 +705,7 @@ def create_room():
         "room_code": _new_room_code(),
         "scenario_id": scenario_id,
         "scenario_title": scenario_title,
+        "visibility": visibility,
         "creator_id": session["user_id"],
         "creator_name": session.get("username", "user"),
         "members": [member],
@@ -1002,6 +1053,9 @@ def get_room_house_rules(room_id):
             "house_rules": _room_house_rules(info),
             "definitions": HOUSE_RULE_DEFINITIONS,
             "global_hints_enabled": _global_hints_enabled(),
+            "visibility": _room_visibility(info),
+            "dice_thresholds": _room_dice_thresholds(info),
+            "dice_threshold_defaults": _admin_dice_thresholds(),
         },
         "House rules loaded successfully",
     )
@@ -1032,6 +1086,13 @@ def update_room_house_rules(room_id):
             if not isinstance(value, bool):
                 return error_response(f"House rule {key} must be a boolean", 400, "Invalid house rule type")
             current[key] = value
+        elif spec["type"] == "nullable_integer":
+            if value is not None and value != "":
+                try:
+                    int(value)
+                except (TypeError, ValueError):
+                    return error_response(f"House rule {key} must be an integer", 400, "Invalid house rule type")
+            current[key] = _normalize_nullable_int(value, spec.get("min", 0), spec.get("max", 100))
         else:
             current[key] = value
 
@@ -1047,6 +1108,13 @@ def update_room_house_rules(room_id):
         )
 
     info["house_rules"] = current
+    # 房间可见性可以在后续房间规则内更改（私人 <-> 公开）。
+    visibility_update = payload.get("visibility")
+    if visibility_update is not None:
+        candidate = str(visibility_update).strip().lower()
+        if candidate not in ROOM_VISIBILITIES:
+            return error_response("Invalid room visibility", 400, "Invalid visibility")
+        info["visibility"] = candidate
     _write_room(room_dir, info)
     log_user_action(
         logger,
@@ -1060,6 +1128,9 @@ def update_room_house_rules(room_id):
             "house_rules": _room_house_rules(info),
             "definitions": HOUSE_RULE_DEFINITIONS,
             "global_hints_enabled": _global_hints_enabled(),
+            "visibility": _room_visibility(info),
+            "dice_thresholds": _room_dice_thresholds(info),
+            "dice_threshold_defaults": _admin_dice_thresholds(),
         },
         "House rules updated successfully",
     )

@@ -141,6 +141,8 @@ interface Scenario {
     updatedAt?: string;
     user_id?: string | number;
     trigger_cards?: TriggerCard[];
+    /** 文档「直接导入」的剧本不含可编辑场景卡，此标记用于前端禁用编辑。 */
+    import_mode?: "direct" | "review" | string;
 }
 
 type ScenarioInput = Omit<Scenario, "id" | "createdAt" | "updatedAt" | "owner_id"> & {
@@ -195,6 +197,7 @@ interface ScenarioViewHandlers {
     onEditScenario(id: number): void;
     onPlayScenario(id: number): void;
     onDeleteScenario(id: number): Promise<void>;
+    onBatchDeleteScenarios(ids: number[]): Promise<void>;
     onImportScenario(files: FileList | null): Promise<void>;
 }
 
@@ -209,6 +212,7 @@ interface ScenarioView {
     renderScenarioList(scenarios: Scenario[]): void;
     openCreateModal(): Promise<void>;
     openEditModal(scenario: Scenario): void;
+    openDirectImportInfo(scenario: Scenario, vectorCount: number): void;
     fillDraftData(draft: ScenarioInput): void;
     setImportReviewReadOnly(readonly: boolean): void;
     showDraftPrompt(): Promise<"continue" | "discard" | "cancel">;

@@ -81,13 +81,46 @@ def _format_toml_key(key):
     return json.dumps(key_text, ensure_ascii=False)
 
 
+def _normalize_toml_name(name):
+    """剥离历史脏数据中反复叠加的引号转义，使段名收敛到基名。
+
+    早期版本把 ``ai.small_models`` 写成 ``["ai.small_models"]``，读取时又未去引号，
+    前端整对象回写后引号被再次转义，导致每次保存转义翻倍。这里做有界收敛。
+    """
+    text = str(name).strip()
+    for _ in range(8):
+        if len(text) < 2 or text[0] != text[-1] or text[0] not in {'"', "'"}:
+            break
+        if text[0] == '"':
+            try:
+                unquoted = json.loads(text)
+            except ValueError:
+                break
+            if not isinstance(unquoted, str) or unquoted == text:
+                break
+            text = unquoted
+        else:
+            text = text[1:-1]
+    return text
+
+
+def _format_toml_section(section):
+    # 点号分隔的段名（如 ai.small_models）按 TOML 点分键原样输出；
+    # 否则 json.dumps 会写成 ["ai.small_models"] 并触发读取侧的引号叠加问题。
+    section_text = _normalize_toml_name(section)
+    parts = section_text.split(".")
+    if section_text and all(_BARE_TOML_KEY_RE.fullmatch(part) for part in parts):
+        return ".".join(parts)
+    return _format_toml_key(section_text)
+
+
 def convert_to_toml(config_data):
     lines = []
     for section, values in config_data.items():
         if not isinstance(values, dict):
             continue
 
-        lines.append(f"[{_format_toml_key(section)}]")
+        lines.append(f"[{_format_toml_section(section)}]")
         for key, value in values.items():
             lines.append(f"{_format_toml_key(key)} = {_format_toml_value(value)}")
         lines.append("")

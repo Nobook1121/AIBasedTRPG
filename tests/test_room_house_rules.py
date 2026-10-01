@@ -58,6 +58,15 @@ def _disable_global_hints(tmp_path):
     (config_dir / "general.toml").write_text("[ai]\nshow_ai_hints = false\n", encoding="utf-8")
 
 
+def _write_admin_dice_defaults(tmp_path, critical=1, fumble=96):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    (config_dir / "general.toml").write_text(
+        f"[ai]\ndice_critical_threshold = {critical}\ndice_fumble_threshold = {fumble}\n",
+        encoding="utf-8",
+    )
+
+
 def test_house_rules_default_off_and_exposed_in_room_summary(tmp_path):
     _write_room(tmp_path)
     app = _app(tmp_path)
@@ -138,6 +147,99 @@ def test_house_rules_require_room_access_and_manage_permission(tmp_path):
         json={"house_rules": {"action_suggestions_enabled": True}},
         headers={"X-CSRF-Token": "csrf"},
     ).status_code == 403
+
+
+def test_house_rules_dice_thresholds_default_to_admin_values(tmp_path):
+    _write_room(tmp_path)
+    _write_admin_dice_defaults(tmp_path, 4, 90)
+    app = _app(tmp_path)
+    client = app.test_client()
+    _login(client)
+
+    data = client.get("/api/rooms/r-1/house-rules", headers={"X-CSRF-Token": "csrf"}).get_json()["data"]
+
+    # 房规未配置时留空，生效值回落到管理员默认值。
+    assert data["house_rules"]["dice_critical_threshold"] is None
+    assert data["house_rules"]["dice_fumble_threshold"] is None
+    assert data["dice_threshold_defaults"] == {"critical": 4, "fumble": 90}
+    assert data["dice_thresholds"] == {"critical": 4, "fumble": 90}
+
+    summary = client.get("/api/rooms/r-1", headers={"X-CSRF-Token": "csrf"}).get_json()["data"]
+    assert summary["dice_thresholds"] == {"critical": 4, "fumble": 90}
+
+
+def test_put_house_rules_dice_thresholds_override_defaults(tmp_path):
+    _write_room(tmp_path)
+    _write_admin_dice_defaults(tmp_path, 4, 90)
+    app = _app(tmp_path)
+    client = app.test_client()
+    _login(client)
+
+    response = client.put(
+        "/api/rooms/r-1/house-rules",
+        json={"house_rules": {"dice_critical_threshold": 2, "dice_fumble_threshold": 99}},
+        headers={"X-CSRF-Token": "csrf"},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["data"]["dice_thresholds"] == {"critical": 2, "fumble": 99}
+    stored = _read_room_info(tmp_path)["house_rules"]
+    assert stored["dice_critical_threshold"] == 2
+    assert stored["dice_fumble_threshold"] == 99
+
+
+def test_put_house_rules_blank_dice_threshold_restores_default(tmp_path):
+    _write_room(tmp_path)
+    _write_admin_dice_defaults(tmp_path, 4, 90)
+    app = _app(tmp_path)
+    client = app.test_client()
+    _login(client)
+
+    client.put(
+        "/api/rooms/r-1/house-rules",
+        json={"house_rules": {"dice_critical_threshold": 2}},
+        headers={"X-CSRF-Token": "csrf"},
+    )
+    response = client.put(
+        "/api/rooms/r-1/house-rules",
+        json={"house_rules": {"dice_critical_threshold": ""}},
+        headers={"X-CSRF-Token": "csrf"},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["data"]["dice_thresholds"]["critical"] == 4
+    assert _read_room_info(tmp_path)["house_rules"]["dice_critical_threshold"] is None
+
+
+def test_put_rejects_non_integer_dice_threshold(tmp_path):
+    _write_room(tmp_path)
+    app = _app(tmp_path)
+    client = app.test_client()
+    _login(client)
+
+    response = client.put(
+        "/api/rooms/r-1/house-rules",
+        json={"house_rules": {"dice_fumble_threshold": "abc"}},
+        headers={"X-CSRF-Token": "csrf"},
+    )
+
+    assert response.status_code == 400
+
+
+def test_put_clamps_out_of_range_dice_threshold(tmp_path):
+    _write_room(tmp_path)
+    app = _app(tmp_path)
+    client = app.test_client()
+    _login(client)
+
+    response = client.put(
+        "/api/rooms/r-1/house-rules",
+        json={"house_rules": {"dice_critical_threshold": 500}},
+        headers={"X-CSRF-Token": "csrf"},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["data"]["dice_thresholds"]["critical"] == 100
 
 
 def test_archive_removes_house_rules(tmp_path):

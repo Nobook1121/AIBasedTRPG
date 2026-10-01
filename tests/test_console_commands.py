@@ -48,6 +48,59 @@ def test_console_command_rejects_unknown_command():
     assert "Unknown command" in result.message
 
 
+def test_console_command_demotes_user_to_user_by_default():
+    from trpg_server.console_commands import execute_console_command
+
+    manager = FakeUserManager()
+    manager.users[0]["role"] = "ADMIN"
+
+    result = execute_console_command("user demote alice", user_manager=manager)
+
+    assert result.ok
+    assert manager.updated == [(1, "USER")]
+    assert "USER" in result.message
+
+
+def test_console_promote_command_accepts_any_target_role():
+    from trpg_server.console_commands import execute_console_command
+
+    manager = FakeUserManager()
+    manager.users[0]["role"] = "OWNER"
+
+    # 通过 promote 显式传入较低角色，同样可以实现降级。
+    result = execute_console_command("user promote alice USER", user_manager=manager)
+
+    assert result.ok
+    assert manager.updated == [(1, "USER")]
+
+
+def test_console_demote_rejects_owner_target():
+    from trpg_server.console_commands import execute_console_command
+
+    manager = FakeUserManager()
+
+    result = execute_console_command("user demote alice OWNER", user_manager=manager)
+
+    assert not result.ok
+    assert manager.updated == []
+
+
+def test_console_command_loop_uses_provided_user_manager_instance():
+    from io import StringIO
+
+    from trpg_server.console_commands import start_console_command_loop
+
+    manager = FakeUserManager()
+    stream = StringIO("user promote bob OWNER\n")
+
+    thread = start_console_command_loop(stdin=stream, user_manager=manager)
+    thread.join(timeout=2)
+
+    # 命令行循环必须写入传入的 manager 实例，而不是模块级默认实例。
+    assert manager.updated == [(2, "OWNER")]
+    assert not thread.is_alive()
+
+
 def test_auth_status_refreshes_session_role_after_console_promotion():
     from trpg_server.app_factory import create_app
 
@@ -65,6 +118,71 @@ def test_auth_status_refreshes_session_role_after_console_promotion():
     assert response.status_code == 200
     with client.session_transaction() as session:
         assert session["role"] == "ADMIN"
+
+
+class FakeRoleUserManager:
+    def __init__(self):
+        self.users = {
+            1: {"id": 1, "username": "admin", "email": "admin@example.com", "role": "ADMIN"},
+            2: {"id": 2, "username": "member", "email": "member@example.com", "role": "USER"},
+            3: {"id": 3, "username": "root", "email": "root@example.com", "role": "OWNER"},
+        }
+        self.updated = []
+
+    def is_session_current(self, user_id, token):
+        return True
+
+    def get_user_by_id(self, user_id):
+        return self.users.get(user_id)
+
+    def update_user_role(self, user_id, role):
+        self.updated.append((user_id, role))
+        return True, "Role updated successfully"
+
+
+def _role_client(manager):
+    from trpg_server.app_factory import create_app
+
+    app = create_app({"TESTING": True, "USER_MANAGER": manager})
+    client = app.test_client()
+    with client.session_transaction() as session:
+        session.update(
+            {
+                "user_id": 1,
+                "username": "admin",
+                "role": "ADMIN",
+                "session_token": "token",
+                "csrf_token": "csrf",
+            }
+        )
+    return client
+
+
+def test_role_route_allows_admin_to_upgrade_and_downgrade_in_scope():
+    manager = FakeRoleUserManager()
+    client = _role_client(manager)
+    headers = {"X-CSRF-Token": "csrf"}
+
+    upgraded = client.put("/api/users/2/role", json={"role": "ADMIN"}, headers=headers)
+    downgraded = client.put("/api/users/2/role", json={"role": "USER"}, headers=headers)
+
+    assert upgraded.status_code == 200
+    assert downgraded.status_code == 200
+    assert manager.updated == [(2, "ADMIN"), (2, "USER")]
+
+
+def test_role_route_blocks_admin_from_privilege_escalation():
+    manager = FakeRoleUserManager()
+    client = _role_client(manager)
+    headers = {"X-CSRF-Token": "csrf"}
+
+    # 普通管理员不能把用户提升为 OWNER，也不能修改权限更高的 OWNER 账号。
+    grant_owner = client.put("/api/users/2/role", json={"role": "OWNER"}, headers=headers)
+    touch_owner = client.put("/api/users/3/role", json={"role": "USER"}, headers=headers)
+
+    assert grant_owner.status_code == 403
+    assert touch_owner.status_code == 403
+    assert manager.updated == []
 
 
 def test_console_promote_is_emitted_through_logging(caplog):

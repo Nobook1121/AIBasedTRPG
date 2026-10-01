@@ -30,7 +30,12 @@
       "name": "Qwen Turbo（经济型）",
       "description": "用于摘要、意图识别、状态更新和格式修复等低成本任务",
       "enabled": true,
-      "params": {"context_window": 1000000, "temperature": 0.2, "top_p": 0.8, "max_tokens": 2048}
+      "params": {
+        "context_window": 1000000,
+        "temperature": 0.2,
+        "top_p": 0.8,
+        "max_tokens": 2048
+      }
     }
   ],
   "embedding": {
@@ -39,10 +44,26 @@
     "dimensions": 1024
   },
   "small_models": {
-    "intent_classification": {"id": "qwen-turbo", "name": "Qwen Turbo", "enabled": true},
-    "state_update": {"id": "qwen-turbo", "name": "Qwen Turbo", "enabled": true},
-    "summarization": {"id": "qwen-turbo", "name": "Qwen Turbo", "enabled": true},
-    "schema_repair": {"id": "qwen-turbo", "name": "Qwen Turbo", "enabled": true}
+    "intent_classification": {
+      "id": "qwen-turbo",
+      "name": "Qwen Turbo",
+      "enabled": true
+    },
+    "state_update": {
+      "id": "qwen-turbo",
+      "name": "Qwen Turbo",
+      "enabled": true
+    },
+    "summarization": {
+      "id": "qwen-turbo",
+      "name": "Qwen Turbo",
+      "enabled": true
+    },
+    "schema_repair": {
+      "id": "qwen-turbo",
+      "name": "Qwen Turbo",
+      "enabled": true
+    }
   },
   "auth_method": "api_key",
   "version": "1.0.0"

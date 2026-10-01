@@ -570,3 +570,187 @@ def test_runtime_retries_once_when_trigger_tool_is_followed_by_empty_completion(
 
     assert len(requester.calls) == 3
     assert result.content == "KP continued"
+
+
+def test_runtime_requests_final_completion_without_tools_after_budget():
+    class BudgetRequester:
+        def __init__(self):
+            self.calls = []
+
+        def __call__(self, payload):
+            self.calls.append(payload)
+            # 带工具时持续请求工具调用，直到轮次用尽。
+            if "tools" in payload:
+                return {"choices": [{"message": {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [{
+                        "id": "call-1",
+                        "type": "function",
+                        "function": {"name": "test.echo", "arguments": "{}"},
+                    }],
+                }}]}
+            # 收尾请求（无工具）返回最终叙事。
+            return {"choices": [{"message": {"role": "assistant", "content": "最终叙事"}}]}
+
+    tool = AgentTool(
+        name="test.echo",
+        description="Echo value",
+        parameters={"type": "object", "properties": {}},
+        handler=lambda arguments, context: {"ok": True},
+    )
+    requester = BudgetRequester()
+
+    result = run_agent_completion(
+        requester=requester,
+        base_payload={"model": "fake-model", "messages": [{"role": "user", "content": "hi"}]},
+        profile=AgentProfile(id="kp", name="KP", prompt="prompt", tool_names=["test.echo"]),
+        registry=ToolRegistry([tool]),
+        context=AgentRequestContext(room_id="room-1"),
+        max_tool_rounds=2,
+    )
+
+    assert result.error is None
+    assert result.content == "最终叙事"
+    # 收尾请求必须移除工具，强制模型给出文本回复。
+    assert "tools" not in requester.calls[-1]
+    assert "tool_choice" not in requester.calls[-1]
+
+
+def test_runtime_falls_back_to_tool_summary_when_budget_exhausted_and_empty():
+    class AlwaysToolRequester:
+        def __init__(self):
+            self.calls = []
+
+        def __call__(self, payload):
+            self.calls.append(payload)
+            if "tools" in payload:
+                return {"choices": [{"message": {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [{
+                        "id": "call-1",
+                        "type": "function",
+                        "function": {"name": "test.echo", "arguments": "{}"},
+                    }],
+                }}]}
+            # 收尾请求也返回空内容。
+            return {"choices": [{"message": {"role": "assistant", "content": ""}}]}
+
+    visible_message = {"type": "dice", "sender_name": "dice", "content": "check result"}
+    tool = AgentTool(
+        name="test.echo",
+        description="Echo value",
+        parameters={"type": "object", "properties": {}},
+        handler=lambda arguments, context: {"ok": True, "visible_message": visible_message},
+    )
+    requester = AlwaysToolRequester()
+
+    result = run_agent_completion(
+        requester=requester,
+        base_payload={"model": "fake-model", "messages": [{"role": "user", "content": "hi"}]},
+        profile=AgentProfile(id="kp", name="KP", prompt="prompt", tool_names=["test.echo"]),
+        registry=ToolRegistry([tool]),
+        context=AgentRequestContext(room_id="room-1"),
+        max_tool_rounds=2,
+    )
+
+    assert result.error is None
+    # 即使模型始终不返回文本，也必须有兜底回复而不是空内容。
+    assert result.content
+    assert result.tool_messages and result.tool_messages[0] == visible_message
+
+
+def test_runtime_flags_rounds_exhausted_with_visible_notice():
+    class AlwaysToolRequester:
+        def __call__(self, payload):
+            if "tools" in payload:
+                return {"choices": [{"message": {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [{
+                        "id": "call-1",
+                        "type": "function",
+                        "function": {"name": "test.echo", "arguments": "{}"},
+                    }],
+                }}]}
+            return {"choices": [{"message": {"role": "assistant", "content": "收尾叙事"}}]}
+
+    tool = AgentTool(
+        name="test.echo",
+        description="Echo value",
+        parameters={"type": "object", "properties": {}},
+        handler=lambda arguments, context: {"ok": True},
+    )
+
+    result = run_agent_completion(
+        requester=AlwaysToolRequester(),
+        base_payload={"model": "fake-model", "messages": [{"role": "user", "content": "hi"}]},
+        profile=AgentProfile(id="kp", name="KP", prompt="prompt", tool_names=["test.echo"]),
+        registry=ToolRegistry([tool]),
+        context=AgentRequestContext(room_id="room-1"),
+        max_tool_rounds=2,
+    )
+
+    assert result.error is None
+    # 超过最大轮数时必须带出明确说明，供聊天框与日志展示。
+    assert result.rounds_exhausted is True
+    assert result.notice and "最大工具调用轮数 2" in result.notice
+
+
+def test_runtime_keeps_partial_result_and_notice_when_request_fails():
+    class FlakyRequester:
+        def __init__(self):
+            self.calls = 0
+
+        def __call__(self, payload):
+            self.calls += 1
+            if self.calls == 1:
+                return {"choices": [{"message": {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [{
+                        "id": "call-1",
+                        "type": "function",
+                        "function": {"name": "test.echo", "arguments": "{}"},
+                    }],
+                }}]}
+            raise RuntimeError("AI 平台请求超时（等待 300 秒未响应）")
+
+    visible_message = {"type": "dice", "sender_name": "dice", "content": "check result"}
+    tool = AgentTool(
+        name="test.echo",
+        description="Echo value",
+        parameters={"type": "object", "properties": {}},
+        handler=lambda arguments, context: {"ok": True, "visible_message": visible_message},
+    )
+
+    result = run_agent_completion(
+        requester=FlakyRequester(),
+        base_payload={"model": "fake-model", "messages": [{"role": "user", "content": "hi"}]},
+        profile=AgentProfile(id="kp", name="KP", prompt="prompt", tool_names=["test.echo"]),
+        registry=ToolRegistry([tool]),
+        context=AgentRequestContext(room_id="room-1"),
+    )
+
+    # 已经拿到的工具结果不能因为后续请求失败而被丢弃。
+    assert result.error is None
+    assert result.content
+    assert result.tool_messages == [visible_message]
+    assert result.notice and "超时" in result.notice
+
+
+def test_runtime_reports_error_when_first_request_fails():
+    def failing_requester(payload):
+        raise RuntimeError("AI 平台请求超时（等待 300 秒未响应）")
+
+    result = run_agent_completion(
+        requester=failing_requester,
+        base_payload={"model": "fake-model", "messages": [{"role": "user", "content": "hi"}]},
+        profile=AgentProfile(id="kp", name="KP", prompt="prompt", tool_names=[]),
+        registry=ToolRegistry([]),
+        context=AgentRequestContext(room_id="room-1"),
+    )
+
+    assert result.error and "超时" in result.error
+    assert result.notice is None

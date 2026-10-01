@@ -18,6 +18,10 @@
     --space-sm: var(--theme-space-sm);
     --space-md: var(--theme-space-md);
     --space-lg: var(--theme-space-lg);
+    /* 房间成员权限配色：房主为单色，管理员为流动渐变（渐变起止色可在用户设置中修改） */
+    --role-owner-name-color: #ffc857;
+    --admin-name-from: #84ff42;
+    --admin-name-to: #0ebeff;
 }
 
 /* 通知框样式 */
@@ -133,6 +137,10 @@ h1, h2, h3, h4, h5, h6 {
     margin-left: 16.666667%;
     height: 100vh;
     overflow: hidden;
+    /* 去掉 Bootstrap 栅格左右内边距：否则主内容比左侧栏右缘内缩 12px，
+       底部聊天输入栏（面板底色与页面底色不同）左侧会露出缝隙。 */
+    padding-left: 0;
+    padding-right: 0;
     transition: margin-left 0.3s ease, width 0.3s ease;
 }
 
@@ -222,11 +230,20 @@ h1, h2, h3, h4, h5, h6 {
     justify-content: flex-start;
 }
 
+/* AI 回复下方的元信息行：处理时间 / Token 消耗 / 知识库调用并排显示 */
+.message-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 12px;
+    row-gap: 2px;
+    margin-top: 5px;
+}
+
 /* 处理时间显示样式 */
 .processing-time {
     font-size: var(--theme-font-size-xs);
     color: var(--theme-text-muted);
-    margin-top: 5px;
     font-style: italic;
 }
 
@@ -237,15 +254,17 @@ h1, h2, h3, h4, h5, h6 {
     color: var(--theme-text-primary);
 }
 
+/* 与同行「消耗 Token / 处理时间」保持同一套排版风格 */
 .knowledge-usage {
-    margin-top: 4px;
-    color: var(--text-muted, #6c757d);
-    font-size: 0.75rem;
-    line-height: 1.4;
+    color: var(--theme-text-muted);
+    font-size: var(--theme-font-size-xs);
+    font-style: italic;
 }
 
-.knowledge-usage i {
-    margin-right: 4px;
+/* 与前一项（处理时间/Token）之间用分隔点区隔 */
+.processing-time + .knowledge-usage::before {
+    content: "·";
+    margin-right: 12px;
 }
 
 .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4, .markdown-body h5, .markdown-body h6 {
@@ -561,6 +580,8 @@ h1, h2, h3, h4, h5, h6 {
     border-radius: 50%;
     overflow: hidden;
     flex-shrink: 0;
+    /* 点击头像弹出成员资料卡 */
+    cursor: pointer;
 }
 
 .message-avatar img {
@@ -758,5 +779,248 @@ input[type="search"] {
 .preview-message,
 .list-group-item {
     transition: background-color 0.18s ease, border-color 0.18s ease;
+}
+
+/* 主页右侧房间成员栏（参考 Discord 的「在此房间的用户」） */
+.home-chat-body {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.home-chat-main {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+}
+
+.home-room-members {
+    display: flex;
+    flex: 0 0 260px;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    border-left: 1px solid var(--border-subtle);
+    background-color: var(--color-panel);
+}
+
+.home-room-members[hidden] {
+    display: none;
+}
+
+.home-room-members-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.home-room-members-title {
+    color: var(--color-text);
+    font-weight: 700;
+}
+
+.home-room-members-header .home-room-online {
+    color: var(--color-muted);
+    font-size: 0.82rem;
+}
+
+.home-room-member-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 10px 8px 14px;
+}
+
+.home-room-members-empty {
+    margin: 8px 6px;
+    color: var(--color-muted);
+    font-size: 0.86rem;
+}
+
+.home-room-member-group + .home-room-member-group {
+    margin-top: 12px;
+}
+
+.home-room-member-group-title {
+    margin: 0 0 6px;
+    padding: 0 6px;
+    color: var(--color-muted);
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.home-room-member-items {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.home-room-member {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px;
+    border-radius: var(--radius-sm);
+    /* 点击成员行弹出成员资料卡 */
+    cursor: pointer;
+}
+
+.home-room-member:hover {
+    background-color: var(--color-panel-muted);
+}
+
+.home-room-member-avatar {
+    position: relative;
+    flex: 0 0 auto;
+    width: 34px;
+    height: 34px;
+}
+
+.home-room-member-avatar img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.home-room-member-presence {
+    position: absolute;
+    right: -1px;
+    bottom: -1px;
+    width: 11px;
+    height: 11px;
+    border: 2px solid var(--color-panel);
+    border-radius: 50%;
+    background-color: var(--color-muted);
+}
+
+.home-room-member-presence.is-online {
+    background-color: var(--color-success);
+}
+
+.home-room-member-presence.is-offline {
+    background-color: var(--color-muted);
+}
+
+.home-room-member-body {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.home-room-member-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    color: var(--color-text);
+    font-size: 0.9rem;
+}
+
+.home-room-member-name-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 房主：名字使用单色高亮 */
+.home-room-member-name.is-owner .home-room-member-name-text {
+    color: var(--role-owner-name-color);
+    font-weight: 600;
+}
+
+/* 管理员：名字使用流动渐变（起止色来自用户设置中的个性化配色） */
+.home-room-member-name.is-admin .home-room-member-name-text {
+    background-image: linear-gradient(
+        90deg,
+        var(--admin-name-from),
+        var(--admin-name-to),
+        var(--admin-name-from)
+    );
+    background-size: 200% 100%;
+    background-position: 0% 50%;
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    font-weight: 600;
+    animation: adminNameGradientFlow 4s linear infinite;
+}
+
+@keyframes adminNameGradientFlow {
+    from {
+        background-position: 0% 50%;
+    }
+    to {
+        /* 位移一整块瓦片（200%），瓦片左右边界同为起始色，因此首尾衔接无跳变 */
+        background-position: 200% 50%;
+    }
+}
+
+/* 权限等级徽标 */
+.home-room-member-role {
+    flex: 0 0 auto;
+    padding: 0 6px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    line-height: 1.6;
+}
+
+.home-room-member-role.is-owner {
+    color: var(--role-owner-name-color);
+    background-color: color-mix(in srgb, var(--role-owner-name-color) 16%, transparent);
+    border-color: color-mix(in srgb, var(--role-owner-name-color) 44%, transparent);
+}
+
+.home-room-member-role.is-admin {
+    color: var(--admin-name-to);
+    background-color: color-mix(in srgb, var(--admin-name-to) 16%, transparent);
+    border-color: color-mix(in srgb, var(--admin-name-from) 44%, transparent);
+}
+
+.home-room-member-role.is-member {
+    color: var(--color-muted);
+    background-color: var(--color-panel-muted);
+}
+
+.home-room-member-self {
+    flex: 0 0 auto;
+    padding: 0 6px;
+    border-radius: 999px;
+    background-color: var(--color-panel-muted);
+    color: var(--color-muted);
+    font-size: 0.7rem;
+}
+
+.home-room-member-card {
+    color: var(--color-muted);
+    font-size: 0.78rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.home-room-member-card.is-unbound {
+    font-style: italic;
+    opacity: 0.75;
+}
+
+@media (max-width: 991.98px) {
+    .home-room-members {
+        flex-basis: 210px;
+    }
 }
 

@@ -330,6 +330,19 @@ def persist_knowledge_index(
     return path
 
 
+def write_knowledge_index(descriptor_path: Path, version: Any, chunks: Iterable[KnowledgeChunk]) -> Path:
+    """直接写入已有的知识块（用于「直接导入」文档时跳过场景卡的情形）。
+
+    ``persist_knowledge_index`` 只能从场景的 ``modules`` 构建分块；直接导入的
+    剧本没有场景卡，因此需要把切分并嵌入后的知识块直接落盘。
+    """
+    path = knowledge_index_path(descriptor_path, version)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    values = [chunk.to_dict() if hasattr(chunk, "to_dict") else dict(chunk) for chunk in chunks]
+    write_json_atomic(path, values)
+    return path
+
+
 def load_knowledge_index(descriptor_path: Path, version: Any) -> list[KnowledgeChunk]:
     path = knowledge_index_path(descriptor_path, version)
     if not path.exists() and str(version).isdigit():

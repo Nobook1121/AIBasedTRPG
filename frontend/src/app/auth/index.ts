@@ -19,13 +19,15 @@ namespace AuthModule {
             closeUserCard();
             window.switchMainTab?.("personal-home", { clearNav: true });
         });
-        document.getElementById("open-profile-dialog")?.addEventListener("click", openProfileDialog);
-        document.getElementById("close-settings-panel")?.addEventListener("click", closeProfileDialog);
+        document.getElementById("open-user-settings")?.addEventListener("click", openUserSettings);
+        document.getElementById("personalHomeSettingsLink")?.addEventListener("click", openUserSettings);
         document.getElementById("saveUserSettings")?.addEventListener("click", saveUserSettings);
-        document.getElementById("open-password-dialog")?.addEventListener("click", openPasswordDialog);
-        document.getElementById("close-password-dialog")?.addEventListener("click", closePasswordDialog);
-        document.getElementById("cancelPasswordDialog")?.addEventListener("click", closePasswordDialog);
         document.getElementById("changePasswordButton")?.addEventListener("click", changePassword);
+        document.querySelectorAll<HTMLButtonElement>(".profile-quick-link[data-target-tab]").forEach((button) => {
+            button.addEventListener("click", () => {
+                window.switchMainTab?.(button.dataset.targetTab || "", { clearNav: false });
+            });
+        });
         document.getElementById("userInfo")?.addEventListener("click", toggleUserCard);
         closeUserCardOnOutsideClick();
         bindProfileNavigation();
@@ -38,3 +40,4 @@ namespace AuthModule {
 
 window.initAuth = AuthModule.initAuth;
 window.setCurrentEditingScenarioId = AuthModule.setCurrentEditingScenarioId;
+window.loadUserSettings = AuthModule.loadUserSettings;

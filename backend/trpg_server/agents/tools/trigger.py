@@ -1,6 +1,7 @@
 from typing import Any
 
 from trpg_server.agents.tools.base import AgentTool
+from trpg_server.agents.trigger_system import find_trigger_definition, validate_trigger
 from trpg_server.scenario_store import build_trigger_message, find_trigger_by_id, load_scenario_by_id
 
 
@@ -10,6 +11,69 @@ def _condition_requires_check(condition: str) -> bool:
         marker in text
         for marker in ("检定", "鉴定", "判定", "技能", "属性", "灵感", "check", "roll", "skill", "attribute")
     )
+
+
+def _reveal_library_trigger(
+    scenario: dict[str, Any], trigger_id: Any, context: Any, arguments: dict[str, Any]
+) -> dict[str, Any]:
+    """解析并揭示「触发器资源库」中的触发器（scenario.trigger_cards / 模块附件）。
+
+    场景栏位触发器由 find_trigger_by_id 处理，资源库触发器没有内联 content，
+    内容来自 attachment.resourceRef。这里复用 validate_trigger（条件、剧本版本、
+    可见性、剧透等级、是否已触发等）做权威校验，避免 KP 直接泄露未解锁内容。
+    """
+    definition = find_trigger_definition(scenario, str(trigger_id))
+    if not definition:
+        return {"error": f"trigger {trigger_id} was not found", "trigger_id": trigger_id}
+
+    room_state = context.room_state() if callable(getattr(context, "room_state", None)) else {}
+    room_state = room_state if isinstance(room_state, dict) else {}
+    room_info = context.room_info() if callable(getattr(context, "room_info", None)) else {}
+    room_info = room_info if isinstance(room_info, dict) else {}
+
+    validation = validate_trigger(
+        str(trigger_id),
+        {**room_state, "scenario_version": room_info.get("scenario_version")},
+        scenario,
+        audience="kp",
+    )
+    if not validation.get("ok"):
+        return {
+            "error": f"trigger {trigger_id} was not approved: {validation.get('reason')}",
+            "trigger_id": trigger_id,
+            "reason": validation.get("reason"),
+        }
+
+    approved = validation.get("trigger") or {}
+    attachments = [item for item in approved.get("attachments", []) if isinstance(item, dict)]
+    contents: list[str] = []
+    for attachment in attachments:
+        resource = attachment.get("resourceRef") or {}
+        if resource.get("content"):
+            contents.append(str(resource["content"]))
+        elif resource.get("url"):
+            contents.append(f"[{resource.get('alt')}]({resource.get('url')})")
+    if not contents:
+        return {"error": f"trigger {trigger_id} has no revealable content", "trigger_id": trigger_id}
+
+    message = {
+        "type": "trigger",
+        "sender_name": str(approved.get("text") or f"触发器{trigger_id}"),
+        "avatar": "/assets/avatars/default_system.jpg",
+        "content": "\n\n".join(contents),
+        "metadata": {
+            "trigger_id": str(trigger_id),
+            "content_mode": "attachment",
+            "scene_id": approved.get("sceneId"),
+        },
+    }
+    return {
+        "triggered": True,
+        "trigger_id": str(trigger_id),
+        "condition": attachments[0].get("condition") if attachments else None,
+        "direct_message": message,
+        "message": message,
+    }
 
 
 def reveal_scenario_trigger(arguments: dict[str, Any], context: Any) -> dict[str, Any]:
@@ -32,7 +96,8 @@ def reveal_scenario_trigger(arguments: dict[str, Any], context: Any) -> dict[str
 
     trigger = find_trigger_by_id(scenario, trigger_id)
     if not trigger:
-        return {"error": f"trigger {trigger_id} was not found"}
+        # 场景栏位触发器未命中时回退到「触发器资源库」（trigger_cards / 模块附件）。
+        return _reveal_library_trigger(scenario, trigger_id, context, arguments)
 
     condition = str(trigger.get("condition") or "").strip()
     condition_met = arguments.get("condition_met")
@@ -98,14 +163,18 @@ def reveal_scenario_trigger(arguments: dict[str, Any], context: Any) -> dict[str
 REVEAL_SCENARIO_TRIGGER_TOOL = AgentTool(
     name="trigger.reveal_scenario_trigger",
     description=(
-        "Reveal a stored scenario trigger by numeric id after its condition has been evaluated. "
+        "Reveal a stored trigger by id after its condition has been evaluated. Supports both scene-slot triggers "
+        "and triggers from the scenario trigger library (trigger_cards). "
         "For check-based conditions, a preceding check.roll_room_check or dice.roll_coc_check result is required. "
         "Do not invent trigger content."
     ),
     parameters={
         "type": "object",
         "properties": {
-            "trigger_id": {"type": "integer", "minimum": 1},
+            "trigger_id": {
+                "type": ["integer", "string"],
+                "description": "场景栏位触发器为数字 id；触发器资源库卡片为字符串 id（如 trg_...）。",
+            },
             "condition_met": {
                 "type": "boolean",
                 "description": "Whether the trigger condition is satisfied after evaluating the current action and any check result.",

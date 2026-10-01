@@ -1,6 +1,10 @@
 from trpg_server.agents.profiles import DEFAULT_KP_TOOLS
 from trpg_server.agents.tools import default_tool_registry
-from trpg_server.agents.tools.dice import roll_coc_check, roll_room_check
+from trpg_server.agents.tools.dice import (
+    execute_roll_coc_check,
+    roll_coc_check,
+    roll_room_check,
+)
 
 import json
 
@@ -63,14 +67,27 @@ def test_coc_check_rejects_invalid_target():
     assert result["error"] == "target must be between 1 and 100"
 
 
-def _context_with_check_member(tmp_path, member):
+def _context_with_check_member(tmp_path, member, house_rules=None, config_dir=None):
     room_dir = tmp_path / "rooms" / "room-1"
     room_dir.mkdir(parents=True)
+    info = {"id": "room-1", "members": [member]}
+    if house_rules is not None:
+        info["house_rules"] = house_rules
     (room_dir / "info.json").write_text(
-        json.dumps({"id": "room-1", "members": [member]}, ensure_ascii=False),
+        json.dumps(info, ensure_ascii=False),
         encoding="utf-8",
     )
-    return AgentRequestContext(room_id="room-1", room_dir=room_dir, agent_id="kp")
+    return AgentRequestContext(room_id="room-1", room_dir=room_dir, agent_id="kp", config_dir=config_dir)
+
+
+def _write_admin_dice_config(tmp_path, critical, fumble):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    (config_dir / "general.toml").write_text(
+        f"[ai]\ndice_critical_threshold = {critical}\ndice_fumble_threshold = {fumble}\n",
+        encoding="utf-8",
+    )
+    return config_dir
 
 
 def test_room_check_reads_skill_from_bound_character_by_username(tmp_path):
@@ -148,6 +165,119 @@ def test_room_check_reads_attribute_alias_from_bound_character(tmp_path):
     assert result["threshold"] == 11
     assert result["success"] is False
     assert result["summary"] == "\u6781\u96be\u654f\u6377 d%: [12] = 12 / 11 \u5931\u8d25"
+
+
+def test_room_check_uses_room_house_rule_thresholds(tmp_path):
+    skill_name = "\u4fa6\u5bdf"
+    context = _context_with_check_member(
+        tmp_path,
+        {
+            "username": "testplayer",
+            "status": "active",
+            "character_card": {
+                "name": "\u8c03\u67e5\u5458",
+                "skills": [{"name": skill_name, "value": 60}],
+            },
+        },
+        house_rules={"dice_critical_threshold": 5, "dice_fumble_threshold": 70},
+    )
+
+    fumble = roll_room_check({"player_name": "testplayer", "name": skill_name}, context, rng=lambda sides: 80)
+    assert fumble["fumble"] is True
+    assert fumble["fumble_threshold"] == 70
+    assert "\uff08\u5927\u5931\u8d25\uff09" in fumble["summary"]
+
+    critical = roll_room_check({"player_name": "testplayer", "name": skill_name}, context, rng=lambda sides: 3)
+    assert critical["critical"] is True
+    assert critical["critical_threshold"] == 5
+
+
+def test_room_check_falls_back_to_admin_default_thresholds(tmp_path):
+    skill_name = "\u4fa6\u5bdf"
+    config_dir = _write_admin_dice_config(tmp_path, 4, 90)
+    context = _context_with_check_member(
+        tmp_path,
+        {
+            "username": "testplayer",
+            "status": "active",
+            "character_card": {
+                "name": "\u8c03\u67e5\u5458",
+                "skills": [{"name": skill_name, "value": 60}],
+            },
+        },
+        house_rules={"dice_critical_threshold": None, "dice_fumble_threshold": None},
+        config_dir=config_dir,
+    )
+
+    fumble = roll_room_check({"player_name": "testplayer", "name": skill_name}, context, rng=lambda sides: 92)
+    assert fumble["fumble"] is True
+    assert fumble["fumble_threshold"] == 90
+
+    critical = roll_room_check({"player_name": "testplayer", "name": skill_name}, context, rng=lambda sides: 4)
+    assert critical["critical"] is True
+    assert critical["critical_threshold"] == 4
+
+
+def test_room_check_arguments_override_configured_thresholds(tmp_path):
+    skill_name = "\u4fa6\u5bdf"
+    context = _context_with_check_member(
+        tmp_path,
+        {
+            "username": "testplayer",
+            "status": "active",
+            "character_card": {
+                "name": "\u8c03\u67e5\u5458",
+                "skills": [{"name": skill_name, "value": 60}],
+            },
+        },
+        house_rules={"dice_critical_threshold": 5, "dice_fumble_threshold": 70},
+    )
+
+    result = roll_room_check(
+        {"player_name": "testplayer", "name": skill_name, "fumble_threshold": 96},
+        context,
+        rng=lambda sides: 80,
+    )
+
+    assert result["fumble"] is False
+    assert result["fumble_threshold"] == 96
+
+
+def test_coc_check_tool_uses_room_house_rule_thresholds(tmp_path):
+    room_dir = tmp_path / "rooms" / "room-1"
+    room_dir.mkdir(parents=True)
+    (room_dir / "info.json").write_text(
+        json.dumps(
+            {
+                "id": "room-1",
+                "house_rules": {"dice_critical_threshold": 5, "dice_fumble_threshold": 70},
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    context = AgentRequestContext(room_id="room-1", room_dir=room_dir, agent_id="kp")
+
+    result = execute_roll_coc_check({"skill": "\u4fa6\u5bdf", "target": 60}, context)
+
+    assert result["critical_threshold"] == 5
+    assert result["fumble_threshold"] == 70
+
+
+def test_coc_check_tool_uses_admin_default_thresholds(tmp_path):
+    room_dir = tmp_path / "rooms" / "room-1"
+    room_dir.mkdir(parents=True)
+    (room_dir / "info.json").write_text(
+        json.dumps({"id": "room-1", "members": []}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    config_dir = _write_admin_dice_config(tmp_path, 7, 88)
+    context = AgentRequestContext(room_id="room-1", room_dir=room_dir, agent_id="kp", config_dir=config_dir)
+
+    result = execute_roll_coc_check({"skill": "\u4fa6\u5bdf", "target": 60}, context)
+
+    assert result["critical_threshold"] == 7
+    assert result["fumble_threshold"] == 88
 
 
 def test_room_check_returns_error_for_missing_bound_character(tmp_path):

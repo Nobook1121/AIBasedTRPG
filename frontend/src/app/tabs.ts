@@ -10,6 +10,10 @@ interface AdminUserRecord {
     last_login?: string;
 }
 
+// 用户组（角色）权限等级：管理员只能在自己的权限范围内调整用户组。
+const USER_ROLE_RANK: Record<string, number> = { USER: 1, ADMIN: 2, OWNER: 3 };
+const USER_ROLE_OPTIONS = ["USER", "ADMIN", "OWNER"];
+
 function initTabs(): void {
     try {
         const navLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>("#sidebar .nav-link"));
@@ -124,6 +128,9 @@ function updateNavigationState(activeLink: HTMLAnchorElement | null, navLinks: H
 function refreshMainTabData(tabId: string): void {
     if (tabId === "save") {
         void window.loadRoomsList?.();
+    }
+    if (tabId === "user-settings") {
+        void window.loadUserSettings?.();
     }
 }
 
@@ -264,6 +271,10 @@ function initSettingsTabs(): void {
     bindGeneralNumberSetting("autosaveInterval", "autosave", "interval", 30, 3600);
     bindGeneralNumberSetting("autosaveMaxNodes", "autosave", "max_nodes", 1, 50);
     bindGeneralNumberSetting("triggerMaxFileSize", "scenario", "trigger_max_file_size", 1024, 52428800);
+    bindGeneralNumberSetting("maxToolRounds", "ai", "max_tool_rounds", 1, 30);
+    bindGeneralNumberSetting("aiRequestTimeout", "ai", "ai_request_timeout", 30, 1800);
+    bindGeneralNumberSetting("diceCriticalThresholdDefault", "ai", "dice_critical_threshold", 0, 100);
+    bindGeneralNumberSetting("diceFumbleThresholdDefault", "ai", "dice_fumble_threshold", 0, 100);
     document.getElementById("savePermissionConfig")?.addEventListener("click", () => {
         void savePermissionConfig();
     });
@@ -485,6 +496,11 @@ function renderUserManagementList(users: AdminUserRecord[]): void {
     list.querySelectorAll<HTMLButtonElement>("[data-impersonate-user-id]").forEach((button) => {
         button.addEventListener("click", () => void startImpersonation(Number.parseInt(button.dataset.impersonateUserId || "", 10)));
     });
+    list.querySelectorAll<HTMLSelectElement>("[data-role-user-id]").forEach((select) => {
+        select.addEventListener("change", () => {
+            void updateAdminUserRole(Number.parseInt(select.dataset.roleUserId || "", 10), select.value, select);
+        });
+    });
 }
 
 function renderUserManagementRow(user: AdminUserRecord): string {
@@ -495,7 +511,7 @@ function renderUserManagementRow(user: AdminUserRecord): string {
         <tr>
             <td>${settingsEscapeHtml(user.username)}</td>
             <td>${settingsEscapeHtml(user.email)}</td>
-            <td>${settingsEscapeHtml(user.role)}</td>
+            <td>${renderAdminUserRoleCell(user, isCurrentUser)}</td>
             <td>${settingsEscapeHtml(user.status)}</td>
             <td>${settingsEscapeHtml(formatOnlineState(user.is_online))}</td>
             <td>${settingsEscapeHtml(formatTimestamp(user.created_at))}</td>
@@ -509,6 +525,49 @@ function renderUserManagementRow(user: AdminUserRecord): string {
             </td>
         </tr>
     `;
+}
+
+function renderAdminUserRoleCell(user: AdminUserRecord, isCurrentUser: boolean): string {
+    const actorRole = window.currentUser?.role || "USER";
+    const actorRank = USER_ROLE_RANK[actorRole] || 0;
+    const targetRank = USER_ROLE_RANK[String(user.role).toUpperCase()] || 0;
+    // 不允许调整自己的用户组（避免误操作失去权限），也不能操作权限高于自己的账号。
+    if (isCurrentUser || targetRank > actorRank) {
+        return settingsEscapeHtml(user.role);
+    }
+    // 可选角色仅限不高于自身权限的等级，普通管理员无法借此晋升为 OWNER。
+    const options = USER_ROLE_OPTIONS
+        .filter((role) => (USER_ROLE_RANK[role] || 0) <= actorRank)
+        .map((role) => `<option value="${role}" ${role === user.role ? "selected" : ""}>${role}</option>`)
+        .join("");
+    return `<select class="form-select form-select-sm user-role-select" data-role-user-id="${user.id}" data-current-role="${settingsEscapeHtml(user.role)}" aria-label="用户组">${options}</select>`;
+}
+
+async function updateAdminUserRole(userId: number, role: string, select: HTMLSelectElement): Promise<void> {
+    if (!Number.isFinite(userId) || !role) return;
+    const message = document.getElementById("userManagementMessage");
+    const previousRole = select.dataset.currentRole || "";
+    select.disabled = true;
+    try {
+        const response = await TrpgApi.put<ApiResponse<unknown>>(`/api/users/${userId}/role`, { role });
+        if (!response.success) {
+            throw new Error(response.message || response.error || "用户组更新失败");
+        }
+        select.dataset.currentRole = role;
+        if (message) {
+            message.textContent = response.message || `已将用户组更新为 ${role}`;
+            message.className = "settings-message success";
+        }
+    } catch (error) {
+        // 失败时回滚下拉框，避免界面与后端状态不一致。
+        select.value = previousRole;
+        if (message) {
+            message.textContent = settingsErrorMessage(error);
+            message.className = "settings-message error";
+        }
+    } finally {
+        select.disabled = false;
+    }
 }
 
 async function startImpersonation(userId: number): Promise<void> {

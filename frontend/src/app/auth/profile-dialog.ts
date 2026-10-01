@@ -1,35 +1,47 @@
 namespace AuthModule {
     const USER_THEME_COOKIE = "trpg_user_theme";
+    const ADMIN_GRADIENT_COOKIE = "trpg_admin_name_gradient";
+    const DEFAULT_ADMIN_NAME_FROM = "#84ff42";
+    const DEFAULT_ADMIN_NAME_TO = "#0ebeff";
+    const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
     let initialProfileTheme = "";
+    let initialAdminNameFrom = DEFAULT_ADMIN_NAME_FROM;
+    let initialAdminNameTo = DEFAULT_ADMIN_NAME_TO;
 
-    export function openProfileDialog(): void {
-        const dialog = document.getElementById("edit-profile-dialog");
-        dialog?.classList.add("open");
-        dialog?.setAttribute("aria-hidden", "false");
-        scrollProfileSection("profile-account-info", false);
+    export function openUserSettings(): void {
+        window.switchMainTab?.("user-settings", { clearNav: true });
+        switchProfileSection("profile-account-info", false);
         resetProfileThemeSetting();
-        TrpgApi.get<ApiResponse<CurrentUser>>("/api/user/profile")
-            .then((response) => {
-                if (!response.success || !response.data) return;
-                const user = response.data;
-                (document.getElementById("editUsername") as HTMLInputElement | null)!.value = user.username || "";
-                (document.getElementById("editEmail") as HTMLInputElement | null)!.value = user.email || "";
-                (document.getElementById("editNickname") as HTMLInputElement | null)!.value = user.nickname || "";
-                const avatar = document.getElementById("avatarPreview") as HTMLImageElement | null;
-                if (avatar) avatar.src = user.avatar || "/assets/avatars/default.jpg";
-            })
-            .catch((error) => console.error("获取用户资料失败:", error));
     }
 
-    export function closeProfileDialog(): void {
-        const dialog = document.getElementById("edit-profile-dialog");
-        dialog?.classList.remove("open");
-        dialog?.setAttribute("aria-hidden", "true");
+    export async function loadUserSettings(): Promise<void> {
+        try {
+            const response = await TrpgApi.get<ApiResponse<CurrentUser>>("/api/user/profile");
+            if (!response.success || !response.data) return;
+            const user = response.data;
+            const username = document.getElementById("editUsername") as HTMLInputElement | null;
+            const email = document.getElementById("editEmail") as HTMLInputElement | null;
+            const nickname = document.getElementById("editNickname") as HTMLInputElement | null;
+            const avatar = document.getElementById("avatarPreview") as HTMLImageElement | null;
+            if (username) username.value = user.username || "";
+            if (email) email.value = user.email || "";
+            if (nickname) nickname.value = user.nickname || "";
+            if (avatar) avatar.src = user.avatar || "/assets/avatars/default.jpg";
+        } catch (error) {
+            console.error("获取用户资料失败:", error);
+        }
+    }
+
+    export function resetUserSettings(): void {
+        clearPasswordFields();
+        showMessage("passwordMessage", "");
+        showMessage("presenceMessage", "");
+        showMessage("settingsMessage", "");
     }
 
     export function bindProfileNavigation(): void {
         document.querySelectorAll<HTMLButtonElement>(".profile-section-tab[data-profile-target]").forEach((tab) => {
-            tab.addEventListener("click", () => scrollProfileSection(tab.dataset.profileTarget || "profile-account-info"));
+            tab.addEventListener("click", () => switchProfileSection(tab.dataset.profileTarget || "profile-account-info"));
         });
         bindProfileThemeSettings();
     }
@@ -74,19 +86,6 @@ namespace AuthModule {
         }
     }
 
-    export function openPasswordDialog(): void {
-        const dialog = document.getElementById("password-dialog");
-        dialog?.classList.add("open");
-        dialog?.setAttribute("aria-hidden", "false");
-        showMessage("passwordMessage", "");
-    }
-
-    export function closePasswordDialog(): void {
-        const dialog = document.getElementById("password-dialog");
-        dialog?.classList.remove("open");
-        dialog?.setAttribute("aria-hidden", "true");
-    }
-
     export async function changePassword(): Promise<void> {
         const currentPassword = (document.getElementById("passwordCurrentPassword") as HTMLInputElement | null)?.value || "";
         const newPassword = (document.getElementById("passwordNewPassword") as HTMLInputElement | null)?.value || "";
@@ -109,25 +108,29 @@ namespace AuthModule {
                 showMessage("passwordMessage", apiMessage(response, authText("profile.error.password_change_failed", "密码修改失败")), true);
                 return;
             }
-            clearPasswordDialogFields();
+            clearPasswordFields();
             showMessage("passwordMessage", authText("profile.success.password_changed", "密码已修改"));
-            setTimeout(closePasswordDialog, 500);
         } catch (error) {
             console.error("密码修改失败:", error);
             showMessage("passwordMessage", authText("profile.error.password_change_failed_retry", "密码修改失败，请稍后重试"), true);
         }
     }
 
-    function scrollProfileSection(targetId: string, smooth = true): void {
-        const target = document.getElementById(targetId);
-        if (!target) return;
-        document.querySelectorAll<HTMLElement>(".profile-section-tab[data-profile-target]").forEach((tab) => {
-            tab.classList.toggle("active", tab.dataset.profileTarget === targetId);
+    function switchProfileSection(targetId: string, smooth = true): void {
+        document.querySelectorAll<HTMLElement>(".profile-panel-section").forEach((section) => {
+            section.classList.toggle("active", section.id === targetId);
         });
-        target.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
+        document.querySelectorAll<HTMLElement>(".profile-section-tab[data-profile-target]").forEach((tab) => {
+            const isActive = tab.dataset.profileTarget === targetId;
+            tab.classList.toggle("active", isActive);
+            tab.closest("details")?.setAttribute("open", "");
+        });
+        if (smooth) {
+            document.querySelector<HTMLElement>(".profile-settings-content")?.scrollTo({ top: 0, behavior: "smooth" });
+        }
     }
 
-    function clearPasswordDialogFields(): void {
+    function clearPasswordFields(): void {
         ["passwordCurrentPassword", "passwordNewPassword", "passwordConfirmPassword"].forEach((id) => {
             const input = document.getElementById(id) as HTMLInputElement | null;
             if (input) input.value = "";
@@ -139,6 +142,8 @@ namespace AuthModule {
         if (!themeSelect || themeSelect.dataset.bound === "true") return;
         themeSelect.dataset.bound = "true";
         themeSelect.addEventListener("change", updateProfilePendingState);
+        document.getElementById("profileAdminNameFrom")?.addEventListener("input", updateProfilePendingState);
+        document.getElementById("profileAdminNameTo")?.addEventListener("input", updateProfilePendingState);
         document.getElementById("saveProfilePendingChanges")?.addEventListener("click", saveProfilePendingChanges);
         document.getElementById("cancelProfilePendingChanges")?.addEventListener("click", cancelProfilePendingChanges);
         resetProfileThemeSetting();
@@ -150,6 +155,13 @@ namespace AuthModule {
         if (themeSelect) {
             themeSelect.value = initialProfileTheme;
         }
+        const gradient = getAdminNameGradientPreference();
+        initialAdminNameFrom = gradient.from;
+        initialAdminNameTo = gradient.to;
+        const fromInput = document.getElementById("profileAdminNameFrom") as HTMLInputElement | null;
+        const toInput = document.getElementById("profileAdminNameTo") as HTMLInputElement | null;
+        if (fromInput) fromInput.value = initialAdminNameFrom;
+        if (toInput) toInput.value = initialAdminNameTo;
         updateProfilePendingState();
     }
 
@@ -158,12 +170,23 @@ namespace AuthModule {
         const pendingBar = document.getElementById("profilePendingSaveBar");
         const count = document.getElementById("profilePendingChangeCount");
         const themeSetting = document.getElementById("profileThemeSetting");
+        const gradientSetting = document.getElementById("profileAdminGradientSetting");
         if (!themeSelect || !pendingBar || !count) return;
 
-        const isDirty = themeSelect.value !== initialProfileTheme;
-        pendingBar.hidden = !isDirty;
-        count.textContent = isDirty ? "1" : "0";
-        themeSetting?.classList.toggle("profile-setting-dirty", isDirty);
+        const themeDirty = themeSelect.value !== initialProfileTheme;
+        const gradientDirty = readColorInput("profileAdminNameFrom", initialAdminNameFrom) !== initialAdminNameFrom
+            || readColorInput("profileAdminNameTo", initialAdminNameTo) !== initialAdminNameTo;
+        const pendingCount = (themeDirty ? 1 : 0) + (gradientDirty ? 1 : 0);
+        pendingBar.hidden = pendingCount === 0;
+        count.textContent = String(pendingCount);
+        themeSetting?.classList.toggle("profile-setting-dirty", themeDirty);
+        gradientSetting?.classList.toggle("profile-setting-dirty", gradientDirty);
+    }
+
+    function readColorInput(id: string, fallback: string): string {
+        const input = document.getElementById(id) as HTMLInputElement | null;
+        const value = input ? input.value.trim().toLowerCase() : "";
+        return HEX_COLOR_PATTERN.test(value) ? value : fallback;
     }
 
     function saveProfilePendingChanges(): void {
@@ -171,15 +194,20 @@ namespace AuthModule {
         if (!themeSelect) return;
         setUserThemePreference(themeSelect.value);
         initialProfileTheme = themeSelect.value;
+
+        const from = readColorInput("profileAdminNameFrom", DEFAULT_ADMIN_NAME_FROM);
+        const to = readColorInput("profileAdminNameTo", DEFAULT_ADMIN_NAME_TO);
+        setAdminNameGradientPreference(from, to);
+        initialAdminNameFrom = from;
+        initialAdminNameTo = to;
+
         updateProfilePendingState();
         window.configManager?.applyTheme();
+        window.configManager?.applyAdminNameGradient();
     }
 
     function cancelProfilePendingChanges(): void {
-        const themeSelect = document.getElementById("profileThemeSelect") as HTMLSelectElement | null;
-        if (!themeSelect) return;
-        themeSelect.value = initialProfileTheme;
-        updateProfilePendingState();
+        resetProfileThemeSetting();
     }
 
     function getUserThemePreference(): string {
@@ -200,6 +228,25 @@ namespace AuthModule {
         document.cookie = `${USER_THEME_COOKIE}=${encodeURIComponent(theme)}; Max-Age=${maxAge}; Path=/; SameSite=Lax`;
     }
 
+    function getAdminNameGradientPreference(): { from: string; to: string } {
+        const prefix = `${ADMIN_GRADIENT_COOKIE}=`;
+        const item = document.cookie
+            .split(";")
+            .map((part) => part.trim())
+            .find((part) => part.startsWith(prefix));
+        if (!item) return { from: DEFAULT_ADMIN_NAME_FROM, to: DEFAULT_ADMIN_NAME_TO };
+        const [rawFrom = "", rawTo = ""] = decodeURIComponent(item.slice(prefix.length)).split(",");
+        return {
+            from: HEX_COLOR_PATTERN.test(rawFrom) ? rawFrom.toLowerCase() : DEFAULT_ADMIN_NAME_FROM,
+            to: HEX_COLOR_PATTERN.test(rawTo) ? rawTo.toLowerCase() : DEFAULT_ADMIN_NAME_TO,
+        };
+    }
+
+    function setAdminNameGradientPreference(from: string, to: string): void {
+        const maxAge = 365 * 24 * 60 * 60;
+        document.cookie = `${ADMIN_GRADIENT_COOKIE}=${encodeURIComponent(`${from},${to}`)}; Max-Age=${maxAge}; Path=/; SameSite=Lax`;
+    }
+
     export async function updatePresence(presence: "online" | "dnd" | "invisible"): Promise<void> {
         try {
             const response = await TrpgApi.put<ApiResponse<CurrentUser>>("/api/user/presence", { presence });
@@ -208,10 +255,10 @@ namespace AuthModule {
                 closeUserCard();
                 return;
             }
-            showMessage("settingsMessage", apiMessage(response, authText("profile.error.presence_update_failed", "在线状态更新失败")), true);
+            showMessage("presenceMessage", apiMessage(response, authText("profile.error.presence_update_failed", "在线状态更新失败")), true);
         } catch (error) {
             console.error("在线状态更新失败:", error);
-            showMessage("settingsMessage", authText("profile.error.presence_update_failed_retry", "在线状态更新失败，请稍后重试"), true);
+            showMessage("presenceMessage", authText("profile.error.presence_update_failed_retry", "在线状态更新失败，请稍后重试"), true);
         }
     }
 }

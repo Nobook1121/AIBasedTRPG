@@ -151,6 +151,19 @@ def test_room_scenario_start_control_uses_hidden_ai_start_flow():
     assert "async function startScenario" in chat_source
 
 
+def test_chat_resume_only_reopens_scenario_for_room_managers():
+    chat_source = (ROOT / "frontend/src/app/chat.ts").read_text(encoding="utf-8")
+
+    # 持久化的思考状态必须记录 scenarioStart，恢复时写回模块级标志。
+    assert "scenarioStart: options.scenarioStart === true" in chat_source
+    assert "restoredScenarioStart = state.scenarioStart === true;" in chat_source
+    # 重发脚本开始前必须校验房主/管理员权限，否则清除状态并提示。
+    resume_block = chat_source.split("function resumePendingAIRequest(", 1)[1]
+    assert "canManageCurrentRoom()" in resume_block
+    assert "只有房主或管理员可以开启剧本" in resume_block
+    assert "scenarioStart ? { scenarioStart: true } : {}" in resume_block
+
+
 def test_chat_persists_and_renders_knowledge_usage_below_kp_message():
     chat_source = (ROOT / "frontend/src/app/chat.ts").read_text(encoding="utf-8")
     chat_template = (ROOT / "frontend/src/templates/chat.html").read_text(encoding="utf-8")

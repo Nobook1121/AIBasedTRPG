@@ -15,6 +15,8 @@ bp = Blueprint("users", __name__)
 logger = logging.getLogger(__name__)
 
 ALLOWED_PRESENCE = {"online", "dnd", "invisible"}
+# 角色/用户组权限等级，用于限制管理员只能在自己权限范围内调整用户组。
+_ROLE_RANK = {"USER": 1, "ADMIN": 2, "OWNER": 3}
 
 
 def _auth_settings_db():
@@ -92,7 +94,22 @@ def update_user_role(user_id):
                 "Invalid role",
             )
 
-        success, message = get_user_manager().update_user_role(user_id, role)
+        manager = get_user_manager()
+        actor_role = str(session.get("role") or "USER").upper()
+        target_user = manager.get_user_by_id(user_id)
+        if not target_user:
+            return error_response("User not found", 404, "User not found")
+
+        # 权限范围校验（升级与降级都允许，但必须在自己权限范围内）：
+        # 1) 不能操作权限高于自己的账号；2) 不能把用户提升到高于自身的角色，
+        # 以免普通管理员通过“用户组管理”自我晋升为 OWNER。
+        actor_rank = _ROLE_RANK.get(actor_role, 0)
+        if _ROLE_RANK.get(str(target_user.get("role")), 0) > actor_rank:
+            return error_response("Permission denied", 403, "Permission denied")
+        if _ROLE_RANK[role] > actor_rank:
+            return error_response("Permission denied", 403, "Permission denied")
+
+        success, message = manager.update_user_role(user_id, role)
         if not success:
             return error_response(message, 404, message)
 

@@ -1,6 +1,7 @@
 interface RoomMember {
     user_id?: string | number;
     username?: string;
+    avatar?: string;
     role?: string;
     room_role?: "owner" | "admin" | "member";
     status?: "active" | "removed";
@@ -42,6 +43,7 @@ interface Room {
     scenario_title?: string;
     scenario_started_at?: string;
     scenario_started_by?: string | number;
+    visibility?: "public" | "private";
     invisible_view?: boolean;
     archived?: boolean;
     completed_at?: string;
@@ -50,11 +52,16 @@ interface Room {
     messages?: ChatMessage[];
     ai_history?: ChatMessage[];
     house_rules?: RoomHouseRules;
+    // 全房间统一的骰娘大成功/大失败阈值（房规优先，其次管理员默认值）。
+    dice_thresholds?: { critical: number; fumble: number };
     saves?: Array<{ filename: string; title?: string; created_at?: string }>;
 }
 
 interface RoomHouseRules {
     action_suggestions_enabled?: boolean;
+    // 留空（null）表示沿用管理员设置页配置的默认阈值。
+    dice_critical_threshold?: number | null;
+    dice_fumble_threshold?: number | null;
 }
 
 interface ChatMessage {

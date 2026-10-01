@@ -21,6 +21,8 @@ interface DiceTool {
     handleDiceCommand(command: string): string;
     parseDiceCommand(command: string): DiceParseResult;
     rollPercentile(bonusDice?: number, penaltyDice?: number): { result: number; rolls: number[] };
+    // 读取骰娘大成功/大失败阈值设置，用于随请求透传给后端骰子工具。
+    getSuccessSettings(): { criticalThreshold: number; fumbleThreshold: number };
 }
 
 interface CheckToolConstructor {

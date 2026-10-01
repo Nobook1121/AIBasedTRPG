@@ -6,16 +6,22 @@ class ScenarioView {
     private isCreating = false;
     private conversionProgressModal: HTMLElement | null = null;
     private conversionProgressTimer: number | null = null;
+    private batchMode = false;
+    private readonly selectedScenarioIds = new Set<number>();
+    private currentScenarios: Scenario[] = [];
 
     constructor() {
         const scenarioList = document.getElementById("scenarioList");
         if (!scenarioList) throw new Error("missing scenarioList container");
         this.scenarioList = scenarioList;
         this.saveScenarioHandler = async () => {
-            await this.handlers?.onSaveScenario();
+            await runSaveButtonCooldown(document.getElementById("saveScenario"), async () => {
+                await this.handlers?.onSaveScenario();
+            });
         };
         this.initEventListeners();
         this.bindScenarioActions();
+        this.bindBatchActions();
     }
 
     setEventHandlers(handlers: ScenarioViewHandlers): void {
@@ -23,10 +29,21 @@ class ScenarioView {
     }
 
     renderScenarioList(scenarios: Scenario[]): void {
+        this.currentScenarios = scenarios;
         this.scenarioList.innerHTML = "";
+        // 数据刷新后同步已选集合，避免删掉的剧本仍留在选中态里
+        const selectableIds = new Set(scenarios.filter((scenario) => this.canDeleteScenario(scenario)).map((scenario) => scenario.id));
+        [...this.selectedScenarioIds].forEach((id) => {
+            if (!selectableIds.has(id)) this.selectedScenarioIds.delete(id);
+        });
+
         scenarios.forEach((scenario) => {
             const card = document.createElement("div");
-            card.className = "scenario-card";
+            const selectable = this.batchMode && this.canDeleteScenario(scenario);
+            const selected = selectable && this.selectedScenarioIds.has(scenario.id);
+            card.className = `scenario-card${this.batchMode ? " batch-mode" : ""}${selected ? " batch-selected" : ""}`;
+            card.dataset.scenarioId = String(scenario.id);
+            if (selectable) card.dataset.batchSelectable = "true";
             card.innerHTML = window.TrpgTemplates.render("scenario-card", {
                 coverPath: safeScenarioCover(scenario.cover),
                 fallbackCover: DEFAULT_SCENARIO_COVER,
@@ -37,16 +54,98 @@ class ScenarioView {
                 id: scenario.id,
                 publicId: scenario.public_id || String(scenario.id),
                 scenarioVersion: scenario.scenario_version || "1.0.0",
-                actionButtons: this.renderScenarioActionButtons(scenario),
+                actionButtons: this.batchMode ? "" : this.renderScenarioActionButtons(scenario),
             });
+            if (selectable) {
+                const check = document.createElement("span");
+                check.className = "batch-card-check";
+                check.setAttribute("aria-hidden", "true");
+                check.innerHTML = `<i class="fa ${selected ? "fa-check-square-o" : "fa-square-o"}"></i>`;
+                card.prepend(check);
+            }
             window.TrpgI18n?.apply(card);
             this.scenarioList.appendChild(card);
         });
+        this.updateBatchToolbar();
+    }
+
+    private canDeleteScenario(scenario: Scenario): boolean {
+        return canUseScenarioPermission("scenarios.delete") && canModifyScenario(scenario);
+    }
+
+    private bindBatchActions(): void {
+        document.getElementById("scenarioBatchToggle")?.addEventListener("click", () => {
+            this.setBatchMode(!this.batchMode);
+        });
+        document.getElementById("scenarioBatchExit")?.addEventListener("click", () => {
+            this.setBatchMode(false);
+        });
+        document.getElementById("scenarioBatchDelete")?.addEventListener("click", () => {
+            void this.deleteSelectedScenarios();
+        });
+        document.getElementById("scenarioBatchSelectAll")?.addEventListener("change", (event) => {
+            this.setAllScenariosSelected((event.target as HTMLInputElement).checked);
+        });
+    }
+
+    private setBatchMode(enabled: boolean): void {
+        if (this.batchMode === enabled) return;
+        this.batchMode = enabled;
+        if (!enabled) this.selectedScenarioIds.clear();
+        this.renderScenarioList(this.currentScenarios);
+    }
+
+    private setAllScenariosSelected(select: boolean): void {
+        this.scenarioList.querySelectorAll<HTMLElement>(".scenario-card[data-batch-selectable='true']").forEach((card) => {
+            const id = Number.parseInt(card.dataset.scenarioId || "", 10);
+            if (!Number.isFinite(id)) return;
+            if (select) this.selectedScenarioIds.add(id); else this.selectedScenarioIds.delete(id);
+            card.classList.toggle("batch-selected", select);
+            const icon = card.querySelector<HTMLElement>(".batch-card-check i");
+            if (icon) icon.className = `fa ${select ? "fa-check-square-o" : "fa-square-o"}`;
+        });
+        this.updateBatchToolbar();
+    }
+
+    private updateBatchToolbar(): void {
+        const toolbar = document.getElementById("scenarioBatchToolbar");
+        const toggle = document.getElementById("scenarioBatchToggle");
+        toggle?.classList.toggle("active", this.batchMode);
+        if (!toolbar) return;
+        toolbar.hidden = !this.batchMode;
+        const count = this.selectedScenarioIds.size;
+        const countEl = document.getElementById("scenarioBatchCount");
+        if (countEl) {
+            countEl.textContent = count > 0 ? scenarioT("common.batch.selected", "已选 {count} 项", { count }) : "";
+        }
+        const selectAll = document.getElementById("scenarioBatchSelectAll") as HTMLInputElement | null;
+        if (selectAll) {
+            const selectable = this.scenarioList.querySelectorAll(".scenario-card[data-batch-selectable='true']").length;
+            selectAll.checked = selectable > 0 && count === selectable;
+            selectAll.indeterminate = count > 0 && count < selectable;
+            selectAll.disabled = selectable === 0;
+        }
+        const deleteButton = document.getElementById("scenarioBatchDelete") as HTMLButtonElement | null;
+        if (deleteButton) deleteButton.disabled = count === 0;
+    }
+
+    private async deleteSelectedScenarios(): Promise<void> {
+        const ids = [...this.selectedScenarioIds];
+        if (!ids.length) {
+            this.showMessage(scenarioT("common.batch.none_selected", "请先选择要删除的项目"));
+            return;
+        }
+        if (!window.confirm(scenarioT("common.batch.delete_confirm", "确定要删除选中的 {count} 项吗？此操作不可恢复。", { count: ids.length }))) return;
+        // 先退出批量模式，控制器完成删除后会以普通视图重新渲染列表
+        this.selectedScenarioIds.clear();
+        this.batchMode = false;
+        await this.handlers?.onBatchDeleteScenarios(ids);
     }
 
     async openCreateModal(): Promise<void> {
         this.isCreating = true;
         this.resetScenarioForm();
+        this.clearDirectImportNotice();
         this.setImportReviewReadOnly(false);
         const modal = new bootstrap.Modal(requiredElement("scenarioModal"), { backdrop: "static" });
         modal.show();
@@ -54,9 +153,38 @@ class ScenarioView {
 
     openEditModal(scenario: Scenario): void {
         this.isCreating = false;
+        this.clearDirectImportNotice();
         this.fillScenarioForm(scenario);
         this.setImportReviewReadOnly(false);
         new bootstrap.Modal(requiredElement("scenarioModal"), { backdrop: "static" }).show();
+    }
+
+    /** 直接导入的剧本没有场景卡：只读展示并显示向量数量，禁止编辑。 */
+    openDirectImportInfo(scenario: Scenario, vectorCount: number): void {
+        this.isCreating = false;
+        this.fillScenarioForm(scenario);
+        this.setImportReviewReadOnly(true);
+        document.getElementById("saveScenario")?.classList.add("d-none");
+        this.renderDirectImportNotice(vectorCount);
+        new bootstrap.Modal(requiredElement("scenarioModal"), { backdrop: "static" }).show();
+    }
+
+    private renderDirectImportNotice(vectorCount: number): void {
+        const body = document.getElementById("scenarioModal")?.querySelector(".modal-body");
+        if (!body) return;
+        let notice = document.getElementById("scenarioDirectImportNotice");
+        if (!notice) {
+            notice = document.createElement("div");
+            notice.id = "scenarioDirectImportNotice";
+            notice.className = "alert alert-info";
+            body.prepend(notice);
+        }
+        notice.textContent = `无法编辑导入剧本。该剧本通过文档直接导入，知识库共 ${vectorCount} 个向量块。`;
+    }
+
+    private clearDirectImportNotice(): void {
+        document.getElementById("scenarioDirectImportNotice")?.remove();
+        document.getElementById("saveScenario")?.classList.remove("d-none");
     }
 
     fillDraftData(draft: ScenarioInput): void {
@@ -358,6 +486,10 @@ class ScenarioView {
 
     private bindScenarioActions(): void {
         this.scenarioList.addEventListener("click", async (event) => {
+            if (this.batchMode) {
+                this.toggleScenarioSelection(event.target as HTMLElement);
+                return;
+            }
             const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button");
             if (!button) return;
 
@@ -374,6 +506,19 @@ class ScenarioView {
                 await this.handlers?.onDeleteScenario(id);
             }
         });
+    }
+
+    private toggleScenarioSelection(target: HTMLElement): void {
+        const card = target.closest<HTMLElement>(".scenario-card");
+        if (!card || card.dataset.batchSelectable !== "true") return;
+        const id = Number.parseInt(card.dataset.scenarioId || "", 10);
+        if (!Number.isFinite(id)) return;
+        const nowSelected = !this.selectedScenarioIds.has(id);
+        if (nowSelected) this.selectedScenarioIds.add(id); else this.selectedScenarioIds.delete(id);
+        card.classList.toggle("batch-selected", nowSelected);
+        const icon = card.querySelector<HTMLElement>(".batch-card-check i");
+        if (icon) icon.className = `fa ${nowSelected ? "fa-check-square-o" : "fa-square-o"}`;
+        this.updateBatchToolbar();
     }
 
     private renderScenarioActionButtons(scenario: Scenario): string {
@@ -1406,6 +1551,29 @@ function safeScenarioCover(cover?: string): string {
     return cover && (cover.startsWith("/assets/scenarios/") || cover.startsWith("/assets/scenario_covers/")) ? cover : DEFAULT_SCENARIO_COVER;
 }
 
+/**
+ * 保存并发布按钮的冷却保护：触发后立即禁用按钮并在冷却期内忽略后续点击，
+ * 避免连点导致短时间内重复创建 / 发布剧本。
+ */
+function runSaveButtonCooldown(button: HTMLElement | null, action: () => Promise<void>, cooldownMs = 3000): Promise<void> {
+    if (!button) return action();
+    if (button.dataset.saveCooldown === "true") return Promise.resolve();
+    button.dataset.saveCooldown = "true";
+    const control = button as HTMLButtonElement;
+    const wasDisabled = control.disabled;
+    control.disabled = true;
+    return (async () => {
+        try {
+            await action();
+        } finally {
+            window.setTimeout(() => {
+                control.disabled = wasDisabled;
+                button.dataset.saveCooldown = "false";
+            }, cooldownMs);
+        }
+    })();
+}
+
 function countModulesOfType(modules: ScenarioModule[], type: ScenarioModuleType): number {
     return modules.filter((module) => module.module_type === type).length;
 }
@@ -1436,8 +1604,8 @@ function updateScenarioModalTitle(key: string, fallback: string): void {
     if (label) label.textContent = scenarioT(key, fallback);
 }
 
-function scenarioT(key: string, fallback: string): string {
-    return window.TrpgI18n?.t(key, fallback) || fallback;
+function scenarioT(key: string, fallback: string, values: Record<string, string | number> = {}): string {
+    return window.TrpgI18n?.t(key, fallback, values) || fallback;
 }
 
 function input(id: string): HTMLInputElement {

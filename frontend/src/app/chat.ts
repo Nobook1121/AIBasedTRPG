@@ -84,6 +84,9 @@ let aiAvatar = "/assets/avatars/default_kp.jpg";
 let aiRoles: ChatRoleConfig[] = [{ id: "kp", name: "KP", wake_words: ["@KP"] }];
 let socket: SocketLike | null = null;
 let activeSuggestions: string[] | null = null;
+// 恢复持久化的思考状态时，记录该请求是否为「开启剧本」。只有它才允许在
+// 断线重连后带上 scenarioStart 重发，避免普通消息误触发开场。
+let restoredScenarioStart = false;
 const thinkingTimers = new Map<string, number>();
 const THINKING_STORAGE_KEY = "trpg_ai_thinking";
 
@@ -111,6 +114,21 @@ function getCurrentRoom(): Room | null {
     return window.currentRoom || null;
 }
 
+/** 点击聊天消息的头像时，在该头像旁弹出对应成员的资料卡（KP / 系统消息不弹） */
+function bindChatAvatarCards(): void {
+    document.addEventListener("click", (event) => {
+        const target = event.target as HTMLElement | null;
+        const avatar = target?.closest<HTMLElement>(".message-avatar");
+        if (!avatar || !avatar.closest("#chatHistory")) return;
+        const senderId = avatar.closest<HTMLElement>(".message")?.dataset.senderId;
+        const room = getCurrentRoom();
+        if (!senderId || !room) return;
+        const member = (room.members || []).find((entry) => String(entry.user_id) === String(senderId));
+        if (!member) return;
+        AuthModule.openMemberProfileCard(room, member, avatar);
+    });
+}
+
 function initChat(): void {
     const chatInput = document.getElementById("chatInput") as HTMLInputElement | null;
     const sendButton = document.getElementById("sendButton") as HTMLButtonElement | null;
@@ -124,6 +142,7 @@ function initChat(): void {
     initWebSocket();
     initCommandPalette(activeChatInput);
     restoreThinkingState();
+    bindChatAvatarCards();
 
     async function sendMessage(): Promise<void> {
         const rawMessage = activeChatInput.value.trim();
@@ -251,7 +270,7 @@ async function sendToAI(chatInput: HTMLInputElement, sendButton: HTMLButtonEleme
     const role = pendingMessages[0]?.role || aiRoles[0] || { id: "kp", name: "KP" };
     addThinkingMessage(thinkingMessageId, role.name || "KP", startTime);
     updateThinkingStage(aiRequestId, "正在准备上下文", "preparing");
-    persistThinkingState({ id: thinkingMessageId, roomId: getCurrentRoom()?.id || null, roleName: role.name || "KP", roleId: role.id || "kp", content: pendingMessages.map((message) => message.content).join("\n"), startedAt: startTime });
+    persistThinkingState({ id: thinkingMessageId, roomId: getCurrentRoom()?.id || null, roleName: role.name || "KP", roleId: role.id || "kp", content: pendingMessages.map((message) => message.content).join("\n"), startedAt: startTime, scenarioStart: options.scenarioStart === true });
     broadcastAIThinkingStart(aiRequestId, role.name || "KP", startTime);
 
     try {
@@ -779,6 +798,70 @@ function renderThinkingContent(label: string): string {
         + `</div>`;
 }
 
+// KP 回复的渐进显现：内容已一次性生成，这里把渲染好的 HTML 逐字显示，
+// 避免整段回复「一下子蹦出来」。受管理员「启用 AI 流式输出」开关控制，
+// 并尊重系统的「减少动态效果」偏好。
+const kpRevealFrames = new WeakMap<HTMLElement, number>();
+
+function kpStreamRevealEnabled(): boolean {
+    if (typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        return false;
+    }
+    return window.configManager?.get<boolean>("general", "ai", "stream_output", true) !== false;
+}
+
+function revealKpContent(container: HTMLElement): void {
+    if (!kpStreamRevealEnabled()) return;
+    const pendingFrame = kpRevealFrames.get(container);
+    if (pendingFrame !== undefined) window.cancelAnimationFrame(pendingFrame);
+
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+    const textNodes: Text[] = [];
+    let totalLength = 0;
+    while (walker.nextNode()) {
+        const node = walker.currentNode as Text;
+        textNodes.push(node);
+        totalLength += (node.nodeValue || "").length;
+    }
+    if (textNodes.length === 0 || totalLength === 0) return;
+
+    const fullTexts = textNodes.map((node) => node.nodeValue || "");
+    textNodes.forEach((node) => { node.nodeValue = ""; });
+
+    // 短文本快速显现，长文本限速，整体时长控制在 0.3s ~ 2.6s。
+    const duration = Math.min(2600, Math.max(300, totalLength * 12));
+    const chatHistory = document.getElementById("chatHistory");
+    const startedAt = performance.now();
+    let revealed = 0;
+
+    const paint = (count: number): void => {
+        let remaining = count;
+        for (let index = 0; index < textNodes.length; index += 1) {
+            const node = textNodes[index];
+            if (!node) continue;
+            const text = fullTexts[index] || "";
+            node.nodeValue = text.slice(0, Math.max(0, Math.min(text.length, remaining)));
+            remaining -= text.length;
+        }
+    };
+
+    const tick = (): void => {
+        const elapsed = performance.now() - startedAt;
+        const target = Math.min(totalLength, Math.round((elapsed / duration) * totalLength));
+        if (target > revealed) {
+            revealed = target;
+            paint(revealed);
+            if (chatHistory) chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+        if (revealed >= totalLength) {
+            kpRevealFrames.delete(container);
+            return;
+        }
+        kpRevealFrames.set(container, window.requestAnimationFrame(tick));
+    };
+    kpRevealFrames.set(container, window.requestAnimationFrame(tick));
+}
+
 function updateThinkingStage(aiRequestId: string, label: string, stage = ""): void {
     const messageElement = document.querySelector<HTMLElement>(`.message.thinking.kp-message[data-ai-request-id="${aiRequestId}"]`);
     if (!messageElement) return;
@@ -801,14 +884,17 @@ function replaceThinkingMessage(messageId: string | number, newContent: string, 
     if (contentDiv) {
         contentDiv.innerHTML = renderMarkdown(newContent);
         contentDiv.className = "message-content markdown-body";
+        revealKpContent(contentDiv);
     }
     targetMessage.classList.remove("thinking");
 
+    const metaContainer = targetMessage.querySelector<HTMLElement>(".message-meta")
+        || targetMessage.querySelector<HTMLElement>(".message-content-container");
     let processingTimeDiv = targetMessage.querySelector<HTMLElement>(".processing-time");
     if (!processingTimeDiv) {
         processingTimeDiv = document.createElement("div");
         processingTimeDiv.className = "processing-time";
-        targetMessage.querySelector(".message-content-container")?.appendChild(processingTimeDiv);
+        metaContainer?.appendChild(processingTimeDiv);
     }
 
     processingTimeDiv.textContent = processingTimeText(processingTime, tokenCount, cacheHitRate);
@@ -818,7 +904,7 @@ function replaceThinkingMessage(messageId: string | number, newContent: string, 
         const wrapper = document.createElement("div");
         wrapper.innerHTML = knowledgeHtml;
         const knowledgeElement = wrapper.firstElementChild;
-        if (knowledgeElement) targetMessage.querySelector(".message-content-container")?.appendChild(knowledgeElement);
+        if (knowledgeElement) metaContainer?.appendChild(knowledgeElement);
     }
 
     const chatHistory = document.getElementById("chatHistory");
@@ -869,7 +955,7 @@ function clearThinkingMessage(aiRequestId: string): void {
     clearPersistedThinkingState(aiRequestId);
 }
 
-function persistThinkingState(state: { id: string; roomId: string | null; roleName: string; roleId?: string; content?: string; startedAt: number }): void {
+function persistThinkingState(state: { id: string; roomId: string | null; roleName: string; roleId?: string; content?: string; startedAt: number; scenarioStart?: boolean }): void {
     try { localStorage.setItem(THINKING_STORAGE_KEY, JSON.stringify(state)); } catch { /* storage may be unavailable */ }
 }
 
@@ -885,6 +971,8 @@ function restoreThinkingState(): void {
         const state = JSON.parse(localStorage.getItem(THINKING_STORAGE_KEY) || "null");
         const roomId = getCurrentRoom()?.id || null;
         if (!state?.id || state.roomId !== roomId) return;
+        // 一并恢复 scenarioStart 标志，供断线重连时决定是否按「开启剧本」重发。
+        restoredScenarioStart = state.scenarioStart === true;
         if (state.content && pendingMessages.length === 0) {
             const role = aiRoles.find((item) => item.id === state.roleId) || aiRoles[0] || { id: state.roleId || "kp", name: state.roleName || "KP" };
             pendingMessages.push({ sender: getCurrentUsername(), content: String(state.content), role, time: new Date().toLocaleTimeString() });
@@ -895,13 +983,25 @@ function restoreThinkingState(): void {
 
 function resumePendingAIRequest(): void {
     if (isAIThinking || pendingMessages.length === 0) return;
+    // 仅当被持久化的确实是剧本开始请求时，才允许带 scenarioStart 重发；
+    // 普通消息恢复后保持原样，避免误触发开场。
+    const scenarioStart = restoredScenarioStart;
+    if (scenarioStart && !canManageCurrentRoom()) {
+        // 同一浏览器共享 localStorage：非房主/管理员（如新加入的玩家）不能凭
+        // 残留状态开启剧本，直接清除并提示。
+        clearPersistedThinkingState();
+        restoredScenarioStart = false;
+        pendingMessages = [];
+        showNotification("只有房主或管理员可以开启剧本", "error");
+        return;
+    }
     try {
         const state = JSON.parse(localStorage.getItem(THINKING_STORAGE_KEY) || "null");
         if (state?.id) clearThinkingMessage(String(state.id));
     } catch { /* ignore */ }
     const chatInput = document.getElementById("chatInput") as HTMLInputElement | null;
     const sendButton = document.getElementById("sendButton") as HTMLButtonElement | null;
-    if (chatInput && sendButton && getCurrentRoom()) void sendToAI(chatInput, sendButton);
+    if (chatInput && sendButton && getCurrentRoom()) void sendToAI(chatInput, sendButton, scenarioStart ? { scenarioStart: true } : {});
 }
 
 function moveThinkingMessageToEnd(messageId: string | number): void {
@@ -947,7 +1047,7 @@ function renderChatMessages(messages: ChatMessage[]): void {
     chatHistory.scrollTop = chatHistory.scrollHeight;
 }
 
-function renderRoomMessage(message: ChatMessage | null): void {
+function renderRoomMessage(message: ChatMessage | null, animate = false): void {
     if (!message) return;
     if (message.id) {
         const duplicate = Array.from(document.querySelectorAll<HTMLElement>("#chatHistory .message[data-id]"))
@@ -972,7 +1072,7 @@ function renderRoomMessage(message: ChatMessage | null): void {
     const displayMessage = message.type === "trigger" && metadata.asset_url && message.content && !message.content.includes(String(metadata.asset_url))
         ? { ...message, content: `${message.content}\n\n[${metadata.asset_name || "附件"}](${metadata.asset_url})` }
         : message;
-    addMessage(
+    const renderedId = addMessage(
         type,
         displayMessage.sender_name || displayMessage.sender || defaultSenderName(type),
         displayMessage.content,
@@ -983,6 +1083,11 @@ function renderRoomMessage(message: ChatMessage | null): void {
         numericMetadata(metadata, "cacheHitRate") ?? numericMetadata(metadata, "cache_hit_rate"),
         displayMessage,
     );
+    // 仅对实时到达的 KP 消息做渐进显现；历史记录一次性铺满，避免回看时跳动。
+    if (animate && type === "kp") {
+        const contentElement = document.querySelector<HTMLElement>(`#chatHistory .message[data-id="${String(renderedId)}"] .message-content`);
+        if (contentElement) revealKpContent(contentElement);
+    }
 }
 
 function clearChatMessages(): void {
@@ -1158,10 +1263,10 @@ function handleIncomingMessage(data: unknown): void {
     if (incoming.message) {
         const aiRequestId = typeof incoming.message.metadata?.aiRequestId === "string" ? incoming.message.metadata.aiRequestId : null;
         if (aiRequestId) clearThinkingMessage(aiRequestId);
-        renderRoomMessage(incoming.message);
+        renderRoomMessage(incoming.message, true);
         return;
     }
-    if (incoming.type && incoming.content) renderRoomMessage(incoming as ChatMessage);
+    if (incoming.type && incoming.content) renderRoomMessage(incoming as ChatMessage, true);
 }
 
 function handleAIThinkingEvent(incoming: IncomingSocketMessage): void {

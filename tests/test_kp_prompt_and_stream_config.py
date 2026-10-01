@@ -32,7 +32,8 @@ def test_general_config_contains_ai_stream_output_flag():
     general_config = Path("data/config/general.toml").read_text(encoding="utf-8")
 
     assert "[ai]" in general_config
-    assert "stream_output = false" in general_config
+    # 默认开启：KP 回复以渐进方式显现，避免整段一次性蹦出。
+    assert "stream_output = true" in general_config
     assert "debug_mode = false" in general_config
 
 
@@ -44,6 +45,14 @@ def test_frontend_settings_exposes_ai_stream_output_toggle():
     assert 'id="streamOutput"' in settings_html
     assert "stream_output" in config_source
     assert "streamOutput" in tabs_source
+
+
+def test_frontend_reveals_kp_replies_progressively():
+    chat_source = Path("frontend/src/app/chat.ts").read_text(encoding="utf-8")
+
+    # KP 回复改为渐进显现，并受「启用 AI 流式输出」开关控制。
+    assert "revealKpContent" in chat_source
+    assert '"general", "ai", "stream_output"' in chat_source
 
 
 def test_debug_mode_exposes_independent_prompt_settings():

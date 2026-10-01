@@ -34,7 +34,7 @@ class ConfigManager {
 
             const sectionMatch = line.match(/^\[(.+)\]$/);
             if (sectionMatch) {
-                currentSection = sectionMatch[1] || "";
+                currentSection = normalizeTomlKey(sectionMatch[1] || "");
                 config[currentSection] = {};
                 continue;
             }
@@ -42,7 +42,7 @@ class ConfigManager {
             const keyValueMatch = line.match(/^([^=]+)=(.+)$/);
             if (!keyValueMatch) continue;
 
-            const key = (keyValueMatch[1] || "").trim();
+            const key = normalizeTomlKey(keyValueMatch[1] || "");
             const value = this.parseValue((keyValueMatch[2] || "").trim());
             if (currentSection) {
                 const section = config[currentSection];
@@ -119,6 +119,12 @@ class ConfigManager {
         configSetCheckboxValue("streamOutput", this.get("general", "ai", "stream_output", false));
         configSetCheckboxValue("showAIHints", this.get("general", "ai", "show_ai_hints", true));
         configSetInputValue("messageFontSize", this.get("general", "chat", "message_font_size", 14));
+        // KP 请求限制（达到后自动收尾并提示，不静默无响应）
+        configSetInputValue("maxToolRounds", this.get("general", "ai", "max_tool_rounds", 8));
+        configSetInputValue("aiRequestTimeout", this.get("general", "ai", "ai_request_timeout", 300));
+        // 骰娘默认阈值（房间规则未单独设置时生效）
+        configSetInputValue("diceCriticalThresholdDefault", this.get("general", "ai", "dice_critical_threshold", 1));
+        configSetInputValue("diceFumbleThresholdDefault", this.get("general", "ai", "dice_fumble_threshold", 96));
 
         console.log("常规设置已应用到 UI");
     }
@@ -166,6 +172,7 @@ class ConfigManager {
 
     initThemeSystem(): void {
         this.applyTheme();
+        this.applyAdminNameGradient();
         const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
         mediaQuery.addEventListener("change", () => {
             const theme = this.get<string>("general", "appearance", "theme", "light");
@@ -173,6 +180,13 @@ class ConfigManager {
                 this.applyTheme();
             }
         });
+    }
+
+    applyAdminNameGradient(): void {
+        const { from, to } = getAdminNameGradientCookie();
+        const root = document.documentElement;
+        root.style.setProperty("--admin-name-from", from || DEFAULT_ADMIN_NAME_FROM);
+        root.style.setProperty("--admin-name-to", to || DEFAULT_ADMIN_NAME_TO);
     }
 
     async saveConfig(configName: string, settings: TomlConfig): Promise<boolean> {
@@ -204,6 +218,27 @@ function isTomlConfig(value: unknown): value is TomlConfig {
     return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/**
+ * 还原 TOML 段名 / 键名的外层引号，例如 ["ai.small_models"] 应解析为 ai.small_models。
+ * 若不去引号，保存回写时引号会被再次转义，反复保存会不断叠加转义。
+ */
+function normalizeTomlKey(raw: string): string {
+    const text = raw.trim();
+    if (text.length >= 2 && text.startsWith('"') && text.endsWith('"')) {
+        try {
+            const parsed = JSON.parse(text) as unknown;
+            if (typeof parsed === "string") return parsed;
+        } catch {
+            // 非合法 JSON 字符串时按字面量处理
+        }
+        return text.slice(1, -1);
+    }
+    if (text.length >= 2 && text.startsWith("'") && text.endsWith("'")) {
+        return text.slice(1, -1);
+    }
+    return text;
+}
+
 function configSetSelectValue(id: string, value: unknown): void {
     const select = document.getElementById(id) as HTMLSelectElement | null;
     if (select) select.value = String(value ?? "");
@@ -233,4 +268,22 @@ function getPersonalThemeCookie(): string {
         .map((part) => part.trim())
         .find((part) => part.startsWith(prefix));
     return item ? decodeURIComponent(item.slice(prefix.length)) : "";
+}
+
+const DEFAULT_ADMIN_NAME_FROM = "#84ff42";
+const DEFAULT_ADMIN_NAME_TO = "#0ebeff";
+const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
+
+function getAdminNameGradientCookie(): { from: string; to: string } {
+    const prefix = "trpg_admin_name_gradient=";
+    const item = document.cookie
+        .split(";")
+        .map((part) => part.trim())
+        .find((part) => part.startsWith(prefix));
+    if (!item) return { from: "", to: "" };
+    const [rawFrom = "", rawTo = ""] = decodeURIComponent(item.slice(prefix.length)).split(",");
+    return {
+        from: HEX_COLOR_PATTERN.test(rawFrom) ? rawFrom : "",
+        to: HEX_COLOR_PATTERN.test(rawTo) ? rawTo : "",
+    };
 }

@@ -22,8 +22,7 @@
         <span class="message-time">{{ displayTime }}</span>
     </div>
     <div class="message-content markdown-body" data-user-content="true">{{{ contentHtml }}}</div>
-    {{{ processingHtml }}}
-    {{{ knowledgeHtml }}}
+    <div class="message-meta">{{{ processingHtml }}}{{{ knowledgeHtml }}}</div>
 </div>
 </template>
 
@@ -32,7 +31,7 @@
 </template>
 
 <template id="chat-knowledge-usage">
-<div class="knowledge-usage" title="{{ title }}"><i class="fa fa-book" aria-hidden="true"></i> {{ text }}</div>
+<div class="knowledge-usage" title="{{ title }}">{{ text }}</div>
 </template>
 
 <template id="chat-welcome">

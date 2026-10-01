@@ -12,6 +12,7 @@ class AgentRequestContext:
     room_id: str | None = None
     room_dir: Path | None = None
     scenarios_dir: Path | None = None
+    config_dir: Path | None = None
     user_id: str | int | None = None
     agent_id: str = "kp"
     request_content: str = ""
@@ -40,12 +41,14 @@ def build_agent_context(
     user_id=None,
     agent_id="kp",
     request_content="",
+    config_dir=None,
 ) -> AgentRequestContext:
     room_dir = safe_join(rooms_dir, room_id) if room_id else None
     return AgentRequestContext(
         room_id=str(room_id) if room_id else None,
         room_dir=room_dir,
         scenarios_dir=scenarios_dir,
+        config_dir=Path(config_dir) if config_dir else None,
         user_id=user_id,
         agent_id=agent_id,
         request_content=str(request_content or ""),

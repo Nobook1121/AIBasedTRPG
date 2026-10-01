@@ -165,20 +165,30 @@ def parse_scenario_document(raw: bytes, filename: str, ocr_provider=None) -> Par
 
 
 def chunk_parsed_document(document: ParsedDocument, target_min: int = 800, target_max: int = 1500, overlap: int = 150) -> list[DocumentChunk]:
+    """按标题把文档切分为语义块（一个场景/章节一个块）。
+
+    直接导入要求「一个场景一个块」，Word/PDF 的标题（转为 Markdown ``#``）与
+    ``第X章`` 等标题行即场景/章节边界，因此遇到标题就开启新块；只有正文超过
+    ``target_max`` 时才继续拆分超大块。``target_min``/``overlap`` 保留以兼容
+    既有调用签名。
+    """
     if not document.markdown.strip():
         return []
-    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", document.markdown) if p.strip()]
     chunks: list[DocumentChunk] = []
-    current = ""
-    for paragraph in paragraphs:
-        if current and len(current) + 2 + len(paragraph) > target_max:
-            chunks.append(DocumentChunk(f"chunk-{len(chunks)+1:04d}", current, None, None, []))
-            current = current[-overlap:] + "\n\n" + paragraph
-        else:
-            current = paragraph if not current else current + "\n\n" + paragraph
-        if len(current) >= target_min and len(current) >= target_max:
-            chunks.append(DocumentChunk(f"chunk-{len(chunks)+1:04d}", current, None, None, []))
-            current = ""
-    if current:
-        chunks.append(DocumentChunk(f"chunk-{len(chunks)+1:04d}", current, None, None, []))
+    current: list[str] = []
+
+    def flush() -> None:
+        text = "\n".join(current).strip()
+        if text:
+            chunks.append(DocumentChunk(f"chunk-{len(chunks)+1:04d}", text, None, None, []))
+        current.clear()
+
+    for line in document.markdown.splitlines():
+        # 标题行作为新的场景/章节起点；首个标题之前的内容自成一块。
+        if _heading(line) and current:
+            flush()
+        current.append(line)
+        if len("\n".join(current)) >= target_max:
+            flush()
+    flush()
     return chunks

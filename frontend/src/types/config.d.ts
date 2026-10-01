@@ -8,6 +8,7 @@ interface ConfigManager {
     initThemeSystem(): void;
     getEffectiveTheme(): string;
     applyTheme(): void;
+    applyAdminNameGradient(): void;
 }
 
 type TomlConfigValue = string | number | boolean | Array<string | number | boolean> | TomlConfig;

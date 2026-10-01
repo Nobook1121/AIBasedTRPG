@@ -1,10 +1,13 @@
 import json
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
 from trpg_server.agents.profiles import AgentProfile
 from trpg_server.agents.tools.base import ToolRegistry
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -19,6 +22,10 @@ class AgentCompletionResult:
     completion_token_count: int | None = None
     cached_token_count: int | None = None
     knowledge_usage: dict[str, Any] | None = None
+    # 非致命异常（请求失败/超时、达到工具轮数上限）时，附带一段要展示给玩家的说明。
+    notice: str | None = None
+    # 是否因为达到 max_tool_rounds 而被迫收尾。
+    rounds_exhausted: bool = False
 
 
 def _extract_message(response_data: dict[str, Any] | None) -> dict[str, Any]:
@@ -110,6 +117,20 @@ def _truncate_tool_result(result: dict[str, Any], max_chars: int | None) -> tupl
     return truncated + marker, truncated + marker
 
 
+def _fallback_tool_summary(
+    tool_messages: list[dict[str, Any]], direct_messages: list[dict[str, Any]]
+) -> str:
+    """当模型最终没有返回可显示内容时，用已有工具结果兜底一句话回复。
+
+    保证玩家始终能收到消息，而不是空响应或 500 错误。
+    """
+    if direct_messages:
+        return "已完成场景处理，详情见上方记录。"
+    if tool_messages:
+        return "已完成检定/场景处理，详情见上方记录。"
+    return "本次工具调用较多，但没有生成可显示的回复，请补充你的行动后重试。"
+
+
 def run_agent_completion(
     requester: Callable[[dict[str, Any]], dict[str, Any]],
     base_payload: dict[str, Any],
@@ -152,13 +173,14 @@ def run_agent_completion(
     tool_state = getattr(context, "tool_state", None)
     stage_callback = tool_state.get("thinking_stage_callback") if isinstance(tool_state, dict) else None
 
-    for _round in range(max_tool_rounds + 1):
-        if isinstance(tool_state, dict):
-            tool_state["agent_request_rounds"] = _round + 1
-        if callable(stage_callback):
-            stage_callback("ai_request", "正在请求 AI")
-        response_data = requester(payload)
-        last_response = response_data
+    def _record_usage(response_data: dict[str, Any] | None) -> None:
+        """累计单次请求的 token 用量（含最终的无工具收尾请求）。"""
+        nonlocal total_token_count, has_token_count
+        nonlocal prompt_token_count, has_prompt_count
+        nonlocal completion_token_count, has_completion_count
+        nonlocal cached_token_count, has_cached_count
+        if not isinstance(response_data, dict):
+            return
         round_token_count = _extract_token_count(response_data)
         round_prompt, round_completion, round_cached = _extract_usage_counts(response_data)
         if round_prompt is not None:
@@ -173,6 +195,33 @@ def run_agent_completion(
         if round_token_count is not None:
             total_token_count += round_token_count
             has_token_count = True
+
+    for _round in range(max_tool_rounds + 1):
+        if isinstance(tool_state, dict):
+            tool_state["agent_request_rounds"] = _round + 1
+        if callable(stage_callback):
+            stage_callback("ai_request", "正在请求 AI")
+        try:
+            response_data = requester(payload)
+        except Exception as exc:
+            # 请求失败或超时时，不要静默丢弃已经拿到的工具结果；
+            # 有可展示内容就带提示返回，否则才作为错误上报。
+            logger.warning("Agent request failed on round %s: %s", _round + 1, exc)
+            if tool_messages or direct_messages:
+                return AgentCompletionResult(
+                    content=_fallback_tool_summary(tool_messages, direct_messages),
+                    token_count=total_token_count if has_token_count else None,
+                    tool_messages=tool_messages,
+                    direct_messages=direct_messages,
+                    prompt_token_count=prompt_token_count if has_prompt_count else None,
+                    completion_token_count=completion_token_count if has_completion_count else None,
+                    cached_token_count=cached_token_count if has_cached_count else None,
+                    knowledge_usage=knowledge_usage if knowledge_usage["tool_calls"] else None,
+                    notice=f"（AI 请求中断：{exc}）",
+                )
+            return AgentCompletionResult(error=str(exc))
+        last_response = response_data
+        _record_usage(response_data)
         message = _extract_message(response_data)
         calls = _tool_calls(message)
         if not calls:
@@ -192,6 +241,9 @@ def run_agent_completion(
                     }
                 )
                 continue
+            # 重试用尽仍为空：用工具结果兜底，避免返回空内容导致前端报错。
+            if not content:
+                content = _fallback_tool_summary(tool_messages, direct_messages)
             return AgentCompletionResult(
                 content=content,
                 token_count=total_token_count if has_token_count else None,
@@ -259,14 +311,45 @@ def run_agent_completion(
                 }
             )
 
+    # 工具轮次用尽：先移除工具、强制模型给出最终叙事；若仍无内容，则用工具结果兜底，
+    # 保证玩家一定能收到一条回复，而不是空响应或 500 错误。
+    final_payload = {**payload}
+    final_payload.pop("tools", None)
+    final_payload.pop("tool_choice", None)
+    final_payload["messages"] = [
+        *messages,
+        {
+            "role": "system",
+            "content": (
+                "已达到工具调用上限。请不要再调用任何工具，直接根据以上工具结果生成简洁、"
+                "连贯的 KP 叙事回复；若确实没有可叙述的内容，就用一句话说明当前状态。"
+            ),
+        },
+    ]
+    if callable(stage_callback):
+        stage_callback("ai_request", "正在请求 AI")
+    try:
+        final_response = requester(final_payload)
+    except Exception as exc:
+        logger.warning("Agent wrap-up request failed: %s", exc)
+        final_response = None
+    _record_usage(final_response)
+    final_content = str(_extract_message(final_response).get("content") or "").strip()
+    if not final_content:
+        final_content = _fallback_tool_summary(tool_messages, direct_messages)
     return AgentCompletionResult(
-        error="Agent tool loop limit exceeded",
+        content=final_content,
         token_count=total_token_count if has_token_count else None,
-        response_data=last_response,
+        response_data=final_response if isinstance(final_response, dict) else last_response,
         tool_messages=tool_messages,
         direct_messages=direct_messages,
         prompt_token_count=prompt_token_count if has_prompt_count else None,
         completion_token_count=completion_token_count if has_completion_count else None,
         cached_token_count=cached_token_count if has_cached_count else None,
         knowledge_usage=knowledge_usage if knowledge_usage["tool_calls"] else None,
+        rounds_exhausted=True,
+        notice=(
+            f"（本次回复已达到最大工具调用轮数 {max_tool_rounds}，KP 已停止继续调用工具并收尾。"
+            "如需继续，请再发送一条消息。）"
+        ),
     )

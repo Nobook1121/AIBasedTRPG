@@ -9,6 +9,7 @@ interface Window {
     reloadCharacterManagement?: () => Promise<void>;
     autoLoadLastRoom?: () => Promise<void>;
     setCurrentEditingScenarioId?: (id: string | number | null) => void;
+    loadUserSettings?: () => Promise<void>;
 }
 
 namespace AuthModule {
@@ -45,6 +46,9 @@ namespace AuthModule {
         const homeAvatar = document.getElementById("personalHomeAvatar") as HTMLImageElement | null;
         const homeName = document.getElementById("personalHomeName");
         const homeMeta = document.getElementById("personalHomeMeta");
+        const homeRole = document.getElementById("personalHomeRole");
+        const homePresence = document.getElementById("personalHomePresence");
+        const homePresenceDot = document.getElementById("personalHomePresenceDot");
         const presenceButtonLabel = document.querySelector<HTMLElement>("#presence-menu-button .presence-current-label");
         if (user) {
             if (name) name.textContent = user.username;
@@ -60,8 +64,9 @@ namespace AuthModule {
             if (cardAvatar) cardAvatar.src = user.avatar || "/assets/avatars/default.jpg";
             if (homeAvatar) homeAvatar.src = user.avatar || "/assets/avatars/default.jpg";
             if (homeName) homeName.textContent = user.nickname || user.username;
+            if (homeRole) homeRole.textContent = user.role || "USER";
             if (homeMeta) {
-                const baseMeta = `${user.role || "USER"} · ${user.email || authText("auth.status.email_missing", "未设置邮箱")}`;
+                const baseMeta = user.email || authText("auth.status.email_missing", "未设置邮箱");
                 homeMeta.textContent = user.impersonation_mode
                     ? `${baseMeta} · ${authText("auth.status.impersonating", "模拟登录中")}`
                     : baseMeta;
@@ -77,9 +82,16 @@ namespace AuthModule {
             if (cardAvatar) cardAvatar.src = "/assets/avatars/default.jpg";
             if (homeAvatar) homeAvatar.src = "/assets/avatars/default.jpg";
             if (homeName) homeName.textContent = authText("auth.status.guest", "未登录");
-            if (homeMeta) homeMeta.textContent = "USER";
+            if (homeRole) homeRole.textContent = "USER";
+            if (homeMeta) homeMeta.textContent = authText("auth.status.guest", "未登录");
             if (presenceButtonLabel) presenceButtonLabel.textContent = authText("presence.status", "在线状态");
         }
+        const presence = window.currentUser?.presence || "online";
+        if (homePresence) homePresence.textContent = window.currentUser ? presenceLabel(presence) : authText("presence.status", "在线状态");
+        if (homePresenceDot) homePresenceDot.className = window.currentUser ? `fa ${presenceIconClass(presence)} presence-dot ${presence}` : "fa fa-circle presence-dot";
+        document.querySelectorAll<HTMLElement>("#user-settings .settings-presence-option[data-presence]").forEach((button) => {
+            button.classList.toggle("active", button.dataset.presence === presence);
+        });
         window.refreshAdminNavigation?.();
         window.refreshScenarioManagement?.();
     }
@@ -92,6 +104,17 @@ namespace AuthModule {
                 return authText("presence.invisible", "隐身");
             default:
                 return authText("presence.online", "在线");
+        }
+    }
+
+    function presenceIconClass(presence: CurrentUser["presence"]): string {
+        switch (presence) {
+            case "dnd":
+                return "fa-minus-circle";
+            case "invisible":
+                return "fa-circle-o";
+            default:
+                return "fa-circle";
         }
     }
 

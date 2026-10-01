@@ -7,6 +7,7 @@
 /frontend/dist/
 /data/tools/*.js
 /frontend/src/app/generated/
+*.tsbuildinfo
 
 # Python caches
 __pycache__/
@@ -15,6 +16,19 @@ __pycache__/
 tests/**/__pycache__/
 backend/trpg_server/**/__pycache__/
 trpg_server/**/__pycache__/
+
+# Python virtual environments
+/.venv/
+/venv/
+
+# Test / static-check caches
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+.hypothesis/
+*.egg-info/
 
 # Runtime data
 /data/runtime/
@@ -37,6 +51,10 @@ trpg_server/**/__pycache__/
 !/data/assets/avatars/default_dice.jpg
 !/data/assets/avatars/default_system.jpg
 
+# User-uploaded scenario covers; keep bundled default tracked
+/data/assets/scenario_covers/*
+!/data/assets/scenario_covers/default_cover.png
+
 # Local worktrees
 /.worktrees/
 
@@ -46,9 +64,25 @@ trpg_server/**/__pycache__/
 /tmp/
 /temp/
 
-# Secrets and local env
+# Package manager debug logs
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.eslintcache
+
+# Editor / OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+
+# Secrets and local env; keep example templates tracked
 .env
 .env.*
+*.env
+!*.example.env
 !.env.example
 *.secret
 docs/*.secret
@@ -74,3 +108,11 @@ docs/过去改进/improved2.md
 tmp_doc_clean.txt
 tmp_doc_utf16.txt
 /.trae/
+docs/样本
+
+# Release archives: upload to GitHub Releases instead of committing
+/release/*.zip
+/release/*.tar.gz
+/release/*.tgz
+/release/*.sha256
+/release/*.sha512

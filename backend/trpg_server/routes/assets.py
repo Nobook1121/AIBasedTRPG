@@ -1,9 +1,12 @@
 import json
+from pathlib import Path
+from uuid import uuid4
 
-from flask import Blueprint, Response, current_app, send_from_directory
+from flask import Blueprint, Response, current_app, request, send_from_directory, session
 
 from trpg_server.ai_platform_config import load_public_platform_config
-from trpg_server.security import safe_join
+from trpg_server.responses import error_response, success_response
+from trpg_server.security import is_allowed_upload, normalize_filename, safe_join
 
 from trpg_server.settings import (
     AI_PLATFORM_ASSETS_DIR,
@@ -11,6 +14,7 @@ from trpg_server.settings import (
     AVATARS_DIR,
     CHARACTERS_DIR,
     CONFIG_DIR,
+    RUNTIME_DIR,
     SCENARIO_COVERS_DIR,
     SCENARIOS_DIR,
     THEME_ASSETS_DIR,
@@ -19,6 +23,20 @@ from trpg_server.settings import (
 )
 
 bp = Blueprint("assets", __name__)
+
+# 主页聊天附件上传目录与限制（图片/视频/常用文档）。
+CHAT_UPLOAD_DIR = RUNTIME_DIR / "uploads" / "chat"
+CHAT_UPLOAD_MAX_BYTES = 20 * 1024 * 1024
+CHAT_UPLOAD_EXTENSIONS = {
+    "png", "jpg", "jpeg", "gif", "webp", "bmp",
+    "mp4", "webm", "ogg", "mov", "m4v",
+    "pdf", "txt", "md", "markdown", "json", "csv", "zip", "rar", "7z",
+    "doc", "docx", "xls", "xlsx", "ppt", "pptx", "rtf",
+}
+
+
+def _chat_upload_dir() -> Path:
+    return Path(current_app.config.get("CHAT_UPLOAD_DIR", CHAT_UPLOAD_DIR))
 
 
 def _get_config_dir():
@@ -86,3 +104,39 @@ def serve_character_data(filename):
 @bp.route("/data/tools/<path:filename>")
 def serve_tool_script(filename):
     return _with_no_cache(send_from_directory(TOOLS_DIR, filename))
+
+
+@bp.route("/api/assets/upload", methods=["POST"])
+def upload_chat_asset():
+    """接收主页聊天附件，保存到 uploads 目录并返回可访问 URL。"""
+    if "user_id" not in session:
+        return error_response("Please login first", 401, "Not logged in")
+    uploaded = request.files.get("file")
+    if not uploaded or not uploaded.filename:
+        return error_response("Please provide a file", 400, "No file")
+    if not is_allowed_upload(uploaded.filename, CHAT_UPLOAD_EXTENSIONS):
+        return error_response("Unsupported file type", 400, "Invalid file type")
+    raw = uploaded.read(CHAT_UPLOAD_MAX_BYTES + 1)
+    if len(raw) > CHAT_UPLOAD_MAX_BYTES:
+        return error_response("File is too large", 413, "File too large")
+
+    upload_dir = _chat_upload_dir()
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    display_name = normalize_filename(uploaded.filename, "attachment")
+    stored_name = f"{uuid4().hex}_{display_name}"
+    (upload_dir / stored_name).write_bytes(raw)
+    return success_response(
+        {
+            "url": f"/assets/uploads/{stored_name}",
+            "name": display_name,
+            "size": len(raw),
+            "content_type": uploaded.mimetype or "",
+        },
+        "File uploaded successfully",
+        201,
+    )
+
+
+@bp.route("/assets/uploads/<path:filename>")
+def serve_chat_upload(filename):
+    return _with_no_cache(send_from_directory(_chat_upload_dir(), filename))

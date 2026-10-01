@@ -659,6 +659,23 @@ interface Window {
     let combatStatsManuallyEdited = false;
     let characterSaveInFlight = false;
 
+    /** 批量管理：个人角色卡列表与角色卡广场各自独立维护模式与选中集合。 */
+    type CharacterBatchTarget = "card" | "gallery";
+    interface CharacterBatchState {
+        mode: boolean;
+        selected: Set<string>;
+    }
+    const characterBatchStates: Record<CharacterBatchTarget, CharacterBatchState> = {
+        card: { mode: false, selected: new Set<string>() },
+        gallery: { mode: false, selected: new Set<string>() }
+    };
+    const CHARACTER_BATCH_DOM: Record<CharacterBatchTarget, {
+        toolbar: string; count: string; selectAll: string; deleteBtn: string; exitBtn: string; toggle: string; listId: string;
+    }> = {
+        card: { toolbar: "characterBatchToolbar", count: "characterBatchCount", selectAll: "characterBatchSelectAll", deleteBtn: "characterBatchDelete", exitBtn: "characterBatchExit", toggle: "characterBatchToggle", listId: "characterList" },
+        gallery: { toolbar: "characterGalleryBatchToolbar", count: "characterGalleryBatchCount", selectAll: "characterGalleryBatchSelectAll", deleteBtn: "characterGalleryBatchDelete", exitBtn: "characterGalleryBatchExit", toggle: "characterGalleryBatchToggle", listId: "characterGalleryList" }
+    };
+
     function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
         const parsed = Number(value);
         if (!Number.isFinite(parsed)) return fallback;
@@ -1496,17 +1513,25 @@ interface Window {
     function renderCharacterGallery(): void {
         const list = byId("characterGalleryList");
         if (!list) return;
+        const batch = characterBatchStates.gallery;
+        pruneCharacterBatchSelection("gallery");
         if (!galleryCards.length) {
             list.innerHTML = `<div class="character-empty-filter">角色卡广场暂无公开角色卡。</div>`;
+            updateCharacterBatchToolbar("gallery");
             return;
         }
         const visibleCards = filteredGalleryCards();
         if (!visibleCards.length) {
             list.innerHTML = `<div class="character-empty-filter">没有符合筛选条件的公开角色卡。</div>`;
+            updateCharacterBatchToolbar("gallery");
             return;
         }
-        list.innerHTML = visibleCards.map((card) => `
-            <article class="character-card" data-gallery-character-id="${escapeHtml(card.id)}">
+        list.innerHTML = visibleCards.map((card) => {
+            const selectable = batch.mode && canModifyGalleryCard(card);
+            const selected = selectable && batch.selected.has(card.id);
+            return `
+            <article class="character-card${batch.mode ? " batch-mode" : ""}${selected ? " batch-selected" : ""}" data-gallery-character-id="${escapeHtml(card.id)}"${selectable ? ' data-batch-selectable="true"' : ""}>
+                ${selectable ? `<span class="batch-card-check" aria-hidden="true"><i class="fa ${selected ? "fa-check-square-o" : "fa-square-o"}"></i></span>` : ""}
                 <div class="character-card-avatar">${card.avatar ? `<img src="${escapeHtml(card.avatar)}" alt="">` : `<i class="fa fa-id-card-o"></i>`}</div>
                 <h5>${escapeHtml(card.name)}</h5>
                 <p>${escapeHtml(getOccupation(card).name)} · ${escapeHtml(card.residence || "未知居住地")}</p>
@@ -1516,12 +1541,12 @@ interface Window {
                     <span>${escapeHtml(card.publisher_name ? `发布者 ${card.publisher_name}` : "公开角色卡")}</span>
                 </div>
                 <div class="character-card-actions">
-                    <button type="button" data-gallery-action="preview">预览</button>
-                    <button type="button" data-gallery-action="apply">应用</button>
-                    ${canModifyGalleryCard(card) ? `<button type="button" data-gallery-action="edit">编辑</button><button type="button" data-gallery-action="delete">删除</button>` : ""}
+                    ${batch.mode ? "" : `<button type="button" data-gallery-action="preview">预览</button><button type="button" data-gallery-action="apply">应用</button>${canModifyGalleryCard(card) ? `<button type="button" data-gallery-action="edit">编辑</button><button type="button" data-gallery-action="delete">删除</button>` : ""}`}
                 </div>
             </article>
-        `).join("");
+        `;
+        }).join("");
+        updateCharacterBatchToolbar("gallery");
     }
 
     function filteredGalleryCards(): COC7CharacterCard[] {
@@ -1539,6 +1564,14 @@ interface Window {
     }
 
     function handleGalleryClick(event: Event): void {
+        if (characterBatchStates.gallery.mode) {
+            const cardElement = (event.target as HTMLElement).closest<HTMLElement>("[data-gallery-character-id]");
+            const batchId = cardElement?.dataset.galleryCharacterId;
+            if (cardElement && batchId && cardElement.dataset.batchSelectable === "true") {
+                toggleCharacterBatchSelection("gallery", batchId, cardElement);
+            }
+            return;
+        }
         const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-gallery-action]");
         if (!button) return;
         const card = button.closest<HTMLElement>("[data-gallery-character-id]");
@@ -1609,6 +1642,10 @@ interface Window {
         activeCardId = "";
         activeGallerySearchTerm = "";
         activeGalleryEditId = "";
+        characterBatchStates.card.mode = false;
+        characterBatchStates.card.selected.clear();
+        characterBatchStates.gallery.mode = false;
+        characterBatchStates.gallery.selected.clear();
         editorSkills = [];
         pendingGeneratedName = "";
         pendingWeaponPickerTarget = "";
@@ -1707,6 +1744,8 @@ interface Window {
         });
         byId("characterGallerySearch")?.addEventListener("input", handleGallerySearchInput);
         byId("characterGalleryList")?.addEventListener("click", handleGalleryClick);
+        bindCharacterBatchControls("card");
+        bindCharacterBatchControls("gallery");
         byId("characterAvatarPreview")?.addEventListener("click", () => byId<HTMLInputElement>("characterAvatarUpload")?.click());
         byId("unbindCharacterPlayer")?.addEventListener("click", unbindCharacterPlayerFromEditor);
         byId("randomizeAttributes")?.addEventListener("click", () => {
@@ -1749,7 +1788,10 @@ interface Window {
             refreshSkillTableCalculations();
         });
         ["characterOccupationSkillLimit", "characterOtherSkillLimit"].forEach((fieldId) => {
-            byId(fieldId)?.addEventListener("input", refreshSkillTableCalculations);
+            // 输入过程中只重算派生阈值，避免把尚未输入完整的中间值（如先输入“9”）当作上限写回所有技能
+            byId(fieldId)?.addEventListener("input", refreshSkillTableThresholds);
+            // 输入完成（失焦/确认）后，再按最终有效上限裁剪各技能点数
+            byId(fieldId)?.addEventListener("change", refreshSkillTableCalculations);
         });
         byId("characterSkillCategoryFilters")?.addEventListener("click", handleSkillCategoryFilterClick);
         byId("characterSkillTableBody")?.addEventListener("input", handleSkillTableInput);
@@ -1911,10 +1953,12 @@ interface Window {
         return `
             <tr data-weapon-row-id="${rowId}">
                 <td>
-                    <button type="button" class="character-weapon-name-button" data-weapon-picker-trigger="${rowId}">
-                        ${formatWeaponNameForDisplay(weapon.name || "选择武器")}
-                    </button>
-                    <input type="hidden" data-weapon-name="${rowId}" value="${escapeHtml(weapon.name)}">
+                    <div class="character-input-shell">
+                        <input type="text" class="form-control form-control-sm character-weapon-name-input" data-weapon-name="${rowId}" value="${escapeHtml(weapon.name)}" placeholder="选择或输入武器">
+                        <button type="button" class="character-input-action" data-weapon-picker-trigger="${rowId}" title="从武器库选择" aria-label="从武器库选择">
+                            <i class="fa fa-list" aria-hidden="true"></i>
+                        </button>
+                    </div>
                 </td>
                 <td>
                     <select class="form-select form-select-sm character-weapon-skill-select" data-weapon-skill="${rowId}">
@@ -1953,11 +1997,6 @@ interface Window {
             weight: "",
             note: ""
         };
-    }
-
-    function formatWeaponNameForDisplay(name: string): string {
-        const text = name.trim() || "选择武器";
-        return escapeHtml(text).replace(/\s+/g, "<wbr>");
     }
 
     function weaponSkillOptions(selectedWeapon: COC7Weapon): string {
@@ -2595,13 +2634,24 @@ interface Window {
     function refreshSkillTableCalculations(): void {
         const body = byId("characterSkillTableBody");
         if (!body) return;
-        body.querySelectorAll<HTMLTableRowElement>("tr[data-skill-row-id]").forEach(refreshSkillRowCalculations);
+        body.querySelectorAll<HTMLTableRowElement>("tr[data-skill-row-id]").forEach((row) => refreshSkillRowCalculations(row));
         refreshSkillPointSummary();
         refreshWeaponSuccessRates();
         syncEditorCreditRating();
     }
 
-    function refreshSkillRowCalculations(row: HTMLTableRowElement): void {
+    // 技能上限输入框正在输入（input 事件）时使用：只根据每个技能自身的数值重算派生阈值，
+    // 不使用尚未输入完整的中间上限去裁剪各技能点数，避免“输入 9 后所有技能上限都变成 9 且无法恢复”。
+    function refreshSkillTableThresholds(): void {
+        const body = byId("characterSkillTableBody");
+        if (!body) return;
+        body.querySelectorAll<HTMLTableRowElement>("tr[data-skill-row-id]").forEach((row) => refreshSkillRowCalculations(row, false));
+        refreshSkillPointSummary();
+        refreshWeaponSuccessRates();
+        syncEditorCreditRating();
+    }
+
+    function refreshSkillRowCalculations(row: HTMLTableRowElement, applyLimitCaps = true): void {
         const occupationCheckbox = row.querySelector<HTMLInputElement>("[data-skill-occupation-checkbox]");
         const occupationInput = row.querySelector<HTMLInputElement>("[data-skill-occupation-points]");
         const interestInput = row.querySelector<HTMLInputElement>("[data-skill-interest-points]");
@@ -2618,15 +2668,20 @@ interface Window {
                 occupationInput.value = "0";
                 notify("只有本职技能才能添加点数", "error");
             }
-            occupationInput.value = String(clampNumber(occupationInput.value, 0, getSkillLimit("occupation"), 0));
+            // 仅在提交（applyLimitCaps）时用上限裁剪点数，输入过程中保留玩家已填写的点数
+            if (applyLimitCaps) {
+                occupationInput.value = String(clampNumber(occupationInput.value, 0, getSkillLimit("occupation"), 0));
+            }
         }
-        if (interestInput) interestInput.value = String(clampNumber(interestInput.value, 0, getSkillLimit("other"), 0));
-        if (growthInput) growthInput.value = String(clampNumber(growthInput.value, 0, getSkillLimit("other"), 0));
+        if (applyLimitCaps && interestInput) interestInput.value = String(clampNumber(interestInput.value, 0, getSkillLimit("other"), 0));
+        if (applyLimitCaps && growthInput) growthInput.value = String(clampNumber(growthInput.value, 0, getSkillLimit("other"), 0));
         enforceSkillPointBudgets();
         const occupationPoints = readSkillRowNumber(row, "occupationPoints", 0);
         const interestPoints = readSkillRowNumber(row, "interestPoints", 0);
         const growthPoints = readSkillRowNumber(row, "growthPoints", 0);
-        const success = clampNumber(base + occupationPoints + interestPoints + growthPoints, 0, getSkillLimit("occupation"), base);
+        const total = base + occupationPoints + interestPoints + growthPoints;
+        // 输入过程中按技能自身数值展示成功率；提交后再套用技能上限裁剪
+        const success = applyLimitCaps ? clampNumber(total, 0, getSkillLimit("occupation"), base) : clampNumber(total, 0, 99, base);
         if (successOutput) successOutput.textContent = String(success);
         if (hardOutput) hardOutput.textContent = String(Math.floor(success / 2));
         if (extremeOutput) extremeOutput.textContent = String(Math.floor(success / 5));
@@ -2851,15 +2906,21 @@ interface Window {
     function renderList(): void {
         const list = byId("characterList");
         if (!list) return;
+        pruneCharacterBatchSelection("card");
         const visibleCards = visibleCharacterCards();
         if (visibleCards.length === 0) {
             list.innerHTML = `<div class="character-empty-filter">没有符合筛选条件的角色卡。</div>`;
+            updateCharacterBatchToolbar("card");
             return;
         }
         list.innerHTML = visibleCards.map(renderCharacterCardSummary).join("");
         list.querySelectorAll<HTMLElement>(".character-card").forEach((cardElement) => {
             cardElement.addEventListener("click", (event) => {
                 const id = cardElement.dataset.characterId || "";
+                if (characterBatchStates.card.mode) {
+                    toggleCharacterBatchSelection("card", id, cardElement);
+                    return;
+                }
                 const action = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-action]")?.dataset.action || "detail";
                 const card = visibleCards.find((item) => item.id === id);
                 if (!card) return;
@@ -2868,11 +2929,15 @@ interface Window {
                 else openCharacterDetail(id);
             });
         });
+        updateCharacterBatchToolbar("card");
     }
 
     function renderCharacterCardSummary(card: COC7CharacterCard): string {
+        const batch = characterBatchStates.card;
+        const selected = batch.mode && batch.selected.has(card.id);
         return `
-            <article class="character-card ${card.id === activeCardId ? "active" : ""}" data-character-id="${escapeHtml(card.id)}">
+            <article class="character-card ${card.id === activeCardId ? "active" : ""}${batch.mode ? " batch-mode" : ""}${selected ? " batch-selected" : ""}" data-character-id="${escapeHtml(card.id)}"${batch.mode ? ' data-batch-selectable="true"' : ""}>
+                ${batch.mode ? `<span class="batch-card-check" aria-hidden="true"><i class="fa ${selected ? "fa-check-square-o" : "fa-square-o"}"></i></span>` : ""}
                 <div class="character-card-avatar">${card.avatar ? `<img src="${escapeHtml(card.avatar)}" alt="">` : `<i class="fa fa-id-card-o"></i>`}</div>
                 <h5>${escapeHtml(card.name)}</h5>
                 <p>${escapeHtml(getOccupation(card).name)} · ${escapeHtml(card.residence || "未知居住地")}</p>
@@ -2882,12 +2947,151 @@ interface Window {
                     <span>MOV ${card.mov}</span>
                 </div>
                 <div class="character-card-actions">
-                    <button type="button" data-action="detail">详情</button>
-                    <button type="button" data-action="edit">编辑</button>
-                    <button type="button" data-action="delete">删除</button>
+                    ${batch.mode ? "" : `<button type="button" data-action="detail">详情</button><button type="button" data-action="edit">编辑</button><button type="button" data-action="delete">删除</button>`}
                 </div>
             </article>
         `;
+    }
+
+    /**
+     * 批量管理通用逻辑：个人角色卡列表（card）与角色卡广场（gallery）复用同一套
+     * 工具栏更新、选中切换与批量删除流程，仅数据源与权限判定不同。
+     */
+    function characterBatchText(key: string, fallback: string, values: Record<string, string | number> = {}): string {
+        return window.TrpgI18n?.t(key, fallback, values) || fallback;
+    }
+
+    function characterBatchElements(target: CharacterBatchTarget) {
+        const dom = CHARACTER_BATCH_DOM[target];
+        return {
+            dom,
+            toolbar: byId(dom.toolbar),
+            count: byId(dom.count),
+            selectAll: byId<HTMLInputElement>(dom.selectAll),
+            deleteBtn: byId<HTMLButtonElement>(dom.deleteBtn),
+            exitBtn: byId<HTMLButtonElement>(dom.exitBtn),
+            toggle: byId<HTMLButtonElement>(dom.toggle),
+            list: byId(dom.listId)
+        };
+    }
+
+    function pruneCharacterBatchSelection(target: CharacterBatchTarget): void {
+        const state = characterBatchStates[target];
+        const source = target === "gallery" ? galleryCards : cards;
+        [...state.selected].forEach((id) => {
+            if (!source.some((card) => card.id === id)) state.selected.delete(id);
+        });
+    }
+
+    function updateCharacterBatchToolbar(target: CharacterBatchTarget): void {
+        const { toolbar, count, selectAll, deleteBtn, toggle, list } = characterBatchElements(target);
+        const state = characterBatchStates[target];
+        toggle?.classList.toggle("active", state.mode);
+        if (!toolbar) return;
+        toolbar.hidden = !state.mode;
+        const selectedCount = state.selected.size;
+        if (count) {
+            count.textContent = selectedCount > 0
+                ? characterBatchText("common.batch.selected", `已选 ${selectedCount} 项`, { count: selectedCount })
+                : "";
+        }
+        if (selectAll) {
+            const selectable = list ? list.querySelectorAll("[data-batch-selectable='true']").length : 0;
+            selectAll.checked = selectable > 0 && selectedCount === selectable;
+            selectAll.indeterminate = selectedCount > 0 && selectedCount < selectable;
+            selectAll.disabled = selectable === 0;
+        }
+        if (deleteBtn) deleteBtn.disabled = selectedCount === 0;
+    }
+
+    function setCharacterBatchMode(target: CharacterBatchTarget, enabled: boolean): void {
+        const state = characterBatchStates[target];
+        if (state.mode === enabled) return;
+        state.mode = enabled;
+        if (!enabled) state.selected.clear();
+        if (target === "gallery") renderCharacterGallery(); else renderList();
+    }
+
+    function toggleCharacterBatchSelection(target: CharacterBatchTarget, id: string, cardElement: HTMLElement): void {
+        if (!id) return;
+        const state = characterBatchStates[target];
+        const nowSelected = !state.selected.has(id);
+        if (nowSelected) state.selected.add(id); else state.selected.delete(id);
+        cardElement.classList.toggle("batch-selected", nowSelected);
+        const icon = cardElement.querySelector<HTMLElement>(".batch-card-check i");
+        if (icon) icon.className = `fa ${nowSelected ? "fa-check-square-o" : "fa-square-o"}`;
+        updateCharacterBatchToolbar(target);
+    }
+
+    function setAllCharacterBatchSelected(target: CharacterBatchTarget, select: boolean): void {
+        const { list } = characterBatchElements(target);
+        const state = characterBatchStates[target];
+        list?.querySelectorAll<HTMLElement>("[data-batch-selectable='true']").forEach((cardElement) => {
+            const id = cardElement.dataset.characterId || cardElement.dataset.galleryCharacterId || "";
+            if (!id) return;
+            if (select) state.selected.add(id); else state.selected.delete(id);
+            cardElement.classList.toggle("batch-selected", select);
+            const icon = cardElement.querySelector<HTMLElement>(".batch-card-check i");
+            if (icon) icon.className = `fa ${select ? "fa-check-square-o" : "fa-square-o"}`;
+        });
+        updateCharacterBatchToolbar(target);
+    }
+
+    async function deleteSelectedCharacterBatch(target: CharacterBatchTarget): Promise<void> {
+        const state = characterBatchStates[target];
+        const ids = [...state.selected];
+        if (!ids.length) {
+            notify(characterBatchText("common.batch.none_selected", "请先选择要删除的项目"), "error");
+            return;
+        }
+        const confirmMessage = characterBatchText(
+            target === "gallery" ? "common.batch.delete_confirm_gallery" : "common.batch.delete_confirm",
+            target === "gallery"
+                ? `确定要删除选中的 ${ids.length} 张公开角色卡吗？此操作不可恢复。`
+                : `确定要删除选中的 ${ids.length} 张角色卡吗？此操作不可恢复。`
+        );
+        if (!window.confirm(confirmMessage)) return;
+
+        const deletedIds = new Set<string>();
+        const failures: string[] = [];
+        for (const id of ids) {
+            try {
+                const url = target === "gallery"
+                    ? `/api/character-gallery/${encodeURIComponent(id)}`
+                    : `/api/characters/${encodeURIComponent(id)}`;
+                const response = await TrpgApi.del<ApiResponse>(url);
+                if (response.success) deletedIds.add(id);
+                else failures.push(response.message || response.error || "删除失败");
+            } catch (error) {
+                failures.push(characterErrorMessage(error));
+            }
+        }
+
+        state.mode = false;
+        state.selected.clear();
+        if (target === "gallery") {
+            galleryCards = galleryCards.filter((card) => !deletedIds.has(card.id));
+            renderCharacterGallery();
+        } else {
+            cards = cards.filter((card) => !deletedIds.has(card.id));
+            if (!cards.some((card) => card.id === activeCardId)) activeCardId = cards[0]?.id || "";
+            render();
+        }
+
+        const deleted = deletedIds.size;
+        if (failures.length === 0) {
+            notify(characterBatchText("common.batch.deleted", `已删除 ${deleted} 项`, { count: deleted }), "success");
+        } else {
+            notify(`已删除 ${deleted} 项，${failures.length} 项失败`, "error");
+        }
+    }
+
+    function bindCharacterBatchControls(target: CharacterBatchTarget): void {
+        const { toggle, exitBtn, deleteBtn, selectAll } = characterBatchElements(target);
+        toggle?.addEventListener("click", () => setCharacterBatchMode(target, !characterBatchStates[target].mode));
+        exitBtn?.addEventListener("click", () => setCharacterBatchMode(target, false));
+        deleteBtn?.addEventListener("click", () => { void deleteSelectedCharacterBatch(target); });
+        selectAll?.addEventListener("change", () => setAllCharacterBatchSelected(target, selectAll.checked));
     }
 
     function openCharacterDetail(cardId: string): void {

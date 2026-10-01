@@ -88,8 +88,32 @@ function initRoomManagement(): void {
         createCharacterFromRoomEntry();
     });
 
+    // 点击右侧成员栏中的成员，在该成员旁弹出资料卡（参考 Discord）
+    document.addEventListener("click", (event) => {
+        const target = event.target as HTMLElement | null;
+        const item = target?.closest<HTMLElement>("#roomMemberList .home-room-member");
+        if (!item || !currentRoom) return;
+        const userId = item.dataset.userId;
+        if (!userId) return;
+        const member = (currentRoom.members || []).find((entry) => String(entry.user_id) === String(userId));
+        if (!member) return;
+        AuthModule.openMemberProfileCard(currentRoom, member, item);
+    });
+
+    // 点击房间码即可复制（房间列表卡片与房间详情都使用同一套委托处理）
+    document.addEventListener("click", (event) => {
+        const target = event.target as HTMLElement | null;
+        const trigger = target?.closest<HTMLElement>("[data-copy-room-code], #copyRoomDetailCode");
+        if (!trigger) return;
+        const code = trigger.dataset.copyRoomCode
+            || document.getElementById("roomDetailCode")?.textContent
+            || "";
+        void copyRoomCodeToClipboard(code);
+    });
+
     populateCharacterSelectors();
     window.loadRoomsList = loadRoomsList;
+    window.addEventListener("trpg:locale-changed", () => renderRoomMemberList(currentRoom));
     void loadRoomsList();
 }
 
@@ -259,6 +283,9 @@ async function openCreateRoomModal(): Promise<void> {
 
     const roomNameInput = document.getElementById("saveName") as HTMLInputElement | null;
     if (roomNameInput) roomNameInput.value = "";
+    // 每次打开创建窗口都重置为默认的私人房间
+    const visibilitySelect = document.getElementById("roomVisibilitySelect") as HTMLSelectElement | null;
+    if (visibilitySelect) visibilitySelect.value = "private";
     const modalElement = document.getElementById("createSaveModal");
     if (modalElement) new bootstrap.Modal(modalElement).show();
 }
@@ -294,6 +321,7 @@ async function createRoomUnlocked(): Promise<void> {
             name: roomName,
             scenario_id: Number.parseInt(scenarioId, 10),
             scenario_title: scenarioTitle,
+            visibility: (document.getElementById("roomVisibilitySelect") as HTMLSelectElement | null)?.value || "private",
             character_card: roomEntrySelection.characterCard,
         });
         if (!data.success || !data.data) {
@@ -395,6 +423,7 @@ function renderRoomCard(room: Room): string {
         activeHeaderHtml: isActive ? window.TrpgTemplates.render("room-active-header") : "",
         archivedBadgeHtml: room.archived || room.archived_at ? window.TrpgTemplates.render("room-archived-badge", { archivedAt: room.archived_at || "" }) : "",
         name: room.name,
+        visibilityBadgeHtml: roomVisibilityBadge(room),
         roomCode: room.room_code || room.code || "-",
         scenarioTitle: room.scenario_title || "未知",
         members,
@@ -520,6 +549,8 @@ function applyInvisibleRoomView(invisible: boolean): void {
     });
     const onlineCount = document.getElementById("homeRoomOnlineCount") as HTMLElement | null;
     if (onlineCount) onlineCount.hidden = invisible;
+    const memberPanel = document.getElementById("homeRoomMembers") as HTMLElement | null;
+    if (memberPanel) memberPanel.hidden = invisible;
     updateHomeRoomMeta();
     const deleteButton = document.getElementById("deleteSave") as HTMLButtonElement | null;
     const createNodeButton = document.getElementById("createSaveNode") as HTMLButtonElement | null;
@@ -544,9 +575,17 @@ function updateRoomDetail(room: Room): void {
     setText("saveScenarioTitle", room.scenario_title || "-");
     setText("saveParticipants", activeRoomMembers(room).map((member) => member.username).join(", ") || "-");
     setText("roomDetailCode", room.room_code || room.code || "-");
+    const visibilityBadge = document.getElementById("roomDetailVisibility") as HTMLElement | null;
+    if (visibilityBadge) {
+        const isPublic = roomVisibility(room) === "public";
+        visibilityBadge.textContent = roomVisibilityLabel(room);
+        visibilityBadge.className = `badge ms-1 ${isPublic ? "bg-info text-dark" : "bg-secondary"}`;
+        visibilityBadge.style.display = "inline-block";
+    }
     setInput("recordRoomName", room.name);
     setText("homeRoomOnlineCount", formatRoomOnlineCount(room));
     renderRoomCharacterBindings(room);
+    renderRoomMemberList(room);
     updateStartScenarioButton(room);
     const archiveButton = document.getElementById("archiveRoom") as HTMLButtonElement | null;
     if (archiveButton) {
@@ -593,6 +632,19 @@ async function archiveCurrentRoom(): Promise<void> {
 interface RoomHouseRulesPayload {
     house_rules: RoomHouseRules;
     global_hints_enabled: boolean;
+    visibility?: "public" | "private";
+    dice_thresholds?: { critical: number; fumble: number };
+    dice_threshold_defaults?: { critical: number; fumble: number };
+}
+
+/** 读取房规弹窗中的大成功/大失败阈值输入；留空返回 null 表示沿用管理员默认值。 */
+function readHouseRuleDiceThreshold(elementId: string): number | null {
+    const input = document.getElementById(elementId) as HTMLInputElement | null;
+    const raw = input?.value.trim() || "";
+    if (!raw) return null;
+    const value = Number.parseInt(raw, 10);
+    if (!Number.isFinite(value)) return null;
+    return Math.max(0, Math.min(100, value));
 }
 
 async function openHouseRulesModal(): Promise<void> {
@@ -600,6 +652,10 @@ async function openHouseRulesModal(): Promise<void> {
     const modalElement = document.getElementById("roomHouseRulesModal");
     const checkbox = document.getElementById("houseRuleActionSuggestions") as HTMLInputElement | null;
     const globalHint = document.getElementById("houseRuleGlobalHint") as HTMLElement | null;
+    const visibilitySelect = document.getElementById("houseRuleVisibility") as HTMLSelectElement | null;
+    const criticalInput = document.getElementById("houseRuleDiceCritical") as HTMLInputElement | null;
+    const fumbleInput = document.getElementById("houseRuleDiceFumble") as HTMLInputElement | null;
+    const diceHint = document.getElementById("houseRuleDiceDefaultHint") as HTMLElement | null;
     if (!modalElement) return;
     try {
         const response = await TrpgApi.get<ApiResponse<RoomHouseRulesPayload>>(`/api/rooms/${encodeURIComponent(currentRoom.id)}/house-rules`);
@@ -613,6 +669,22 @@ async function openHouseRulesModal(): Promise<void> {
             checkbox.disabled = !globalEnabled;
         }
         if (globalHint) globalHint.hidden = globalEnabled;
+        if (visibilitySelect) visibilitySelect.value = response.data.visibility === "public" ? "public" : "private";
+        // 留空代表沿用管理员设置页配置的默认阈值，占位符展示当前默认值。
+        const defaults = response.data.dice_threshold_defaults;
+        const critical = response.data.house_rules?.dice_critical_threshold;
+        const fumble = response.data.house_rules?.dice_fumble_threshold;
+        if (criticalInput) {
+            criticalInput.value = critical === null || critical === undefined ? "" : String(critical);
+            criticalInput.placeholder = defaults ? `留空使用默认值（${defaults.critical}）` : "留空使用默认值";
+        }
+        if (fumbleInput) {
+            fumbleInput.value = fumble === null || fumble === undefined ? "" : String(fumble);
+            fumbleInput.placeholder = defaults ? `留空使用默认值（${defaults.fumble}）` : "留空使用默认值";
+        }
+        if (diceHint && defaults) {
+            diceHint.textContent = `留空表示使用管理员设置的默认阈值（大成功 ≤ ${defaults.critical}，大失败 ≥ ${defaults.fumble}）。`;
+        }
         new bootstrap.Modal(modalElement).show();
     } catch (error) {
         showNotification(`加载房规失败：${roomErrorMessage(error)}`, "error");
@@ -622,16 +694,25 @@ async function openHouseRulesModal(): Promise<void> {
 async function saveHouseRules(): Promise<void> {
     if (!currentRoom?.id) return;
     const checkbox = document.getElementById("houseRuleActionSuggestions") as HTMLInputElement | null;
+    const visibilitySelect = document.getElementById("houseRuleVisibility") as HTMLSelectElement | null;
     if (!checkbox) return;
     try {
         const response = await TrpgApi.put<ApiResponse<RoomHouseRulesPayload>>(`/api/rooms/${encodeURIComponent(currentRoom.id)}/house-rules`, {
-            house_rules: { action_suggestions_enabled: checkbox.checked },
+            house_rules: {
+                action_suggestions_enabled: checkbox.checked,
+                dice_critical_threshold: readHouseRuleDiceThreshold("houseRuleDiceCritical"),
+                dice_fumble_threshold: readHouseRuleDiceThreshold("houseRuleDiceFumble"),
+            },
+            visibility: visibilitySelect?.value || "private",
         });
         if (!response.success || !response.data) {
             showNotification(response.message || response.error || "保存房规失败", "error");
             return;
         }
         currentRoom.house_rules = response.data.house_rules;
+        if (response.data.visibility) currentRoom.visibility = response.data.visibility;
+        if (response.data.dice_thresholds) currentRoom.dice_thresholds = response.data.dice_thresholds;
+        updateRoomDetail(currentRoom);
         bootstrap.Modal.getInstance(document.getElementById("roomHouseRulesModal"))?.hide();
         showNotification("房规已保存", "success");
     } catch (error) {
@@ -703,6 +784,66 @@ function renderRoomMemberBindingRow(room: Room, member: RoomMember): string {
         changeButtonHtml: canChangeCard ? window.TrpgTemplates.render("room-bind-character-button", { userId: member.user_id || "" }) : "",
         removeButtonHtml: canRemove ? window.TrpgTemplates.render("room-remove-member-button", { userId: member.user_id || "" }) : "",
         promoteButtonHtml: canPromote ? window.TrpgTemplates.render("room-promote-member-button", { userId: member.user_id || "" }) : "",
+    });
+}
+
+function roomText(key: string, fallback: string, values?: Record<string, string | number>): string {
+    return window.TrpgI18n?.t(key, fallback, values) || fallback;
+}
+
+function renderRoomMemberList(room: Room | null): void {
+    const container = document.getElementById("roomMemberList") as HTMLElement | null;
+    if (!container) return;
+    const emptyHtml = `<p class="home-room-members-empty">${escapeRoomHtml(roomText("home.members.empty", "加入房间后这里会显示房间成员。"))}</p>`;
+    const visibleRoom = room && room.invisible_view !== true ? room : null;
+    const members = visibleRoom ? activeRoomMembers(visibleRoom) : [];
+    if (!visibleRoom || members.length === 0) {
+        container.innerHTML = emptyHtml;
+        return;
+    }
+    const groups: Array<{ key: string; fallback: string; members: RoomMember[] }> = [
+        {
+            key: "home.members.group.online",
+            fallback: "在线 {count}",
+            members: members.filter((member) => member.is_online === true),
+        },
+        {
+            key: "home.members.group.offline",
+            fallback: "离线 {count}",
+            members: members.filter((member) => member.is_online !== true),
+        },
+    ];
+    container.innerHTML = groups
+        .filter((group) => group.members.length > 0)
+        .map((group) => window.TrpgTemplates.render("room-member-group", {
+            title: roomText(group.key, group.fallback, { count: group.members.length }),
+            itemsHtml: group.members.map((member) => renderRoomMemberListItem(visibleRoom, member)).join(""),
+        }))
+        .join("");
+}
+
+function renderRoomMemberListItem(room: Room, member: RoomMember): string {
+    const isOnline = member.is_online === true;
+    const isSelf = String(member.user_id) === String(window.currentUser?.user_id);
+    const hasCard = Boolean(member.character_card?.name);
+    const selfBadgeHtml = isSelf
+        ? `<span class="home-room-member-self">${escapeRoomHtml(roomText("home.members.you", "你"))}</span>`
+        : "";
+    const roleKind = AuthModule.memberRoleKind(room, member);
+    const roleLabel = member.permission_label || roomPermissionLabel(room, member);
+    const roleBadgeHtml = `<span class="home-room-member-role is-${roleKind}">${escapeRoomHtml(roleLabel)}</span>`;
+    return window.TrpgTemplates.render("room-member-item", {
+        userId: String(member.user_id || ""),
+        selfClass: isSelf ? " is-self" : "",
+        roleClass: roleKind === "member" ? "" : ` is-${roleKind}`,
+        avatar: member.avatar || "/assets/avatars/default.jpg",
+        presenceClass: isOnline ? "is-online" : "is-offline",
+        presenceTitle: roomText(isOnline ? "home.members.online" : "home.members.offline", isOnline ? "在线" : "离线"),
+        username: member.username || "-",
+        roleBadgeHtml,
+        selfBadgeHtml,
+        cardClass: hasCard ? "" : " is-unbound",
+        cardName: hasCard ? member.character_card?.name : roomText("home.members.unbound", "未绑定角色卡"),
     });
 }
 
@@ -1048,6 +1189,7 @@ function clearCurrentRoom(): void {
     applyInvisibleRoomView(false);
     setText("homeRoomTitle", "未加入房间");
     setText("homeRoomOnlineCount", "在线玩家 0/0");
+    renderRoomMemberList(null);
     showRoomListView();
 }
 
@@ -1148,6 +1290,46 @@ function roomEscapeHtml(value: unknown): string {
 
 function roomErrorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
+}
+
+/** 房间可见性：默认私人（仅房间码可加入），公开房间展示给所有玩家。 */
+function roomVisibility(room: Room): "public" | "private" {
+    return room.visibility === "public" ? "public" : "private";
+}
+
+function roomVisibilityLabel(room: Room): string {
+    return roomVisibility(room) === "public" ? "公开" : "私人";
+}
+
+function roomVisibilityBadge(room: Room): string {
+    if (roomVisibility(room) !== "public") return "";
+    return `<span class="badge bg-info text-dark ms-1">公开</span>`;
+}
+
+async function copyRoomCodeToClipboard(code: string): Promise<void> {
+    const value = String(code || "").trim();
+    if (!value || value === "-") {
+        showNotification("暂无可复制的房间码", "error");
+        return;
+    }
+    try {
+        if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(value);
+        } else {
+            // 兼容不支持异步剪贴板 API 的环境
+            const helper = document.createElement("textarea");
+            helper.value = value;
+            helper.style.position = "fixed";
+            helper.style.opacity = "0";
+            document.body.appendChild(helper);
+            helper.select();
+            document.execCommand("copy");
+            helper.remove();
+        }
+        showNotification(`房间码已复制：${value}`, "success");
+    } catch {
+        showNotification("复制房间码失败，请手动复制", "error");
+    }
 }
 
 window.initRoomManagement = initRoomManagement;

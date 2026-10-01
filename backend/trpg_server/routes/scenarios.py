@@ -1,4 +1,4 @@
-﻿import json
+import json
 import logging
 import re
 import secrets
@@ -282,6 +282,34 @@ def _rooms_using_scenario(scenario_id):
     return result
 
 
+def _remove_scenario_knowledge(scenario_id, descriptor_path=None):
+    """删除剧本时同步清理知识库。
+
+    剧本的向量条目保存在全局向量库中，删除剧本文件并不会移除它们；如果不显式
+    清理，已删除剧本的知识仍可被检索到。这里同时移除向量库条目与知识索引文件。
+    """
+    deleted_vectors = 0
+    vector_store = current_app.extensions.get("vector_store")
+    if vector_store is not None:
+        try:
+            deleted_vectors = int(vector_store.delete_by_filter({"scenario_id": str(scenario_id)}))
+        except Exception:
+            logger.exception("Failed to delete scenario vectors: %s", scenario_id)
+    if descriptor_path is not None:
+        index_dir = Path(descriptor_path).parent / "knowledge-index"
+        if index_dir.exists():
+            for path in index_dir.glob("*.json"):
+                try:
+                    path.unlink()
+                except OSError:
+                    logger.exception("Failed to delete knowledge index file: %s", path)
+            try:
+                index_dir.rmdir()
+            except OSError:
+                pass
+    return deleted_vectors
+
+
 def load_scenarios():
     global _scenarios_cache, _cache_timestamp
 
@@ -334,9 +362,12 @@ def load_scenarios():
 def get_all_scenarios():
     try:
         scenarios = load_scenarios()
+        # 归档（例如删除时仍有房间占用）的剧本对所有列表都应不可见，否则删除后
+        # 其他玩家/其他链接仍会看到该剧本。
+        visible = [scenario for scenario in scenarios if not scenario.get("archived")]
         return success_response(
-            scenarios,
-            f"Successfully loaded {len(scenarios)} scenarios",
+            visible,
+            f"Successfully loaded {len(visible)} scenarios",
         )
     except Exception as exc:
         logger.exception("Failed to load scenarios")
@@ -812,6 +843,7 @@ def delete_scenario(scenario_id):
             clear_scenarios_cache()
             return success_response({"archived": True, "active_rooms": len(active_rooms)}, "Scenario archived because active rooms still use it")
         delete_scenario_record(target_file)
+        _remove_scenario_knowledge(scenario_id, target_file)
         cover_url = str((scenario_data or {}).get("cover") or "")
         if cover_url.startswith("/assets/scenarios/"):
             cover_path = safe_join(SCENARIOS_DIR, cover_url.replace("/assets/scenarios/", ""))

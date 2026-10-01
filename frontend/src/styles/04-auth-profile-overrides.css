@@ -355,94 +355,141 @@
     color: var(--color-text-muted);
 }
 
-.profile-dialog {
+/* 成员资料卡：点击聊天头像或右侧成员栏时，在该头像旁弹出（参考 Discord） */
+.member-profile-card {
     position: fixed;
-    inset: 0;
-    z-index: 10001;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    background: var(--theme-bg-overlay);
-}
-
-.profile-dialog.open {
-    display: flex;
-}
-
-.profile-dialog-surface {
-    display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
-    grid-template-columns: 220px minmax(0, 640px);
-    width: min(920px, calc(100vw - 32px));
-    height: min(720px, calc(100vh - 48px));
+    top: 0;
+    left: 0;
+    z-index: 9500;
+    width: min(300px, calc(100vw - 24px));
     overflow: hidden;
-    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
     background: var(--color-panel);
     box-shadow: var(--shadow-md);
-    transform: translateY(10px) scale(0.985);
-    transition: transform 0.18s ease;
+    /* 关闭时保留布局尺寸，便于在显示前测量宽高来定位 */
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(0.97);
+    transform-origin: top left;
+    transition: opacity 0.14s ease, transform 0.14s ease, visibility 0.14s ease;
 }
 
-.profile-dialog.open .profile-dialog-surface {
-    transform: translateY(0) scale(1);
+.member-profile-card.open {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+    transform: scale(1);
 }
 
-.profile-dialog-topbar {
-    grid-column: 1 / -1;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 18px 20px;
-    border-bottom: 1px solid var(--border-subtle);
-    background: color-mix(in srgb, var(--color-panel) 94%, transparent);
+.member-profile-banner {
+    height: 58px;
+    background: linear-gradient(135deg, var(--admin-name-from), var(--admin-name-to));
 }
 
-.profile-dialog-topbar h3 {
+.member-profile-body {
+    padding: 0 14px 14px;
+}
+
+.member-profile-avatar {
+    position: relative;
+    display: block;
+    width: 64px;
+    height: 64px;
+    margin-top: -32px;
+    border: 4px solid var(--color-panel);
+    border-radius: 50%;
+    background: var(--color-panel);
+    box-sizing: border-box;
+}
+
+.member-profile-avatar img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.member-profile-presence {
+    position: absolute;
+    right: -2px;
+    bottom: -2px;
+    width: 16px;
+    height: 16px;
+    border: 3px solid var(--color-panel);
+    border-radius: 50%;
+    background-color: var(--color-muted);
+    box-sizing: border-box;
+}
+
+.member-profile-presence.is-online {
+    background-color: var(--color-success);
+}
+
+.member-profile-presence.is-offline {
+    background-color: var(--color-muted);
+}
+
+.member-profile-name-row {
+    flex-wrap: wrap;
+    margin-top: 8px;
+    font-size: 1rem;
+}
+
+/* 卡片内名字允许换行，避免长用户名被省略号截断 */
+.member-profile-name-row .home-room-member-name-text {
+    overflow: visible;
+    white-space: normal;
+    text-overflow: clip;
+    font-weight: 700;
+}
+
+.member-profile-fields {
+    display: grid;
+    gap: 8px;
+    margin: 12px 0 0;
+}
+
+.member-profile-field {
+    display: grid;
+    grid-template-columns: 84px minmax(0, 1fr);
+    gap: 8px;
+    align-items: baseline;
+}
+
+.member-profile-field dt {
+    color: var(--color-text-muted);
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.member-profile-field dd {
     margin: 0;
     color: var(--color-text);
-    font-size: 1.08rem;
-    font-weight: 650;
-    letter-spacing: 0;
+    font-size: 0.88rem;
+    overflow-wrap: anywhere;
 }
 
-.profile-dialog-eyebrow {
-    margin-bottom: 3px;
-    color: var(--color-text-muted);
-    font-size: 0.72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0;
-}
-
-.profile-dialog-close {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 34px;
-    height: 34px;
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-sm);
-    color: var(--color-text-muted);
-    background: var(--color-panel);
-    transition: color 0.16s ease, border-color 0.16s ease, background 0.16s ease, transform 0.16s ease;
-}
-
-.profile-dialog-close:hover {
-    color: var(--color-text);
-    border-color: color-mix(in srgb, var(--border-subtle) 65%, var(--color-text));
-    background: var(--color-panel-muted);
-    transform: translateY(-1px);
+/* 用户设置页：左侧分类导航 + 右侧内容面板 */
+.user-settings-layout {
+    display: grid;
+    grid-template-columns: minmax(200px, 240px) minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
 }
 
 .profile-settings-sidebar {
-    grid-row: 2;
+    position: sticky;
+    top: 12px;
     display: flex;
     flex-direction: column;
     gap: 8px;
     padding: 16px;
     background: var(--color-panel-muted);
-    border-right: 1px solid var(--border-subtle);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
 }
 
 .profile-settings-sidebar-title {
@@ -531,6 +578,26 @@
     background: #f4c542;
 }
 
+.profile-color-fields {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.profile-color-input {
+    width: 48px;
+    height: 32px;
+    padding: 2px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background: var(--color-panel);
+    cursor: pointer;
+}
+
+.profile-color-arrow {
+    color: var(--color-muted);
+}
+
 .profile-pending-save-bar {
     position: sticky;
     bottom: 12px;
@@ -552,23 +619,7 @@
 }
 
 .profile-settings-content {
-    grid-row: 2;
-    padding: 18px;
-    overflow-y: auto;
-    scroll-behavior: smooth;
-}
-
-.profile-dialog-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    margin: -18px -18px 14px;
-    padding: 16px 18px;
-    border-bottom: 1px solid var(--border-subtle);
-    background: color-mix(in srgb, var(--theme-bg-panel) 94%, transparent);
+    min-width: 0;
 }
 
 .profile-panel-section {
@@ -580,7 +631,16 @@
     border-radius: var(--radius-sm);
     background: var(--color-panel);
     box-shadow: var(--theme-shadow-sm);
-    scroll-margin-top: 78px;
+}
+
+.profile-panel-section:not(.active) {
+    display: none;
+}
+
+.profile-section-hint {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: 0.88rem;
 }
 
 .profile-inline-action {
@@ -599,16 +659,13 @@
 }
 
 .profile-save-bar {
-    position: sticky;
-    bottom: -18px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    margin: 12px -18px -18px;
-    padding: 12px 18px;
+    margin-top: 8px;
+    padding-top: 14px;
     border-top: 1px solid var(--border-subtle);
-    background: color-mix(in srgb, var(--theme-bg-panel) 94%, transparent);
 }
 
 .profile-placeholder {
@@ -620,60 +677,135 @@
     background: var(--color-panel-muted);
 }
 
-.password-dialog {
-    position: fixed;
-    inset: 0;
-    z-index: 10002;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    background: var(--theme-bg-overlay);
-}
-
-.password-dialog.open {
-    display: flex;
-}
-
-.password-dialog-surface {
-    width: min(420px, calc(100vw - 32px));
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-sm);
-    background: var(--color-panel);
-    box-shadow: var(--shadow-md);
-    transform: translateY(10px) scale(0.98);
-    animation: passwordDialogIn 0.16s ease forwards;
-}
-
-.password-dialog .profile-dialog-header {
-    position: static;
-    margin: 0;
-    padding: 16px;
-}
-
-.password-dialog-body {
-    display: grid;
-    gap: 8px;
-    padding: 16px;
-}
-
-.password-dialog-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    padding: 12px 16px;
-    border-top: 1px solid var(--border-subtle);
-    background: var(--color-panel-muted);
-}
-
 .password-message {
     min-height: 20px;
     font-size: 0.9rem;
 }
 
-@keyframes passwordDialogIn {
-    to {
-        transform: translateY(0) scale(1);
-    }
+.settings-presence-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.settings-presence-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--color-text-muted);
+    background: var(--color-panel-muted);
+    transition: color 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.settings-presence-option:hover,
+.settings-presence-option:focus-visible {
+    color: var(--color-text);
+    border-color: color-mix(in srgb, var(--border-subtle) 60%, var(--color-text));
+}
+
+.settings-presence-option.active {
+    color: var(--color-text);
+    border-color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 12%, var(--color-panel));
+}
+
+/* 个人主页：身份卡与快捷入口 */
+.profile-hero {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 20px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--color-panel);
+    box-shadow: var(--theme-shadow-sm);
+}
+
+.profile-hero img {
+    border-radius: 50%;
+    border: 1px solid var(--border-subtle);
+}
+
+.profile-hero-body {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+
+.profile-hero-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+
+.profile-hero-heading h3 {
+    margin: 0;
+    color: var(--color-text);
+}
+
+.profile-role-chip {
+    padding: 2px 10px;
+    border: 1px solid var(--border-subtle);
+    border-radius: 999px;
+    color: var(--color-text-muted);
+    background: var(--color-panel-muted);
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0;
+}
+
+.profile-hero-meta {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+    overflow-wrap: anywhere;
+}
+
+.profile-hero-presence {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+}
+
+.profile-quick-links {
+    margin-top: 18px;
+}
+
+.profile-quick-links h4 {
+    margin: 0 0 10px;
+    color: var(--color-text);
+    font-size: 1rem;
+}
+
+.profile-quick-link-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+}
+
+.profile-quick-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    background: var(--color-panel);
+    box-shadow: var(--theme-shadow-sm);
+    transition: transform 0.16s ease, border-color 0.16s ease;
+}
+
+.profile-quick-link:hover,
+.profile-quick-link:focus-visible {
+    transform: translateY(-2px);
+    border-color: var(--color-primary);
 }
 
 /* 用户信息区域样式 */
@@ -1108,20 +1240,19 @@
 }
 
 @media (max-width: 760px) {
-    .profile-dialog-surface {
+    .user-settings-layout {
         grid-template-columns: 1fr;
     }
 
-    .profile-settings-sidebar,
-    .profile-settings-content {
-        grid-row: auto;
+    .profile-settings-sidebar {
+        position: static;
+        max-height: 220px;
+        overflow-y: auto;
     }
 
-    .profile-settings-sidebar {
-        max-height: 180px;
-        overflow-y: auto;
-        border-right: 0;
-        border-bottom: 1px solid var(--border-subtle);
+    .profile-hero {
+        flex-direction: column;
+        align-items: flex-start;
     }
 
     .role-config-header {
