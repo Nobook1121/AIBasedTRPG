@@ -1,0 +1,66 @@
+{
+  "id": "drifter",
+  "nameKey": "occupations.drifter",
+  "name": "流浪者",
+  "categoryKey": "occupationCategories.gray",
+  "category": "灰色/无职",
+  "order": 9,
+  "creditRating": {
+    "min": 0,
+    "max": 5
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + APP/DEX/STR * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "choose": [
+          "APP",
+          "DEX",
+          "STR"
+        ],
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "climb"
+    },
+    {
+      "skillKey": "jump"
+    },
+    {
+      "skillKey": "listen"
+    },
+    {
+      "skillKey": "navigate"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "stealth"
+    },
+    {
+      "freeChoice": "任意两项其他个人或时代特长"
+    }
+  ]
+}

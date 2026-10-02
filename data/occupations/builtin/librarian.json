@@ -1,0 +1,39 @@
+{
+  "id": "librarian",
+  "nameKey": "occupations.librarian",
+  "name": "图书馆管理员(原作向)",
+  "categoryKey": "occupationCategories.whiteCollar",
+  "category": "职工",
+  "order": 7,
+  "creditRating": {
+    "min": 9,
+    "max": 35
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "accounting"
+    },
+    {
+      "skillKey": "libraryUse"
+    },
+    {
+      "skillKey": "languageOther"
+    },
+    {
+      "skillKey": "languageOwn"
+    },
+    {
+      "freeChoice": "任意四项其他个人特长或专业书籍主题"
+    }
+  ]
+}

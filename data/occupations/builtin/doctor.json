@@ -1,0 +1,48 @@
+{
+  "id": "doctor",
+  "nameKey": "occupations.doctor",
+  "name": "医生(原作向)",
+  "categoryKey": "occupationCategories.medical",
+  "category": "医疗系统",
+  "order": 1,
+  "creditRating": {
+    "min": 30,
+    "max": 80
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "firstAid"
+    },
+    {
+      "skillKey": "medicine"
+    },
+    {
+      "skillKey": "languageOther",
+      "specialtyKey": "latin"
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "skillKey": "science",
+      "specialtyKey": "biology"
+    },
+    {
+      "skillKey": "science",
+      "specialtyKey": "pharmacy"
+    },
+    {
+      "freeChoice": "任意两种其他学术或个人特长"
+    }
+  ]
+}

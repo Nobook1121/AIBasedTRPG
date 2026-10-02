@@ -62,6 +62,8 @@ interface RoomHouseRules {
     // 留空（null）表示沿用管理员设置页配置的默认阈值。
     dice_critical_threshold?: number | null;
     dice_fumble_threshold?: number | null;
+    // 房间级技能基础值覆盖（键为 skillKey 或 skillKey.specialtyKey）。
+    skill_bases?: Record<string, number>;
 }
 
 interface ChatMessage {

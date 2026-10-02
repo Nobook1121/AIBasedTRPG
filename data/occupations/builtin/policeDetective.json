@@ -1,0 +1,66 @@
+{
+  "id": "policeDetective",
+  "nameKey": "occupations.policeDetective",
+  "name": "警探(原作向)",
+  "categoryKey": "occupationCategories.authority",
+  "category": "军警政",
+  "order": 5,
+  "creditRating": {
+    "min": 20,
+    "max": 50
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + STR * 2 + DEX * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "attribute": "STR",
+        "multiplier": 2
+      },
+      {
+        "attribute": "DEX",
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "firearms"
+    },
+    {
+      "skillKey": "law"
+    },
+    {
+      "skillKey": "listen"
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "skillKey": "spotHidden"
+    },
+    {
+      "skillKey": "disguise"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    }
+  ]
+}

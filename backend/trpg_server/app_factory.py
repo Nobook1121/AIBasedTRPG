@@ -6,6 +6,8 @@ import logging
 import sqlite3
 import os
 import json
+import threading
+import time
 import requests
 from pathlib import Path
 
@@ -115,6 +117,7 @@ def create_app(config=None):
     app.config["VECTOR_STORE"] = app.extensions["vector_store"]
     _configure_scenario_chunk_analyzer(app)
     register_socket_events(socketio)
+    _start_autosave_scheduler(app)
 
     @app.errorhandler(404)
     def _api_not_found(error):
@@ -150,6 +153,29 @@ def create_app(config=None):
         return error
 
     return app
+
+
+def _start_autosave_scheduler(app):
+    """启动服务端自动存档调度线程（不再依赖玩家浏览器定时触发）。"""
+    if app.config.get("TESTING") or app.config.get("AUTOSAVE_SCHEDULER_DISABLED"):
+        return
+    if app.extensions.get("autosave_scheduler_started"):
+        return
+    app.extensions["autosave_scheduler_started"] = True
+    tick_seconds = max(15, int(app.config.get("AUTOSAVE_SCHEDULER_TICK", 30)))
+
+    def _loop():
+        from trpg_server.routes.rooms import run_scheduled_autosaves
+
+        while True:
+            time.sleep(tick_seconds)
+            try:
+                with app.app_context():
+                    run_scheduled_autosaves()
+            except Exception:
+                logger.debug("Autosave scheduler tick failed", exc_info=True)
+
+    threading.Thread(target=_loop, name="autosave-scheduler", daemon=True).start()
 
 
 def _configure_scenario_chunk_analyzer(app):

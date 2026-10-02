@@ -2,10 +2,12 @@ import logging
 import random
 import re
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from trpg_server.agents.tools.base import AgentTool
-from trpg_server.json_store import write_json_atomic
+from trpg_server.json_store import read_json, write_json_atomic
+from trpg_server.settings import CONFIG_DIR
 
 logger = logging.getLogger(__name__)
 DIFFICULTY_ALIASES = {"regular": "regular", "普通": "regular", "hard": "hard", "困难": "hard", "extreme": "extreme", "极难": "extreme"}
@@ -71,6 +73,75 @@ def _active_members(context: Any) -> list[dict[str, Any]]:
 def _find_member(player_name: str, context: Any) -> dict[str, Any] | None:
     expected = player_name.casefold()
     return next((m for m in _active_members(context) if m.get("is_active", True) is not False and m.get("status", "active") != "removed" and str(m.get("username") or "").casefold() == expected), None)
+# 常见的中文技能名变体 -> 技能目录中的正式名称（大小写/字形差异的兼容）。
+CHECK_NAME_ALIASES = {
+    "侦查": "侦察", "观察": "侦察", "搜索": "侦察", "调查": "侦察",
+    "倾听": "聆听", "图书馆": "图书馆使用", "驾驶": "汽车驾驶", "驾车": "汽车驾驶",
+    "隐藏": "潜行", "躲藏": "潜行", "电脑使用": "计算机使用",
+}
+# COC7 技能目录缓存：(配置文件路径, mtime, 技能名集合)。
+_CHECK_NAME_CACHE: tuple[str, float, set[str]] | None = None
+
+
+def _skill_catalog_names(config_dir: Any = None) -> set[str]:
+    """加载 COC7 技能目录，返回可接受的技能名集合（英文键 + 本地化中文名 + 专精）。
+
+    结果按文件 mtime 缓存，避免每次检定都读盘。
+    """
+    global _CHECK_NAME_CACHE
+    base = Path(config_dir) if config_dir else CONFIG_DIR
+    path = base / "character_skills.json"
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
+        return set()
+    if _CHECK_NAME_CACHE is not None and _CHECK_NAME_CACHE[0] == str(path) and _CHECK_NAME_CACHE[1] == mtime:
+        return _CHECK_NAME_CACHE[2]
+    catalog = read_json(path, default={})
+    names: set[str] = set()
+    if isinstance(catalog, dict):
+        locales = catalog.get("locales") if isinstance(catalog.get("locales"), dict) else {}
+        locale = str(catalog.get("defaultLocale") or "zh-CN")
+        labels = locales.get(locale) if isinstance(locales.get(locale), dict) else {}
+        skills = catalog.get("skills") if isinstance(catalog.get("skills"), list) else []
+        for item in skills:
+            if not isinstance(item, dict):
+                continue
+            key = str(item.get("key") or "").strip()
+            if key:
+                names.add(key.casefold())
+            label = labels.get(str(item.get("labelKey") or ""))
+            if label:
+                names.add(str(label).casefold())
+            specialties = item.get("specialties") if isinstance(item.get("specialties"), list) else []
+            for specialty in specialties:
+                if not isinstance(specialty, dict):
+                    continue
+                specialty_key = str(specialty.get("key") or "").strip()
+                if specialty_key:
+                    names.add(specialty_key.casefold())
+                specialty_label = labels.get(str(specialty.get("labelKey") or ""))
+                if specialty_label:
+                    names.add(str(specialty_label).casefold())
+    names.update(name.casefold() for name in SKILL_KEY_LABELS)
+    names.update(label.casefold() for label in SKILL_KEY_LABELS.values())
+    _CHECK_NAME_CACHE = (str(path), mtime, names)
+    return names
+
+
+def _is_known_check_name(check_name: str, config_dir: Any = None) -> bool:
+    """判断检定名是否为 COC7 认可的属性、技能或专精（接受常见中文变体）。"""
+    text = str(check_name or "").strip()
+    if not text:
+        return False
+    if text.endswith("检定"):
+        text = text[:-2].strip()
+    if ATTRIBUTE_ALIASES.get(text) or ATTRIBUTE_ALIASES.get(text.upper()):
+        return True
+    text = CHECK_NAME_ALIASES.get(text, text)
+    return text.casefold() in _skill_catalog_names(config_dir)
+
+
 def _lookup_check_value(card: dict[str, Any], check_name: str) -> int | None:
     normalized_name = str(check_name or "").strip()
     key = ATTRIBUTE_ALIASES.get(normalized_name) or ATTRIBUTE_ALIASES.get(normalized_name.upper())
@@ -213,7 +284,10 @@ def roll_room_check(arguments: dict[str, Any], context: Any, rng: Callable[[int]
         card = member.get("character_card")
         if not isinstance(card, dict): return {"error": f"player {player_name} has no bound character card"}
         base_target = _lookup_check_value(card, check_name)
-        if base_target is None or base_target < 0: return {"error": f"{check_name} was not found on player {player_name}'s character card"}
+        if base_target is None or base_target < 0:
+            if not _is_known_check_name(check_name, getattr(context, "config_dir", None)):
+                return {"error": f"“{check_name}”不是 COC7 标准属性或技能目录中的技能，已拒绝该检定；请改用标准检定名（如 侦察/聆听/心理学/力量/敏捷）或角色卡上已有的技能。"}
+            return {"error": f"{check_name} was not found on player {player_name}'s character card"}
         if base_target > 100: return {"error": f"{check_name} value must be between 0 and 100"}
         threshold = _adjust_threshold(_threshold(base_target, difficulty), arguments.get("adjustment", arguments.get("correction")))
         display_name = _resolve_check_display_name(card, check_name)

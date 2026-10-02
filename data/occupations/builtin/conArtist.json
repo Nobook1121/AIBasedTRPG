@@ -1,0 +1,70 @@
+{
+  "id": "conArtist",
+  "nameKey": "occupations.conArtist",
+  "name": "欺诈师",
+  "categoryKey": "occupationCategories.criminal",
+  "category": "罪犯",
+  "order": 5,
+  "creditRating": {
+    "min": 10,
+    "max": 65
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + APP * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "attribute": "APP",
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "appraise"
+    },
+    {
+      "skillKey": "artCraft",
+      "specialtyKey": "acting"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "law"
+        },
+        {
+          "skillKey": "languageOther"
+        }
+      ]
+    },
+    {
+      "skillKey": "listen"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "skillKey": "sleightOfHand"
+    }
+  ]
+}

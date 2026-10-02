@@ -1,0 +1,46 @@
+{
+  "id": "studentIntern",
+  "nameKey": "occupations.studentIntern",
+  "name": "学生/实习生",
+  "categoryKey": "occupationCategories.academic",
+  "category": "学者",
+  "order": 7,
+  "creditRating": {
+    "min": 5,
+    "max": 10
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "chooseOne": [
+        {
+          "skillKey": "languageOwn"
+        },
+        {
+          "skillKey": "languageOther"
+        }
+      ]
+    },
+    {
+      "skillKey": "libraryUse"
+    },
+    {
+      "skillKey": "listen"
+    },
+    {
+      "freeChoice": "任意三个学习的专业"
+    },
+    {
+      "freeChoice": "任意两项其他个人或时代特长"
+    }
+  ]
+}

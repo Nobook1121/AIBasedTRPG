@@ -1,0 +1,66 @@
+{
+  "id": "exorcist",
+  "nameKey": "occupations.exorcist",
+  "name": "除魅师(现代)",
+  "categoryKey": "occupationCategories.religion",
+  "category": "宗教相关",
+  "order": 5,
+  "creditRating": {
+    "min": 20,
+    "max": 50
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "driveAuto"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "fighting",
+          "specialtyKey": "brawl"
+        },
+        {
+          "skillKey": "firearms"
+        }
+      ]
+    },
+    {
+      "skillKey": "history"
+    },
+    {
+      "skillKey": "occult"
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "skillKey": "stealth"
+    }
+  ]
+}

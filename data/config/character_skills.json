@@ -55,7 +55,7 @@
       "labelKey": "skills.lipRead",
       "repeatable": 1,
       "category": "探索",
-      "base": 0,
+      "base": 1,
       "specialties": []
     },
     {
@@ -79,7 +79,7 @@
       "labelKey": "skills.computerUse",
       "repeatable": 1,
       "category": "探索",
-      "base": 0,
+      "base": 5,
       "specialties": [],
       "eraLimited": true
     },
@@ -278,35 +278,43 @@
       "specialties": [
         {
           "key": "brawl",
-          "labelKey": "skillSpecialties.fighting.brawl"
+          "labelKey": "skillSpecialties.fighting.brawl",
+          "base": 25
         },
         {
           "key": "sword",
-          "labelKey": "skillSpecialties.fighting.sword"
+          "labelKey": "skillSpecialties.fighting.sword",
+          "base": 20
         },
         {
           "key": "spear",
-          "labelKey": "skillSpecialties.fighting.spear"
+          "labelKey": "skillSpecialties.fighting.spear",
+          "base": 20
         },
         {
           "key": "axe",
-          "labelKey": "skillSpecialties.fighting.axe"
+          "labelKey": "skillSpecialties.fighting.axe",
+          "base": 15
         },
         {
           "key": "garrote",
-          "labelKey": "skillSpecialties.fighting.garrote"
+          "labelKey": "skillSpecialties.fighting.garrote",
+          "base": 15
         },
         {
           "key": "chainsaw",
-          "labelKey": "skillSpecialties.fighting.chainsaw"
+          "labelKey": "skillSpecialties.fighting.chainsaw",
+          "base": 10
         },
         {
           "key": "flail",
-          "labelKey": "skillSpecialties.fighting.flail"
+          "labelKey": "skillSpecialties.fighting.flail",
+          "base": 10
         },
         {
           "key": "whip",
-          "labelKey": "skillSpecialties.fighting.whip"
+          "labelKey": "skillSpecialties.fighting.whip",
+          "base": 5
         }
       ]
     },
@@ -319,31 +327,38 @@
       "specialties": [
         {
           "key": "handgun",
-          "labelKey": "skillSpecialties.firearms.handgun"
+          "labelKey": "skillSpecialties.firearms.handgun",
+          "base": 20
         },
         {
           "key": "rifleShotgun",
-          "labelKey": "skillSpecialties.firearms.rifleShotgun"
+          "labelKey": "skillSpecialties.firearms.rifleShotgun",
+          "base": 25
         },
         {
           "key": "submachineGun",
-          "labelKey": "skillSpecialties.firearms.submachineGun"
+          "labelKey": "skillSpecialties.firearms.submachineGun",
+          "base": 15
         },
         {
           "key": "sniperRifle",
-          "labelKey": "skillSpecialties.firearms.sniperRifle"
+          "labelKey": "skillSpecialties.firearms.sniperRifle",
+          "base": 5
         },
         {
           "key": "bow",
-          "labelKey": "skillSpecialties.firearms.bow"
+          "labelKey": "skillSpecialties.firearms.bow",
+          "base": 15
         },
         {
           "key": "machineGun",
-          "labelKey": "skillSpecialties.firearms.machineGun"
+          "labelKey": "skillSpecialties.firearms.machineGun",
+          "base": 10
         },
         {
           "key": "heavyWeapon",
-          "labelKey": "skillSpecialties.firearms.heavyWeapon"
+          "labelKey": "skillSpecialties.firearms.heavyWeapon",
+          "base": 10
         }
       ]
     },
@@ -368,7 +383,7 @@
       "labelKey": "skills.demolitions",
       "repeatable": 1,
       "category": "战斗",
-      "base": 0,
+      "base": 1,
       "specialties": []
     },
     {
@@ -376,7 +391,7 @@
       "labelKey": "skills.artillery",
       "repeatable": 1,
       "category": "战斗",
-      "base": 0,
+      "base": 1,
       "specialties": []
     },
     {
@@ -440,7 +455,7 @@
       "labelKey": "skills.diving",
       "repeatable": 1,
       "category": "运动",
-      "base": 0,
+      "base": 1,
       "specialties": []
     },
     {
@@ -512,7 +527,7 @@
       "labelKey": "skills.electronics",
       "repeatable": 1,
       "category": "知识",
-      "base": 0,
+      "base": 1,
       "specialties": [],
       "eraLimited": true
     },
@@ -794,6 +809,7 @@
       "repeatable": 3,
       "category": "其他",
       "base": 0,
+      "userDefinedBase": true,
       "specialties": []
     }
   ],

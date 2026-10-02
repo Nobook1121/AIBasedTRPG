@@ -1,0 +1,55 @@
+{
+  "id": "firefighter",
+  "nameKey": "occupations.firefighter",
+  "name": "消防员",
+  "categoryKey": "occupationCategories.authority",
+  "category": "军警政",
+  "order": 7,
+  "creditRating": {
+    "min": 9,
+    "max": 30
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + STR/DEX * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "choose": [
+          "STR",
+          "DEX"
+        ],
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "climb"
+    },
+    {
+      "skillKey": "dodge"
+    },
+    {
+      "skillKey": "driveAuto"
+    },
+    {
+      "skillKey": "firstAid"
+    },
+    {
+      "skillKey": "jump"
+    },
+    {
+      "skillKey": "mechanicalRepair"
+    },
+    {
+      "skillKey": "operateHeavyMachinery"
+    },
+    {
+      "skillKey": "throw"
+    }
+  ]
+}

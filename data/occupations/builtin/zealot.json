@@ -1,0 +1,59 @@
+{
+  "id": "zealot",
+  "nameKey": "occupations.zealot",
+  "name": "狂热者",
+  "categoryKey": "occupationCategories.religion",
+  "category": "宗教相关",
+  "order": 6,
+  "creditRating": {
+    "min": 0,
+    "max": 30
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + APP/POW * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "choose": [
+          "APP",
+          "POW"
+        ],
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "history"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "skillKey": "stealth"
+    },
+    {
+      "freeChoice": "任意三项其他个人或时代特长"
+    }
+  ]
+}

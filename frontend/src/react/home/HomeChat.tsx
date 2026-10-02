@@ -116,6 +116,7 @@ export function HomeChat() {
                     <div id="aiSuggestions" className="chat-suggestions" hidden aria-live="polite" />
 
                     <div className="chat-input p-3">
+                        <div id="typingIndicator" className="chat-typing-indicator" hidden aria-live="polite" />
                         <div className="input-group">
                             <button
                                 className="btn btn-outline-secondary"

@@ -1,0 +1,51 @@
+{
+  "id": "pilot",
+  "nameKey": "occupations.pilot",
+  "name": "飞行员",
+  "categoryKey": "occupationCategories.sports",
+  "category": "运动/探险",
+  "order": 10,
+  "creditRating": {
+    "min": 20,
+    "max": 70
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + DEX * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "attribute": "DEX",
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "electricalRepair"
+    },
+    {
+      "skillKey": "mechanicalRepair"
+    },
+    {
+      "skillKey": "navigate"
+    },
+    {
+      "skillKey": "operateHeavyMachinery"
+    },
+    {
+      "skillKey": "pilot",
+      "specialtyKey": "aircraft"
+    },
+    {
+      "skillKey": "science",
+      "specialtyKey": "astronomy"
+    },
+    {
+      "freeChoice": "任意两项其他个人或时代特长"
+    }
+  ]
+}

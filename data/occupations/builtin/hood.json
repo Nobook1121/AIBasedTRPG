@@ -1,0 +1,68 @@
+{
+  "id": "hood",
+  "nameKey": "occupations.hood",
+  "name": "混混",
+  "categoryKey": "occupationCategories.criminal",
+  "category": "罪犯",
+  "order": 11,
+  "creditRating": {
+    "min": 3,
+    "max": 10
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + STR/DEX * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "choose": [
+          "STR",
+          "DEX"
+        ],
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "climb"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "fighting"
+    },
+    {
+      "skillKey": "firearms"
+    },
+    {
+      "skillKey": "jump"
+    },
+    {
+      "skillKey": "sleightOfHand"
+    },
+    {
+      "skillKey": "stealth"
+    },
+    {
+      "skillKey": "throw"
+    }
+  ]
+}

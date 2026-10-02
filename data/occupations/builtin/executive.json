@@ -1,0 +1,55 @@
+{
+  "id": "executive",
+  "nameKey": "occupations.executive",
+  "name": "中高层管理人员",
+  "categoryKey": "occupationCategories.whiteCollar",
+  "category": "职工",
+  "order": 4,
+  "creditRating": {
+    "min": 20,
+    "max": 80
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "accounting"
+    },
+    {
+      "skillKey": "languageOther"
+    },
+    {
+      "skillKey": "law"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "freeChoice": "任意两项其他个人或时代特长"
+    }
+  ]
+}

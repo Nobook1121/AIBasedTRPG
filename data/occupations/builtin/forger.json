@@ -1,0 +1,49 @@
+{
+  "id": "forger",
+  "nameKey": "occupations.forger",
+  "name": "赝造者",
+  "categoryKey": "occupationCategories.criminal",
+  "category": "罪犯",
+  "order": 9,
+  "creditRating": {
+    "min": 20,
+    "max": 60
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "accounting"
+    },
+    {
+      "skillKey": "appraise"
+    },
+    {
+      "skillKey": "artCraft",
+      "specialtyKey": "forgery"
+    },
+    {
+      "skillKey": "history"
+    },
+    {
+      "skillKey": "libraryUse"
+    },
+    {
+      "skillKey": "spotHidden"
+    },
+    {
+      "skillKey": "sleightOfHand"
+    },
+    {
+      "freeChoice": "任意一项其他个人或时代特长"
+    }
+  ]
+}

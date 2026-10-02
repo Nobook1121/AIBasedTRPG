@@ -164,31 +164,56 @@ def parse_scenario_document(raw: bytes, filename: str, ocr_provider=None) -> Par
     return _text_document(raw, filename)
 
 
-def chunk_parsed_document(document: ParsedDocument, target_min: int = 800, target_max: int = 1500, overlap: int = 150) -> list[DocumentChunk]:
+def chunk_parsed_document(document: ParsedDocument, target_min: int = 800, target_max: int = 800, overlap: int = 150) -> list[DocumentChunk]:
     """按标题把文档切分为语义块（一个场景/章节一个块）。
 
     直接导入要求「一个场景一个块」，Word/PDF 的标题（转为 Markdown ``#``）与
     ``第X章`` 等标题行即场景/章节边界，因此遇到标题就开启新块；只有正文超过
     ``target_max`` 时才继续拆分超大块。``target_min``/``overlap`` 保留以兼容
     既有调用签名。
+
+    ``target_max`` 是「子块」上限：同一章节被拆出的多个子块共享同一
+    ``chapter_path``，检索命中后可据此回填整章上下文。
     """
     if not document.markdown.strip():
         return []
     chunks: list[DocumentChunk] = []
     current: list[str] = []
+    section_title: str | None = None
 
     def flush() -> None:
+        if not current:
+            return
+        marker = section_title.lstrip("#").strip() if section_title else ""
+        chapter_path = [marker] if marker else []
         text = "\n".join(current).strip()
         if text:
-            chunks.append(DocumentChunk(f"chunk-{len(chunks)+1:04d}", text, None, None, []))
+            first_line = text.splitlines()[0].lstrip("#").strip()
+            # 被继续切分的续块不含标题行，补上所属章节，保证每块自带语境。
+            if marker and not first_line.startswith(marker[:12]):
+                text = f"【{marker}】\n{text}"
+            chunks.append(DocumentChunk(f"chunk-{len(chunks)+1:04d}", text, None, None, chapter_path))
         current.clear()
 
     for line in document.markdown.splitlines():
         # 标题行作为新的场景/章节起点；首个标题之前的内容自成一块。
-        if _heading(line) and current:
+        if _heading(line):
             flush()
+            section_title = line.strip()
         current.append(line)
         if len("\n".join(current)) >= target_max:
-            flush()
+            # 超过上限时优先在最近的空行（自然段边界）处切分，避免把句子拦腰截断。
+            split_at = None
+            for index in range(len(current) - 1, 0, -1):
+                if not current[index].strip():
+                    split_at = index
+                    break
+            if split_at is not None and split_at >= len(current) // 3:
+                tail = current[split_at + 1:]
+                del current[split_at:]
+                flush()
+                current.extend(tail)
+            else:
+                flush()
     flush()
     return chunks

@@ -1,0 +1,49 @@
+{
+  "id": "judicialOfficer",
+  "nameKey": "occupations.judicialOfficer",
+  "name": "司法人员",
+  "categoryKey": "occupationCategories.authority",
+  "category": "军警政",
+  "order": 9,
+  "creditRating": {
+    "min": 20,
+    "max": 40
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "driveAuto"
+    },
+    {
+      "skillKey": "fighting",
+      "specialtyKey": "brawl"
+    },
+    {
+      "skillKey": "firearms"
+    },
+    {
+      "skillKey": "law"
+    },
+    {
+      "skillKey": "persuade"
+    },
+    {
+      "skillKey": "stealth"
+    },
+    {
+      "skillKey": "spotHidden"
+    },
+    {
+      "freeChoice": "任意一项其他个人或时代特长"
+    }
+  ]
+}

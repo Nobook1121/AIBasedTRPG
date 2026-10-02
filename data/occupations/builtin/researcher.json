@@ -1,0 +1,55 @@
+{
+  "id": "researcher",
+  "nameKey": "occupations.researcher",
+  "name": "研究员",
+  "categoryKey": "occupationCategories.academic",
+  "category": "学者",
+  "order": 5,
+  "creditRating": {
+    "min": 9,
+    "max": 30
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "history"
+    },
+    {
+      "skillKey": "libraryUse"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "languageOther"
+    },
+    {
+      "skillKey": "spotHidden"
+    },
+    {
+      "freeChoice": "任意三项其他学术领域"
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "id": "governmentOfficial",
+  "nameKey": "occupations.governmentOfficial",
+  "name": "政府官员",
+  "categoryKey": "occupationCategories.authority",
+  "category": "军警政",
+  "order": 10,
+  "creditRating": {
+    "min": 50,
+    "max": 90
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + APP * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "attribute": "APP",
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "charm"
+    },
+    {
+      "skillKey": "history"
+    },
+    {
+      "skillKey": "intimidate"
+    },
+    {
+      "skillKey": "fastTalk"
+    },
+    {
+      "skillKey": "listen"
+    },
+    {
+      "skillKey": "languageOwn"
+    },
+    {
+      "skillKey": "persuade"
+    },
+    {
+      "skillKey": "psychology"
+    }
+  ]
+}

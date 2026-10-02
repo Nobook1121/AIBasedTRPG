@@ -21,13 +21,14 @@ interface RoomEntrySelection {
 }
 
 let currentRoom: Room | null = null;
-let autosaveTimer: number | null = null;
 let previewNodeFilename: string | null = null;
 let roomEntryCharacterModal: BootstrapModalInstance | null = null;
 let roomEntrySelectionResolver: ((result: RoomEntrySelection | null) => void) | null = null;
 let roomEntrySelectionSettled = false;
 let roomEntrySelectionAction: RoomEntrySelection["action"] = "join";
 let roomEntrySelectionRoomId: string | null = null;
+// 目标房间的房规技能基础值上限（进入房间选择角色卡时用于校验）。
+let roomEntrySkillBases: Record<string, number> = {};
 const roomActionLocks = new Set<string>();
 
 function initRoomManagement(): void {
@@ -62,6 +63,9 @@ function initRoomManagement(): void {
     });
     document.getElementById("saveHouseRules")?.addEventListener("click", () => {
         void saveHouseRules();
+    });
+    document.getElementById("openRoomSkillBaseSettings")?.addEventListener("click", () => {
+        window.COC7CharacterSheet?.openSkillBaseSettings?.("room");
     });
     document.getElementById("startScenario")?.addEventListener("click", () => {
         void window.startScenario?.();
@@ -128,6 +132,31 @@ function getLastRoomCharacterStorageKey(roomId?: string): string {
 
 function isElevatedUser(): boolean {
     return ["ADMIN", "OWNER"].includes(window.currentUser?.role || "");
+}
+
+/** 房规中的技能基础值覆盖表（未配置时为空对象）。 */
+function roomSkillBaseOverrides(room: Room | null | undefined): Record<string, number> {
+    const bases = room?.house_rules?.skill_bases;
+    return bases && typeof bases === "object" ? bases : {};
+}
+
+/**
+ * 校验角色卡技能基础值是否超过房规上限：超上限时提示，用户确认后返回按上限裁剪后的卡片。
+ * 返回 null 表示用户放弃使用该角色卡；无上限或无超限时原样返回。
+ */
+function enforceSkillBaseLimits(
+    characterCard: Partial<COC7CharacterCard> | null | undefined,
+    overrides: Record<string, number>,
+    actionLabel: string
+): Partial<COC7CharacterCard> | null {
+    if (!characterCard) return null;
+    if (!Object.keys(overrides).length) return characterCard;
+    const card = characterCard as COC7CharacterCard;
+    const overflows = window.COC7CharacterSheet?.collectCardSkillBaseOverflows?.(card, overrides) || [];
+    if (!overflows.length) return characterCard;
+    const confirmed = window.confirm(`${actionLabel}\n以下技能基础值超过房间规则上限：${overflows.join("、")}\n继续将自动把超出部分降低为房间规则上限。`);
+    if (!confirmed) return null;
+    return window.COC7CharacterSheet?.clampCardSkillBases?.(card, overrides) || characterCard;
 }
 
 function getCharacterCards(): COC7CharacterCard[] {
@@ -198,9 +227,14 @@ function populateRoomEntryCharacterSelect(): void {
     if (invisibleButton) invisibleButton.hidden = !isElevatedUser() || roomEntrySelectionAction === "create";
 }
 
-async function promptRoomEntryCharacterSelection(action: RoomEntrySelection["action"], roomId: string | null = null): Promise<RoomEntrySelection | null> {
+async function promptRoomEntryCharacterSelection(
+    action: RoomEntrySelection["action"],
+    roomId: string | null = null,
+    skillBases: Record<string, number> = {}
+): Promise<RoomEntrySelection | null> {
     roomEntrySelectionAction = action;
     roomEntrySelectionRoomId = roomId;
+    roomEntrySkillBases = skillBases;
     // Character management loads cards asynchronously during application
     // startup. Refreshing the room list can happen before that request ends.
     await window.reloadCharacterManagement?.();
@@ -224,11 +258,14 @@ function settleRoomEntrySelection(result: RoomEntrySelection | null): void {
 }
 
 async function confirmRoomEntryCharacterSelection(): Promise<void> {
-    const characterCard = getSelectedCharacterCardSnapshot("roomEntryCharacterSelect");
-    if (!characterCard) {
+    const selectedCard = getSelectedCharacterCardSnapshot("roomEntryCharacterSelect");
+    if (!selectedCard) {
         showNotification("请选择要使用的角色卡", "error");
         return;
     }
+    // 超出房规上限时提示；用户取消则停留在选择弹窗，可改选其他角色卡。
+    const characterCard = enforceSkillBaseLimits(selectedCard, roomEntrySkillBases, "该角色卡的基础值超过本房间规则上限。");
+    if (!characterCard) return;
     settleRoomEntrySelection({ action: roomEntrySelectionAction, characterCard });
     if (roomEntrySelectionRoomId) {
         syncRoomCharacterSelection(roomEntrySelectionRoomId, characterCard);
@@ -462,7 +499,7 @@ async function openRoomDetail(roomId: string): Promise<void> {
             return;
         }
 
-        const roomEntrySelection = await promptRoomEntryCharacterSelection("join", roomId);
+        const roomEntrySelection = await promptRoomEntryCharacterSelection("join", roomId, roomSkillBaseOverrides(data.data));
         if (!roomEntrySelection || roomEntrySelection.createCharacter || roomEntrySelection.action === "create") return;
 
         if (roomEntrySelection.action === "invisible") {
@@ -512,6 +549,8 @@ async function enterRoom(room: Room): Promise<void> {
 
     currentRoom = room;
     window.currentRoom = currentRoom;
+    // 房间规则优先级最高：切换房间后重建技能基础值，使新房规即时生效。
+    void window.COC7CharacterSheet?.reloadSkillBases?.();
     window.restoreThinkingState?.();
     window.resumePendingAIRequest?.();
     const invisibleView = room.invisible_view === true;
@@ -534,13 +573,35 @@ async function enterRoom(room: Room): Promise<void> {
     window.setChatReadOnly?.(invisibleView);
     applyInvisibleRoomView(invisibleView);
     if (invisibleView) {
-        stopAutosaveTimer();
         renderRoomNodeList([]);
         return;
     }
+    await enforceSelfCardSkillBaseLimit(room);
     window.joinSocketRoom?.(room.id);
-    startAutosaveTimer();
     await loadRoomNodes();
+}
+
+/**
+ * 进入房间后兜底校验当前用户角色卡：超过房规上限时提示，用户确认后按上限裁剪并回写服务器。
+ * 覆盖「按房间码加入」这类进入前拿不到房规的场景。
+ */
+async function enforceSelfCardSkillBaseLimit(room: Room): Promise<void> {
+    const overrides = roomSkillBaseOverrides(room);
+    if (!Object.keys(overrides).length) return;
+    const userId = String(window.currentUser?.user_id || "");
+    if (!userId) return;
+    const card = (room.members || []).find((member) => String(member.user_id) === userId)?.character_card;
+    if (!card) return;
+    const clamped = enforceSkillBaseLimits(card, overrides, "该角色卡的基础值超过本房间规则上限。");
+    if (!clamped || clamped === card) return;
+    const response = await TrpgApi.put<ApiResponse<Room>>(
+        `/api/rooms/${encodeURIComponent(room.id)}/members/${encodeURIComponent(userId)}/character`,
+        { character_card: clamped }
+    );
+    if (!response.success || !response.data) return;
+    currentRoom = response.data;
+    window.currentRoom = currentRoom;
+    updateRoomDetail(currentRoom);
 }
 
 function applyInvisibleRoomView(invisible: boolean): void {
@@ -603,6 +664,30 @@ function updateRoomDetail(room: Room): void {
 window.refreshRoomArchiveUi = (): void => {
     if (currentRoom) updateRoomDetail(currentRoom);
 };
+
+/**
+ * 收到「房间成员变化」事件时重新拉取当前房间，刷新在线状态、角色配色与成员列表。
+ * 只更新成员相关 UI，不重绘聊天记录，避免打断正在阅读的消息。
+ */
+async function refreshCurrentRoomMembers(): Promise<void> {
+    const room = currentRoom;
+    if (!room?.id || room.invisible_view) return;
+    try {
+        const response = await TrpgApi.get<ApiResponse<Room>>(`/api/rooms/${encodeURIComponent(room.id)}`);
+        if (!response.success || !response.data) return;
+        const nextRoom: Room = { ...response.data, messages: room.messages ?? [] };
+        currentRoom = nextRoom;
+        window.currentRoom = nextRoom;
+        updateRoomDetail(nextRoom);
+        setText("homeRoomOnlineCount", formatRoomOnlineCount(nextRoom));
+        renderRoomMemberList(nextRoom);
+    } catch {
+        /* 网络异常时静默忽略，等待下一次事件刷新 */
+    }
+}
+
+window.refreshCurrentRoomMembers = refreshCurrentRoomMembers;
+window.refreshRoomNodes = loadRoomNodes;
 
 function canManageRoom(room: Room): boolean {
     if (isElevatedUser()) return true;
@@ -713,6 +798,7 @@ async function saveHouseRules(): Promise<void> {
         if (response.data.visibility) currentRoom.visibility = response.data.visibility;
         if (response.data.dice_thresholds) currentRoom.dice_thresholds = response.data.dice_thresholds;
         updateRoomDetail(currentRoom);
+        void window.COC7CharacterSheet?.reloadSkillBases?.();
         bootstrap.Modal.getInstance(document.getElementById("roomHouseRulesModal"))?.hide();
         showNotification("房规已保存", "success");
     } catch (error) {
@@ -880,9 +966,15 @@ async function confirmRoomCharacterBinding(): Promise<void> {
 
 async function confirmRoomCharacterBindingUnlocked(userId: string): Promise<void> {
     if (!currentRoom?.id) return;
-    const characterCard = getSelectedCharacterCardSnapshot("roomBindCharacterSelect");
-    if (!characterCard) {
+    const selectedCard = getSelectedCharacterCardSnapshot("roomBindCharacterSelect");
+    if (!selectedCard) {
         showNotification("请选择要绑定的角色卡", "error");
+        return;
+    }
+    // 超出房规上限时提示；用户取消则中止本次绑定，可先调整角色卡。
+    const characterCard = enforceSkillBaseLimits(selectedCard, roomSkillBaseOverrides(currentRoom), "该角色卡的基础值超过本房间规则上限。");
+    if (!characterCard) {
+        showNotification("已取消绑定：角色卡基础值超过房间规则上限", "info");
         return;
     }
     const response = await TrpgApi.put<ApiResponse<Room>>(`/api/rooms/${currentRoom.id}/members/${encodeURIComponent(userId)}/character`, {
@@ -1013,7 +1105,6 @@ async function deleteCurrentRoom(): Promise<void> {
         currentRoom = null;
         window.currentRoom = null;
         TrpgCookies.remove(getLastRoomStorageKey());
-        stopAutosaveTimer();
         window.clearChatMessages?.();
         showRoomListView();
         showNotification("房间已删除", "success");
@@ -1145,34 +1236,6 @@ async function deleteRoomNode(nodeFilename: string): Promise<void> {
     }
 }
 
-function startAutosaveTimer(): void {
-    stopAutosaveTimer();
-    const enableAutosave = (document.getElementById("enableAutosave") as HTMLInputElement | null)?.checked;
-    if (!enableAutosave) return;
-
-    const interval = Number.parseInt((document.getElementById("autosaveInterval") as HTMLInputElement | null)?.value || "300", 10) || 300;
-    autosaveTimer = window.setInterval(() => {
-        void saveRoomAutosave();
-    }, interval * 1000);
-}
-
-function stopAutosaveTimer(): void {
-    if (autosaveTimer !== null) {
-        window.clearInterval(autosaveTimer);
-        autosaveTimer = null;
-    }
-}
-
-async function saveRoomAutosave(): Promise<void> {
-    if (!currentRoom) return;
-    try {
-        await TrpgApi.post<ApiResponse>(`/api/rooms/${currentRoom.id}/autosave`);
-        await loadRoomNodes();
-    } catch (error) {
-        console.error("自动存档失败:", error);
-    }
-}
-
 async function autoLoadLastRoom(): Promise<void> {
     if (!window.currentUser?.user_id) return;
     const lastRoomId = TrpgCookies.get(getLastRoomStorageKey());
@@ -1184,7 +1247,6 @@ function clearCurrentRoom(): void {
     if (currentRoom?.id) window.leaveSocketRoom?.(currentRoom.id);
     currentRoom = null;
     window.currentRoom = null;
-    stopAutosaveTimer();
     window.setChatReadOnly?.(false);
     applyInvisibleRoomView(false);
     setText("homeRoomTitle", "未加入房间");

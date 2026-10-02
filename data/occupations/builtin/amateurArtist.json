@@ -1,0 +1,59 @@
+{
+  "id": "amateurArtist",
+  "nameKey": "occupations.amateurArtist",
+  "name": "业余艺术爱好者(原作向)",
+  "categoryKey": "occupationCategories.literary",
+  "category": "文艺工作",
+  "order": 12,
+  "creditRating": {
+    "min": 50,
+    "max": 99
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + APP * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "attribute": "APP",
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "artCraft"
+    },
+    {
+      "skillKey": "firearms"
+    },
+    {
+      "skillKey": "languageOther"
+    },
+    {
+      "skillKey": "ride"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "freeChoice": "任意三项其他个人或时代特长"
+    }
+  ]
+}

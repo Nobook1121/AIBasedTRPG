@@ -1,0 +1,50 @@
+{
+  "id": "zookeeper",
+  "nameKey": "occupations.zookeeper",
+  "name": "饲养员",
+  "categoryKey": "occupationCategories.service",
+  "category": "服务业",
+  "order": 6,
+  "creditRating": {
+    "min": 9,
+    "max": 40
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "animalHandling"
+    },
+    {
+      "skillKey": "accounting"
+    },
+    {
+      "skillKey": "dodge"
+    },
+    {
+      "skillKey": "firstAid"
+    },
+    {
+      "skillKey": "naturalWorld"
+    },
+    {
+      "skillKey": "medicine"
+    },
+    {
+      "skillKey": "science",
+      "specialtyKey": "pharmacy"
+    },
+    {
+      "skillKey": "science",
+      "specialtyKey": "zoology"
+    }
+  ]
+}

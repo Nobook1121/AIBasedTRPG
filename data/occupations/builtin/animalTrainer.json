@@ -1,0 +1,56 @@
+{
+  "id": "animalTrainer",
+  "nameKey": "occupations.animalTrainer",
+  "name": "动物训练师",
+  "categoryKey": "occupationCategories.service",
+  "category": "服务业",
+  "order": 7,
+  "creditRating": {
+    "min": 10,
+    "max": 40
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + APP/POW * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "choose": [
+          "APP",
+          "POW"
+        ],
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "jump"
+    },
+    {
+      "skillKey": "listen"
+    },
+    {
+      "skillKey": "naturalWorld"
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "skillKey": "science",
+      "specialtyKey": "zoology"
+    },
+    {
+      "skillKey": "stealth"
+    },
+    {
+      "skillKey": "track"
+    },
+    {
+      "freeChoice": "任意一项其他个人或时代特长"
+    }
+  ]
+}

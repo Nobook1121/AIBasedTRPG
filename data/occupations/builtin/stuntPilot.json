@@ -1,0 +1,49 @@
+{
+  "id": "stuntPilot",
+  "nameKey": "occupations.stuntPilot",
+  "name": "特技飞行员(古典)",
+  "categoryKey": "occupationCategories.sports",
+  "category": "运动/探险",
+  "order": 11,
+  "creditRating": {
+    "min": 30,
+    "max": 60
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "accounting"
+    },
+    {
+      "skillKey": "electricalRepair"
+    },
+    {
+      "skillKey": "listen"
+    },
+    {
+      "skillKey": "mechanicalRepair"
+    },
+    {
+      "skillKey": "navigate"
+    },
+    {
+      "skillKey": "pilot",
+      "specialtyKey": "aircraft"
+    },
+    {
+      "skillKey": "spotHidden"
+    },
+    {
+      "freeChoice": "任意一项其他个人或时代特长"
+    }
+  ]
+}

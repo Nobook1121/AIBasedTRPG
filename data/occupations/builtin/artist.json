@@ -1,0 +1,72 @@
+{
+  "id": "artist",
+  "nameKey": "occupations.artist",
+  "name": "艺术家",
+  "categoryKey": "occupationCategories.academic",
+  "category": "学者",
+  "order": 8,
+  "creditRating": {
+    "min": 9,
+    "max": 50
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + DEX/POW * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "choose": [
+          "DEX",
+          "POW"
+        ],
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "artCraft"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "history"
+        },
+        {
+          "skillKey": "naturalWorld"
+        }
+      ]
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "languageOther"
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "skillKey": "spotHidden"
+    },
+    {
+      "freeChoice": "任意两项其他个人或时代特长"
+    }
+  ]
+}

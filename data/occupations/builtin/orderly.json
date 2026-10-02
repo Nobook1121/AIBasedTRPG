@@ -1,0 +1,66 @@
+{
+  "id": "orderly",
+  "nameKey": "occupations.orderly",
+  "name": "勤杂护工",
+  "categoryKey": "occupationCategories.service",
+  "category": "服务业",
+  "order": 4,
+  "creditRating": {
+    "min": 6,
+    "max": 15
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + STR * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "attribute": "STR",
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "electricalRepair"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "fighting",
+      "specialtyKey": "brawl"
+    },
+    {
+      "skillKey": "firstAid"
+    },
+    {
+      "skillKey": "listen"
+    },
+    {
+      "skillKey": "mechanicalRepair"
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "skillKey": "stealth"
+    }
+  ]
+}

@@ -51,6 +51,54 @@ def test_runtime_config_clamps_and_defaults_request_limits(tmp_path):
     assert config.ai_request_timeout == 30
 
 
+def test_runtime_config_reads_knowledge_retrieval_settings(tmp_path):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+
+    defaults = load_ai_runtime_config(config_dir)
+    assert defaults.retrieval_top_k_default == 5
+    assert defaults.retrieval_top_k_direct == 6
+    assert defaults.chunk_child_max_chars == 800
+    assert defaults.chunk_parent_max_chars == 2400
+    assert defaults.sticky_rounds == 1
+    assert defaults.cooldown_rounds == 3
+
+    (config_dir / "general.toml").write_text(
+        "[ai.knowledge]\ntop_k_default = 3\ntop_k_direct = 12\n"
+        "chunk_child_max_chars = 600\nchunk_parent_max_chars = 3200\n"
+        "sticky_rounds = 2\ncooldown_rounds = 5\n",
+        encoding="utf-8",
+    )
+    config = load_ai_runtime_config(config_dir)
+
+    assert config.retrieval_top_k_default == 3
+    assert config.retrieval_top_k_direct == 12
+    assert config.chunk_child_max_chars == 600
+    assert config.chunk_parent_max_chars == 3200
+    assert config.sticky_rounds == 2
+    assert config.cooldown_rounds == 5
+
+
+def test_runtime_config_clamps_knowledge_retrieval_settings(tmp_path):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "general.toml").write_text(
+        "[ai.knowledge]\ntop_k_default = 0\ntop_k_direct = 999\n"
+        "chunk_child_max_chars = 10\nchunk_parent_max_chars = 999999\n"
+        "sticky_rounds = 99\ncooldown_rounds = 99\n",
+        encoding="utf-8",
+    )
+
+    config = load_ai_runtime_config(config_dir)
+
+    assert config.retrieval_top_k_default == 1
+    assert config.retrieval_top_k_direct == 32
+    assert config.chunk_child_max_chars == 200
+    assert config.chunk_parent_max_chars == 16000
+    assert config.sticky_rounds == 10
+    assert config.cooldown_rounds == 20
+
+
 def test_runtime_config_reads_quoted_dotted_sections(tmp_path):
     config_dir = tmp_path / "config"
     config_dir.mkdir()
@@ -97,6 +145,17 @@ def test_general_config_has_no_escaped_section_names():
     assert "[ai.small_models]" in content
     assert "[ai.prompt]" in content
     assert '\\"' not in content
+
+
+def test_shipped_general_config_exposes_knowledge_settings():
+    config = load_ai_runtime_config(Path("data/config/general.toml").parent)
+
+    assert config.retrieval_top_k_default == 5
+    assert config.retrieval_top_k_direct == 6
+    assert config.chunk_child_max_chars == 800
+    assert config.chunk_parent_max_chars == 2400
+    assert config.sticky_rounds == 1
+    assert config.cooldown_rounds == 3
 
 
 def test_frontend_parser_unquotes_toml_section_names():

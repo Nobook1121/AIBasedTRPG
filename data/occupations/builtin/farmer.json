@@ -1,0 +1,77 @@
+{
+  "id": "farmer",
+  "nameKey": "occupations.farmer",
+  "name": "农民",
+  "categoryKey": "occupationCategories.industry",
+  "category": "工农商",
+  "order": 7,
+  "creditRating": {
+    "min": 9,
+    "max": 30
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + STR/DEX * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "choose": [
+          "STR",
+          "DEX"
+        ],
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "artCraft",
+      "specialtyKey": "farming"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "driveAuto"
+        },
+        {
+          "skillKey": "pilot",
+          "specialtyKey": "carriage"
+        }
+      ]
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "mechanicalRepair"
+    },
+    {
+      "skillKey": "naturalWorld"
+    },
+    {
+      "skillKey": "operateHeavyMachinery"
+    },
+    {
+      "skillKey": "track"
+    },
+    {
+      "freeChoice": "任意一项其他个人或时代特长"
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "id": "shopkeeper",
+  "nameKey": "occupations.shopkeeper",
+  "name": "店老板",
+  "categoryKey": "occupationCategories.industry",
+  "category": "工农商",
+  "order": 13,
+  "creditRating": {
+    "min": 20,
+    "max": 40
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + DEX/APP * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "choose": [
+          "DEX",
+          "APP"
+        ],
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "accounting"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "electricalRepair"
+    },
+    {
+      "skillKey": "listen"
+    },
+    {
+      "skillKey": "mechanicalRepair"
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "skillKey": "spotHidden"
+    }
+  ]
+}

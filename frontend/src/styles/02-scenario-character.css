@@ -1646,6 +1646,76 @@
     min-width: 110px;
 }
 
+.character-skill-specialty-button {
+    flex: 0 0 auto;
+    min-height: 28px;
+    padding: 3px 8px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--color-muted);
+    background: var(--color-panel-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    white-space: nowrap;
+    transition: color 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
+}
+
+.character-skill-specialty-button:hover {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+.character-skill-specialty-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.character-skill-specialty-option {
+    padding: 6px 12px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--color-text);
+    background: var(--color-panel-muted);
+    font-size: 0.82rem;
+}
+
+.character-skill-specialty-option:hover,
+.character-skill-specialty-option.is-active {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+    background: var(--color-panel);
+}
+
+.character-skill-base-table-shell {
+    max-height: 60vh;
+    overflow: auto;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--color-panel);
+}
+
+.character-skill-base-input {
+    width: 110px;
+}
+
+.character-skill-base-readonly {
+    color: var(--color-muted);
+    font-size: 0.82rem;
+}
+
+.character-skill-base-hint {
+    margin-bottom: 10px;
+    color: var(--color-muted);
+    font-size: 0.82rem;
+}
+
+.character-skill-base-message {
+    margin-right: auto;
+    color: var(--color-muted);
+    font-size: 0.82rem;
+}
+
 .character-skill-points-input {
     width: 72px;
     min-height: 30px;
@@ -1985,10 +2055,69 @@
     text-align: center;
 }
 
-.occupation-template-list {
+.occupation-category-list {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 10px;
+}
+
+.occupation-category {
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--color-panel);
+    overflow: hidden;
+}
+
+.occupation-category-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 12px 14px;
+    border: none;
+    color: var(--color-text);
+    background: var(--color-panel-muted);
+    font-size: 1rem;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease;
+}
+
+.occupation-category-header:hover,
+.occupation-category-header.is-open {
+    color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 12%, var(--color-panel));
+}
+
+.occupation-category-name {
+    flex: 1 1 auto;
+}
+
+.occupation-category-count {
+    min-width: 24px;
+    padding: 0 6px;
+    border-radius: 999px;
+    color: var(--color-muted);
+    background: color-mix(in srgb, var(--color-text) 10%, transparent);
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.occupation-category-arrow {
+    color: var(--color-muted);
+    transition: transform 0.18s ease;
+}
+
+.occupation-category-header.is-open .occupation-category-arrow {
+    transform: rotate(90deg);
+}
+
+.occupation-category-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
+    padding: 12px;
 }
 
 .occupation-template-card {
@@ -2000,18 +2129,89 @@
     color: var(--color-text);
     background: var(--color-panel);
     text-align: left;
-    transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .occupation-template-card:hover {
     border-color: var(--color-primary);
     box-shadow: var(--shadow-md);
-    transform: translateY(-1px);
 }
 
-.occupation-template-card span,
-.occupation-template-card small {
+.occupation-template-card__head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.occupation-template-card__name {
+    flex: 1 1 auto;
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.occupation-template-card__apply {
+    flex: 0 0 auto;
+    padding: 4px 14px;
+    border: 1px solid var(--color-primary);
+    border-radius: var(--radius-sm, 6px);
+    color: var(--color-primary);
+    background: transparent;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: color 0.18s ease, background 0.18s ease;
+}
+
+.occupation-template-card__apply:hover {
+    color: #fff;
+    background: var(--color-primary);
+}
+
+.occupation-template-card__row {
+    margin: 0;
     color: var(--color-muted);
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
+.occupation-template-card__label {
+    margin-right: 6px;
+    color: var(--color-text);
+    font-weight: 600;
+}
+
+.character-occupation-hint {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px;
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    border: 1px solid color-mix(in srgb, var(--color-primary) 35%, transparent);
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    background: color-mix(in srgb, var(--color-primary) 10%, var(--color-panel));
+    font-size: 0.85rem;
+    line-height: 1.6;
+}
+
+.character-occupation-hint__title {
+    color: var(--color-primary);
+}
+
+.character-occupation-hint__sep {
+    color: var(--color-muted);
+}
+
+.occupation-category-grid[hidden],
+.character-occupation-hint[hidden] {
+    display: none;
+}
+
+@media (max-width: 640px) {
+    .occupation-category-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
 }
 
 .skill-check-grid {

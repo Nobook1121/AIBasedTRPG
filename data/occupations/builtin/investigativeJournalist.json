@@ -1,0 +1,52 @@
+{
+  "id": "investigativeJournalist",
+  "nameKey": "occupations.investigativeJournalist",
+  "name": "调查记者(原作向)",
+  "categoryKey": "occupationCategories.sports",
+  "category": "运动/探险",
+  "order": 4,
+  "creditRating": {
+    "min": 9,
+    "max": 30
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "history"
+    },
+    {
+      "skillKey": "libraryUse"
+    },
+    {
+      "skillKey": "languageOwn"
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    }
+  ]
+}

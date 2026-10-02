@@ -1,0 +1,69 @@
+{
+  "id": "soldier",
+  "nameKey": "occupations.soldier",
+  "name": "士兵",
+  "categoryKey": "occupationCategories.authority",
+  "category": "军警政",
+  "order": 4,
+  "creditRating": {
+    "min": 9,
+    "max": 30
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + STR/DEX * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "choose": [
+          "STR",
+          "DEX"
+        ],
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "chooseOne": [
+        {
+          "skillKey": "climb"
+        },
+        {
+          "skillKey": "swim"
+        }
+      ]
+    },
+    {
+      "skillKey": "dodge"
+    },
+    {
+      "skillKey": "fighting"
+    },
+    {
+      "skillKey": "firearms"
+    },
+    {
+      "skillKey": "stealth"
+    },
+    {
+      "skillKey": "survival"
+    },
+    {
+      "skillKey": "firstAid"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "mechanicalRepair"
+        },
+        {
+          "skillKey": "languageOther"
+        }
+      ]
+    }
+  ]
+}

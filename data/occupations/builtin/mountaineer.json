@@ -1,0 +1,56 @@
+{
+  "id": "mountaineer",
+  "nameKey": "occupations.mountaineer",
+  "name": "登山家",
+  "categoryKey": "occupationCategories.sports",
+  "category": "运动/探险",
+  "order": 7,
+  "creditRating": {
+    "min": 30,
+    "max": 60
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + STR/DEX * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "choose": [
+          "STR",
+          "DEX"
+        ],
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "climb"
+    },
+    {
+      "skillKey": "firstAid"
+    },
+    {
+      "skillKey": "jump"
+    },
+    {
+      "skillKey": "listen"
+    },
+    {
+      "skillKey": "navigate"
+    },
+    {
+      "skillKey": "languageOther"
+    },
+    {
+      "skillKey": "survival",
+      "specialtyKey": "mountain"
+    },
+    {
+      "skillKey": "track"
+    }
+  ]
+}

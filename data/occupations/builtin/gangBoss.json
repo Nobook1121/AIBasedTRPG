@@ -1,0 +1,62 @@
+{
+  "id": "gangBoss",
+  "nameKey": "occupations.gangBoss",
+  "name": "黑帮老大",
+  "categoryKey": "occupationCategories.gray",
+  "category": "灰色/无职",
+  "order": 3,
+  "creditRating": {
+    "min": 60,
+    "max": 95
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + APP * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "attribute": "APP",
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "fighting"
+    },
+    {
+      "skillKey": "firearms"
+    },
+    {
+      "skillKey": "law"
+    },
+    {
+      "skillKey": "listen"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "skillKey": "spotHidden"
+    }
+  ]
+}

@@ -497,10 +497,54 @@ def _maybe_remember_important_action(content, context):
         logger.exception("Failed to remember important player action")
 
 
-def _compact_history_entries(summary):
+_KEY_FACT_LABELS = {
+    "location_discovered": "地点",
+    "npc_status": "NPC",
+    "item_acquired": "物品",
+    "decision_made": "决策",
+}
+
+
+def _parse_compact_payload(text):
+    """解析模型返回的 JSON 摘要；解析失败时退化为纯文本叙事。"""
+    raw = str(text or "").strip()
+    match = re.search(r"\{.*\}", raw, re.DOTALL)
+    candidate = match.group(0) if match else raw
+    try:
+        data = json.loads(candidate)
+    except (TypeError, ValueError):
+        return {"narrative": raw, "key_facts": []}
+    if not isinstance(data, dict):
+        return {"narrative": raw, "key_facts": []}
+    narrative = str(data.get("narrative") or data.get("summary") or "").strip()
+    facts = data.get("key_facts")
+    return {"narrative": narrative or raw, "key_facts": facts if isinstance(facts, list) else []}
+
+
+def _compact_history_entries(payload):
     # Keep the persisted summary useful without imposing an output-token cap on
     # normal KP replies.
-    clean = str(summary or "").strip()
+    if isinstance(payload, dict):
+        narrative = str(payload.get("narrative") or "").strip()
+        facts = payload.get("key_facts")
+    else:
+        narrative = str(payload or "").strip()
+        facts = []
+    lines = [narrative] if narrative else []
+    rendered = []
+    if isinstance(facts, list):
+        for fact in facts:
+            if not isinstance(fact, dict):
+                continue
+            text = str(fact.get("text") or "").strip()
+            if not text:
+                continue
+            kind = str(fact.get("type") or "").strip()
+            rendered.append(f"- [{_KEY_FACT_LABELS.get(kind, kind or '事实')}] {text}")
+    if rendered:
+        lines.append("关键事实：")
+        lines.extend(rendered)
+    clean = "\n".join(lines).strip() or "（无可压缩内容）"
     if len(clean) > 4000:
         clean = clean[:3999].rstrip() + "…"
     return [{"role": "system", "content": f"历史压缩摘要：\n{clean}", "compact": True}]
@@ -510,6 +554,18 @@ def _compact_history_with_ai(requester, model, history):
     if not history:
         return []
 
+    # 双层滚动摘要：把已有的 compact 摘要与新增对话一起交给模型融合，
+    # 避免每次压缩都丢掉之前的记忆；同时要求输出结构化的 key_facts，
+    # 让关键剧情事实（地点/NPC/物品/决策）不会随叙事压缩而丢失。
+    previous = next((item for item in history if isinstance(item, dict) and item.get("compact")), None)
+    dialogue = [item for item in history if isinstance(item, dict) and not item.get("compact")]
+    if previous is None and not dialogue:
+        return []
+
+    sections = []
+    if previous is not None:
+        sections.append(f"【已有滚动摘要】\n{previous.get('content') or ''}")
+    sections.append(f"【新增对话】\n{_json_for_log(dialogue)}")
     payload = {
         "model": model,
         "temperature": 0.2,
@@ -517,17 +573,20 @@ def _compact_history_with_ai(requester, model, history):
             {
                 "role": "system",
                 "content": (
-                    "请压缩当前桌上角色扮演房间的历史记录。保留当前场景、关键事实、NPC状态、"
-                    "每位玩家的行动、未解决线索和检定结果；使用短句和键值格式，不要编造内容。"
+                    "你在维护跑团房间的滚动记忆。请把「已有滚动摘要」与「新增对话」融合成一份更新的摘要，"
+                    "不要编造未发生的内容。只输出 JSON，不要输出多余文字，格式："
+                    '{"narrative": "不超过250字的叙事摘要，保留当前场景、未解决的线索与检定结果", '
+                    '"key_facts": [{"type": "location_discovered|npc_status|item_acquired|decision_made", '
+                    '"text": "一句话事实"}]}'
                 ),
             },
-            {"role": "user", "content": _json_for_log(history)},
+            {"role": "user", "content": "\n\n".join(sections)},
         ],
     }
     summary, _token_count = _extract_ai_response(requester(payload))
     if not summary.strip():
         raise RuntimeError("AI 平台未返回历史压缩摘要")
-    return _compact_history_entries(summary)
+    return _compact_history_entries(_parse_compact_payload(summary))
 
 
 def _select_model(platform_config):
@@ -718,6 +777,21 @@ def _history_for_request(history, max_chars=8000, recent_items=12):
         result.append(item)
         total += size
     return list(reversed(result))
+
+
+def _retrieval_query(history, content, turns: int = 3, part_chars: int = 500, max_chars: int = 1500) -> str:
+    """拼接最近若干轮对话作为知识库检索 query。
+
+    只用玩家当前一句话检索时，泛化输入（如「我调查一下周围」）与任何知识块都
+    没有词法/向量交集，检索会一直落到同一批兜底块，看起来"召回固定不随剧情变化"。
+    把最近几轮对话一并作为 query，命中的剧情上下文才会随剧情推进而改变。
+    """
+    parts: list[str] = []
+    if isinstance(history, list):
+        recent = [item for item in history if isinstance(item, dict) and not item.get("compact")][-turns:]
+        parts.extend(str(item.get("content") or "").strip()[:part_chars] for item in recent)
+    parts.append(str(content or "").strip()[:part_chars])
+    return "\n".join(part for part in parts if part)[-max_chars:]
 
 
 def _extract_ai_response(response_data):
@@ -943,6 +1017,7 @@ def chat():
                     "禁止调用场景工具（如 room.activate_scenario_scene）与触发器工具（trigger.reveal_scenario_trigger）；"
                     "最多用一句话提醒房主或管理员点击“开启剧本”。"
                 )
+        direct_import = False
         if room_id:
             system_prompt = (
                 f"{system_prompt}\n"
@@ -955,9 +1030,22 @@ def chat():
                 "本轮已注入房间快照、动态状态和剧本知识库检索结果，不要重复调用 room.get_room_snapshot；"
                 "检索结果足够回答时不要再调用 room.get_scenario_context 或 room.get_scenario_module。"
                 "明确检定时直接调用对应检定工具；得到结果后直接生成最终叙事，除非已知触发条件要求继续调用触发器。"
+                "检定只能使用 COC7 标准属性（力量/敏捷/意志/教育等）或角色卡上已有的技能名，禁止编造技能目录中不存在的技能。"
                 "禁止使用相同参数重复调用同一工具；互不依赖的工具应在同一轮并行调用。"
                 "只有明确到达结局或满足剧本结束条件时，才在 state_updates 中设置 completed 或 ending_reached 为 true。"
             )
+            scenario_summary = (room_snapshot or {}).get("scenario") if isinstance(room_snapshot, dict) else None
+            scenario_summary = scenario_summary if isinstance(scenario_summary, dict) else {}
+            direct_import = str(scenario_summary.get("import_mode") or "") == "direct" or bool(
+                scenario_summary.get("found") and not scenario_summary.get("module_count")
+            )
+            if direct_import:
+                system_prompt += (
+                    "\n【直接导入剧本】本剧本以知识库检索块为唯一剧情来源，没有场景模块与 scene_manifest。"
+                    "请勿调用 room.get_scenario_module 或 room.activate_scenario_scene，也不要因缺少模块而声称剧本缺失。"
+                    "叙事必须严格依据下方「导入剧本目录」与每轮自动注入的 Knowledge retrieval 片段；"
+                    "未被检索覆盖的细节应先说明需要检索，不得编造或自行推进剧情。"
+                )
 
         prompt_history = _history_for_request(history)
         scene_static = None
@@ -971,16 +1059,45 @@ def chat():
         if room_id:
             _emit_thinking_stage(room_id, ai_request_id, "vector_search", "正在调用向量库")
             try:
-                scenario_results = KnowledgeBaseService(
+                knowledge_service = KnowledgeBaseService(
                     rooms_dir=current_app.config.get("ROOMS_DIR", ROOMS_DIR),
                     scenarios_dir=current_app.config.get("SCENARIOS_DIR", SCENARIOS_DIR),
                     vector_store=current_app.extensions.get("vector_store"),
                     embedding_provider=current_app.extensions.get("embedding_provider"),
-                ).search(room_id, content, top_k=3)
+                )
+                # 导入剧本只有知识块这一条剧情来源，多取几条降低"遗忘"概率；
+                # 检索 query 带上最近几轮对话，避免泛化输入每次都落到同一批兜底块。
+                retrieval_query = _retrieval_query(history, content)
+                retrieval_top_k = (
+                    runtime_config.retrieval_top_k_direct
+                    if direct_import
+                    else runtime_config.retrieval_top_k_default
+                )
+                scenario_results = knowledge_service.search(
+                    room_id,
+                    retrieval_query,
+                    top_k=retrieval_top_k,
+                    sticky_rounds=runtime_config.sticky_rounds,
+                    cooldown_rounds=runtime_config.cooldown_rounds,
+                    parent_max_chars=runtime_config.chunk_parent_max_chars,
+                )
                 scenario_results = [
                     item for item in scenario_results
                     if isinstance(item, dict) and str(item.get("text") or "").strip()
                 ]
+                if direct_import:
+                    catalog = knowledge_service.catalog(room_id)
+                    if catalog:
+                        # 目录是稳定前缀（可命中 provider 前缀缓存），但仍用紧凑行格式
+                        # 而非 JSON，避免每行长键名把静态提示撑大、占用输入 token。
+                        catalog_lines = "\n".join(
+                            f"{item.get('chunk_id')}：{item.get('title')}" for item in catalog
+                        )
+                        system_prompt += (
+                            "\n【导入剧本目录】以下是本剧本的全部章节索引（chunk_id：标题），请据此把握剧情走向；"
+                            "需要某章细节时以每轮自动注入的 Knowledge retrieval 为准。\n"
+                            + catalog_lines
+                        )
             except (OSError, ValueError):
                 logger.exception("Scenario retrieval failed")
         rules_version = str((agent_context.room_info().get("rulesets") or {}).get("coc7") or "1") if room_id else "1"
@@ -1001,6 +1118,7 @@ def chat():
             rules_version=rules_version,
             retrieval_results=scenario_results,
             ruleset_results=[],
+            retrieval_full=direct_import,
         )
         _emit_thinking_stage(room_id, ai_request_id, "vector_search_done", "向量库检索完成")
         if room_snapshot_message:
@@ -1107,6 +1225,9 @@ def chat():
             context=agent_context,
             max_tool_rounds=runtime_config.max_tool_rounds,
             max_tool_result_chars=runtime_config.max_tool_result_chars,
+            excluded_tools=(
+                {"room.get_scenario_module", "room.activate_scenario_scene"} if direct_import else None
+            ),
         )
         elapsed_ms = round((time.perf_counter() - started_at) * 1000, 2)
         if result.error:

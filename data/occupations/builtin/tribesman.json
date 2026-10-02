@@ -1,0 +1,62 @@
+{
+  "id": "tribesman",
+  "nameKey": "occupations.tribesman",
+  "name": "部落成员",
+  "categoryKey": "occupationCategories.religion",
+  "category": "宗教相关",
+  "order": 7,
+  "creditRating": {
+    "min": 0,
+    "max": 15
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + STR/DEX * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "choose": [
+          "STR",
+          "DEX"
+        ],
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "climb"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "fighting"
+        },
+        {
+          "skillKey": "throw"
+        }
+      ]
+    },
+    {
+      "skillKey": "listen"
+    },
+    {
+      "skillKey": "naturalWorld"
+    },
+    {
+      "skillKey": "occult"
+    },
+    {
+      "skillKey": "spotHidden"
+    },
+    {
+      "skillKey": "swim"
+    },
+    {
+      "skillKey": "survival"
+    }
+  ]
+}

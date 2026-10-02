@@ -1,0 +1,63 @@
+{
+  "id": "explorer",
+  "nameKey": "occupations.explorer",
+  "name": "探险家(古典)",
+  "categoryKey": "occupationCategories.sports",
+  "category": "运动/探险",
+  "order": 9,
+  "creditRating": {
+    "min": 55,
+    "max": 80
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + APP/DEX/STR * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "choose": [
+          "APP",
+          "DEX",
+          "STR"
+        ],
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "chooseOne": [
+        {
+          "skillKey": "climb"
+        },
+        {
+          "skillKey": "swim"
+        }
+      ]
+    },
+    {
+      "skillKey": "firearms"
+    },
+    {
+      "skillKey": "history"
+    },
+    {
+      "skillKey": "jump"
+    },
+    {
+      "skillKey": "naturalWorld"
+    },
+    {
+      "skillKey": "navigate"
+    },
+    {
+      "skillKey": "languageOther"
+    },
+    {
+      "skillKey": "survival"
+    }
+  ]
+}

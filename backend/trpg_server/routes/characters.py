@@ -223,6 +223,9 @@ def _skill_to_test_item(skill):
         "growth": growth_points,
         "isProfessional": bool(skill.get("occupation") or skill.get("checked")),
     }
+    specialty_key = _as_text(skill.get("specialtyKey"), "").strip()
+    if specialty_key:
+        item["specialtyKey"] = specialty_key
     return item
 
 
@@ -247,6 +250,9 @@ def _skill_from_test_item(item, group_key, index):
         "interestPoints": interest_points,
         "growthPoints": growth_points,
     }
+    specialty_key = _as_text(item.get("specialtyKey"), "").strip()
+    if specialty_key:
+        skill["specialtyKey"] = specialty_key
     return skill
 
 

@@ -12,7 +12,7 @@ from trpg_server.logging_config import log_access_denied, log_user_action, user_
 from trpg_server.permission_config import is_role_allowed, permission_config_path
 from trpg_server.responses import error_response, success_response
 from trpg_server.role_config import load_roles
-from trpg_server.security import is_socket_user_online, safe_join
+from trpg_server.security import get_user_manager, is_socket_user_online, safe_join
 from trpg_server.settings import CONFIG_DIR, ROOMS_DIR, SCENARIOS_DIR, ROOM_ARCHIVES_DIR, CHARACTERS_DIR, HISTORY_DIR
 from trpg_server.agents.config import load_ai_runtime_config
 from trpg_server.agents.versioning import migrate_room_binding
@@ -41,6 +41,9 @@ HOUSE_RULE_DEFINITIONS = {
     # 骰娘大成功/大失败阈值（全房间统一）。留空表示沿用管理员设置页配置的全局默认值。
     "dice_critical_threshold": {"type": "nullable_integer", "default": None, "min": 0, "max": 100, "ai_prompt": False},
     "dice_fumble_threshold": {"type": "nullable_integer", "default": None, "min": 0, "max": 100, "ai_prompt": False},
+    # 技能基础值覆盖表：键为技能键（带专精时为 `skillKey.specialtyKey`），值为 0-99 整数。
+    # 留空表示沿用下一优先级（用户个性化 > 管理员设置 > 技能目录默认值）。
+    "skill_bases": {"type": "skill_bases", "default": {}, "ai_prompt": False},
 }
 DEFAULT_ROOM_HOUSE_RULES = {key: spec["default"] for key, spec in HOUSE_RULE_DEFINITIONS.items()}
 
@@ -77,6 +80,22 @@ def _autosave_node_limit():
     except (OSError, ValueError, tomllib.TOMLDecodeError):
         value = DEFAULT_AUTOSAVE_NODE_LIMIT
     return max(1, min(value, 50))
+
+
+def _autosave_settings():
+    """读取 general.toml 的 [autosave] 段，供服务端后台调度使用。"""
+    defaults = {"enabled": True, "interval": 300}
+    config_path = _get_config_dir() / "general.toml"
+    try:
+        config = tomllib.loads(config_path.read_text(encoding="utf-8")) if config_path.exists() else {}
+    except (OSError, tomllib.TOMLDecodeError):
+        config = {}
+    section = config.get("autosave") or {}
+    try:
+        interval = int(section.get("interval", defaults["interval"]))
+    except (TypeError, ValueError):
+        interval = defaults["interval"]
+    return {"enabled": bool(section.get("enabled", defaults["enabled"])), "interval": max(30, min(interval, 3600))}
 
 
 def _timestamp():
@@ -141,7 +160,29 @@ def _room_house_rules(info):
             value = bool(value)
         elif spec["type"] == "nullable_integer":
             value = _normalize_nullable_int(value, spec.get("min", 0), spec.get("max", 100))
+        elif spec["type"] == "skill_bases":
+            value = _normalize_skill_bases(value)
         normalized[key] = value
+    return normalized
+
+
+def _normalize_skill_bases(value):
+    """把房规中的技能基础值覆盖表规范化：键为非空字符串，值为 0-99 整数。
+
+    非法键值直接丢弃（等同「未填写」），从而回退到下一优先级。
+    """
+    if not isinstance(value, dict):
+        return {}
+    normalized = {}
+    for raw_key, raw_value in value.items():
+        key = str(raw_key).strip()
+        if not key or raw_value is None or raw_value == "":
+            continue
+        try:
+            number = int(raw_value)
+        except (TypeError, ValueError):
+            continue
+        normalized[key] = max(0, min(99, number))
     return normalized
 
 
@@ -600,6 +641,20 @@ def _is_member_online(member):
     return user_id is not None and is_socket_user_online(user_id)
 
 
+def _live_member_role(member):
+    """实时读取账号角色：用户被降级/升级后，房间成员快照里的旧角色不再生效。"""
+    fallback = member.get("role")
+    user_id = member.get("user_id")
+    if user_id is None:
+        return fallback
+    try:
+        manager = get_user_manager()
+        user = manager.get_user_by_id(user_id) if hasattr(manager, "get_user_by_id") else None
+    except Exception:  # noqa: BLE001 - 用户查询失败时回退到房间快照，不影响房间读取
+        user = None
+    return (user or {}).get("role") or fallback
+
+
 def _room_visibility(info):
     value = str((info or {}).get("visibility") or ROOM_VISIBILITY_PRIVATE).strip().lower()
     return value if value in ROOM_VISIBILITIES else ROOM_VISIBILITY_PRIVATE
@@ -607,6 +662,16 @@ def _room_visibility(info):
 
 def _room_summary(info):
     _normalize_members(info)
+
+    def _member_view(member):
+        # 角色以账号数据库为准，避免降级后成员仍显示为管理员配色/标签。
+        role = _live_member_role(member)
+        view = {**member, "role": role}
+        view["is_active"] = _is_active_member(member)
+        view["is_online"] = _is_member_online(member)
+        view["permission_label"] = _room_permission_label(view, info)
+        return view
+
     return {
         "id": info.get("id"),
         "name": info.get("name"),
@@ -622,15 +687,7 @@ def _room_summary(info):
         "completed_at": info.get("completed_at"),
         "creator_id": info.get("creator_id"),
         "creator_name": info.get("creator_name"),
-        "members": [
-            {
-                **member,
-                "is_active": _is_active_member(member),
-                "is_online": _is_member_online(member),
-                "permission_label": _room_permission_label(member, info),
-            }
-            for member in info.get("members", [])
-        ],
+        "members": [_member_view(member) for member in info.get("members", [])],
         "house_rules": _room_house_rules(info),
         # 全房间统一的骰娘大成功/大失败阈值（房规优先，其次管理员默认值）。
         "dice_thresholds": _room_dice_thresholds(info),
@@ -1093,6 +1150,10 @@ def update_room_house_rules(room_id):
                 except (TypeError, ValueError):
                     return error_response(f"House rule {key} must be an integer", 400, "Invalid house rule type")
             current[key] = _normalize_nullable_int(value, spec.get("min", 0), spec.get("max", 100))
+        elif spec["type"] == "skill_bases":
+            if not isinstance(value, dict):
+                return error_response(f"House rule {key} must be an object", 400, "Invalid house rule type")
+            current[key] = _normalize_skill_bases(value)
         else:
             current[key] = value
 
@@ -1573,25 +1634,19 @@ def delete_room_node(room_id, node_filename):
     return success_response(message="Room node deleted successfully")
 
 
-@bp.route("/api/rooms/<room_id>/autosave", methods=["POST"])
-def save_room_autosave(room_id):
-    login_error = _require_login()
-    if login_error:
-        return login_error
+def _write_room_autosave(room_dir, room_id, messages, *, username=None, user_id=None):
+    """写入自动存档节点并裁剪旧节点。
 
-    room_dir, info = _find_room(room_id)
-    if not room_dir:
-        return error_response("Room not found", 404, "Room not found")
-    if not _can_access(info):
-        return _denied(room_id)
-
+    ``username`` 为空表示由服务端后台调度触发（记录为系统动作）；传入时保留
+    玩家手动触发路径的操作日志。
+    """
     timestamp = int(time.time() * 1000)
     autosave = {
         "filename": f"autosave-{timestamp}.json",
         "updated_at": _timestamp(),
         "created_at": _timestamp(),
         "automatic": True,
-        "messages": _read_messages(room_dir),
+        "messages": messages,
     }
     nodes_dir = room_dir / "nodes"
     nodes_dir.mkdir(parents=True, exist_ok=True)
@@ -1605,12 +1660,70 @@ def save_room_autosave(room_id):
     automatic_nodes.sort(key=lambda item: item[0], reverse=True)
     for _, old_file in automatic_nodes[_autosave_node_limit():]:
         old_file.unlink(missing_ok=True)
-    log_user_action(
-        logger,
-        user_action_text(session.get("username"), "保存了房间自动存档"),
-        用户ID=session.get("user_id"),
-        房间ID=room_id,
-        消息数=len(autosave["messages"]),
+    if username:
+        log_user_action(
+            logger,
+            user_action_text(username, "保存了房间自动存档"),
+            用户ID=user_id,
+            房间ID=room_id,
+            消息数=len(messages),
+        )
+    else:
+        log_user_action(logger, "系统保存了房间自动存档", 房间ID=room_id, 消息数=len(messages))
+    socketio = current_app.extensions.get("socketio")
+    if socketio is not None:
+        socketio.emit("room_autosave_created", {"room_id": room_id, "filename": autosave["filename"]}, room=room_id)
+    return autosave
+
+
+def run_scheduled_autosaves():
+    """后台调度入口：为开启自动存档且到期的房间写入自动存档节点。
+
+    由 app_factory 启动的守护线程周期调用，需要处于 Flask 应用上下文中。
+    """
+    settings = _autosave_settings()
+    if not settings["enabled"]:
+        return
+    interval = settings["interval"]
+    now = time.time()
+    for room_dir in _iter_room_dirs():
+        info = _read_room(room_dir)
+        if not info or info.get("archived"):
+            continue
+        autosave_path = room_dir / "autosave.json"
+        try:
+            if autosave_path.exists() and now - autosave_path.stat().st_mtime < interval:
+                continue
+        except OSError:
+            continue
+        messages = _read_messages(room_dir)
+        if not messages:
+            continue
+        room_id = info.get("id") or room_dir.name
+        try:
+            _write_room_autosave(room_dir, room_id, messages)
+        except OSError:
+            logger.debug("Scheduled autosave failed for room %s", room_id, exc_info=True)
+
+
+@bp.route("/api/rooms/<room_id>/autosave", methods=["POST"])
+def save_room_autosave(room_id):
+    login_error = _require_login()
+    if login_error:
+        return login_error
+
+    room_dir, info = _find_room(room_id)
+    if not room_dir:
+        return error_response("Room not found", 404, "Room not found")
+    if not _can_access(info):
+        return _denied(room_id)
+
+    autosave = _write_room_autosave(
+        room_dir,
+        room_id,
+        _read_messages(room_dir),
+        username=session.get("username"),
+        user_id=session.get("user_id"),
     )
     return success_response(autosave, "Room autosave saved successfully")
 

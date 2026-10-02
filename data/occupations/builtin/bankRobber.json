@@ -1,0 +1,62 @@
+{
+  "id": "bankRobber",
+  "nameKey": "occupations.bankRobber",
+  "name": "银行劫匪",
+  "categoryKey": "occupationCategories.criminal",
+  "category": "罪犯",
+  "order": 2,
+  "creditRating": {
+    "min": 5,
+    "max": 75
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + STR/DEX * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "choose": [
+          "STR",
+          "DEX"
+        ],
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "driveAuto"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "electricalRepair"
+        },
+        {
+          "skillKey": "mechanicalRepair"
+        }
+      ]
+    },
+    {
+      "skillKey": "fighting"
+    },
+    {
+      "skillKey": "firearms"
+    },
+    {
+      "skillKey": "intimidate"
+    },
+    {
+      "skillKey": "locksmith"
+    },
+    {
+      "skillKey": "operateHeavyMachinery"
+    },
+    {
+      "freeChoice": "任意一项其他个人或时代特长"
+    }
+  ]
+}

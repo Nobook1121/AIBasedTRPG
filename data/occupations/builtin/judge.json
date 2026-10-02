@@ -1,0 +1,48 @@
+{
+  "id": "judge",
+  "nameKey": "occupations.judge",
+  "name": "法官",
+  "categoryKey": "occupationCategories.authority",
+  "category": "军警政",
+  "order": 8,
+  "creditRating": {
+    "min": 50,
+    "max": 80
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "history"
+    },
+    {
+      "skillKey": "intimidate"
+    },
+    {
+      "skillKey": "law"
+    },
+    {
+      "skillKey": "libraryUse"
+    },
+    {
+      "skillKey": "listen"
+    },
+    {
+      "skillKey": "languageOwn"
+    },
+    {
+      "skillKey": "persuade"
+    },
+    {
+      "skillKey": "psychology"
+    }
+  ]
+}

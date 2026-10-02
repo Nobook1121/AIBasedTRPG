@@ -1,0 +1,62 @@
+{
+  "id": "occultist",
+  "nameKey": "occupations.occultist",
+  "name": "神秘学家",
+  "categoryKey": "occupationCategories.religion",
+  "category": "宗教相关",
+  "order": 1,
+  "creditRating": {
+    "min": 9,
+    "max": 65
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "anthropology"
+    },
+    {
+      "skillKey": "history"
+    },
+    {
+      "skillKey": "libraryUse"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "occult"
+    },
+    {
+      "skillKey": "languageOther"
+    },
+    {
+      "skillKey": "science",
+      "specialtyKey": "astronomy"
+    },
+    {
+      "freeChoice": "任意一项其他个人或时代特长"
+    }
+  ]
+}

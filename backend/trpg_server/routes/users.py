@@ -1,10 +1,13 @@
 import logging
+from pathlib import Path
 
 from flask import Blueprint, current_app, request, session
 
+from trpg_server.json_store import read_json
 from trpg_server.logging_config import log_user_action, user_action_text
 from trpg_server.responses import error_response, success_response
 from trpg_server.security import get_user_manager, is_socket_user_online, require_permission_node
+from trpg_server.settings import ROOMS_DIR
 from trpg_server.users.smtp import (
     admin_auth_settings,
     get_auth_settings,
@@ -17,6 +20,24 @@ logger = logging.getLogger(__name__)
 ALLOWED_PRESENCE = {"online", "dnd", "invisible"}
 # 角色/用户组权限等级，用于限制管理员只能在自己权限范围内调整用户组。
 _ROLE_RANK = {"USER": 1, "ADMIN": 2, "OWNER": 3}
+
+
+def _notify_role_change(user_id, role):
+    """角色变更后通知当事人与其所在房间，前端据此刷新权限 UI 与成员配色。"""
+    socketio = current_app.extensions.get("socketio")
+    if socketio is None:
+        return
+    socketio.emit("role_changed", {"user_id": user_id, "role": role}, room=f"user:{user_id}")
+    rooms_dir = current_app.config.get("ROOMS_DIR", ROOMS_DIR)
+    try:
+        room_dirs = [entry for entry in Path(rooms_dir).iterdir() if entry.is_dir()]
+    except OSError:
+        room_dirs = []
+    for room_dir in room_dirs:
+        info = read_json(room_dir / "info.json", default={}) or {}
+        members = info.get("members") or []
+        if any(str(member.get("user_id")) == str(user_id) for member in members):
+            socketio.emit("room_members_changed", {"room_id": info.get("id")}, room=info.get("id"))
 
 
 def _auth_settings_db():
@@ -120,6 +141,7 @@ def update_user_role(user_id):
             目标用户ID=user_id,
             角色=role,
         )
+        _notify_role_change(user_id, role)
         return success_response(message=message)
     except Exception as exc:
         logger.exception("Failed to update user role: %s", user_id)

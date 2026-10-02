@@ -275,6 +275,12 @@ function initSettingsTabs(): void {
     bindGeneralNumberSetting("aiRequestTimeout", "ai", "ai_request_timeout", 30, 1800);
     bindGeneralNumberSetting("diceCriticalThresholdDefault", "ai", "dice_critical_threshold", 0, 100);
     bindGeneralNumberSetting("diceFumbleThresholdDefault", "ai", "dice_fumble_threshold", 0, 100);
+    bindGeneralNumberSetting("retrievalTopKDefault", "ai.knowledge", "top_k_default", 1, 32);
+    bindGeneralNumberSetting("retrievalTopKDirect", "ai.knowledge", "top_k_direct", 1, 32);
+    bindGeneralNumberSetting("chunkChildMaxChars", "ai.knowledge", "chunk_child_max_chars", 200, 8000);
+    bindGeneralNumberSetting("chunkParentMaxChars", "ai.knowledge", "chunk_parent_max_chars", 200, 16000);
+    bindGeneralNumberSetting("stickyRounds", "ai.knowledge", "sticky_rounds", 0, 10);
+    bindGeneralNumberSetting("cooldownRounds", "ai.knowledge", "cooldown_rounds", 0, 20);
     document.getElementById("savePermissionConfig")?.addEventListener("click", () => {
         void savePermissionConfig();
     });

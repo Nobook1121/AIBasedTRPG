@@ -1,0 +1,78 @@
+{
+  "id": "hunter",
+  "nameKey": "occupations.hunter",
+  "name": "猎人",
+  "categoryKey": "occupationCategories.industry",
+  "category": "工农商",
+  "order": 9,
+  "creditRating": {
+    "min": 20,
+    "max": 50
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + STR/DEX * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "choose": [
+          "STR",
+          "DEX"
+        ],
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "firearms"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "listen"
+        },
+        {
+          "skillKey": "spotHidden"
+        }
+      ]
+    },
+    {
+      "skillKey": "naturalWorld"
+    },
+    {
+      "skillKey": "navigate"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "languageOther"
+        },
+        {
+          "skillKey": "survival"
+        }
+      ]
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "science",
+          "specialtyKey": "biology"
+        },
+        {
+          "skillKey": "science",
+          "specialtyKey": "botany"
+        }
+      ]
+    },
+    {
+      "skillKey": "stealth"
+    },
+    {
+      "skillKey": "track"
+    }
+  ]
+}

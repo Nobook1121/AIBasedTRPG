@@ -1,0 +1,53 @@
+{
+  "id": "labAssistant",
+  "nameKey": "occupations.labAssistant",
+  "name": "实验室助理",
+  "categoryKey": "occupationCategories.academic",
+  "category": "学者",
+  "order": 6,
+  "creditRating": {
+    "min": 10,
+    "max": 30
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "chooseOne": [
+        {
+          "skillKey": "computerUse"
+        },
+        {
+          "skillKey": "libraryUse"
+        }
+      ]
+    },
+    {
+      "skillKey": "electricalRepair"
+    },
+    {
+      "skillKey": "languageOther"
+    },
+    {
+      "skillKey": "science",
+      "specialtyKey": "chemistry"
+    },
+    {
+      "freeChoice": "任意两项科学专业领域"
+    },
+    {
+      "skillKey": "spotHidden"
+    },
+    {
+      "freeChoice": "任意一项其他个人特长"
+    }
+  ]
+}

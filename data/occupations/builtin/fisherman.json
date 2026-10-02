@@ -1,0 +1,61 @@
+{
+  "id": "fisherman",
+  "nameKey": "occupations.fisherman",
+  "name": "渔民",
+  "categoryKey": "occupationCategories.industry",
+  "category": "工农商",
+  "order": 8,
+  "creditRating": {
+    "min": 20,
+    "max": 40
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "firstAid"
+    },
+    {
+      "skillKey": "mechanicalRepair"
+    },
+    {
+      "skillKey": "naturalWorld"
+    },
+    {
+      "skillKey": "navigate"
+    },
+    {
+      "skillKey": "pilot"
+    },
+    {
+      "skillKey": "spotHidden"
+    },
+    {
+      "skillKey": "swim"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    }
+  ]
+}

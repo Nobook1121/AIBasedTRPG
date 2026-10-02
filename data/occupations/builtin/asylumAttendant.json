@@ -1,0 +1,66 @@
+{
+  "id": "asylumAttendant",
+  "nameKey": "occupations.asylumAttendant",
+  "name": "精神病院护工",
+  "categoryKey": "occupationCategories.medical",
+  "category": "医疗系统",
+  "order": 7,
+  "creditRating": {
+    "min": 8,
+    "max": 20
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + STR/DEX * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "choose": [
+          "STR",
+          "DEX"
+        ],
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "dodge"
+    },
+    {
+      "skillKey": "fighting",
+      "specialtyKey": "brawl"
+    },
+    {
+      "skillKey": "firstAid"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "listen"
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "skillKey": "stealth"
+    }
+  ]
+}

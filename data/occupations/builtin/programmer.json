@@ -1,0 +1,46 @@
+{
+  "id": "programmer",
+  "nameKey": "occupations.programmer",
+  "name": "程序员",
+  "categoryKey": "occupationCategories.whiteCollar",
+  "category": "职工",
+  "order": 10,
+  "creditRating": {
+    "min": 10,
+    "max": 70
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "computerUse"
+    },
+    {
+      "skillKey": "electricalRepair"
+    },
+    {
+      "skillKey": "electronics"
+    },
+    {
+      "skillKey": "libraryUse"
+    },
+    {
+      "skillKey": "science",
+      "specialtyKey": "mathematics"
+    },
+    {
+      "skillKey": "spotHidden"
+    },
+    {
+      "freeChoice": "任意两项其他个人或时代特长"
+    }
+  ]
+}

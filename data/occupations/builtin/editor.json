@@ -1,0 +1,58 @@
+{
+  "id": "editor",
+  "nameKey": "occupations.editor",
+  "name": "编辑",
+  "categoryKey": "occupationCategories.literary",
+  "category": "文艺工作",
+  "order": 2,
+  "creditRating": {
+    "min": 10,
+    "max": 30
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "accounting"
+    },
+    {
+      "skillKey": "history"
+    },
+    {
+      "skillKey": "languageOwn"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "skillKey": "spotHidden"
+    },
+    {
+      "freeChoice": "任意一项其他个人或时代特长"
+    }
+  ]
+}

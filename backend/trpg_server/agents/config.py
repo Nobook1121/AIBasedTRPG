@@ -27,6 +27,18 @@ class AIRuntimeConfig:
     # 骰娘大成功 / 大失败的全局默认阈值（管理员设置页可改，房规可覆盖）。
     dice_critical_threshold: int = 1
     dice_fumble_threshold: int = 96
+    # 知识库检索与切块。``top_k_*`` 现在表示「返回的章节数」：命中后会把同章节的
+    # 相邻小块回填成完整章节，因此数值比按块召回时可以更小。
+    # 直接导入的剧本只有知识块这一条剧情来源，因此召回数可单独放大。
+    retrieval_top_k_default: int = 5
+    retrieval_top_k_direct: int = 6
+    # 子块用于精确召回，父块上限用于命中后回填章节上下文。
+    chunk_child_max_chars: int = 800
+    chunk_parent_max_chars: int = 2400
+    # 章节粘滞/冷却：最近 sticky_rounds 轮召回过的章节排序加权，
+    # 最近 cooldown_rounds 轮召回过的章节排序降权（只调排序，不截断内容）。
+    sticky_rounds: int = 1
+    cooldown_rounds: int = 3
 
 
 def _toml_int(value: str, fallback: int) -> int:
@@ -71,6 +83,12 @@ def load_ai_runtime_config(config_dir: Path) -> AIRuntimeConfig:
     ai_request_timeout = AIRuntimeConfig.ai_request_timeout
     dice_critical_threshold = AIRuntimeConfig.dice_critical_threshold
     dice_fumble_threshold = AIRuntimeConfig.dice_fumble_threshold
+    retrieval_top_k_default = AIRuntimeConfig.retrieval_top_k_default
+    retrieval_top_k_direct = AIRuntimeConfig.retrieval_top_k_direct
+    chunk_child_max_chars = AIRuntimeConfig.chunk_child_max_chars
+    chunk_parent_max_chars = AIRuntimeConfig.chunk_parent_max_chars
+    sticky_rounds = AIRuntimeConfig.sticky_rounds
+    cooldown_rounds = AIRuntimeConfig.cooldown_rounds
     for raw_line in general_file.read_text(encoding="utf-8").splitlines():
         line = raw_line.split("#", 1)[0].strip()
         if not line:
@@ -78,7 +96,7 @@ def load_ai_runtime_config(config_dir: Path) -> AIRuntimeConfig:
         if line.startswith("[") and line.endswith("]"):
             current_section = _unquote_toml_name(line[1:-1])
             continue
-        if current_section in {"ai", "ai.small_models", "ai.prompt"} and "=" in line:
+        if current_section in {"ai", "ai.small_models", "ai.prompt", "ai.knowledge"} and "=" in line:
             key, value = [part.strip() for part in line.split("=", 1)]
             key = _unquote_toml_name(key)
             quoted_value = bool(value.startswith(('"', "'")))
@@ -95,6 +113,19 @@ def load_ai_runtime_config(config_dir: Path) -> AIRuntimeConfig:
                     snapshot_include_entity_manifest = value.lower() == "true"
                 elif key == "max_tool_result_chars":
                     max_tool_result_chars = max(500, _toml_int(value, AIRuntimeConfig.max_tool_result_chars))
+            elif current_section == "ai.knowledge":
+                if key == "top_k_default":
+                    retrieval_top_k_default = max(1, min(32, _toml_int(value, AIRuntimeConfig.retrieval_top_k_default)))
+                elif key == "top_k_direct":
+                    retrieval_top_k_direct = max(1, min(32, _toml_int(value, AIRuntimeConfig.retrieval_top_k_direct)))
+                elif key == "chunk_child_max_chars":
+                    chunk_child_max_chars = max(200, min(8000, _toml_int(value, AIRuntimeConfig.chunk_child_max_chars)))
+                elif key == "chunk_parent_max_chars":
+                    chunk_parent_max_chars = max(200, min(16000, _toml_int(value, AIRuntimeConfig.chunk_parent_max_chars)))
+                elif key == "sticky_rounds":
+                    sticky_rounds = max(0, min(10, _toml_int(value, AIRuntimeConfig.sticky_rounds)))
+                elif key == "cooldown_rounds":
+                    cooldown_rounds = max(0, min(20, _toml_int(value, AIRuntimeConfig.cooldown_rounds)))
             elif key == "stream_output":
                 stream_output = value.lower() == "true"
             elif key == "debug_mode":
@@ -122,4 +153,10 @@ def load_ai_runtime_config(config_dir: Path) -> AIRuntimeConfig:
         ai_request_timeout=ai_request_timeout,
         dice_critical_threshold=dice_critical_threshold,
         dice_fumble_threshold=dice_fumble_threshold,
+        retrieval_top_k_default=retrieval_top_k_default,
+        retrieval_top_k_direct=retrieval_top_k_direct,
+        chunk_child_max_chars=chunk_child_max_chars,
+        chunk_parent_max_chars=chunk_parent_max_chars,
+        sticky_rounds=sticky_rounds,
+        cooldown_rounds=cooldown_rounds,
     )

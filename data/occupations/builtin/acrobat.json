@@ -1,0 +1,49 @@
+{
+  "id": "acrobat",
+  "nameKey": "occupations.acrobat",
+  "name": "杂技演员",
+  "categoryKey": "occupationCategories.literary",
+  "category": "文艺工作",
+  "order": 8,
+  "creditRating": {
+    "min": 9,
+    "max": 20
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + DEX * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "attribute": "DEX",
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "climb"
+    },
+    {
+      "skillKey": "dodge"
+    },
+    {
+      "skillKey": "jump"
+    },
+    {
+      "skillKey": "throw"
+    },
+    {
+      "skillKey": "spotHidden"
+    },
+    {
+      "skillKey": "swim"
+    },
+    {
+      "freeChoice": "任意两项其他个人或时代特长"
+    }
+  ]
+}

@@ -126,7 +126,7 @@ def test_room_restore_keeps_last_selected_character_card_for_room():
 
     assert 'getLastRoomCharacterStorageKey' in rooms_source
     assert 'syncRoomCharacterSelection' in rooms_source
-    assert 'promptRoomEntryCharacterSelection("join", roomId)' in rooms_source
+    assert 'promptRoomEntryCharacterSelection("join", roomId, roomSkillBaseOverrides(' in rooms_source
     assert 'const selfMember = activeRoomMembers(room).find' in rooms_source
 
 

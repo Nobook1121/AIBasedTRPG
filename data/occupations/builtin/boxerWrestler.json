@@ -1,0 +1,50 @@
+{
+  "id": "boxerWrestler",
+  "nameKey": "occupations.boxerWrestler",
+  "name": "拳击手/摔跤手",
+  "categoryKey": "occupationCategories.sports",
+  "category": "运动/探险",
+  "order": 2,
+  "creditRating": {
+    "min": 9,
+    "max": 60
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + STR * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "attribute": "STR",
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "dodge"
+    },
+    {
+      "skillKey": "fighting",
+      "specialtyKey": "brawl"
+    },
+    {
+      "skillKey": "intimidate"
+    },
+    {
+      "skillKey": "jump"
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "skillKey": "spotHidden"
+    },
+    {
+      "freeChoice": "任意两项其他个人或时代特长"
+    }
+  ]
+}

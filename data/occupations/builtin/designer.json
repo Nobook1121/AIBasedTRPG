@@ -1,0 +1,56 @@
+{
+  "id": "designer",
+  "nameKey": "occupations.designer",
+  "name": "设计师",
+  "categoryKey": "occupationCategories.literary",
+  "category": "文艺工作",
+  "order": 3,
+  "creditRating": {
+    "min": 20,
+    "max": 60
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "accounting"
+    },
+    {
+      "skillKey": "artCraft",
+      "specialtyKey": "photography"
+    },
+    {
+      "skillKey": "artCraft"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "computerUse"
+        },
+        {
+          "skillKey": "libraryUse"
+        }
+      ]
+    },
+    {
+      "skillKey": "mechanicalRepair"
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "skillKey": "spotHidden"
+    },
+    {
+      "freeChoice": "任意一项其他个人特长"
+    }
+  ]
+}

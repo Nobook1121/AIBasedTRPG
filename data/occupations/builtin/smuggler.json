@@ -1,0 +1,80 @@
+{
+  "id": "smuggler",
+  "nameKey": "occupations.smuggler",
+  "name": "走私者",
+  "categoryKey": "occupationCategories.criminal",
+  "category": "罪犯",
+  "order": 10,
+  "creditRating": {
+    "min": 20,
+    "max": 60
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + DEX/APP * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "choose": [
+          "DEX",
+          "APP"
+        ],
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "firearms"
+    },
+    {
+      "skillKey": "listen"
+    },
+    {
+      "skillKey": "navigate"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "driveAuto"
+        },
+        {
+          "skillKey": "pilot",
+          "specialtyKey": "aircraft"
+        },
+        {
+          "skillKey": "pilot",
+          "specialtyKey": "boat"
+        }
+      ]
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "skillKey": "sleightOfHand"
+    },
+    {
+      "skillKey": "spotHidden"
+    }
+  ]
+}

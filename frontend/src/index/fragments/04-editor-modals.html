@@ -211,7 +211,7 @@
                                         <div class="character-input-shell">
                                             <input type="text" class="form-control" id="characterOccupation" list="characterOccupationOptions" placeholder="选择或输入自定义职业">
                                             <datalist id="characterOccupationOptions"></datalist>
-                                            <button type="button" class="character-input-action" id="openOccupationTemplatePicker" title="选择职业模板">
+                                            <button type="button" class="character-input-action" id="openOccupationTemplatePicker" data-i18n-title="occupation.modal.title" title="选择职业">
                                                 <i class="fa fa-briefcase" aria-hidden="true"></i>
                                             </button>
                                         </div>
@@ -332,6 +332,7 @@
                                     </div>
                                 </section>
                             </div>
+                            <div class="character-occupation-hint" id="characterOccupationHint" hidden></div>
                             <div class="character-skill-filter-strip" id="characterSkillCategoryFilters" aria-label="技能分类筛选">
                                 <button type="button" class="character-skill-filter is-active" data-skill-category="全部技能">全部技能</button>
                                 <button type="button" class="character-skill-filter" data-skill-category="特殊">特殊</button>
@@ -532,26 +533,11 @@
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="occupationTemplateModalLabel">选择职业模板</h5>
+                    <h5 class="modal-title" id="occupationTemplateModalLabel" data-i18n="occupation.modal.title">选择职业</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="occupation-template-list" id="occupationTemplateList" aria-live="polite"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="modal fade" id="skillSpecialtyModal" tabindex="-1" aria-labelledby="skillSpecialtyModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="skillSpecialtyModalLabel">选择技能类型</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <input type="hidden" id="skillSpecialtyTargetRow">
-                    <div class="character-specialty-options" id="skillSpecialtyOptions"></div>
+                    <div class="occupation-category-list" id="occupationTemplateList" aria-live="polite"></div>
                 </div>
             </div>
         </div>
@@ -571,6 +557,56 @@
                 <div class="modal-body">
                     <input type="hidden" id="weaponPickerTargetRow">
                     <div class="character-weapon-catalog-list" id="characterWeaponCatalogList" aria-live="polite"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="skillSpecialtyModal" tabindex="-1" aria-labelledby="skillSpecialtyModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="skillSpecialtyModalLabel">选择专精</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="skillSpecialtyTargetRow">
+                    <div class="character-skill-specialty-list" id="skillSpecialtyList"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" id="cancelSkillSpecialty">取消</button>
+                    <button type="button" class="btn btn-primary" id="confirmSkillSpecialty">确认</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="skillBaseSettingsModal" tabindex="-1" aria-labelledby="skillBaseSettingsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="skillBaseSettingsModalLabel">设置技能基础值</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="character-skill-base-hint" id="skillBaseSettingsHint"></p>
+                    <div class="character-skill-base-table-shell">
+                        <table class="character-skill-table">
+                            <thead>
+                                <tr>
+                                    <th>技能</th>
+                                    <th>默认值</th>
+                                    <th>自定义基础值</th>
+                                </tr>
+                            </thead>
+                            <tbody id="skillBaseSettingsTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <span class="character-skill-base-message" id="skillBaseSettingsMessage"></span>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="saveSkillBaseSettings">保存</button>
                 </div>
             </div>
         </div>

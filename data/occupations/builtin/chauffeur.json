@@ -1,0 +1,62 @@
+{
+  "id": "chauffeur",
+  "nameKey": "occupations.chauffeur",
+  "name": "私人司机",
+  "categoryKey": "occupationCategories.whiteCollar",
+  "category": "职工",
+  "order": 12,
+  "creditRating": {
+    "min": 10,
+    "max": 40
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + DEX * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "attribute": "DEX",
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "driveAuto"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "listen"
+    },
+    {
+      "skillKey": "mechanicalRepair"
+    },
+    {
+      "skillKey": "navigate"
+    },
+    {
+      "skillKey": "spotHidden"
+    },
+    {
+      "freeChoice": "任意一项其他个人或时代特长"
+    }
+  ]
+}

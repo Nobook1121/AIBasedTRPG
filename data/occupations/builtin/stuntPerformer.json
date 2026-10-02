@@ -1,0 +1,75 @@
+{
+  "id": "stuntPerformer",
+  "nameKey": "occupations.stuntPerformer",
+  "name": "替身演员",
+  "categoryKey": "occupationCategories.literary",
+  "category": "文艺工作",
+  "order": 7,
+  "creditRating": {
+    "min": 10,
+    "max": 50
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + STR/DEX * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "choose": [
+          "STR",
+          "DEX"
+        ],
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "climb"
+    },
+    {
+      "skillKey": "dodge"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "electricalRepair"
+        },
+        {
+          "skillKey": "mechanicalRepair"
+        }
+      ]
+    },
+    {
+      "skillKey": "fighting"
+    },
+    {
+      "skillKey": "firstAid"
+    },
+    {
+      "skillKey": "jump"
+    },
+    {
+      "skillKey": "swim"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "diving"
+        },
+        {
+          "skillKey": "driveAuto"
+        },
+        {
+          "skillKey": "pilot"
+        }
+      ]
+    },
+    {
+      "skillKey": "ride"
+    }
+  ]
+}

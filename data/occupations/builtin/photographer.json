@@ -1,0 +1,60 @@
+{
+  "id": "photographer",
+  "nameKey": "occupations.photographer",
+  "name": "摄影师",
+  "categoryKey": "occupationCategories.literary",
+  "category": "文艺工作",
+  "order": 9,
+  "creditRating": {
+    "min": 9,
+    "max": 30
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "artCraft",
+      "specialtyKey": "photography"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "skillKey": "science",
+      "specialtyKey": "chemistry"
+    },
+    {
+      "skillKey": "stealth"
+    },
+    {
+      "skillKey": "spotHidden"
+    },
+    {
+      "freeChoice": "任意两项其他个人或时代特长"
+    }
+  ]
+}

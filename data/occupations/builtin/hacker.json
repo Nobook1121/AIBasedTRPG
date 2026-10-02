@@ -1,0 +1,58 @@
+{
+  "id": "hacker",
+  "nameKey": "occupations.hacker",
+  "name": "黑客",
+  "categoryKey": "occupationCategories.gray",
+  "category": "灰色/无职",
+  "order": 2,
+  "creditRating": {
+    "min": 10,
+    "max": 70
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "computerUse"
+    },
+    {
+      "skillKey": "electricalRepair"
+    },
+    {
+      "skillKey": "electronics"
+    },
+    {
+      "skillKey": "libraryUse"
+    },
+    {
+      "skillKey": "spotHidden"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "freeChoice": "任意两项其他技能"
+    }
+  ]
+}

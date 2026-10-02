@@ -1,0 +1,72 @@
+{
+  "id": "patrolOfficer",
+  "nameKey": "occupations.patrolOfficer",
+  "name": "巡警(原作向)",
+  "categoryKey": "occupationCategories.authority",
+  "category": "军警政",
+  "order": 6,
+  "creditRating": {
+    "min": 9,
+    "max": 30
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + STR * 2 + DEX * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "attribute": "STR",
+        "multiplier": 2
+      },
+      {
+        "attribute": "DEX",
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "fighting"
+    },
+    {
+      "skillKey": "firearms"
+    },
+    {
+      "skillKey": "firstAid"
+    },
+    {
+      "skillKey": "law"
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "skillKey": "spotHidden"
+    },
+    {
+      "skillKey": "driveAuto"
+    },
+    {
+      "skillKey": "ride"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    }
+  ]
+}

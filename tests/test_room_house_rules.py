@@ -242,6 +242,66 @@ def test_put_clamps_out_of_range_dice_threshold(tmp_path):
     assert response.get_json()["data"]["dice_thresholds"]["critical"] == 100
 
 
+def test_house_rules_skill_bases_default_to_empty_object(tmp_path):
+    _write_room(tmp_path)
+    app = _app(tmp_path)
+    client = app.test_client()
+    _login(client)
+
+    data = client.get("/api/rooms/r-1/house-rules", headers={"X-CSRF-Token": "csrf"}).get_json()["data"]
+
+    assert data["house_rules"]["skill_bases"] == {}
+
+
+def test_put_house_rules_skill_bases_reads_back_and_drops_invalid_entries(tmp_path):
+    _write_room(tmp_path)
+    app = _app(tmp_path)
+    client = app.test_client()
+    _login(client)
+
+    response = client.put(
+        "/api/rooms/r-1/house-rules",
+        json={"house_rules": {"skill_bases": {"spotHidden": 40, "fighting.sword": "20", "bad": "abc", "": 5}}},
+        headers={"X-CSRF-Token": "csrf"},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["data"]["house_rules"]["skill_bases"] == {"spotHidden": 40, "fighting.sword": 20}
+    assert _read_room_info(tmp_path)["house_rules"]["skill_bases"] == {"spotHidden": 40, "fighting.sword": 20}
+
+
+def test_put_house_rules_skill_bases_clamps_out_of_range(tmp_path):
+    _write_room(tmp_path)
+    app = _app(tmp_path)
+    client = app.test_client()
+    _login(client)
+
+    response = client.put(
+        "/api/rooms/r-1/house-rules",
+        json={"house_rules": {"skill_bases": {"spotHidden": 500, "listen": -3}}},
+        headers={"X-CSRF-Token": "csrf"},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["data"]["house_rules"]["skill_bases"] == {"spotHidden": 99, "listen": 0}
+
+
+def test_put_rejects_non_object_skill_bases(tmp_path):
+    _write_room(tmp_path)
+    app = _app(tmp_path)
+    client = app.test_client()
+    _login(client)
+
+    response = client.put(
+        "/api/rooms/r-1/house-rules",
+        json={"house_rules": {"skill_bases": [1, 2]}},
+        headers={"X-CSRF-Token": "csrf"},
+    )
+
+    assert response.status_code == 400
+    assert "skill_bases" not in _read_room_info(tmp_path).get("house_rules", {})
+
+
 def test_archive_removes_house_rules(tmp_path):
     _write_room(tmp_path, completed_at="2026-01-01 00:00:00", house_rules={"action_suggestions_enabled": True})
     app = _app(tmp_path)

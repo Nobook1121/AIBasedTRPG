@@ -1,0 +1,57 @@
+{
+  "id": "architect",
+  "nameKey": "occupations.architect",
+  "name": "建筑师",
+  "categoryKey": "occupationCategories.industry",
+  "category": "工农商",
+  "order": 2,
+  "creditRating": {
+    "min": 30,
+    "max": 70
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "accounting"
+    },
+    {
+      "skillKey": "artCraft",
+      "specialtyKey": "drafting"
+    },
+    {
+      "skillKey": "law"
+    },
+    {
+      "skillKey": "languageOwn"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "computerUse"
+        },
+        {
+          "skillKey": "libraryUse"
+        }
+      ]
+    },
+    {
+      "skillKey": "persuade"
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "skillKey": "science",
+      "specialtyKey": "mathematics"
+    }
+  ]
+}

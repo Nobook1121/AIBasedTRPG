@@ -1,0 +1,66 @@
+{
+  "id": "gambler",
+  "nameKey": "occupations.gambler",
+  "name": "赌徒",
+  "categoryKey": "occupationCategories.gray",
+  "category": "灰色/无职",
+  "order": 7,
+  "creditRating": {
+    "min": 8,
+    "max": 50
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + DEX/APP * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "choose": [
+          "DEX",
+          "APP"
+        ],
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "accounting"
+    },
+    {
+      "skillKey": "artCraft",
+      "specialtyKey": "acting"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "listen"
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "skillKey": "sleightOfHand"
+    },
+    {
+      "skillKey": "spotHidden"
+    }
+  ]
+}

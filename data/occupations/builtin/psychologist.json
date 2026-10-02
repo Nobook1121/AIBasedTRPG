@@ -1,0 +1,49 @@
+{
+  "id": "psychologist",
+  "nameKey": "occupations.psychologist",
+  "name": "心理学家",
+  "categoryKey": "occupationCategories.medical",
+  "category": "医疗系统",
+  "order": 4,
+  "creditRating": {
+    "min": 10,
+    "max": 40
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "anthropology"
+    },
+    {
+      "skillKey": "artCraft",
+      "specialtyKey": "photography"
+    },
+    {
+      "skillKey": "history"
+    },
+    {
+      "skillKey": "libraryUse"
+    },
+    {
+      "skillKey": "occult"
+    },
+    {
+      "skillKey": "languageOther"
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "freeChoice": "任意一项其他个人或时代特长"
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "id": "undertaker",
+  "nameKey": "occupations.undertaker",
+  "name": "殡葬师",
+  "categoryKey": "occupationCategories.service",
+  "category": "服务业",
+  "order": 5,
+  "creditRating": {
+    "min": 20,
+    "max": 40
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "accounting"
+    },
+    {
+      "skillKey": "driveAuto"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "history"
+    },
+    {
+      "skillKey": "occult"
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "skillKey": "science",
+      "specialtyKey": "biology"
+    },
+    {
+      "skillKey": "science",
+      "specialtyKey": "chemistry"
+    }
+  ]
+}

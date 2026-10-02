@@ -1,0 +1,39 @@
+{
+  "id": "professor",
+  "nameKey": "occupations.professor",
+  "name": "教授(原作向)",
+  "categoryKey": "occupationCategories.academic",
+  "category": "学者",
+  "order": 3,
+  "creditRating": {
+    "min": 20,
+    "max": 70
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "libraryUse"
+    },
+    {
+      "skillKey": "languageOther"
+    },
+    {
+      "skillKey": "languageOwn"
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "freeChoice": "任意四项其他学术、时代或个人特长"
+    }
+  ]
+}

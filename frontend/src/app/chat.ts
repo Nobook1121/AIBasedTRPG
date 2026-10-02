@@ -89,6 +89,11 @@ let activeSuggestions: string[] | null = null;
 let restoredScenarioStart = false;
 const thinkingTimers = new Map<string, number>();
 const THINKING_STORAGE_KEY = "trpg_ai_thinking";
+// 其他玩家「正在输入」状态：key 为发送者标识，value 为显示名与超时定时器。
+const typingUsers = new Map<string, { name: string; timer: number }>();
+const TYPING_EMIT_INTERVAL_MS = 1800;
+const TYPING_IDLE_TIMEOUT_MS = 4000;
+let lastTypingEmitAt = 0;
 
 const COMMAND_DEFINITIONS: CommandDefinition[] = [
     { name: "/dice", usage: "/dice {dice}", description: "掷骰" },
@@ -141,6 +146,7 @@ function initChat(): void {
     void loadAIRoles();
     initWebSocket();
     initCommandPalette(activeChatInput);
+    initTypingIndicator(activeChatInput);
     restoreThinkingState();
     bindChatAvatarCards();
 
@@ -717,6 +723,114 @@ function getMessageClass(type: string): string {
     }
 }
 
+const CHAT_VIDEO_EXTENSIONS = new Set(["mp4", "webm", "ogg", "ogv", "mov", "m4v", "mkv"]);
+const CHAT_IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "avif"]);
+
+/** 根据 URL 后缀判断媒体类型，用于把聊天里的图片/视频渲染成缩略图或内嵌播放器。 */
+function chatMediaKind(url: string): "video" | "image" | null {
+    const clean = (url || "").split(/[?#]/)[0]?.toLowerCase() ?? "";
+    const extension = clean.includes(".") ? clean.slice(clean.lastIndexOf(".") + 1) : "";
+    if (CHAT_VIDEO_EXTENSIONS.has(extension)) return "video";
+    if (CHAT_IMAGE_EXTENSIONS.has(extension)) return "image";
+    return null;
+}
+
+let chatMediaLightbox: HTMLElement | null = null;
+
+/** 网页内媒体预览浮层：图片/视频都在当前页面内放大显示，不跳转、不下载。 */
+function ensureChatMediaLightbox(): HTMLElement {
+    if (chatMediaLightbox && document.body.contains(chatMediaLightbox)) return chatMediaLightbox;
+    const overlay = document.createElement("div");
+    overlay.className = "chat-media-lightbox";
+    overlay.hidden = true;
+    overlay.innerHTML = `<button type="button" class="chat-media-lightbox-close" aria-label="关闭预览">&times;</button>`
+        + `<div class="chat-media-lightbox-body"></div>`;
+    const handleClose = (): void => closeChatMediaLightbox();
+    overlay.addEventListener("click", (event) => {
+        const target = event.target as HTMLElement | null;
+        if (event.target === overlay || target?.classList.contains("chat-media-lightbox-close")) handleClose();
+    });
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !overlay.hidden) handleClose();
+    });
+    document.body.appendChild(overlay);
+    chatMediaLightbox = overlay;
+    return overlay;
+}
+
+function openChatMediaLightbox(url: string, kind: "video" | "image"): void {
+    if (!url) return;
+    const overlay = ensureChatMediaLightbox();
+    const body = overlay.querySelector<HTMLElement>(".chat-media-lightbox-body");
+    if (!body) return;
+    body.innerHTML = "";
+    if (kind === "video") {
+        const video = document.createElement("video");
+        video.src = url;
+        video.controls = true;
+        video.autoplay = true;
+        video.playsInline = true;
+        video.className = "chat-media-lightbox-video";
+        body.appendChild(video);
+    } else {
+        const image = document.createElement("img");
+        image.src = url;
+        image.alt = "图片预览";
+        image.className = "chat-media-lightbox-image";
+        body.appendChild(image);
+    }
+    overlay.hidden = false;
+    document.body.classList.add("chat-media-lightbox-open");
+}
+
+function closeChatMediaLightbox(): void {
+    const overlay = chatMediaLightbox;
+    if (!overlay) return;
+    const body = overlay.querySelector<HTMLElement>(".chat-media-lightbox-body");
+    if (body) body.innerHTML = "";
+    overlay.hidden = true;
+    document.body.classList.remove("chat-media-lightbox-open");
+}
+
+/** 后处理消息 HTML：图片显示为缩略图、视频链接替换为内嵌播放器，并统一绑定放大预览。 */
+function enhanceMessageMedia(container: HTMLElement): void {
+    container.querySelectorAll<HTMLImageElement>("img").forEach((image) => {
+        image.classList.add("chat-media-thumb");
+        image.loading = "lazy";
+        if (image.dataset.mediaBound === "1") return;
+        image.dataset.mediaBound = "1";
+        image.addEventListener("click", () => openChatMediaLightbox(image.currentSrc || image.src, "image"));
+    });
+
+    container.querySelectorAll<HTMLAnchorElement>("a[href]").forEach((anchor) => {
+        const href = anchor.getAttribute("href") || "";
+        if (chatMediaKind(href) !== "video" || anchor.dataset.mediaBound === "1") return;
+        anchor.dataset.mediaBound = "1";
+        const wrapper = document.createElement("div");
+        wrapper.className = "chat-media-video";
+        const video = document.createElement("video");
+        video.src = href;
+        video.controls = true;
+        video.preload = "metadata";
+        video.playsInline = true;
+        video.className = "chat-media-video-player";
+        const expand = document.createElement("button");
+        expand.type = "button";
+        expand.className = "chat-media-video-expand";
+        expand.title = "放大播放";
+        expand.setAttribute("aria-label", "放大播放");
+        expand.textContent = "放大";
+        expand.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            openChatMediaLightbox(href, "video");
+        });
+        wrapper.appendChild(video);
+        wrapper.appendChild(expand);
+        anchor.replaceWith(wrapper);
+    });
+}
+
 function addMessage(
     type: string,
     sender: string,
@@ -756,6 +870,8 @@ function addMessage(
         processingHtml: renderProcessingTime(type, processingTime, tokenCount, cacheHitRate),
         knowledgeHtml: type === "kp" ? renderKnowledgeUsage(message?.metadata?.knowledgeUsage as KnowledgeUsage | undefined) : "",
     });
+    const renderedContentElement = messageDiv.querySelector<HTMLElement>(".message-content");
+    if (renderedContentElement) enhanceMessageMedia(renderedContentElement);
     chatHistory.appendChild(messageDiv);
     chatHistory.scrollTop = chatHistory.scrollHeight;
     return resolvedMessageId;
@@ -884,6 +1000,7 @@ function replaceThinkingMessage(messageId: string | number, newContent: string, 
     if (contentDiv) {
         contentDiv.innerHTML = renderMarkdown(newContent);
         contentDiv.className = "message-content markdown-body";
+        enhanceMessageMedia(contentDiv);
         revealKpContent(contentDiv);
     }
     targetMessage.classList.remove("thinking");
@@ -1120,6 +1237,10 @@ function initWebSocket(): void {
             showAuthModal();
         });
         socket.on("new_message", (data) => handleIncomingMessage(data));
+        socket.on("user_typing", (data) => handleUserTyping(data));
+        socket.on("room_members_changed", () => { void window.refreshCurrentRoomMembers?.(); });
+        socket.on("room_autosave_created", () => { void window.refreshRoomNodes?.(); });
+        socket.on("role_changed", (data) => handleRoleChanged(data));
     } catch (error) {
         console.warn("WebSocket 连接失败，消息同步不可用:", error);
     }
@@ -1142,6 +1263,7 @@ function joinSocketRoom(roomId: string): void {
 }
 
 function leaveSocketRoom(roomId: string): void {
+    clearTypingIndicator();
     if (socket?.connected && roomId) socket.emit("leave_room", { room_id: roomId });
 }
 
@@ -1293,6 +1415,82 @@ function handleAIThinkingEvent(incoming: IncomingSocketMessage): void {
 function normalizeIncomingMessage(data: unknown): IncomingSocketMessage | null {
     if (typeof data !== "object" || data === null) return null;
     return data as IncomingSocketMessage;
+}
+
+/** 监听输入框，节流广播本机用户的「正在输入」事件。 */
+function initTypingIndicator(chatInput: HTMLInputElement): void {
+    chatInput.addEventListener("input", () => emitTyping(chatInput.value));
+    chatInput.addEventListener("blur", () => { lastTypingEmitAt = 0; });
+}
+
+function emitTyping(value: string): void {
+    if (!socket?.connected || !value.trim()) return;
+    const room = getCurrentRoom();
+    if (!room?.id || room.invisible_view) return;
+    const now = Date.now();
+    if (now - lastTypingEmitAt < TYPING_EMIT_INTERVAL_MS) return;
+    lastTypingEmitAt = now;
+    socket.emit("typing", {
+        room_id: room.id,
+        user_id: getCurrentUserId(),
+        username: getCurrentUsername(),
+    });
+}
+
+function handleUserTyping(data: unknown): void {
+    const payload = (data || {}) as { room_id?: string; user_id?: string | number; username?: string };
+    const room = getCurrentRoom();
+    if (payload.room_id && room?.id !== payload.room_id) return;
+    const senderKey = String(payload.user_id ?? payload.username ?? "");
+    if (!senderKey || senderKey === String(getCurrentUserId() ?? "")) return;
+    const name = payload.username || "某人";
+    const existing = typingUsers.get(senderKey);
+    if (existing) window.clearTimeout(existing.timer);
+    const timer = window.setTimeout(() => {
+        typingUsers.delete(senderKey);
+        renderTypingIndicator();
+    }, TYPING_IDLE_TIMEOUT_MS);
+    typingUsers.set(senderKey, { name, timer });
+    renderTypingIndicator();
+}
+
+function renderTypingIndicator(): void {
+    const indicator = document.getElementById("typingIndicator");
+    if (!indicator) return;
+    const names = Array.from(typingUsers.values()).map((entry) => entry.name);
+    if (names.length === 0) {
+        indicator.hidden = true;
+        indicator.textContent = "";
+        return;
+    }
+    indicator.hidden = false;
+    indicator.textContent = names.length === 1
+        ? `${names[0]} 正在输入…`
+        : `${names.slice(0, 2).join("、")}${names.length > 2 ? " 等" : ""}正在输入…`;
+}
+
+function clearTypingIndicator(): void {
+    typingUsers.forEach((entry) => window.clearTimeout(entry.timer));
+    typingUsers.clear();
+    renderTypingIndicator();
+}
+
+/** 当前账号角色被管理员调整后，重新拉取资料并刷新权限相关 UI。 */
+function handleRoleChanged(data: unknown): void {
+    const payload = (data || {}) as { user_id?: string | number; role?: string };
+    if (String(payload.user_id ?? "") !== String(getCurrentUserId() ?? "")) return;
+    void refreshCurrentUserProfile();
+}
+
+async function refreshCurrentUserProfile(): Promise<void> {
+    try {
+        const response = await TrpgApi.get<ApiResponse<AuthModule.CurrentUser>>("/api/user/profile");
+        if (!response.success || !response.data) return;
+        AuthModule.setCurrentUser(response.data);
+        showNotification(`你的账号权限已更新为 ${response.data.role || "USER"}`, "info");
+    } catch {
+        /* 资料刷新失败时静默忽略，下次请求会再次刷新 session 角色 */
+    }
 }
 
 function numericMetadata(metadata: Record<string, unknown>, key: string): number | null {

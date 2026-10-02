@@ -1,0 +1,58 @@
+{
+  "id": "antiquarian",
+  "nameKey": "occupations.antiquarian",
+  "name": "古董商",
+  "categoryKey": "occupationCategories.industry",
+  "category": "工农商",
+  "order": 12,
+  "creditRating": {
+    "min": 30,
+    "max": 50
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "accounting"
+    },
+    {
+      "skillKey": "appraise"
+    },
+    {
+      "skillKey": "driveAuto"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "history"
+    },
+    {
+      "skillKey": "libraryUse"
+    },
+    {
+      "skillKey": "navigate"
+    }
+  ]
+}

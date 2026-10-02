@@ -1,0 +1,61 @@
+{
+  "id": "artHistorian",
+  "nameKey": "occupations.artHistorian",
+  "name": "文物学家(原作向)",
+  "categoryKey": "occupationCategories.academic",
+  "category": "学者",
+  "order": 1,
+  "creditRating": {
+    "min": 30,
+    "max": 70
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "appraise"
+    },
+    {
+      "skillKey": "artCraft"
+    },
+    {
+      "skillKey": "history"
+    },
+    {
+      "skillKey": "libraryUse"
+    },
+    {
+      "skillKey": "languageOther"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "spotHidden"
+    },
+    {
+      "freeChoice": "任意一项其他个人或时代特长"
+    }
+  ]
+}

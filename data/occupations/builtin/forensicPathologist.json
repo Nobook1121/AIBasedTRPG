@@ -1,0 +1,51 @@
+{
+  "id": "forensicPathologist",
+  "nameKey": "occupations.forensicPathologist",
+  "name": "法医",
+  "categoryKey": "occupationCategories.medical",
+  "category": "医疗系统",
+  "order": 3,
+  "creditRating": {
+    "min": 40,
+    "max": 60
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "languageOther"
+    },
+    {
+      "skillKey": "libraryUse"
+    },
+    {
+      "skillKey": "medicine"
+    },
+    {
+      "skillKey": "persuade"
+    },
+    {
+      "skillKey": "science",
+      "specialtyKey": "biology"
+    },
+    {
+      "skillKey": "science",
+      "specialtyKey": "forensics"
+    },
+    {
+      "skillKey": "science",
+      "specialtyKey": "pharmacy"
+    },
+    {
+      "skillKey": "spotHidden"
+    }
+  ]
+}

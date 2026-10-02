@@ -1,0 +1,55 @@
+{
+  "id": "assassin",
+  "nameKey": "occupations.assassin",
+  "name": "刺客",
+  "categoryKey": "occupationCategories.criminal",
+  "category": "罪犯",
+  "order": 1,
+  "creditRating": {
+    "min": 30,
+    "max": 60
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + STR/DEX * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "choose": [
+          "STR",
+          "DEX"
+        ],
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "disguise"
+    },
+    {
+      "skillKey": "electricalRepair"
+    },
+    {
+      "skillKey": "fighting"
+    },
+    {
+      "skillKey": "firearms"
+    },
+    {
+      "skillKey": "locksmith"
+    },
+    {
+      "skillKey": "mechanicalRepair"
+    },
+    {
+      "skillKey": "stealth"
+    },
+    {
+      "skillKey": "psychology"
+    }
+  ]
+}

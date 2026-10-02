@@ -1,0 +1,55 @@
+{
+  "id": "archaeologist",
+  "nameKey": "occupations.archaeologist",
+  "name": "考古学家(原作向)",
+  "categoryKey": "occupationCategories.academic",
+  "category": "学者",
+  "order": 2,
+  "creditRating": {
+    "min": 10,
+    "max": 40
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "appraise"
+    },
+    {
+      "skillKey": "archaeology"
+    },
+    {
+      "skillKey": "history"
+    },
+    {
+      "skillKey": "languageOther"
+    },
+    {
+      "skillKey": "libraryUse"
+    },
+    {
+      "skillKey": "spotHidden"
+    },
+    {
+      "skillKey": "mechanicalRepair"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "navigate"
+        },
+        {
+          "skillKey": "science"
+        }
+      ]
+    }
+  ]
+}

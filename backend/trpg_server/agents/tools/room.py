@@ -321,6 +321,7 @@ def _summarize_scenario(scenario: dict[str, Any] | None, room_info: dict[str, An
         "scenario_version": scenario.get("scenario_version") or scenario.get("version") or "1",
         "description": scenario.get("description") or scenario.get("notes"),
         "found": True,
+        "import_mode": scenario.get("import_mode"),
         "available_sections": _collect_available_sections(scenario),
         "allow_open_ending": scenario.get("allow_open_ending", False),
         "module_count": len(_scenario_modules(scenario)),

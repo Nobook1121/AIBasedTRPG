@@ -1,0 +1,63 @@
+{
+  "id": "bartender",
+  "nameKey": "occupations.bartender",
+  "name": "酒保",
+  "categoryKey": "occupationCategories.service",
+  "category": "服务业",
+  "order": 1,
+  "creditRating": {
+    "min": 8,
+    "max": 25
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + APP * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "attribute": "APP",
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "accounting"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "fighting",
+      "specialtyKey": "brawl"
+    },
+    {
+      "skillKey": "listen"
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "skillKey": "spotHidden"
+    },
+    {
+      "freeChoice": "任意一项其他个人或时代特长"
+    }
+  ]
+}

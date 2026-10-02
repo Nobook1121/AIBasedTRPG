@@ -24,6 +24,7 @@ interface LegacyAttributesInput extends Partial<COC7Attributes> {
 interface COC7Skill {
     id: string;
     skillKey?: string;
+    specialtyKey?: string;
     name: string;
     value: number;
     base: number;
@@ -34,11 +35,13 @@ interface COC7Skill {
     occupationPoints?: number;
     interestPoints?: number;
     growthPoints?: number;
+    customBase?: boolean;
 }
 
 interface SkillSpecialtyCatalogEntry {
     key: string;
     labelKey: string;
+    base?: number;
 }
 
 interface SkillCatalogEntry {
@@ -49,10 +52,13 @@ interface SkillCatalogEntry {
     repeatable: number;
     specialties: SkillSpecialtyCatalogEntry[];
     eraLimited?: boolean;
+    userDefinedBase?: boolean;
 }
 
 interface OccupationPointFormulaTerm {
-    attribute: COC7AttributeKey;
+    attribute?: COC7AttributeKey;
+    /** 「或」项：取候选属性中的最高值参与计算。 */
+    choose?: COC7AttributeKey[];
     multiplier: number;
 }
 
@@ -60,6 +66,8 @@ interface SkillSuccessLimits {
     occupation: number;
     other: number;
 }
+
+type SkillBaseSettingsMode = "admin" | "room" | "user";
 
 type OccupationPointFormula = Array<COC7AttributeKey | OccupationPointFormulaTerm>;
 
@@ -153,20 +161,24 @@ interface COC7Occupation {
     id: string;
     name: string;
     nameKey?: string;
+    categoryKey?: string;
+    category?: string;
+    order?: number;
     creditRating: [number, number];
+    /** 仅确定本职技能键（打勾判定用）；模糊条目见 occupationSkillEntries。 */
     occupationSkills: string[];
     pointsFormula: OccupationPointFormula;
     occupationSkillEntries?: OccupationSkillEntry[];
-    occupationSkillLabels?: string[];
-    skillBonuses: Record<string, number>;
     skillBases: Record<string, number>;
-    specialties: string[];
-    passiveEffects: string[];
 }
 
 interface OccupationCatalogPayload {
     id: string;
     nameKey?: string;
+    name?: string;
+    categoryKey?: string;
+    category?: string;
+    order?: number;
     creditRating?: { min?: number; max?: number };
     occupationSkillPoints?: {
         formula?: string;
@@ -357,7 +369,11 @@ interface CharacterApi {
     countSelectedOccupationSkills: (skills: COC7Skill[]) => number;
     validateOccupationSkillSelection: (card: COC7CharacterCard) => COC7SkillAllocationSummary;
     autoAllocateOccupationSkills: (card: COC7CharacterCard) => COC7CharacterCard;
-    getOccupationPassiveEffects: (card: COC7CharacterCard) => string[];
+    applySkillSpecialty: (rowId: string, specialtyKey: string) => void;
+    openSkillBaseSettings: (mode: SkillBaseSettingsMode) => void;
+    reloadSkillBases: () => Promise<void>;
+    collectCardSkillBaseOverflows: (card: COC7CharacterCard, roomBases?: Record<string, number>) => string[];
+    clampCardSkillBases: (card: COC7CharacterCard, roomBases?: Record<string, number>) => COC7CharacterCard;
     rollAttributeCheck: (attributes: COC7Attributes, attributeKey: COC7AttributeKey, roller?: () => number) => AttributeCheckResult;
     generateInvestigatorName: (gender?: InvestigatorGender, random?: () => number) => string;
     generateRegionalName: (region?: NameRegion, gender?: InvestigatorGender, random?: () => number) => string;
@@ -383,6 +399,7 @@ interface Window {
     const STORAGE_KEY = "ai-trpg:coc7-character-cards";
     const ACTIVE_STORAGE_KEY = "ai-trpg:coc7-active-character";
     const RULE_SETTINGS_STORAGE_KEY = "ai-trpg:coc7-character-rule-settings";
+    const USER_SKILL_BASES_STORAGE_KEY = "ai-trpg:coc7-skill-base-settings";
     const ATTRIBUTE_KEYS: COC7CoreAttributeKey[] = ["STR", "DEX", "SIZ", "APP", "CON", "INT", "POW", "EDU", "LUC"];
     const PLAYER_UNBOUND_LABEL = "未绑定玩家";
     const ATTRIBUTE_LABELS: Record<COC7CoreAttributeKey, string> = {
@@ -467,161 +484,29 @@ interface Window {
         italy: { family: ["Rossi", "Bianchi", "Romano", "Ricci", "Marino"], male: ["Marco", "Luca", "Giovanni", "Matteo"], female: ["Giulia", "Sofia", "Elena", "Bianca"], neutral: ["Andrea", "Noa", "Vale"], westernOrder: true }
     };
 
-    let PRESET_OCCUPATIONS: COC7Occupation[] = [
-        {
-            id: "detective",
-            name: "私家侦探",
-            creditRating: [9, 30],
-            occupationSkills: ["artCraft", "disguise", "law", "libraryUse", "psychology", "spotHidden", "stealth", "fastTalk"],
-            pointsFormula: ["EDU", "EDU", "DEX", "DEX"],
-            skillBonuses: { spotHidden: 20, listen: 15, psychology: 15, libraryUse: 10 },
-            skillBases: {},
-            specialties: ["调查", "跟踪", "线索整合"],
-            passiveEffects: ["调查场景中第一次侦查或聆听检定可获得 +10 情境加值。"]
-        },
-        {
-            id: "doctor",
-            name: "医生",
-            creditRating: [30, 80],
-            occupationSkills: ["firstAid", "medicine", "psychology", "science", "scienceBiology", "sciencePharmacy", "languageOther", "persuade"],
-            pointsFormula: ["EDU", "EDU", "EDU", "EDU"],
-            skillBonuses: { medicine: 25, firstAid: 20, psychology: 10, science: 10 },
-            skillBases: {},
-            specialties: ["治疗", "诊断", "解剖"],
-            passiveEffects: ["处理伤势时，急救成功后可额外恢复 1 点生命值。"]
-        },
-        {
-            id: "professor",
-            name: "大学教授",
-            creditRating: [20, 70],
-            occupationSkills: ["libraryUse", "languageOwn", "history", "archaeology", "science", "psychology", "languageOther", "persuade"],
-            pointsFormula: ["EDU", "EDU", "EDU", "EDU"],
-            skillBonuses: { libraryUse: 25, languageOwn: 20, history: 15, archaeology: 15 },
-            skillBases: {},
-            specialties: ["学术研究", "文献检索", "古物辨识"],
-            passiveEffects: ["学术分组技能检定成功后，可额外获得一条背景线索。"]
-        },
-        {
-            id: "journalist",
-            name: "记者",
-            creditRating: [9, 30],
-            occupationSkills: ["artCraft", "history", "libraryUse", "languageOwn", "psychology", "fastTalk", "photography", "persuade"],
-            pointsFormula: ["EDU", "EDU", "APP", "APP"],
-            skillBonuses: { libraryUse: 20, fastTalk: 15, psychology: 10, photography: 10 },
-            skillBases: {},
-            specialties: ["采访", "摄影", "舆论调查"],
-            passiveEffects: ["公开场合收集传闻时，话术或说服检定可获得 +10 情境加值。"]
-        },
-        {
-            id: "police",
-            name: "警探",
-            creditRating: [20, 50],
-            occupationSkills: ["fightingBrawl", "firearmsHandgun", "firstAid", "law", "listen", "psychology", "spotHidden", "driveAuto"],
-            pointsFormula: ["EDU", "EDU", "STR", "DEX"],
-            skillBonuses: { law: 15, spotHidden: 15, firearmsHandgun: 10, psychology: 10 },
-            skillBases: {},
-            specialties: ["执法", "审讯", "现场控制"],
-            passiveEffects: ["面对普通市民或地方机构时，可获得一次身份便利。"]
-        },
-        {
-            id: "occultist",
-            name: "神秘学者",
-            creditRating: [9, 30],
-            occupationSkills: ["anthropology", "history", "libraryUse", "occult", "languageOther", "psychology", "spotHidden", "cthulhuMythos"],
-            pointsFormula: ["EDU", "EDU", "INT", "INT"],
-            skillBonuses: { occult: 25, libraryUse: 15, history: 10, languageOther: 10 },
-            skillBases: {},
-            specialties: ["仪式", "民俗", "禁书"],
-            passiveEffects: ["辨识神秘符号、仪式或民俗时可获得 +10 情境加值。"]
-        },
-        {
-            id: "antiquarian",
-            name: "古董商",
-            creditRating: [30, 70],
-            occupationSkills: ["appraise", "artCraft", "history", "libraryUse", "languageOther", "occult", "persuade", "spotHidden"],
-            pointsFormula: ["EDU", "EDU", "APP", "APP"],
-            skillBonuses: { appraise: 25, history: 15, persuade: 10, spotHidden: 10 },
-            skillBases: {},
-            specialties: ["估价", "古物", "交易"],
-            passiveEffects: ["鉴定古物、赝品或收藏来源时可获得 +10 情境加值。"]
-        },
-        {
-            id: "soldier",
-            name: "士兵",
-            creditRating: [9, 30],
-            occupationSkills: ["climb", "dodge", "fightingBrawl", "firearmsRifle", "firstAid", "stealth", "survival", "throw"],
-            pointsFormula: ["EDU", "EDU", "STR", "DEX"],
-            skillBonuses: { firearmsRifle: 20, fightingBrawl: 15, firstAid: 10, survival: 10 },
-            skillBases: {},
-            specialties: ["战斗", "野外", "纪律"],
-            passiveEffects: ["战斗轮开始前第一次运动类行动可获得 +10 情境加值。"]
-        },
-        {
-            id: "criminal",
-            name: "罪犯",
-            creditRating: [5, 65],
-            occupationSkills: ["appraise", "disguise", "fightingBrawl", "firearmsHandgun", "locksmith", "sleightOfHand", "stealth", "fastTalk"],
-            pointsFormula: ["EDU", "EDU", "DEX", "DEX"],
-            skillBonuses: { stealth: 20, locksmith: 15, sleightOfHand: 15, fastTalk: 10 },
-            skillBases: {},
-            specialties: ["潜入", "黑市", "伪装"],
-            passiveEffects: ["处理非法交易、潜入或销赃线索时可获得 +10 情境加值。"]
-        },
-        {
-            id: "engineer",
-            name: "工程师",
-            creditRating: [30, 60],
-            occupationSkills: ["electricalRepair", "mechanicalRepair", "operateHeavyMachinery", "science", "scienceEngineering", "libraryUse", "mathematics", "spotHidden"],
-            pointsFormula: ["EDU", "EDU", "EDU", "EDU"],
-            skillBonuses: { mechanicalRepair: 25, electricalRepair: 20, scienceEngineering: 15, operateHeavyMachinery: 10 },
-            skillBases: {},
-            specialties: ["机械", "电气", "结构"],
-            passiveEffects: ["修复机械、电气设备或分析工程结构时可获得 +10 情境加值。"]
-        }
+    // 职业数据全部来自 /api/character-catalogs/occupations（data/occupations/builtin/*.json）。
+    let PRESET_OCCUPATIONS: COC7Occupation[] = [];
+
+    /** 职业类别展示顺序（与 data/occupations 的 11 个 slug 对应）。 */
+    const OCCUPATION_CATEGORY_ORDER = [
+        "literary", "industry", "whiteCollar", "academic", "medical",
+        "sports", "service", "religion", "gray", "criminal", "authority"
     ];
 
-    const OCCUPATION_LABELS: Record<string, string> = {
-        "occupations.writer": "作家"
+    /** 目录未加载时的空职业兜底，避免取值崩溃。 */
+    const EMPTY_OCCUPATION: COC7Occupation = {
+        id: "",
+        name: "",
+        nameKey: "",
+        categoryKey: "",
+        category: "",
+        order: 0,
+        creditRating: [0, 99],
+        occupationSkills: [],
+        pointsFormula: [],
+        occupationSkillEntries: [],
+        skillBases: {}
     };
-
-    const SKILL_SPECIALTY_LABELS: Record<string, string> = {
-        "artCraft.writing": "写作"
-    };
-
-    const WRITER_OCCUPATION: COC7Occupation = {
-        id: "writer",
-        name: "作家",
-        nameKey: "occupations.writer",
-        creditRating: [9, 30],
-        occupationSkills: ["artCraft", "history", "libraryUse", "naturalWorld", "occult", "languageOther", "languageOwn", "psychology"],
-        pointsFormula: [{ attribute: "EDU", multiplier: 4 }],
-        occupationSkillEntries: [
-            { skillKey: "artCraft", specialtyKey: "writing" },
-            { skillKey: "history" },
-            { skillKey: "libraryUse" },
-            { chooseOne: [{ skillKey: "naturalWorld" }, { skillKey: "occult" }] },
-            { skillKey: "languageOther" },
-            { skillKey: "languageOwn" },
-            { skillKey: "psychology" },
-            { freeChoice: "personalOrEraSpecialty" }
-        ],
-        occupationSkillLabels: ["技艺(写作)", "历史", "图书馆使用", "博物学或神秘学", "外语", "母语", "心理学", "任意一项其他个人或时代特长"],
-        skillBonuses: {},
-        skillBases: {
-            artCraft: 5,
-            history: 5,
-            libraryUse: 20,
-            naturalWorld: 10,
-            occult: 5,
-            languageOther: 1,
-            languageOwn: 0,
-            psychology: 10
-        },
-        specialties: [],
-        passiveEffects: []
-    };
-
-    PRESET_OCCUPATIONS = [WRITER_OCCUPATION];
 
     let SKILL_CATALOG: SkillCatalogEntry[] = [];
     let SKILL_LOCALE_MAP: Record<string, string> = {};
@@ -649,6 +534,11 @@ interface Window {
     let nameGeneratorModal: BootstrapModalInstance | null = null;
     let occupationTemplateModal: BootstrapModalInstance | null = null;
     let weaponPickerModal: BootstrapModalInstance | null = null;
+    let skillSpecialtyModal: BootstrapModalInstance | null = null;
+    let skillBaseSettingsModal: BootstrapModalInstance | null = null;
+    let pendingSkillSpecialtyRowId = "";
+    let pendingSkillSpecialtyKey = "";
+    let skillBaseSettingsMode: SkillBaseSettingsMode = "user";
     let pendingGeneratedName = "";
     let pendingWeaponPickerTarget = "";
     let activeSkillCategoryFilter = "全部技能";
@@ -822,6 +712,12 @@ interface Window {
         const occupation = getOccupationById(occupationId);
         return occupation.pointsFormula.reduce((total, term) => {
             if (typeof term === "string") return total + attributes[term];
+            // 「或」项取候选属性中的最高值（房规约定）。
+            if (term.choose?.length) {
+                const best = term.choose.reduce((max, key) => Math.max(max, attributes[key] ?? 0), 0);
+                return total + best * term.multiplier;
+            }
+            if (!term.attribute) return total;
             return total + attributes[term.attribute] * term.multiplier;
         }, 0);
     }
@@ -873,12 +769,18 @@ interface Window {
     }
 
     function getOccupationById(occupationId: string): COC7Occupation {
-        return PRESET_OCCUPATIONS.find((occupation) => occupation.id === occupationId) || PRESET_OCCUPATIONS[0] as COC7Occupation;
+        return PRESET_OCCUPATIONS.find((occupation) => occupation.id === occupationId) || PRESET_OCCUPATIONS[0] || EMPTY_OCCUPATION;
     }
 
     function resolveOccupationFromInput(value: string): COC7Occupation {
         const normalized = value.trim();
-        return PRESET_OCCUPATIONS.find((occupation) => occupation.id === normalized || occupation.name === normalized) || getOccupationById("writer");
+        if (!normalized) return EMPTY_OCCUPATION;
+        return PRESET_OCCUPATIONS.find((occupation) => (
+            occupation.id === normalized
+            || occupation.name === normalized
+            || occupation.nameKey === normalized
+            || occupationDisplayName(occupation) === normalized
+        )) || EMPTY_OCCUPATION;
     }
 
     function resolveOccupationIdFromInput(value: string): string {
@@ -891,10 +793,6 @@ interface Window {
 
     function getOccupation(card: COC7CharacterCard): COC7Occupation {
         return getOccupationById(card.occupationId);
-    }
-
-    function getOccupationPassiveEffects(card: COC7CharacterCard): string[] {
-        return [...getOccupation(card).passiveEffects];
     }
 
     function validateOccupationSkillSelection(card: COC7CharacterCard): COC7SkillAllocationSummary {
@@ -910,19 +808,24 @@ interface Window {
 
     function autoAllocateOccupationSkills(card: COC7CharacterCard): COC7CharacterCard {
         const occupation = getOccupation(card);
-        const bonusEntries = Object.entries(occupation.skillBonuses);
         const skills = card.skills.map((skill) => {
             const skillKey = resolveSkillKey(skill);
             const occupationSkill = occupation.occupationSkills.includes(skillKey);
-            const bonusEntry = bonusEntries.find(([skillId]) => skillId === skillKey);
-            const bonus = bonusEntry ? bonusEntry[1] : 0;
-            const value = clampNumber(skill.value + bonus, 0, 99, skill.value);
-            return {
+            // 职业可指定技能专精：写入专精并按专精重算基础值（保持与专精弹窗一致的低耦合逻辑）。
+            const occupationSpecialty = getOccupationSpecialtyKey(occupation, skillKey);
+            const specialtyKey = occupationSpecialty || String(skill.specialtyKey || "").trim();
+            const base = occupationSpecialty ? resolveEffectiveBase(skillKey, occupationSpecialty, card.attributes, occupation) : skill.base;
+            const value = clampNumber(skill.value + (base - skill.base), 0, 99, skill.value);
+            const result: COC7Skill = {
                 ...skill,
                 checked: skill.checked || occupationSkill,
                 occupation: skill.occupation || occupationSkill,
+                base,
                 value
             };
+            if (specialtyKey) result.specialtyKey = specialtyKey;
+            else delete result.specialtyKey;
+            return result;
         });
         return createCharacterCard({ ...card, skills });
     }
@@ -1033,18 +936,21 @@ interface Window {
     }
 
     function normalizeSkills(skills?: COC7Skill[], attributes?: COC7Attributes, occupation?: COC7Occupation): COC7Skill[] {
-        const source = skills && skills.length ? mergeSkillCatalog(skills) : BASE_SKILLS;
+        const hasSource = Boolean(skills && skills.length);
+        const source = hasSource ? mergeSkillCatalog(skills as COC7Skill[]) : BASE_SKILLS;
         return source.map((skill) => {
             const skillKey = resolveSkillKey(skill);
-            const base = Object.prototype.hasOwnProperty.call(skill, "base")
-                ? clampNumber(skill.base, 0, 99, calculateSkillBase(skill, attributes, occupation))
-                : calculateSkillBase(skill, attributes, occupation);
+            const specialtyKey = String(skill.specialtyKey || "").trim();
+            // 已存在 / 导入的角色卡以卡片自身存的基础值为准；新建或空技能使用有效基础值。
+            const base = hasSource && Object.prototype.hasOwnProperty.call(skill, "base")
+                ? clampNumber(skill.base, 0, 99, resolveEffectiveBase(skillKey, specialtyKey, attributes, occupation))
+                : resolveEffectiveBase(skillKey, specialtyKey, attributes, occupation);
             const occupationPoints = clampNumber(skill.occupationPoints, 0, 99, 0);
             const interestPoints = clampNumber(skill.interestPoints, 0, 99, 0);
             const growthPoints = clampNumber(skill.growthPoints, 0, 99, 0);
             const value = clampNumber(skill.value, 0, 99, base + occupationPoints + interestPoints + growthPoints);
             const occupationSkill = occupation?.occupationSkills.includes(skillKey) || Boolean(skill.occupation);
-            return {
+            const result: COC7Skill = {
                 id: skill.id || slugify(skill.name),
                 skillKey,
                 name: String(skill.name || "未命名技能").slice(0, 40),
@@ -1058,6 +964,9 @@ interface Window {
                 interestPoints,
                 growthPoints
             };
+            if (specialtyKey) result.specialtyKey = specialtyKey;
+            if (isUserDefinedBaseSkill(skillKey)) result.customBase = true;
+            return result;
         });
     }
 
@@ -1086,25 +995,109 @@ interface Window {
     }
 
     function calculateSkillBase(skill: COC7Skill, attributes?: COC7Attributes, occupation?: COC7Occupation): number {
-        const baseKey = resolveSkillBaseKey(skill);
-        if (occupation?.skillBases && Object.prototype.hasOwnProperty.call(occupation.skillBases, baseKey)) {
-            return clampNumber(occupation.skillBases[baseKey], 0, 99, clampNumber(skill.base, 0, 99, 0));
+        return resolveEffectiveBase(resolveSkillKey(skill), skill.specialtyKey || "", attributes, occupation);
+    }
+
+    /** 技能基础值覆盖表键：无专精为 `skillKey`，有专精为 `skillKey.specialtyKey`。 */
+    function skillBaseOverrideKey(skillKey: string, specialtyKey?: string): string {
+        const specialty = String(specialtyKey || "").trim();
+        return specialty ? `${skillKey}.${specialty}` : skillKey;
+    }
+
+    function normalizeSkillBaseMap(value: unknown): Record<string, number> {
+        if (typeof value === "string") {
+            try {
+                return normalizeSkillBaseMap(JSON.parse(value));
+            } catch {
+                return {};
+            }
         }
-        if (baseKey === "dodge" && attributes) return Math.floor(attributes.DEX / 2);
-        return clampNumber(skill.base, 0, 99, 0);
+        if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+        return Object.entries(value as Record<string, unknown>).reduce((map, [rawKey, rawValue]) => {
+            const key = String(rawKey || "").trim();
+            if (!key || rawValue === null || rawValue === "") return map;
+            const parsed = Number(rawValue);
+            if (!Number.isFinite(parsed)) return map;
+            map[key] = clampNumber(parsed, 0, 99, 0);
+            return map;
+        }, {} as Record<string, number>);
+    }
+
+    /** 管理员设置中的技能基础值（`general.toml` → `[character_rules].skill_bases`，JSON 字符串）。 */
+    function getAdminSkillBases(): Record<string, number> {
+        return normalizeSkillBaseMap(getConfigSection("character_rules")?.skill_bases);
+    }
+
+    /** 用户个性化设置的技能基础值（localStorage）。 */
+    function getUserSkillBases(): Record<string, number> {
+        const storage = safeStorage();
+        return normalizeSkillBaseMap(storage?.getItem(USER_SKILL_BASES_STORAGE_KEY));
+    }
+
+    /** 当前房间房规中的技能基础值（进入房间后生效）。 */
+    function getRoomSkillBases(): Record<string, number> {
+        const houseRules = (global.currentRoom as { house_rules?: { skill_bases?: unknown } } | undefined)?.house_rules;
+        return normalizeSkillBaseMap(houseRules?.skill_bases);
+    }
+
+    /** 标记为「用户自填」的技能（如自定义技能）不参与默认值解析。 */
+    function isUserDefinedBaseSkill(skillKey: string): boolean {
+        const entry = SKILL_CATALOG.find((item) => item.key === skillKey);
+        return Boolean(entry?.userDefinedBase) || skillKey === "custom";
+    }
+
+    function getCatalogSkillEntry(skillKey: string): SkillCatalogEntry | undefined {
+        return SKILL_CATALOG.find((entry) => entry.key === skillKey);
+    }
+
+    function getCatalogDefaultBase(skillKey: string, specialtyKey?: string): number | null {
+        const entry = getCatalogSkillEntry(skillKey);
+        if (!entry || entry.userDefinedBase) return null;
+        const specialty = String(specialtyKey || "").trim();
+        if (specialty) {
+            const match = entry.specialties.find((item) => item.key === specialty);
+            if (match && typeof match.base === "number") return clampNumber(match.base, 0, 99, entry.base);
+        }
+        return clampNumber(entry.base, 0, 99, 0);
+    }
+
+    /**
+     * 有效基础值：房间规则 > 用户个性化 > 管理员设置 > 技能目录默认 > 动态值。
+     * 动态值（闪避=DEX/2、母语=EDU）可被上级覆盖；职业文件 skillBases 保持最高优先。
+     */
+    function resolveEffectiveBase(skillKey: string, specialtyKey?: string, attributes?: COC7Attributes, occupation?: COC7Occupation): number {
+        if (isUserDefinedBaseSkill(skillKey)) return 0;
+        const specialty = String(specialtyKey || "").trim();
+        const overrideKey = skillBaseOverrideKey(skillKey, specialty);
+        if (occupation?.skillBases) {
+            if (Object.prototype.hasOwnProperty.call(occupation.skillBases, overrideKey)) {
+                return clampNumber(occupation.skillBases[overrideKey], 0, 99, 0);
+            }
+            if (specialty && Object.prototype.hasOwnProperty.call(occupation.skillBases, skillKey)) {
+                return clampNumber(occupation.skillBases[skillKey], 0, 99, 0);
+            }
+        }
+        for (const overrides of [getRoomSkillBases(), getUserSkillBases(), getAdminSkillBases()]) {
+            if (Object.prototype.hasOwnProperty.call(overrides, overrideKey)) return overrides[overrideKey] ?? 0;
+            if (specialty && Object.prototype.hasOwnProperty.call(overrides, skillKey)) return overrides[skillKey] ?? 0;
+        }
+        if (attributes) {
+            if (skillKey === "dodge") return Math.floor(attributes.DEX / 2);
+            if (skillKey === "languageOwn") return clampNumber(attributes.EDU, 0, 99, 0);
+        }
+        const catalogBase = getCatalogDefaultBase(skillKey, specialty);
+        if (catalogBase !== null) return catalogBase;
+        if (attributes && skillKey === "dodge") return Math.floor(attributes.DEX / 2);
+        if (attributes && skillKey === "languageOwn") return clampNumber(attributes.EDU, 0, 99, 0);
+        return 0;
     }
 
     function resolveSkillKey(skill: Pick<COC7Skill, "id" | "skillKey">): string {
         return skill.skillKey || skill.id.split("__")[0] || skill.id;
     }
 
-    function resolveSkillBaseKey(skill: Pick<COC7Skill, "id" | "skillKey">): string {
-        return skill.skillKey || skill.id.split("__")[0] || skill.id;
-    }
-
     function getOccupationSpecialtyKey(occupation: COC7Occupation | undefined, skillKey: string): string {
-        const match = (occupation?.occupationSkillEntries || []).find((entry) => entry.skillKey === skillKey && entry.specialtyKey);
-        return match?.specialtyKey || "";
+        return (occupation?.occupationSkillEntries || []).filter((entry) => entry.skillKey === skillKey).map((entry) => entry.specialtyKey || "")[0] || "";
     }
 
     function normalizeWeapons(weapons?: COC7Weapon[]): COC7Weapon[] {
@@ -1308,18 +1301,17 @@ interface Window {
         const minCredit = clampNumber(payload.creditRating?.min, 0, 99, 9);
         const maxCredit = clampNumber(payload.creditRating?.max, minCredit, 99, 30);
         return {
-            id: payload.id || "writer",
-            name: localizeOccupationName(payload.nameKey, payload.id),
+            id: payload.id || "",
+            name: String(payload.name || "").trim() || localizeOccupationName(payload.nameKey, payload.id),
             nameKey: payload.nameKey || "",
+            categoryKey: payload.categoryKey || "",
+            category: String(payload.category || "").trim(),
+            order: Number.isFinite(payload.order) ? Number(payload.order) : 0,
             creditRating: [minCredit, maxCredit],
             occupationSkills: skillKeys,
             pointsFormula: normalizeOccupationFormula(payload.occupationSkillPoints?.terms),
             occupationSkillEntries: entries,
-            occupationSkillLabels: entries.map(occupationSkillEntryLabel),
-            skillBonuses: {},
-            skillBases: normalizeSkillBases(payload.skillBases),
-            specialties: [],
-            passiveEffects: []
+            skillBases: normalizeSkillBases(payload.skillBases)
         };
     }
 
@@ -1391,12 +1383,17 @@ interface Window {
             base: clampNumber(entry.base, 0, 99, 0),
             repeatable: clampNumber(entry.repeatable, 1, 9, 1),
             specialties: Array.isArray(entry.specialties)
-                ? entry.specialties.map((specialty) => ({
-                    key: String(specialty.key || "").trim(),
-                    labelKey: String(specialty.labelKey || "").trim()
-                })).filter((specialty) => Boolean(specialty.key))
+                ? entry.specialties.map((specialty) => {
+                    const normalized: SkillSpecialtyCatalogEntry = {
+                        key: String(specialty.key || "").trim(),
+                        labelKey: String(specialty.labelKey || "").trim()
+                    };
+                    if (typeof specialty.base === "number") normalized.base = clampNumber(specialty.base, 0, 99, 0);
+                    return normalized;
+                }).filter((specialty) => Boolean(specialty.key))
                 : [],
-            eraLimited: Boolean(entry.eraLimited)
+            eraLimited: Boolean(entry.eraLimited),
+            userDefinedBase: Boolean(entry.userDefinedBase)
         })).filter((entry) => Boolean(entry.key));
     }
 
@@ -1412,12 +1409,13 @@ interface Window {
             const repeatCount = Math.max(1, entry.repeatable || 1);
             for (let index = 0; index < repeatCount; index += 1) {
                 const suffix = repeatCount > 1 ? index + 1 : 0;
+                const base = resolveEffectiveBase(entry.key, "", undefined, undefined);
                 flattened.push({
                     id: repeatCount > 1 ? `${entry.key}__${suffix}` : entry.key,
                     skillKey: entry.key,
                     name: label,
-                    base: entry.base,
-                    value: entry.base,
+                    base,
+                    value: base,
                     category: entry.category,
                     checked: false
                 });
@@ -1427,20 +1425,32 @@ interface Window {
     }
 
     function normalizeOccupationFormula(terms?: OccupationPointFormulaTerm[]): OccupationPointFormula {
-        const validTerms = (terms || []).filter((term) => ATTRIBUTE_KEYS.includes(term.attribute as COC7CoreAttributeKey) || term.attribute === "AGE");
+        const validTerms: OccupationPointFormulaTerm[] = [];
+        (terms || []).forEach((term) => {
+            if (Array.isArray(term.choose) && term.choose.length) {
+                const choices = term.choose.filter((key) => ATTRIBUTE_KEYS.includes(key as COC7CoreAttributeKey));
+                if (!choices.length) return;
+                const multiplier = Number(term.multiplier);
+                validTerms.push({ choose: choices, multiplier: Number.isFinite(multiplier) ? multiplier : 1 });
+                return;
+            }
+            if (term.attribute === "AGE" || ATTRIBUTE_KEYS.includes(term.attribute as COC7CoreAttributeKey)) {
+                const multiplier = Number(term.multiplier);
+                validTerms.push({ attribute: term.attribute as COC7AttributeKey, multiplier: Number.isFinite(multiplier) ? multiplier : 1 });
+            }
+        });
         return validTerms.length ? validTerms : [{ attribute: "EDU", multiplier: 4 }];
     }
 
     function occupationSkillKeys(entry: OccupationSkillEntry): string[] {
-        if (entry.skillKey) return [entry.skillKey];
-        if (entry.chooseOne) return entry.chooseOne.flatMap(occupationSkillKeys);
-        return [];
+        // 仅确定技能参与打勾；「或」「任意 N 项」等模糊条目由 occupationSkillEntries 保留展示。
+        return entry.skillKey ? [entry.skillKey] : [];
     }
 
     function occupationSkillEntryLabel(entry: OccupationSkillEntry): string {
         if (entry.skillKey) return formatSkillLabel(entry.skillKey, entry.specialtyKey);
         if (entry.chooseOne) return entry.chooseOne.map(occupationSkillEntryLabel).join(localizeCatalogText("或"));
-        if (entry.freeChoice === "personalOrEraSpecialty") return localizeCatalogText("任意一项其他个人或时代特长");
+        if (entry.freeChoice) return localizeCatalogText(entry.freeChoice);
         return localizeCatalogText("自定义本职技能");
     }
 
@@ -1451,13 +1461,20 @@ interface Window {
     }
 
     function localizeSkillSpecialty(skillKey: string, specialtyKey: string): string {
-        const source = SKILL_LOCALE_MAP[`skillSpecialties.${skillKey}.${specialtyKey}`] || SKILL_SPECIALTY_LABELS[`${skillKey}.${specialtyKey}`] || specialtyKey;
+        const source = SKILL_LOCALE_MAP[`skillSpecialties.${skillKey}.${specialtyKey}`] || specialtyKey;
         return localizeCatalogText(source);
     }
 
     function localizeOccupationName(nameKey?: string, fallback?: string): string {
-        const source = nameKey ? OCCUPATION_LABELS[nameKey] || fallback || nameKey : fallback || "未命名职业";
+        const fallbackText = fallback || nameKey || "未命名职业";
+        const source = nameKey ? (window.TrpgI18n?.t(nameKey, fallbackText) || fallbackText) : fallbackText;
         return localizeCatalogText(source);
+    }
+
+    function localizeOccupationCategory(categoryKey?: string, fallback?: string): string {
+        const fallbackText = fallback || "";
+        const source = categoryKey ? (window.TrpgI18n?.t(categoryKey, fallbackText) || fallbackText) : fallbackText;
+        return source ? localizeCatalogText(source) : "";
     }
 
     function localizeCatalogText(value: string): string {
@@ -1711,6 +1728,10 @@ interface Window {
         occupationTemplateModal = occupationModalElement && typeof bootstrap !== "undefined" ? new bootstrap.Modal(occupationModalElement) : null;
         const weaponPickerModalElement = byId("characterWeaponPickerModal");
         weaponPickerModal = weaponPickerModalElement && typeof bootstrap !== "undefined" ? new bootstrap.Modal(weaponPickerModalElement) : null;
+        const skillSpecialtyModalElement = byId("skillSpecialtyModal");
+        skillSpecialtyModal = skillSpecialtyModalElement && typeof bootstrap !== "undefined" ? new bootstrap.Modal(skillSpecialtyModalElement) : null;
+        const skillBaseSettingsModalElement = byId("skillBaseSettingsModal");
+        skillBaseSettingsModal = skillBaseSettingsModalElement && typeof bootstrap !== "undefined" ? new bootstrap.Modal(skillBaseSettingsModalElement) : null;
         hydrateOccupationSelect();
         bindEvents();
         void Promise.all([loadSkillCatalog(), loadOccupationCatalogs(), loadWeaponCatalog()]).then(() => {
@@ -1757,11 +1778,14 @@ interface Window {
         byId("saveCharacterRuleSettings")?.addEventListener("click", () => {
             void saveRuleSettingsFromPanel();
         });
+        byId("openAdminSkillBaseSettings")?.addEventListener("click", () => openSkillBaseSettings("admin"));
+        byId("openUserSkillBaseSettings")?.addEventListener("click", () => openSkillBaseSettings("user"));
         byId("characterOccupation")?.addEventListener("input", () => {
             occupationSkillPointsManuallyEdited = false;
             editorSkills = readChecklistSkills();
             hydrateSkillChecklist(editorSkills);
             refreshEditorRuleSummary();
+            renderOccupationHint();
         });
         byId("characterCreditRating")?.addEventListener("input", syncEditorCreditRating);
         byId("characterOccupationSkillPoints")?.addEventListener("input", () => {
@@ -1796,6 +1820,13 @@ interface Window {
         byId("characterSkillCategoryFilters")?.addEventListener("click", handleSkillCategoryFilterClick);
         byId("characterSkillTableBody")?.addEventListener("input", handleSkillTableInput);
         byId("characterSkillTableBody")?.addEventListener("change", handleSkillTableInput);
+        byId("characterSkillTableBody")?.addEventListener("click", handleSkillTableClick);
+        byId("skillSpecialtyList")?.addEventListener("click", handleSkillSpecialtyListClick);
+        byId("cancelSkillSpecialty")?.addEventListener("click", () => skillSpecialtyModal?.hide());
+        byId("confirmSkillSpecialty")?.addEventListener("click", confirmSkillSpecialtySelection);
+        byId("saveSkillBaseSettings")?.addEventListener("click", () => {
+            void saveSkillBaseSettings();
+        });
         byId("characterWeaponTableBody")?.addEventListener("input", handleWeaponTableInput);
         byId("characterWeaponTableBody")?.addEventListener("change", handleWeaponTableInput);
         byId("characterWeaponTableBody")?.addEventListener("click", handleWeaponTableClick);
@@ -1824,7 +1855,7 @@ interface Window {
     function hydrateOccupationSelect(): void {
         const list = byId<HTMLDataListElement>("characterOccupationOptions");
         if (!list) return;
-        list.innerHTML = PRESET_OCCUPATIONS.map((occupation) => `<option value="${escapeHtml(occupation.name)}"></option>`).join("");
+        list.innerHTML = PRESET_OCCUPATIONS.map((occupation) => `<option value="${escapeHtml(occupationDisplayName(occupation))}"></option>`).join("");
     }
 
     function hydrateSkillChecklist(skills: COC7Skill[] = BASE_SKILLS): void {
@@ -1862,7 +1893,7 @@ interface Window {
                             ${typeButton}
                         </div>
                     </td>
-                    <td><span class="character-skill-value-cell" data-skill-base="${rowId}">${skill.base}</span></td>
+                    <td>${buildSkillBaseCell(skill, rowId)}</td>
                     <td><input type="number" class="form-control form-control-sm character-skill-points-input" min="0" max="${getSkillLimit("occupation")}" value="${occupationPoints}" data-skill-occupation-points="${rowId}" ${occupationDisabled}></td>
                     <td><input type="number" class="form-control form-control-sm character-skill-points-input" min="0" max="${getSkillLimit("other")}" value="${interestPoints}" data-skill-interest-points="${rowId}"></td>
                     <td><input type="number" class="form-control form-control-sm character-skill-points-input" min="0" max="${getSkillLimit("other")}" value="${growthPoints}" data-skill-growth-points="${rowId}"></td>
@@ -1875,6 +1906,15 @@ interface Window {
         refreshSkillTableVisibility();
         refreshSkillPointSummary();
         syncEditorCreditRating();
+    }
+
+    /** 自定义技能（用户自填基础值）渲染为可输入控件，其余展示只读基础值。 */
+    function buildSkillBaseCell(skill: COC7Skill, rowId: string): string {
+        const skillKey = resolveSkillKey(skill);
+        if (isUserDefinedBaseSkill(skillKey)) {
+            return `<input type="number" class="form-control form-control-sm character-skill-points-input" min="0" max="99" value="${skill.base}" data-skill-base="${rowId}">`;
+        }
+        return `<span class="character-skill-value-cell" data-skill-base="${rowId}">${skill.base}</span>`;
     }
 
     function buildCustomSkillNameInput(skill: COC7Skill, rowId: string): string {
@@ -1890,8 +1930,186 @@ interface Window {
     }
 
     function buildSkillSpecialtyButton(skill: COC7Skill): string {
-        void skill;
-        return "";
+        const skillKey = resolveSkillKey(skill);
+        if (!getSkillSpecialties(skillKey).length) return "";
+        const specialtyKey = String(skill.specialtyKey || "").trim();
+        const label = specialtyKey
+            ? localizeSkillSpecialty(skillKey, specialtyKey)
+            : (window.TrpgI18n?.t("character.skill.specialty.choose", "选择{name}", { name: skill.name }) || `选择${skill.name}`);
+        return `<button type="button" class="character-skill-specialty-button" data-skill-specialty-trigger="${escapeHtml(skill.id)}">${escapeHtml(label)}</button>`;
+    }
+
+    function getSkillSpecialties(skillKey: string): SkillSpecialtyCatalogEntry[] {
+        return getCatalogSkillEntry(skillKey)?.specialties || [];
+    }
+
+    function handleSkillTableClick(event: Event): void {
+        const trigger = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-skill-specialty-trigger]");
+        if (!trigger) return;
+        openSkillSpecialtyPicker(trigger.dataset.skillSpecialtyTrigger || "");
+    }
+
+    function openSkillSpecialtyPicker(rowId: string): void {
+        const skill = editorSkills.find((item) => item.id === rowId);
+        const skillKey = skill ? resolveSkillKey(skill) : (rowId.split("__")[0] || rowId);
+        const specialties = getSkillSpecialties(skillKey);
+        if (!specialties.length) return;
+        pendingSkillSpecialtyRowId = rowId;
+        pendingSkillSpecialtyKey = String(skill?.specialtyKey || "").trim();
+        setInputValue("skillSpecialtyTargetRow", rowId);
+        const list = byId("skillSpecialtyList");
+        if (list) {
+            list.innerHTML = specialties.map((specialty) => {
+                const active = specialty.key === pendingSkillSpecialtyKey;
+                return `<button type="button" class="character-skill-specialty-option${active ? " is-active" : ""}" data-skill-specialty-option="${escapeHtml(specialty.key)}">${escapeHtml(localizeSkillSpecialty(skillKey, specialty.key))}</button>`;
+            }).join("");
+        }
+        skillSpecialtyModal?.show();
+    }
+
+    function handleSkillSpecialtyListClick(event: Event): void {
+        const option = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-skill-specialty-option]");
+        if (!option) return;
+        pendingSkillSpecialtyKey = option.dataset.skillSpecialtyOption || "";
+        document.querySelectorAll<HTMLElement>("#skillSpecialtyList [data-skill-specialty-option]").forEach((item) => {
+            item.classList.toggle("is-active", item === option);
+        });
+    }
+
+    function confirmSkillSpecialtySelection(): void {
+        if (pendingSkillSpecialtyRowId) applySkillSpecialty(pendingSkillSpecialtyRowId, pendingSkillSpecialtyKey);
+        skillSpecialtyModal?.hide();
+    }
+
+    /**
+     * 低耦合：把专精写入指定技能行并重算基础值。
+     * 专精弹窗与「选择职业」等流程均可直接调用，无需关心行的渲染细节。
+     */
+    function applySkillSpecialty(rowId: string, specialtyKey: string): void {
+        editorSkills = readChecklistSkills();
+        const index = editorSkills.findIndex((item) => item.id === rowId);
+        const skill = index < 0 ? undefined : editorSkills[index];
+        if (!skill) return;
+        const skillKey = resolveSkillKey(skill);
+        const nextSpecialty = String(specialtyKey || "").trim();
+        const base = resolveEffectiveBase(skillKey, nextSpecialty, readAttributes(), resolveOccupationFromInput(getInputValue("characterOccupation")));
+        const next: COC7Skill = { ...skill, base };
+        if (nextSpecialty) next.specialtyKey = nextSpecialty;
+        else delete next.specialtyKey;
+        next.value = clampNumber(base + (skill.occupationPoints || 0) + (skill.interestPoints || 0) + (skill.growthPoints || 0), 0, 99, base);
+        editorSkills[index] = next;
+        hydrateSkillChecklist(editorSkills);
+    }
+
+    function formatDefaultBaseLabel(skillKey: string, value: number | null): string {
+        if (skillKey === "dodge") return "DEX/2";
+        if (skillKey === "languageOwn") return "EDU";
+        return value === null ? "—" : String(value);
+    }
+
+    function renderSkillBaseSettingsRow(key: string, label: string, defaultLabel: string, overrides: Record<string, number>, editable: boolean): string {
+        const current = Object.prototype.hasOwnProperty.call(overrides, key) ? String(overrides[key]) : "";
+        const control = editable
+            ? `<input type="number" class="form-control form-control-sm character-skill-base-input" min="0" max="99" value="${escapeHtml(current)}" placeholder="留空=默认" data-skill-base-key="${escapeHtml(key)}">`
+            : `<span class="character-skill-base-readonly">用户自填</span>`;
+        return `<tr><td>${escapeHtml(label)}</td><td>${escapeHtml(defaultLabel)}</td><td>${control}</td></tr>`;
+    }
+
+    function renderSkillBaseSettingsTable(overrides: Record<string, number>): void {
+        const body = byId("skillBaseSettingsTableBody");
+        if (!body) return;
+        const rows: string[] = [];
+        SKILL_CATALOG.forEach((entry) => {
+            const skillName = localizeCatalogText(SKILL_LOCALE_MAP[entry.labelKey] || entry.labelKey.split(".").pop() || entry.key);
+            if (entry.userDefinedBase) {
+                rows.push(renderSkillBaseSettingsRow(entry.key, skillName, "用户自填", overrides, false));
+                return;
+            }
+            rows.push(renderSkillBaseSettingsRow(entry.key, skillName, formatDefaultBaseLabel(entry.key, getCatalogDefaultBase(entry.key, "")), overrides, true));
+            entry.specialties.forEach((specialty) => {
+                const label = `${skillName}(${localizeSkillSpecialty(entry.key, specialty.key)})`;
+                const key = skillBaseOverrideKey(entry.key, specialty.key);
+                rows.push(renderSkillBaseSettingsRow(key, label, formatDefaultBaseLabel(entry.key, getCatalogDefaultBase(entry.key, specialty.key)), overrides, true));
+            });
+        });
+        body.innerHTML = rows.join("");
+    }
+
+    function collectSkillBaseOverridesFromModal(): Record<string, number> {
+        const body = byId("skillBaseSettingsTableBody");
+        if (!body) return {};
+        return Array.from(body.querySelectorAll<HTMLInputElement>("[data-skill-base-key]")).reduce((map, input) => {
+            const key = input.dataset.skillBaseKey || "";
+            const raw = input.value.trim();
+            if (!key || raw === "") return map;
+            const parsed = Number(raw);
+            if (!Number.isFinite(parsed)) return map;
+            map[key] = clampNumber(parsed, 0, 99, 0);
+            return map;
+        }, {} as Record<string, number>);
+    }
+
+    function skillBaseSettingsHint(mode: SkillBaseSettingsMode): string {
+        if (mode === "admin") return "管理员默认值仅作兜底：房间规则与用户个性化未填写时才生效。";
+        if (mode === "room") return "房间规则优先级最高，进入房间后覆盖用户个性化与管理员默认值。";
+        return "用户个性化基础值用于新建角色卡，进入房间后以房规为准。";
+    }
+
+    function openSkillBaseSettings(mode: SkillBaseSettingsMode): void {
+        skillBaseSettingsMode = mode;
+        setText("skillBaseSettingsMessage", "");
+        setText("skillBaseSettingsHint", skillBaseSettingsHint(mode));
+        const overrides = mode === "admin" ? getAdminSkillBases() : mode === "room" ? getRoomSkillBases() : getUserSkillBases();
+        renderSkillBaseSettingsTable(overrides);
+        skillBaseSettingsModal?.show();
+    }
+
+    async function saveSkillBaseSettings(): Promise<void> {
+        const overrides = collectSkillBaseOverridesFromModal();
+        setText("skillBaseSettingsMessage", "");
+        if (skillBaseSettingsMode === "user") {
+            const storage = safeStorage();
+            if (storage) storage.setItem(USER_SKILL_BASES_STORAGE_KEY, JSON.stringify(overrides));
+            await reloadSkillBases();
+            setText("skillBaseSettingsMessage", "已保存");
+            return;
+        }
+        if (skillBaseSettingsMode === "admin") {
+            const generalConfig = global.configManager?.getConfig("general") || {};
+            const characterRules = { ...(getConfigSection("character_rules") || {}), skill_bases: JSON.stringify(overrides) };
+            const saved = await global.configManager?.saveConfig("general", { ...generalConfig, character_rules: characterRules });
+            await reloadSkillBases();
+            setText("skillBaseSettingsMessage", saved === false ? "技能基础值保存失败" : "技能基础值已保存");
+            return;
+        }
+        const roomId = String((global.currentRoom as { id?: string } | undefined)?.id || "");
+        if (!roomId) {
+            setText("skillBaseSettingsMessage", "尚未进入房间，无法保存房间规则");
+            return;
+        }
+        try {
+            const response = await TrpgApi.put<ApiResponse<{ house_rules?: { skill_bases?: Record<string, number> } }>>(
+                `/api/rooms/${encodeURIComponent(roomId)}/house-rules`,
+                { house_rules: { skill_bases: overrides } }
+            );
+            if (!response.success) {
+                setText("skillBaseSettingsMessage", response.message || "技能基础值保存失败");
+                return;
+            }
+            const room = global.currentRoom as { house_rules?: Record<string, unknown> } | undefined;
+            if (room) room.house_rules = { ...(room.house_rules || {}), skill_bases: response.data?.house_rules?.skill_bases ?? overrides };
+            await reloadSkillBases();
+            setText("skillBaseSettingsMessage", "技能基础值已保存");
+        } catch (error) {
+            console.error("保存房间技能基础值失败:", error);
+            setText("skillBaseSettingsMessage", "技能基础值保存失败，请稍后重试");
+        }
+    }
+
+    /** 重新加载技能目录并刷新当前编辑中的技能表（房间切换 / 保存基础值后调用）。 */
+    async function reloadSkillBases(): Promise<void> {
+        await loadSkillCatalog();
+        if (editorSkills.length) hydrateSkillChecklist(editorSkills);
     }
 
     function getSkillLimit(type: "occupation" | "other"): number {
@@ -2306,6 +2524,7 @@ interface Window {
         hydrateWeaponTable(target.weapons);
         refreshEditorRuleSummary();
         syncEditorCreditRating();
+        renderOccupationHint();
         modal?.show();
     }
 
@@ -2328,41 +2547,142 @@ interface Window {
         nameGeneratorModal?.hide();
     }
 
+    function occupationDisplayName(occupation: COC7Occupation): string {
+        return localizeOccupationName(occupation.nameKey, occupation.name) || occupation.name;
+    }
+
+    function occupationCategorySlug(categoryKey: string): string {
+        return categoryKey.split(".").pop() || categoryKey;
+    }
+
+    function occupationCategorySortIndex(categoryKey: string): number {
+        const index = OCCUPATION_CATEGORY_ORDER.indexOf(occupationCategorySlug(categoryKey));
+        return index < 0 ? OCCUPATION_CATEGORY_ORDER.length : index;
+    }
+
+    function occupationCategoryGroups(): Array<{ key: string; label: string; occupations: COC7Occupation[] }> {
+        const groups = new Map<string, COC7Occupation[]>();
+        PRESET_OCCUPATIONS.forEach((occupation) => {
+            const key = occupation.categoryKey || occupation.category || "other";
+            const list = groups.get(key) || [];
+            list.push(occupation);
+            groups.set(key, list);
+        });
+        return Array.from(groups.entries()).map(([key, list]) => ({
+            key,
+            label: localizeOccupationCategory(key, list[0]?.category || key),
+            occupations: [...list].sort((a, b) => (a.order || 0) - (b.order || 0) || a.name.localeCompare(b.name))
+        })).sort((a, b) => occupationCategorySortIndex(a.key) - occupationCategorySortIndex(b.key));
+    }
+
+    function occupationSkillSummary(occupation: COC7Occupation): string {
+        // 延迟到渲染时求值：此时技能目录已加载，技能名可正确本地化。
+        const labels = occupation.occupationSkillEntries?.length
+            ? occupation.occupationSkillEntries.map(occupationSkillEntryLabel)
+            : occupation.occupationSkills.map((skillKey) => formatSkillLabel(skillKey));
+        return labels.join(localizeCatalogText("、"));
+    }
+
+    function renderOccupationTemplateCard(occupation: COC7Occupation): string {
+        const t = (key: string, fallback: string) => window.TrpgI18n?.t(key, fallback) || fallback;
+        const [minCredit, maxCredit] = occupation.creditRating;
+        return `
+            <article class="occupation-template-card">
+                <div class="occupation-template-card__head">
+                    <strong class="occupation-template-card__name">${escapeHtml(occupationDisplayName(occupation))}</strong>
+                    <button type="button" class="occupation-template-card__apply" data-occupation-id="${escapeHtml(occupation.id)}">${escapeHtml(t("occupation.card.apply", "就职"))}</button>
+                </div>
+                <p class="occupation-template-card__row"><span class="occupation-template-card__label">${escapeHtml(t("occupation.card.occupation_skills", "本职技能"))}</span>${escapeHtml(occupationSkillSummary(occupation))}</p>
+                <p class="occupation-template-card__row"><span class="occupation-template-card__label">${escapeHtml(t("occupation.card.credit_rating", "信用评级"))}</span>${minCredit}~${maxCredit}</p>
+                <p class="occupation-template-card__row"><span class="occupation-template-card__label">${escapeHtml(t("occupation.card.skill_points", "职业点数"))}</span>${escapeHtml(formatOccupationPointFormula(occupation.pointsFormula))}</p>
+            </article>
+        `;
+    }
+
+    function toggleOccupationCategory(header: HTMLButtonElement): void {
+        const grid = header.nextElementSibling;
+        if (!(grid instanceof HTMLElement)) return;
+        const willOpen = grid.hidden;
+        grid.hidden = !willOpen;
+        header.classList.toggle("is-open", willOpen);
+        header.setAttribute("aria-expanded", willOpen ? "true" : "false");
+    }
+
     function openOccupationTemplatePicker(): void {
         const container = byId("occupationTemplateList");
         if (!container) return;
-        container.innerHTML = PRESET_OCCUPATIONS.map((occupation) => `
-            <button type="button" class="occupation-template-card" data-occupation-id="${escapeHtml(occupation.id)}">
-                <strong>${escapeHtml(localizeCatalogText(occupation.name))}</strong>
-                <span>信用评级 ${occupation.creditRating[0]}-${occupation.creditRating[1]}</span>
-                <small>职业点：${formatOccupationPointFormula(occupation.pointsFormula)}</small>
-                <small>本职技能：${(occupation.occupationSkillLabels || occupation.occupationSkills.map(skillNameById)).join("、")}</small>
-            </button>
+        container.innerHTML = occupationCategoryGroups().map((group) => `
+            <section class="occupation-category">
+                <button type="button" class="occupation-category-header" aria-expanded="false">
+                    <span class="occupation-category-name">${escapeHtml(group.label)}</span>
+                    <span class="occupation-category-count">${group.occupations.length}</span>
+                    <i class="fa fa-chevron-right occupation-category-arrow" aria-hidden="true"></i>
+                </button>
+                <div class="occupation-category-grid" hidden>
+                    ${group.occupations.map(renderOccupationTemplateCard).join("")}
+                </div>
+            </section>
         `).join("");
+        container.querySelectorAll<HTMLButtonElement>(".occupation-category-header").forEach((header) => {
+            header.addEventListener("click", () => toggleOccupationCategory(header));
+        });
         container.querySelectorAll<HTMLButtonElement>("[data-occupation-id]").forEach((button) => {
-            button.addEventListener("click", () => applyOccupationTemplate(button.dataset.occupationId || "writer"));
+            button.addEventListener("click", () => applyOccupationTemplate(button.dataset.occupationId || ""));
         });
         occupationTemplateModal?.show();
     }
 
+    /** 就职：写职业名 → 自动勾选确定本职技能 → 写专精 → 生成职业点数 → 刷新提示行。 */
     function applyOccupationTemplate(occupationId: string): void {
         const occupation = getOccupationById(occupationId);
-        setInputValue("characterOccupation", occupation.name);
+        if (!occupation.id) return;
+        setInputValue("characterOccupation", occupationDisplayName(occupation));
         occupationSkillPointsManuallyEdited = false;
-        const currentSkills = readChecklistSkills().map((skill) => ({
-            ...skill,
-            checked: false,
-            occupation: false
-        }));
-        editorSkills = normalizeSkills(mergeSkillCatalog(currentSkills), readAttributes(), occupation);
+        // 清空所有打勾与专精，随后由 normalizeSkills 按「确定本职技能」重新勾选。
+        const cleared = readChecklistSkills().map((skill) => {
+            const next: COC7Skill = { ...skill, checked: false, occupation: false, isProfessional: false };
+            delete next.specialtyKey;
+            return next;
+        });
         activeSkillCategoryFilter = "全部技能";
         document.querySelectorAll<HTMLElement>("#characterSkillCategoryFilters [data-skill-category]").forEach((item) => {
             item.classList.toggle("is-active", item.dataset.skillCategory === activeSkillCategoryFilter);
         });
+        editorSkills = normalizeSkills(mergeSkillCatalog(cleared), readAttributes(), occupation);
         hydrateSkillChecklist(editorSkills);
+        // 带专精的确定条目：复用专精接口写入并重算基础值（模糊条目不打勾、不写专精）。
+        (occupation.occupationSkillEntries || [])
+            .filter((entry) => entry.skillKey && entry.specialtyKey)
+            .forEach((entry) => {
+                const row = editorSkills.find((skill) => resolveSkillKey(skill) === entry.skillKey);
+                if (row) applySkillSpecialty(row.id, entry.specialtyKey || "");
+            });
         refreshEditorRuleSummary();
-        syncEditorCreditRating();
+        renderOccupationHint();
         occupationTemplateModal?.hide();
+    }
+
+    /** 技能列表上方的一行提示：职业名 / 信用评级 / 全部本职技能（含模糊表述）。 */
+    function renderOccupationHint(): void {
+        const hint = byId("characterOccupationHint");
+        if (!hint) return;
+        const occupation = resolveOccupationFromInput(getInputValue("characterOccupation"));
+        if (!occupation.id) {
+            hint.hidden = true;
+            hint.innerHTML = "";
+            return;
+        }
+        const t = (key: string, fallback: string) => window.TrpgI18n?.t(key, fallback) || fallback;
+        const separator = `<span class="character-occupation-hint__sep">|</span>`;
+        hint.innerHTML = [
+            `<strong class="character-occupation-hint__title">${escapeHtml(t("occupation.hint.title", "【提示】"))}</strong>`,
+            `<span>${escapeHtml(t("occupation.hint.occupation", "职业名"))}: ${escapeHtml(occupationDisplayName(occupation))}</span>`,
+            separator,
+            `<span>${escapeHtml(t("occupation.hint.credit_rating", "信用评级"))}: ${occupation.creditRating[0]}~${occupation.creditRating[1]}</span>`,
+            separator,
+            `<span>${escapeHtml(t("occupation.hint.skills", "本职技能"))}: ${escapeHtml(occupationSkillSummary(occupation))}</span>`
+        ].join("");
+        hint.hidden = false;
     }
 
     function hydrateRuleSettingsPanel(): void {
@@ -2442,7 +2762,12 @@ interface Window {
     }
 
     function formatOccupationPointFormula(formula: OccupationPointFormula): string {
-        return formula.map((term) => typeof term === "string" ? term : `${term.attribute} * ${term.multiplier}`).join(" + ");
+        return formula.map((term) => {
+            if (typeof term === "string") return term;
+            // 「或」项：按候选属性展示为「DEX或POW * 2」。
+            if (term.choose?.length) return `${term.choose.join(localizeCatalogText("或"))} * ${term.multiplier}`;
+            return `${term.attribute} * ${term.multiplier}`;
+        }).join(" + ");
     }
 
     function handleAvatarUpload(event: Event): void {
@@ -2581,7 +2906,7 @@ interface Window {
             const growthPoints = readSkillRowNumber(row, "growthPoints", 0);
             const value = clampNumber(base + occupationPoints + interestPoints + growthPoints, 0, 99, base);
             const name = isCustomSkill(skillKey) ? readCustomSkillName(row) || skillNameById(skillKey) : baseSkill?.name || skillNameById(skillKey);
-            return {
+            const result: COC7Skill = {
                 ...(baseSkill || {}),
                 id: rowId,
                 skillKey,
@@ -2596,6 +2921,10 @@ interface Window {
                 interestPoints,
                 growthPoints
             };
+            const specialtyKey = String(editorSkills.find((item) => item.id === rowId)?.specialtyKey || "").trim();
+            if (specialtyKey) result.specialtyKey = specialtyKey;
+            if (isUserDefinedBaseSkill(skillKey)) result.customBase = true;
+            return result;
         });
     }
 
@@ -3723,7 +4052,6 @@ interface Window {
         const mentalStates = recordField(characterStatus.mentalStates);
         const stories = recordField(payload.stories);
         const assets = recordField(payload.assets);
-        const preserveSkillBase = Boolean(loadRuleSettings().allowSkillBaseEdit);
         const age = clampNumber(payload.age, 15, 99, 25);
         const skillOccurrences = new Map<string, number>();
         const skills: COC7Skill[] = Object.entries(recordField(payload.skillGroups)).flatMap(([group, items]) => {
@@ -3737,7 +4065,9 @@ interface Window {
                 const skillKey = skillKeyByName(name, stringField(item.key || item.id || item.skillKey || `${slugify(name)}-${index}`));
                 const occurrence = (skillOccurrences.get(skillKey) || 0) + 1;
                 skillOccurrences.set(skillKey, occurrence);
-                const base = preserveSkillBase ? importedBase : clampNumber(item.base, 0, 99, skillBaseByKey(skillKey, group));
+                // 导入时以角色卡中的基础值为主；缺失时才回退到目录默认值。
+                const hasImportedBase = item.base !== undefined && item.base !== null && item.base !== "";
+                const base = hasImportedBase ? importedBase : clampNumber(item.base, 0, 99, skillBaseByKey(skillKey, group));
                 const value = clampNumber(item.value, 0, 99, base + occupationPoints + interestPoints + growthPoints);
                 const skill: COC7Skill = {
                     id: occurrence === 1 ? skillKey : `${skillKey}__${occurrence}`,
@@ -3753,6 +4083,8 @@ interface Window {
                     interestPoints,
                     growthPoints
                 };
+                const specialtyKey = stringField(item.specialtyKey);
+                if (specialtyKey) skill.specialtyKey = specialtyKey;
                 return skill;
             });
         });
@@ -3869,9 +4201,64 @@ interface Window {
         });
     }
 
+    /** 收集基础值超过有效上限（房间 > 用户个性化 > 管理员 > 目录默认）的技能名。 */
+    function collectOverLimitSkillNames(card: COC7CharacterCard): string[] {
+        const occupation = getOccupation(card);
+        return card.skills.reduce((names, skill) => {
+            const skillKey = resolveSkillKey(skill);
+            if (isUserDefinedBaseSkill(skillKey)) return names;
+            const ceiling = resolveEffectiveBase(skillKey, skill.specialtyKey || "", card.attributes, occupation);
+            if (skill.base > ceiling) names.push(skill.name);
+            return names;
+        }, [] as string[]);
+    }
+
+    /** 房规技能基础值上限（键为 `skillKey` 或 `skillKey.specialtyKey`）。 */
+    function resolveRoomSkillBaseCeiling(
+        skillKey: string,
+        specialtyKey: string,
+        overrides: Record<string, number>
+    ): number | null {
+        const overrideKey = skillBaseOverrideKey(skillKey, specialtyKey);
+        if (Object.prototype.hasOwnProperty.call(overrides, overrideKey)) return overrides[overrideKey] ?? null;
+        if (specialtyKey && Object.prototype.hasOwnProperty.call(overrides, skillKey)) return overrides[skillKey] ?? null;
+        return null;
+    }
+
+    /** 角色卡基础值超过房规上限的技能名列表（绑定前提示用）。 */
+    function collectCardSkillBaseOverflows(card: COC7CharacterCard, roomBases?: Record<string, number>): string[] {
+        const overrides = roomBases || getRoomSkillBases();
+        if (!Object.keys(overrides).length) return [];
+        return card.skills.reduce((names, skill) => {
+            const skillKey = resolveSkillKey(skill);
+            if (isUserDefinedBaseSkill(skillKey)) return names;
+            const ceiling = resolveRoomSkillBaseCeiling(skillKey, String(skill.specialtyKey || "").trim(), overrides);
+            if (ceiling !== null && skill.base > ceiling) names.push(skill.name);
+            return names;
+        }, [] as string[]);
+    }
+
+    /** 进入房间绑定角色卡时，将超出房规上限的基础值裁剪为上限并重算成功率。 */
+    function clampCardSkillBases(card: COC7CharacterCard, roomBases?: Record<string, number>): COC7CharacterCard {
+        const overrides = roomBases || getRoomSkillBases();
+        const skills = card.skills.map((skill) => {
+            const skillKey = resolveSkillKey(skill);
+            if (isUserDefinedBaseSkill(skillKey)) return skill;
+            const ceiling = resolveRoomSkillBaseCeiling(skillKey, String(skill.specialtyKey || "").trim(), overrides);
+            if (ceiling === null || skill.base <= ceiling) return skill;
+            return {
+                ...skill,
+                base: ceiling,
+                value: clampNumber(skill.value - (skill.base - ceiling), 0, 99, ceiling)
+            };
+        });
+        return createCharacterCard({ ...card, skills });
+    }
+
     async function importCharacterData(data: unknown): Promise<number> {
         const payloads = Array.isArray(data) ? data : [data];
         let imported = 0;
+        const overLimitSkills = new Set<string>();
         for (const payload of payloads) {
             if (!isRecord(payload)) continue;
             if (!canCreateCharacterCard()) break;
@@ -3883,11 +4270,15 @@ interface Window {
                 ...importInput,
                 playerId: isCurrentUserElevated() ? stringField(input.playerId) : currentPlayerId()
             });
+            collectOverLimitSkillNames(card).forEach((name) => overLimitSkills.add(name));
             const savedCard = await saveCardToServer(card);
             if (!savedCard) continue;
             cards = [savedCard, ...cards.filter((item) => item.id !== savedCard.id)];
             activeCardId = savedCard.id;
             imported += 1;
+        }
+        if (overLimitSkills.size) {
+            notify(`导入的角色卡中以下技能基础值超过设定上限，已按导入值保留：${Array.from(overLimitSkills).join("、")}`, "info");
         }
         return imported;
     }
@@ -3973,7 +4364,11 @@ interface Window {
         countSelectedOccupationSkills,
         validateOccupationSkillSelection,
         autoAllocateOccupationSkills,
-        getOccupationPassiveEffects,
+        applySkillSpecialty,
+        openSkillBaseSettings,
+        reloadSkillBases,
+        collectCardSkillBaseOverflows,
+        clampCardSkillBases,
         rollAttributeCheck,
         generateInvestigatorName,
         generateRegionalName,

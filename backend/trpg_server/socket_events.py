@@ -8,10 +8,21 @@ from trpg_server.security import ACTIVE_SESSION_REGISTRY_KEY, SESSION_TOKEN_KEY
 
 logger = logging.getLogger(__name__)
 
+# 记录每个用户当前加入的 Socket.IO 房间，便于断线时通知相关房间刷新成员在线状态。
+USER_ROOM_MEMBERSHIP_KEY = "USER_ROOM_MEMBERSHIP"
+
 
 def register_socket_events(socketio):
     if getattr(socketio, "_trpg_events_registered", False):
         return
+
+    def _room_membership():
+        return current_app.config.setdefault(USER_ROOM_MEMBERSHIP_KEY, {})
+
+    def _notify_room_members_changed(room_id):
+        # 广播「成员列表已变化」：客户端据此重新拉取房间，刷新在线状态与角色配色。
+        if room_id:
+            socketio.emit("room_members_changed", {"room_id": room_id}, room=room_id)
 
     def _session_is_current():
         if "user_id" not in session:
@@ -41,10 +52,14 @@ def register_socket_events(socketio):
     @socketio.on("disconnect")
     def handle_disconnect():
         if "user_id" in session:
-            active_sockets = current_app.config.setdefault("ACTIVE_SOCKET_SESSIONS", {})
             user_key = str(session["user_id"])
+            active_sockets = current_app.config.setdefault("ACTIVE_SOCKET_SESSIONS", {})
             if active_sockets.get(user_key) == request.sid:
                 active_sockets.pop(user_key, None)
+            # 断开后该用户变为离线，通知其所在房间刷新成员在线状态。
+            membership = _room_membership()
+            for room_id in membership.pop(user_key, set()):
+                _notify_room_members_changed(room_id)
         logger.debug("WebSocket client disconnected")
 
     @socketio.on("join_room")
@@ -57,24 +72,33 @@ def register_socket_events(socketio):
         room_id = (data or {}).get("room_id")
         if room_id:
             join_room(room_id)
+            if "user_id" in session:
+                membership = _room_membership()
+                membership.setdefault(str(session["user_id"]), set()).add(room_id)
             log_user_action(
                 logger,
                 user_action_text(session.get("username"), "加入了房间"),
                 用户ID=session.get("user_id"),
                 房间ID=room_id,
             )
+            # 用户刚上线/进入房间，通知房间内其他人刷新成员列表。
+            _notify_room_members_changed(room_id)
 
     @socketio.on("leave_room")
     def handle_leave_room(data):
         room_id = (data or {}).get("room_id")
         if room_id:
             leave_room(room_id)
+            if "user_id" in session:
+                membership = _room_membership()
+                membership.get(str(session["user_id"]), set()).discard(room_id)
             log_user_action(
                 logger,
                 user_action_text(session.get("username"), "离开了房间"),
                 用户ID=session.get("user_id"),
                 房间ID=room_id,
             )
+            _notify_room_members_changed(room_id)
 
     @socketio.on("send_message")
     def handle_send_message(data):

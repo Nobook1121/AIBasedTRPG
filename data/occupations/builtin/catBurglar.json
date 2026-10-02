@@ -1,0 +1,71 @@
+{
+  "id": "catBurglar",
+  "nameKey": "occupations.catBurglar",
+  "name": "女飞贼(古典)",
+  "categoryKey": "occupationCategories.criminal",
+  "category": "罪犯",
+  "order": 7,
+  "creditRating": {
+    "min": 10,
+    "max": 80
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + APP * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "attribute": "APP",
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "artCraft"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "fighting",
+          "specialtyKey": "brawl"
+        },
+        {
+          "skillKey": "firearms",
+          "specialtyKey": "handgun"
+        }
+      ]
+    },
+    {
+      "skillKey": "driveAuto"
+    },
+    {
+      "skillKey": "listen"
+    },
+    {
+      "skillKey": "stealth"
+    },
+    {
+      "freeChoice": "任意一项其他个人或时代特长"
+    }
+  ]
+}

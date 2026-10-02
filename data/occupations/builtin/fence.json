@@ -1,0 +1,66 @@
+{
+  "id": "fence",
+  "nameKey": "occupations.fence",
+  "name": "赃物贩子",
+  "categoryKey": "occupationCategories.criminal",
+  "category": "罪犯",
+  "order": 8,
+  "creditRating": {
+    "min": 20,
+    "max": 40
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + APP * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "attribute": "APP",
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "accounting"
+    },
+    {
+      "skillKey": "appraise"
+    },
+    {
+      "skillKey": "artCraft",
+      "specialtyKey": "forgery"
+    },
+    {
+      "skillKey": "history"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "libraryUse"
+    },
+    {
+      "skillKey": "spotHidden"
+    },
+    {
+      "freeChoice": "任意一项其他技能"
+    }
+  ]
+}

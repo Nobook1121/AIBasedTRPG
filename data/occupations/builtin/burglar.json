@@ -1,0 +1,59 @@
+{
+  "id": "burglar",
+  "nameKey": "occupations.burglar",
+  "name": "窃贼",
+  "categoryKey": "occupationCategories.criminal",
+  "category": "罪犯",
+  "order": 4,
+  "creditRating": {
+    "min": 5,
+    "max": 40
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + DEX * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "attribute": "DEX",
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "appraise"
+    },
+    {
+      "skillKey": "climb"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "electricalRepair"
+        },
+        {
+          "skillKey": "mechanicalRepair"
+        }
+      ]
+    },
+    {
+      "skillKey": "listen"
+    },
+    {
+      "skillKey": "locksmith"
+    },
+    {
+      "skillKey": "sleightOfHand"
+    },
+    {
+      "skillKey": "stealth"
+    },
+    {
+      "skillKey": "spotHidden"
+    }
+  ]
+}

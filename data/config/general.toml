@@ -39,6 +39,14 @@ max_snapshot_scene_manifest = 30
 snapshot_include_entity_manifest = false
 max_tool_result_chars = 4000
 
+[ai.knowledge]
+top_k_default = 5
+top_k_direct = 6
+chunk_child_max_chars = 800
+chunk_parent_max_chars = 2400
+sticky_rounds = 1
+cooldown_rounds = 3
+
 [character_rules]
 attribute_ratio_percent = 20
 max_cards_per_user = 3

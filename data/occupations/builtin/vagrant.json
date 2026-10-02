@@ -1,0 +1,62 @@
+{
+  "id": "vagrant",
+  "nameKey": "occupations.vagrant",
+  "name": "游民",
+  "categoryKey": "occupationCategories.gray",
+  "category": "灰色/无职",
+  "order": 8,
+  "creditRating": {
+    "min": 0,
+    "max": 5
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + DEX/APP * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "choose": [
+          "DEX",
+          "APP"
+        ],
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "artCraft"
+    },
+    {
+      "skillKey": "climb"
+    },
+    {
+      "skillKey": "jump"
+    },
+    {
+      "skillKey": "listen"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "locksmith"
+        },
+        {
+          "skillKey": "sleightOfHand"
+        }
+      ]
+    },
+    {
+      "skillKey": "navigate"
+    },
+    {
+      "skillKey": "stealth"
+    },
+    {
+      "freeChoice": "任意一项其他个人或时代特长"
+    }
+  ]
+}

@@ -64,6 +64,10 @@
                                     <input type="number" class="form-control" id="houseRuleDiceFumble" min="0" max="100" placeholder="留空使用默认值">
                                 </div>
                                 <p class="form-text mt-2" id="houseRuleDiceDefaultHint" data-i18n="room.house_rules.dice_default_hint">留空表示使用管理员设置的默认阈值。</p>
+                                <hr class="my-3">
+                                <h6 data-i18n="room.house_rules.skill_bases">技能基础值</h6>
+                                <p class="form-text" data-i18n="room.house_rules.skill_bases_hint">房间规则优先级最高，进入房间后覆盖用户个性化与管理员默认值。</p>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="openRoomSkillBaseSettings" data-i18n="room.house_rules.skill_bases_button">设置技能基础值</button>
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="common.cancel">取消</button>
@@ -435,6 +439,7 @@
                                     <summary><span><i class="fa fa-cog" aria-hidden="true"></i><span data-i18n="profile.section.website_settings">网站设置</span></span><i class="fa fa-chevron-down" aria-hidden="true"></i></summary>
                                     <div class="profile-subnav">
                                         <button type="button" class="profile-section-tab" data-profile-target="profile-website-theme" data-i18n="profile.section.website_theme">外观偏好</button>
+                                        <button type="button" class="profile-section-tab" data-profile-target="profile-skill-bases" data-i18n="profile.section.skill_bases">技能基础值</button>
                                     </div>
                                 </details>
                             </aside>
@@ -534,6 +539,11 @@
                                             <button type="button" class="btn btn-primary" id="saveProfilePendingChanges" data-i18n="common.save">保存</button>
                                         </div>
                                     </div>
+                                </section>
+                                <section class="profile-panel-section" id="profile-skill-bases">
+                                    <h4 data-i18n="profile.section.skill_bases">技能基础值</h4>
+                                    <p class="profile-section-hint" data-i18n="profile.note.skill_bases">个性化基础值保存在当前浏览器，用于新建角色卡；进入房间后以房规为准。</p>
+                                    <button class="btn btn-outline-secondary btn-sm" id="openUserSkillBaseSettings" type="button" data-i18n="profile.action.edit_skill_bases">设置技能基础值</button>
                                 </section>
                             </div>
                         </div>
@@ -684,6 +694,40 @@
                                 </div>
                             </div>
                             <div class="mb-4">
+                                <h4>知识库检索与剧本切块</h4>
+                                <p class="text-muted">控制每次请求召回的章节数量、导入剧本的切块粒度，以及章节召回的新鲜度策略。</p>
+                                <div class="form-group mt-2">
+                                    <label for="retrievalTopKDefault">普通剧本检索召回章节数</label>
+                                    <input type="number" class="form-control" id="retrievalTopKDefault" value="5" min="1" max="32">
+                                    <small class="text-muted">带场景模块的剧本每次召回的章节数量（1-32）。</small>
+                                </div>
+                                <div class="form-group mt-2">
+                                    <label for="retrievalTopKDirect">导入剧本检索召回章节数</label>
+                                    <input type="number" class="form-control" id="retrievalTopKDirect" value="6" min="1" max="32">
+                                    <small class="text-muted">导入剧本只有知识块这一条剧情来源，命中后会回填整章（1-32）。</small>
+                                </div>
+                                <div class="form-group mt-2">
+                                    <label for="chunkChildMaxChars">导入剧本子块字符上限</label>
+                                    <input type="number" class="form-control" id="chunkChildMaxChars" value="800" min="200" max="8000">
+                                    <small class="text-muted">子块越小召回越精确；章节超过该长度才继续切分（优先在段落边界）（200-8000）。</small>
+                                </div>
+                                <div class="form-group mt-2">
+                                    <label for="chunkParentMaxChars">导入剧本回填章节字符上限</label>
+                                    <input type="number" class="form-control" id="chunkParentMaxChars" value="2400" min="200" max="16000">
+                                    <small class="text-muted">命中子块后按顺序回填同章节内容，直到达到该上限（200-16000）。</small>
+                                </div>
+                                <div class="form-group mt-2">
+                                    <label for="stickyRounds">章节粘滞轮数</label>
+                                    <input type="number" class="form-control" id="stickyRounds" value="1" min="0" max="10">
+                                    <small class="text-muted">最近 N 轮召回过的章节排序加权，让剧情上下文连贯（0-10）。</small>
+                                </div>
+                                <div class="form-group mt-2">
+                                    <label for="cooldownRounds">章节冷却轮数</label>
+                                    <input type="number" class="form-control" id="cooldownRounds" value="3" min="0" max="20">
+                                    <small class="text-muted">最近 N 轮召回过的章节排序降权，避免反复召回同一段（仅调排序，不截断内容）（0-20）。</small>
+                                </div>
+                            </div>
+                            <div class="mb-4">
                                 <h4 data-i18n="settings.dice.title">骰娘设置</h4>
                                 <p class="text-muted" data-i18n="settings.dice.description">全房间统一阈值，房间规则未单独设置时使用该默认值。</p>
                                 <div class="form-group mt-2">
@@ -820,6 +864,13 @@
                                         允许导入时保留技能基础值
                                     </label>
                                     <small class="text-muted">关闭后，技能基础值以职业文件和技能目录为准。</small>
+                                </div>
+                                <div class="form-group mt-3">
+                                    <label>技能基础值</label>
+                                    <div class="mt-1">
+                                        <button class="btn btn-outline-secondary btn-sm" id="openAdminSkillBaseSettings" type="button">设置技能基础值</button>
+                                    </div>
+                                    <small class="text-muted">管理员默认值仅作兜底：房间规则与用户个性化未填写时才生效。</small>
                                 </div>
                             </div>
                             <section class="tool-panel mb-4" id="aiTokenDashboard">

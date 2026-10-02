@@ -1,0 +1,45 @@
+{
+  "id": "accountant",
+  "nameKey": "occupations.accountant",
+  "name": "会计师",
+  "categoryKey": "occupationCategories.whiteCollar",
+  "category": "职工",
+  "order": 1,
+  "creditRating": {
+    "min": 30,
+    "max": 70
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "accounting"
+    },
+    {
+      "skillKey": "law"
+    },
+    {
+      "skillKey": "libraryUse"
+    },
+    {
+      "skillKey": "listen"
+    },
+    {
+      "skillKey": "persuade"
+    },
+    {
+      "skillKey": "spotHidden"
+    },
+    {
+      "freeChoice": "任意两项其他个人或时代特长"
+    }
+  ]
+}

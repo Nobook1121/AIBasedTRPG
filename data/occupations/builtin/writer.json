@@ -1,6 +1,10 @@
 {
   "id": "writer",
   "nameKey": "occupations.writer",
+  "name": "作家(原作向)",
+  "categoryKey": "occupationCategories.literary",
+  "category": "文艺工作",
+  "order": 1,
   "creditRating": {
     "min": 9,
     "max": 30
@@ -14,16 +18,7 @@
       }
     ]
   },
-  "skillBases": {
-    "artCraft": 5,
-    "history": 5,
-    "libraryUse": 20,
-    "naturalWorld": 10,
-    "occult": 5,
-    "languageOther": 1,
-    "languageOwn": 0,
-    "psychology": 10
-  },
+  "skillBases": {},
   "occupationSkills": [
     {
       "skillKey": "artCraft",
@@ -55,7 +50,7 @@
       "skillKey": "psychology"
     },
     {
-      "freeChoice": "personalOrEraSpecialty"
+      "freeChoice": "任意一项其他个人或时代特长"
     }
   ]
 }

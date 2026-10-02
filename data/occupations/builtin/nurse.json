@@ -1,0 +1,63 @@
+{
+  "id": "nurse",
+  "nameKey": "occupations.nurse",
+  "name": "护士",
+  "categoryKey": "occupationCategories.medical",
+  "category": "医疗系统",
+  "order": 2,
+  "creditRating": {
+    "min": 9,
+    "max": 30
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "firstAid"
+    },
+    {
+      "skillKey": "listen"
+    },
+    {
+      "skillKey": "medicine"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "skillKey": "science",
+      "specialtyKey": "biology"
+    },
+    {
+      "skillKey": "science",
+      "specialtyKey": "chemistry"
+    },
+    {
+      "skillKey": "spotHidden"
+    }
+  ]
+}

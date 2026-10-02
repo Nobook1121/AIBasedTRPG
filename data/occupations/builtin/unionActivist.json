@@ -1,0 +1,59 @@
+{
+  "id": "unionActivist",
+  "nameKey": "occupations.unionActivist",
+  "name": "工会活动家",
+  "categoryKey": "occupationCategories.authority",
+  "category": "军警政",
+  "order": 11,
+  "creditRating": {
+    "min": 5,
+    "max": 50
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "accounting"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "fighting",
+      "specialtyKey": "brawl"
+    },
+    {
+      "skillKey": "law"
+    },
+    {
+      "skillKey": "listen"
+    },
+    {
+      "skillKey": "operateHeavyMachinery"
+    },
+    {
+      "skillKey": "psychology"
+    }
+  ]
+}

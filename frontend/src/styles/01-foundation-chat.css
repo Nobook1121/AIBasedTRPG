@@ -1024,3 +1024,157 @@ input[type="search"] {
     }
 }
 
+/* ==========================================================================
+   聊天消息换行对齐：无论我方还是对方，换行后一律对齐气泡左侧
+   ========================================================================== */
+.message-content,
+.message-content .markdown-body,
+.message-content .markdown-body p,
+.message-content .markdown-body li {
+    text-align: left;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.message.player-message .message-content-container {
+    align-items: flex-end;
+}
+
+/* ==========================================================================
+   图片缩略图 + 点击放大预览（网页内浮层，不跳转、不下载）
+   ========================================================================== */
+.markdown-body img.chat-media-thumb {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: min(100%, 260px);
+    max-height: 200px;
+    object-fit: cover;
+    cursor: zoom-in;
+    border-radius: var(--theme-radius-xs);
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.markdown-body img.chat-media-thumb:hover {
+    transform: scale(1.02);
+    box-shadow: var(--theme-shadow-md);
+}
+
+/* 视频内嵌播放器：消息里直接播放，附「放大」按钮进入网页内全屏 */
+.chat-media-video {
+    position: relative;
+    display: inline-block;
+    max-width: 100%;
+    margin: 4px 0;
+}
+
+.chat-media-video-player {
+    display: block;
+    width: auto;
+    max-width: min(100%, 360px);
+    max-height: 240px;
+    border-radius: var(--theme-radius-xs);
+    background: #000;
+}
+
+.chat-media-video-expand {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    padding: 2px 10px;
+    border: none;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.62);
+    color: #fff;
+    font-size: 0.72rem;
+    line-height: 1.6;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.18s ease, background-color 0.18s ease;
+}
+
+.chat-media-video:hover .chat-media-video-expand,
+.chat-media-video-expand:focus-visible {
+    opacity: 1;
+}
+
+.chat-media-video-expand:hover {
+    background: rgba(0, 0, 0, 0.85);
+}
+
+body.chat-media-lightbox-open {
+    overflow: hidden;
+}
+
+.chat-media-lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 200000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(0, 0, 0, 0.82);
+}
+
+.chat-media-lightbox[hidden] {
+    display: none;
+}
+
+.chat-media-lightbox-body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    max-width: 92vw;
+    max-height: 92vh;
+}
+
+.chat-media-lightbox-image {
+    max-width: 92vw;
+    max-height: 92vh;
+    width: auto;
+    height: auto;
+    border-radius: var(--radius-sm);
+}
+
+.chat-media-lightbox-video {
+    max-width: 92vw;
+    max-height: 92vh;
+    width: auto;
+    height: auto;
+    background: #000;
+    border-radius: var(--radius-sm);
+}
+
+.chat-media-lightbox-close {
+    position: absolute;
+    top: 16px;
+    right: 20px;
+    width: 40px;
+    height: 40px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.16);
+    color: #fff;
+    font-size: 1.6rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color 0.18s ease;
+}
+
+.chat-media-lightbox-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* 「xxx 正在输入」提示，位于聊天输入框上方 */
+.chat-typing-indicator {
+    min-height: 18px;
+    padding: 0 6px 6px;
+    color: var(--color-muted);
+    font-size: 0.78rem;
+}
+
+.chat-typing-indicator[hidden] {
+    display: none;
+}
+

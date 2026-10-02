@@ -56,7 +56,18 @@ class ConfigManager {
     }
 
     parseValue(value: string): TomlConfigValue {
-        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        if (value.startsWith('"') && value.endsWith('"')) {
+            // TOML 基本字符串需要还原 \" \\ 等转义，否则嵌套结构（以 JSON 字符串保存）
+            // 读出来会残留反斜杠，再次保存时转义会反复叠加。
+            try {
+                const parsed = JSON.parse(value) as unknown;
+                if (typeof parsed === "string") return parsed;
+            } catch {
+                // 非法 JSON 字符串（如未转义的引号）按字面量处理
+            }
+            return value.slice(1, -1);
+        }
+        if (value.startsWith("'") && value.endsWith("'")) {
             return value.slice(1, -1);
         }
         if (value === "true") return true;
@@ -125,6 +136,13 @@ class ConfigManager {
         // 骰娘默认阈值（房间规则未单独设置时生效）
         configSetInputValue("diceCriticalThresholdDefault", this.get("general", "ai", "dice_critical_threshold", 1));
         configSetInputValue("diceFumbleThresholdDefault", this.get("general", "ai", "dice_fumble_threshold", 96));
+        // 知识库检索与切块
+        configSetInputValue("retrievalTopKDefault", this.get("general", "ai.knowledge", "top_k_default", 5));
+        configSetInputValue("retrievalTopKDirect", this.get("general", "ai.knowledge", "top_k_direct", 6));
+        configSetInputValue("chunkChildMaxChars", this.get("general", "ai.knowledge", "chunk_child_max_chars", 800));
+        configSetInputValue("chunkParentMaxChars", this.get("general", "ai.knowledge", "chunk_parent_max_chars", 2400));
+        configSetInputValue("stickyRounds", this.get("general", "ai.knowledge", "sticky_rounds", 1));
+        configSetInputValue("cooldownRounds", this.get("general", "ai.knowledge", "cooldown_rounds", 3));
 
         console.log("常规设置已应用到 UI");
     }

@@ -1,0 +1,60 @@
+{
+  "id": "filmActor",
+  "nameKey": "occupations.filmActor",
+  "name": "电影演员",
+  "categoryKey": "occupationCategories.literary",
+  "category": "文艺工作",
+  "order": 5,
+  "creditRating": {
+    "min": 20,
+    "max": 90
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + APP * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "attribute": "APP",
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "artCraft",
+      "specialtyKey": "acting"
+    },
+    {
+      "skillKey": "disguise"
+    },
+    {
+      "skillKey": "driveAuto"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "freeChoice": "任意两项其他个人或时代特长"
+    }
+  ]
+}

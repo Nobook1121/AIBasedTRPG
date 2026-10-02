@@ -1,0 +1,61 @@
+{
+  "id": "butler",
+  "nameKey": "occupations.butler",
+  "name": "管家/佣人",
+  "categoryKey": "occupationCategories.service",
+  "category": "服务业",
+  "order": 3,
+  "creditRating": {
+    "min": 9,
+    "max": 40
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "chooseOne": [
+        {
+          "skillKey": "artCraft",
+          "specialtyKey": "cooking"
+        },
+        {
+          "skillKey": "artCraft",
+          "specialtyKey": "tailoring"
+        },
+        {
+          "skillKey": "artCraft",
+          "specialtyKey": "barber"
+        }
+      ]
+    },
+    {
+      "skillKey": "firstAid"
+    },
+    {
+      "skillKey": "listen"
+    },
+    {
+      "skillKey": "languageOther"
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "skillKey": "spotHidden"
+    },
+    {
+      "skillKey": "accounting"
+    },
+    {
+      "skillKey": "appraise"
+    }
+  ]
+}

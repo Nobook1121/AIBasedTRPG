@@ -1,0 +1,63 @@
+{
+  "id": "gentleman",
+  "nameKey": "occupations.gentleman",
+  "name": "绅士/淑女",
+  "categoryKey": "occupationCategories.gray",
+  "category": "灰色/无职",
+  "order": 11,
+  "creditRating": {
+    "min": 40,
+    "max": 90
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + APP * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "attribute": "APP",
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "artCraft"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "firearms",
+      "specialtyKey": "rifleShotgun"
+    },
+    {
+      "skillKey": "history"
+    },
+    {
+      "skillKey": "languageOther"
+    },
+    {
+      "skillKey": "navigate"
+    },
+    {
+      "skillKey": "ride"
+    }
+  ]
+}

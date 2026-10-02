@@ -1,0 +1,62 @@
+{
+  "id": "missionary",
+  "nameKey": "occupations.missionary",
+  "name": "传教士",
+  "categoryKey": "occupationCategories.religion",
+  "category": "宗教相关",
+  "order": 4,
+  "creditRating": {
+    "min": 0,
+    "max": 30
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + APP * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "attribute": "APP",
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "artCraft"
+    },
+    {
+      "skillKey": "firstAid"
+    },
+    {
+      "skillKey": "mechanicalRepair"
+    },
+    {
+      "skillKey": "medicine"
+    },
+    {
+      "skillKey": "naturalWorld"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "freeChoice": "任意两项其他个人或时代特长"
+    }
+  ]
+}

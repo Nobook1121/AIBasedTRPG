@@ -1,0 +1,61 @@
+{
+  "id": "bookseller",
+  "nameKey": "occupations.bookseller",
+  "name": "书商",
+  "categoryKey": "occupationCategories.industry",
+  "category": "工农商",
+  "order": 11,
+  "creditRating": {
+    "min": 20,
+    "max": 40
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "accounting"
+    },
+    {
+      "skillKey": "appraise"
+    },
+    {
+      "skillKey": "driveAuto"
+    },
+    {
+      "skillKey": "history"
+    },
+    {
+      "skillKey": "libraryUse"
+    },
+    {
+      "skillKey": "languageOwn"
+    },
+    {
+      "skillKey": "languageOther"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    }
+  ]
+}

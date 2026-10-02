@@ -1,0 +1,69 @@
+{
+  "id": "claimsInvestigator",
+  "nameKey": "occupations.claimsInvestigator",
+  "name": "中介调查员",
+  "categoryKey": "occupationCategories.whiteCollar",
+  "category": "职工",
+  "order": 2,
+  "creditRating": {
+    "min": 20,
+    "max": 45
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + STR/DEX * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "choose": [
+          "STR",
+          "DEX"
+        ],
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "fighting",
+      "specialtyKey": "brawl"
+    },
+    {
+      "skillKey": "firearms"
+    },
+    {
+      "skillKey": "law"
+    },
+    {
+      "skillKey": "libraryUse"
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "skillKey": "stealth"
+    },
+    {
+      "skillKey": "track"
+    }
+  ]
+}

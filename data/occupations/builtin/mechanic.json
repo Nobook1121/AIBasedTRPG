@@ -1,0 +1,55 @@
+{
+  "id": "mechanic",
+  "nameKey": "occupations.mechanic",
+  "name": "技工",
+  "categoryKey": "occupationCategories.industry",
+  "category": "工农商",
+  "order": 5,
+  "creditRating": {
+    "min": 9,
+    "max": 40
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "chooseOne": [
+        {
+          "skillKey": "artCraft",
+          "specialtyKey": "carpentry"
+        },
+        {
+          "skillKey": "artCraft",
+          "specialtyKey": "welding"
+        },
+        {
+          "skillKey": "artCraft",
+          "specialtyKey": "plumbing"
+        }
+      ]
+    },
+    {
+      "skillKey": "climb"
+    },
+    {
+      "skillKey": "driveAuto"
+    },
+    {
+      "skillKey": "electricalRepair"
+    },
+    {
+      "skillKey": "mechanicalRepair"
+    },
+    {
+      "skillKey": "operateHeavyMachinery"
+    }
+  ]
+}

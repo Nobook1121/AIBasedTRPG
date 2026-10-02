@@ -1,0 +1,50 @@
+{
+  "id": "alienist",
+  "nameKey": "occupations.alienist",
+  "name": "精神病医生(古典)",
+  "categoryKey": "occupationCategories.medical",
+  "category": "医疗系统",
+  "order": 6,
+  "creditRating": {
+    "min": 10,
+    "max": 60
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "law"
+    },
+    {
+      "skillKey": "listen"
+    },
+    {
+      "skillKey": "medicine"
+    },
+    {
+      "skillKey": "languageOther"
+    },
+    {
+      "skillKey": "psychoanalysis"
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "skillKey": "science",
+      "specialtyKey": "biology"
+    },
+    {
+      "skillKey": "science",
+      "specialtyKey": "chemistry"
+    }
+  ]
+}

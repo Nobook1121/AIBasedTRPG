@@ -1,0 +1,82 @@
+{
+  "id": "bountyHunter",
+  "nameKey": "occupations.bountyHunter",
+  "name": "赏金猎人",
+  "categoryKey": "occupationCategories.gray",
+  "category": "灰色/无职",
+  "order": 6,
+  "creditRating": {
+    "min": 9,
+    "max": 30
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + STR/DEX * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "choose": [
+          "STR",
+          "DEX"
+        ],
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "driveAuto"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "electronics"
+        },
+        {
+          "skillKey": "electricalRepair"
+        }
+      ]
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "fighting"
+        },
+        {
+          "skillKey": "firearms"
+        }
+      ]
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "law"
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "skillKey": "track"
+    },
+    {
+      "skillKey": "stealth"
+    }
+  ]
+}

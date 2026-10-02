@@ -1,0 +1,76 @@
+{
+  "id": "spy",
+  "nameKey": "occupations.spy",
+  "name": "间谍",
+  "categoryKey": "occupationCategories.authority",
+  "category": "军警政",
+  "order": 3,
+  "creditRating": {
+    "min": 20,
+    "max": 60
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + DEX/APP * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "choose": [
+          "DEX",
+          "APP"
+        ],
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "chooseOne": [
+        {
+          "skillKey": "artCraft",
+          "specialtyKey": "acting"
+        },
+        {
+          "skillKey": "disguise"
+        }
+      ]
+    },
+    {
+      "skillKey": "firearms"
+    },
+    {
+      "skillKey": "listen"
+    },
+    {
+      "skillKey": "languageOther"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "skillKey": "sleightOfHand"
+    },
+    {
+      "skillKey": "stealth"
+    }
+  ]
+}

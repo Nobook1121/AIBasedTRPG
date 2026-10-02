@@ -1,0 +1,52 @@
+{
+  "id": "taxiDriver",
+  "nameKey": "occupations.taxiDriver",
+  "name": "出租车司机",
+  "categoryKey": "occupationCategories.whiteCollar",
+  "category": "职工",
+  "order": 13,
+  "creditRating": {
+    "min": 9,
+    "max": 30
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + DEX * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "attribute": "DEX",
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "accounting"
+    },
+    {
+      "skillKey": "driveAuto"
+    },
+    {
+      "skillKey": "electricalRepair"
+    },
+    {
+      "skillKey": "fastTalk"
+    },
+    {
+      "skillKey": "mechanicalRepair"
+    },
+    {
+      "skillKey": "navigate"
+    },
+    {
+      "skillKey": "spotHidden"
+    },
+    {
+      "freeChoice": "任意一项其他个人或时代特长"
+    }
+  ]
+}

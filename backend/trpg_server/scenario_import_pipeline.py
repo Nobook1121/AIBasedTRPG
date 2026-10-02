@@ -11,15 +11,24 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
+from trpg_server.agents.config import AIRuntimeConfig, load_ai_runtime_config
 from trpg_server.scenario_documents import chunk_parsed_document, parse_scenario_document
 from trpg_server.scenario_importer import _summary
 
 logger = logging.getLogger(__name__)
 
 
+def _chunk_child_max(config: Any) -> int:
+    """读取管理员设置的导入剧本子块字符上限。"""
+    config_dir = config.get("CONFIG_DIR") if hasattr(config, "get") else None
+    if not config_dir:
+        return AIRuntimeConfig().chunk_child_max_chars
+    return load_ai_runtime_config(config_dir).chunk_child_max_chars
+
+
 def _chunk_title(text: str, index: int) -> str:
     for line in str(text or "").splitlines():
-        value = line.strip().lstrip("#").strip()
+        value = line.strip().lstrip("#").strip().strip("【】").strip()
         if value:
             return value[:120]
     return f"Imported section {index}"
@@ -27,6 +36,12 @@ def _chunk_title(text: str, index: int) -> str:
 
 def _local_metadata(chunk: Any, index: int) -> dict[str, Any]:
     title = _chunk_title(getattr(chunk, "text", ""), index)
+    chapter_path = getattr(chunk, "chapter_path", None)
+    # section 是「章节归属」去重/回填键：同一章节被拆成多个子块时取值相同，
+    # 检索命中后据此把相邻子块回填成完整章节。
+    section = ""
+    if isinstance(chapter_path, list) and chapter_path:
+        section = str(chapter_path[0]).strip()
     lowered = title.casefold()
     if any(word in lowered for word in ("ending", "结局", "true end", "bad end", "crazy end")):
         card_type = "ending"
@@ -40,6 +55,7 @@ def _local_metadata(chunk: Any, index: int) -> dict[str, Any]:
         "card_type": card_type,
         "summary": _summary(str(getattr(chunk, "text", "")), 180),
         "title": title,
+        "section": section,
     }
 
 
@@ -77,7 +93,7 @@ class ScenarioImportPipeline:
 
             # 直接导入：按标题（Word/PDF 标题、Markdown #、第X章）切分为语义块，
             # 每个标题对应原文中的一个场景/章节，不再生成场景卡。
-            sections = chunk_parsed_document(parsed)
+            sections = chunk_parsed_document(parsed, target_max=_chunk_child_max(self.config))
             total = len(sections)
             self.store.update(job_id, status="chunking", current_stage="chunking", progress=15, stage_progress=100, stage_meta={"totalChunks": total, "processedChunks": total})
             self.store.save_intermediate(job_id, "chunks", [c.__dict__ for c in sections])
@@ -106,7 +122,10 @@ class ScenarioImportPipeline:
                     text=section.text,
                     chunk_id=f"chunk-{index:04d}",
                     source_ref={"page": section.page, "page_end": section.page_end, "chapter": section.chapter_path or []},
-                    metadata={"title": str(metadata.get("title") or _chunk_title(section.text, index))},
+                    metadata={
+                        "title": str(metadata.get("title") or _chunk_title(section.text, index)),
+                        "section": str(metadata.get("section") or ""),
+                    },
                 )
                 vectors = provider.embed([chunk.text])
                 if not vectors:

@@ -1,0 +1,55 @@
+{
+  "id": "traveler",
+  "nameKey": "occupations.traveler",
+  "name": "旅行家",
+  "categoryKey": "occupationCategories.sports",
+  "category": "运动/探险",
+  "order": 8,
+  "creditRating": {
+    "min": 5,
+    "max": 20
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + STR/DEX * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "choose": [
+          "STR",
+          "DEX"
+        ],
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "firearms"
+    },
+    {
+      "skillKey": "firstAid"
+    },
+    {
+      "skillKey": "listen"
+    },
+    {
+      "skillKey": "naturalWorld"
+    },
+    {
+      "skillKey": "navigate"
+    },
+    {
+      "skillKey": "spotHidden"
+    },
+    {
+      "skillKey": "survival"
+    },
+    {
+      "skillKey": "track"
+    }
+  ]
+}

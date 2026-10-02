@@ -139,11 +139,13 @@ def run_agent_completion(
     context: Any,
     max_tool_rounds: int = 8,
     max_tool_result_chars: int | None = None,
+    excluded_tools: set[str] | None = None,
 ) -> AgentCompletionResult:
     payload = {**base_payload}
     messages = list(payload.get("messages", []))
     payload["messages"] = messages
-    enabled_tools = registry.select(profile.tool_names)
+    excluded = {str(name) for name in (excluded_tools or set())}
+    enabled_tools = [tool for tool in registry.select(profile.tool_names) if tool.name not in excluded]
     if enabled_tools:
         payload["tools"] = [tool.schema() for tool in enabled_tools]
         payload["tool_choice"] = "auto"

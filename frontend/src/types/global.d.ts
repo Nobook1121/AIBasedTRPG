@@ -32,6 +32,8 @@ interface Window {
     clearChatMessages?: () => void;
     setChatReadOnly?: (readOnly: boolean) => void;
     refreshRoomArchiveUi?: () => void;
+    refreshCurrentRoomMembers?: () => Promise<void>;
+    refreshRoomNodes?: () => Promise<void>;
     joinSocketRoom?: (roomId: string) => void;
     leaveSocketRoom?: (roomId: string) => void;
     reconnectSocket?: () => void;

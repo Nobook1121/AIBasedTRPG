@@ -1,0 +1,65 @@
+{
+  "id": "militaryOfficer",
+  "nameKey": "occupations.militaryOfficer",
+  "name": "军官",
+  "categoryKey": "occupationCategories.authority",
+  "category": "军警政",
+  "order": 1,
+  "creditRating": {
+    "min": 20,
+    "max": 70
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + STR/DEX * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "choose": [
+          "STR",
+          "DEX"
+        ],
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "accounting"
+    },
+    {
+      "skillKey": "firearms"
+    },
+    {
+      "skillKey": "navigate"
+    },
+    {
+      "skillKey": "firstAid"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "freeChoice": "任意一项其他个人或时代特长"
+    }
+  ]
+}

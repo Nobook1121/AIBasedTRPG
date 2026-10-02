@@ -1,0 +1,60 @@
+{
+  "id": "musician",
+  "nameKey": "occupations.musician",
+  "name": "音乐家",
+  "categoryKey": "occupationCategories.literary",
+  "category": "文艺工作",
+  "order": 4,
+  "creditRating": {
+    "min": 9,
+    "max": 30
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + DEX/POW * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "choose": [
+          "DEX",
+          "POW"
+        ],
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "artCraft",
+      "specialtyKey": "music"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "listen"
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "freeChoice": "任意四项其他技能"
+    }
+  ]
+}

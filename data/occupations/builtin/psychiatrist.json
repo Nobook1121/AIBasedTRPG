@@ -1,0 +1,50 @@
+{
+  "id": "psychiatrist",
+  "nameKey": "occupations.psychiatrist",
+  "name": "精神病学家",
+  "categoryKey": "occupationCategories.medical",
+  "category": "医疗系统",
+  "order": 5,
+  "creditRating": {
+    "min": 30,
+    "max": 80
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "languageOther"
+    },
+    {
+      "skillKey": "listen"
+    },
+    {
+      "skillKey": "medicine"
+    },
+    {
+      "skillKey": "persuade"
+    },
+    {
+      "skillKey": "psychoanalysis"
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "skillKey": "science",
+      "specialtyKey": "biology"
+    },
+    {
+      "skillKey": "science",
+      "specialtyKey": "chemistry"
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "id": "pharmacist",
+  "nameKey": "occupations.pharmacist",
+  "name": "药剂师",
+  "categoryKey": "occupationCategories.medical",
+  "category": "医疗系统",
+  "order": 8,
+  "creditRating": {
+    "min": 35,
+    "max": 75
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "accounting"
+    },
+    {
+      "skillKey": "firstAid"
+    },
+    {
+      "skillKey": "languageOther",
+      "specialtyKey": "latin"
+    },
+    {
+      "skillKey": "libraryUse"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "skillKey": "science",
+      "specialtyKey": "pharmacy"
+    },
+    {
+      "skillKey": "science",
+      "specialtyKey": "chemistry"
+    }
+  ]
+}

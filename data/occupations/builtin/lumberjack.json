@@ -1,0 +1,68 @@
+{
+  "id": "lumberjack",
+  "nameKey": "occupations.lumberjack",
+  "name": "伐木工",
+  "categoryKey": "occupationCategories.industry",
+  "category": "工农商",
+  "order": 3,
+  "creditRating": {
+    "min": 9,
+    "max": 30
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + STR/DEX * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "choose": [
+          "STR",
+          "DEX"
+        ],
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "climb"
+    },
+    {
+      "skillKey": "dodge"
+    },
+    {
+      "skillKey": "fighting",
+      "specialtyKey": "chainsaw"
+    },
+    {
+      "skillKey": "firstAid"
+    },
+    {
+      "skillKey": "jump"
+    },
+    {
+      "skillKey": "mechanicalRepair"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "naturalWorld"
+        },
+        {
+          "skillKey": "science",
+          "specialtyKey": "biology"
+        },
+        {
+          "skillKey": "science",
+          "specialtyKey": "botany"
+        }
+      ]
+    },
+    {
+      "skillKey": "throw"
+    }
+  ]
+}

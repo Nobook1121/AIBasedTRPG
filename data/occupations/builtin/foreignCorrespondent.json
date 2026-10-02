@@ -1,0 +1,58 @@
+{
+  "id": "foreignCorrespondent",
+  "nameKey": "occupations.foreignCorrespondent",
+  "name": "驻外记者",
+  "categoryKey": "occupationCategories.sports",
+  "category": "运动/探险",
+  "order": 6,
+  "creditRating": {
+    "min": 10,
+    "max": 40
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 4",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 4
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "skillKey": "history"
+    },
+    {
+      "skillKey": "languageOther"
+    },
+    {
+      "skillKey": "languageOwn"
+    },
+    {
+      "skillKey": "listen"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "freeChoice": "任意一项其他个人或时代特长"
+    }
+  ]
+}

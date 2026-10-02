@@ -1,0 +1,90 @@
+{
+  "id": "loneCriminal",
+  "nameKey": "occupations.loneCriminal",
+  "name": "独行罪犯",
+  "categoryKey": "occupationCategories.criminal",
+  "category": "罪犯",
+  "order": 6,
+  "creditRating": {
+    "min": 5,
+    "max": 65
+  },
+  "occupationSkillPoints": {
+    "formula": "EDU * 2 + DEX/APP * 2",
+    "terms": [
+      {
+        "attribute": "EDU",
+        "multiplier": 2
+      },
+      {
+        "choose": [
+          "DEX",
+          "APP"
+        ],
+        "multiplier": 2
+      }
+    ]
+  },
+  "skillBases": {},
+  "occupationSkills": [
+    {
+      "chooseOne": [
+        {
+          "skillKey": "artCraft",
+          "specialtyKey": "acting"
+        },
+        {
+          "skillKey": "disguise"
+        }
+      ]
+    },
+    {
+      "skillKey": "appraise"
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "charm"
+        },
+        {
+          "skillKey": "fastTalk"
+        },
+        {
+          "skillKey": "intimidate"
+        },
+        {
+          "skillKey": "persuade"
+        }
+      ]
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "fighting"
+        },
+        {
+          "skillKey": "firearms"
+        }
+      ]
+    },
+    {
+      "chooseOne": [
+        {
+          "skillKey": "locksmith"
+        },
+        {
+          "skillKey": "mechanicalRepair"
+        }
+      ]
+    },
+    {
+      "skillKey": "stealth"
+    },
+    {
+      "skillKey": "psychology"
+    },
+    {
+      "skillKey": "spotHidden"
+    }
+  ]
+}
