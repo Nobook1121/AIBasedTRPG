@@ -277,6 +277,79 @@ class ScenarioView {
         modal.addEventListener("hidden.bs.modal", () => modal.remove());
     }
 
+    private async openKnowledgeEditor(scenarioId: number): Promise<void> {
+        let sections: KnowledgeSectionInfo[];
+        try {
+            const response = await TrpgApi.requestWithResponse<ApiResponse<KnowledgeSectionInfo[]>>(`/api/scripts/${scenarioId}/knowledge`);
+            if (!response.response.ok || !response.data.success || !Array.isArray(response.data.data)) {
+                throw new Error(response.data.message || "加载知识块失败");
+            }
+            sections = response.data.data;
+        } catch (error) {
+            this.showMessage(scenarioViewErrorMessage(error), true);
+            return;
+        }
+
+        const modal = document.createElement("div");
+        modal.className = "modal fade";
+        modal.id = "scenarioKnowledgeModal";
+        modal.tabIndex = -1;
+        modal.innerHTML = `
+            <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">知识块（世界书）</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted small">触发词命中即直接激活该章节（不再依赖语义相似度）；常驻条目每轮注入；archived 章节不参与检索。</p>
+                        <div class="scenario-knowledge-list">
+                            ${sections.length ? sections.map(renderKnowledgeSection).join("") : '<p class="text-muted">该剧本暂无知识块，请先发布或导入剧本。</p>'}
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                    </div>
+                </div>
+            </div>`;
+
+        document.body.appendChild(modal);
+        window.TrpgI18n?.apply(modal);
+        const instance = new bootstrap.Modal(modal);
+        modal.addEventListener("click", (event) => {
+            const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-save-knowledge]");
+            if (button) void this.saveKnowledgeSection(scenarioId, button);
+        });
+        modal.addEventListener("hidden.bs.modal", () => modal.remove());
+        instance.show();
+    }
+
+    private async saveKnowledgeSection(scenarioId: number, button: HTMLButtonElement): Promise<void> {
+        const item = button.closest<HTMLElement>("[data-section-key]");
+        if (!item) return;
+        const sectionKey = item.dataset.sectionKey || "";
+        const fields: Record<string, unknown> = {};
+        item.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>("[data-field]").forEach((field) => {
+            const name = field.dataset.field;
+            if (!name) return;
+            if (field instanceof HTMLInputElement && field.type === "checkbox") fields[name] = field.checked;
+            else fields[name] = field.value;
+        });
+        button.disabled = true;
+        try {
+            const response = await TrpgApi.requestWithResponse<ApiResponse<KnowledgeSectionInfo[]>>(`/api/scripts/${scenarioId}/knowledge`, {
+                method: "PUT",
+                body: { sectionKey, fields },
+            });
+            if (!response.response.ok || !response.data.success) throw new Error(response.data.message || "保存失败");
+            this.showMessage("世界书字段已保存");
+        } catch (error) {
+            this.showMessage(scenarioViewErrorMessage(error), true);
+        } finally {
+            button.disabled = false;
+        }
+    }
+
     showImportChoice(): Promise<"edit" | "direct" | "cancel"> {
         return new Promise((resolve) => {
             const modal = document.createElement("div");
@@ -500,6 +573,8 @@ class ScenarioView {
                 if (await confirmScenarioSpoilerAccess(id)) this.handlers?.onPreviewScenario(id);
             } else if (button.classList.contains("edit-scenario")) {
                 if (await confirmScenarioSpoilerAccess(id)) this.handlers?.onEditScenario(id);
+            } else if (button.classList.contains("knowledge-scenario")) {
+                await this.openKnowledgeEditor(id);
             } else if (button.classList.contains("play-scenario")) {
                 this.handlers?.onPlayScenario(id);
             } else if (button.classList.contains("delete-scenario")) {
@@ -529,6 +604,7 @@ class ScenarioView {
         return [
             canPreview ? `<button class="btn btn-sm btn-primary preview-scenario" data-id="${id}">${scenarioT("scenario.list.preview", "预览")}</button>` : "",
             canEdit ? `<button class="btn btn-sm btn-secondary edit-scenario" data-id="${id}">${scenarioT("scenario.list.edit", "编辑")}</button>` : "",
+            canEdit ? `<button class="btn btn-sm btn-outline-secondary knowledge-scenario" data-id="${id}">${scenarioT("scenario.list.knowledge", "世界书")}</button>` : "",
             canDelete ? `<button class="btn btn-sm btn-danger delete-scenario" data-id="${id}">${scenarioT("scenario.list.delete", "删除")}</button>` : "",
         ].join("");
     }
@@ -1641,6 +1717,51 @@ function scenarioEscapeHtml(value: unknown): string {
 
 function scenarioViewErrorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
+}
+
+function renderKnowledgeSection(section: KnowledgeSectionInfo): string {
+    const option = (value: string, label: string, current: string): string =>
+        `<option value="${value}"${value === current ? " selected" : ""}>${label}</option>`;
+    const numberField = (label: string, field: string, value: number): string =>
+        `<label class="form-group"><span>${label}</span><input type="number" class="form-control" data-field="${field}" value="${value}"></label>`;
+    return `
+        <details class="scenario-knowledge-item" data-section-key="${scenarioEscapeHtml(section.section_key)}">
+            <summary>
+                <span class="scenario-knowledge-title">${scenarioEscapeHtml(section.title)}</span>
+                <span class="scenario-knowledge-meta">${section.chunk_ids.length} 块 · ${scenarioEscapeHtml(section.tier)}${section.is_constant ? " · 常驻" : ""}</span>
+            </summary>
+            <div class="scenario-knowledge-body">
+                <p class="text-muted small">${scenarioEscapeHtml(section.preview)}</p>
+                <div class="scenario-knowledge-grid">
+                    <label class="form-group"><span>触发词（逗号分隔）</span><textarea class="form-control" rows="2" data-field="keywords">${scenarioEscapeHtml(section.keywords.join("、"))}</textarea></label>
+                    <label class="form-group"><span>副键（逗号分隔）</span><textarea class="form-control" rows="2" data-field="secondary_keywords">${scenarioEscapeHtml(section.secondary_keywords.join("、"))}</textarea></label>
+                    <label class="form-group"><span>副键逻辑</span><select class="form-select" data-field="secondary_logic">
+                        ${option("and_any", "任一命中", section.secondary_logic)}
+                        ${option("and_all", "全部命中", section.secondary_logic)}
+                        ${option("not_any", "全不命中", section.secondary_logic)}
+                        ${option("not_all", "非全命中", section.secondary_logic)}
+                    </select></label>
+                    <label class="form-group"><span>分层</span><select class="form-select" data-field="tier">
+                        ${option("core", "core（优先）", section.tier)}
+                        ${option("background", "background", section.tier)}
+                        ${option("archived", "archived（排除）", section.tier)}
+                    </select></label>
+                    <label class="form-group"><span>分组</span><input type="text" class="form-control" data-field="group" value="${scenarioEscapeHtml(section.group)}"></label>
+                    ${numberField("分组权重", "group_weight", section.group_weight)}
+                    ${numberField("优先级", "priority", section.priority)}
+                    ${numberField("顺序", "order", section.order)}
+                    ${numberField("概率 %", "probability", section.probability)}
+                    ${numberField("粘滞轮", "sticky_rounds", section.sticky_rounds)}
+                    ${numberField("冷却轮", "cooldown_rounds", section.cooldown_rounds)}
+                    ${numberField("延迟轮", "delay_rounds", section.delay_rounds)}
+                </div>
+                <div class="scenario-knowledge-flags">
+                    <label class="form-check"><input class="form-check-input" type="checkbox" data-field="is_constant"${section.is_constant ? " checked" : ""}><span>常驻注入</span></label>
+                    <label class="form-check"><input class="form-check-input" type="checkbox" data-field="trigger_chunks"${section.trigger_chunks ? " checked" : ""}><span>允许递归触发</span></label>
+                </div>
+                <button type="button" class="btn btn-sm btn-primary" data-save-knowledge>保存本章节</button>
+            </div>
+        </details>`;
 }
 
 function canUseScenarioPermission(nodeId: string): boolean {

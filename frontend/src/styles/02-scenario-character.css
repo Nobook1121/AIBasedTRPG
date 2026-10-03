@@ -445,6 +445,15 @@
 .scenario-resource-list { display: grid; gap: .45rem; }
 .scenario-resource-row { display: flex; justify-content: space-between; gap: 1rem; padding: .55rem .7rem; border-radius: var(--radius-sm); background: var(--color-panel); }
 
+.scenario-knowledge-list { display: grid; gap: .6rem; }
+.scenario-knowledge-item { border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--color-panel-muted); }
+.scenario-knowledge-item > summary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .6rem .8rem; cursor: pointer; }
+.scenario-knowledge-title { font-weight: 600; }
+.scenario-knowledge-meta { color: var(--text-muted); font-size: .8rem; }
+.scenario-knowledge-body { padding: 0 .8rem .8rem; }
+.scenario-knowledge-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: .6rem; }
+.scenario-knowledge-flags { display: flex; gap: 1.2rem; margin: .7rem 0; }
+
 .scenario-module-entity-top {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

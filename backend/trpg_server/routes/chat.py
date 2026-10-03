@@ -1080,6 +1080,10 @@ def chat():
                     sticky_rounds=runtime_config.sticky_rounds,
                     cooldown_rounds=runtime_config.cooldown_rounds,
                     parent_max_chars=runtime_config.chunk_parent_max_chars,
+                    keyword_channel=runtime_config.keyword_channel_enabled,
+                    recursive_scanning=runtime_config.recursive_scanning,
+                    max_recursion_depth=runtime_config.max_recursion_depth,
+                    token_budget=runtime_config.lorebook_token_budget,
                 )
                 scenario_results = [
                     item for item in scenario_results

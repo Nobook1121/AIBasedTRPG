@@ -85,7 +85,9 @@ def test_runtime_config_clamps_knowledge_retrieval_settings(tmp_path):
     (config_dir / "general.toml").write_text(
         "[ai.knowledge]\ntop_k_default = 0\ntop_k_direct = 999\n"
         "chunk_child_max_chars = 10\nchunk_parent_max_chars = 999999\n"
-        "sticky_rounds = 99\ncooldown_rounds = 99\n",
+        "sticky_rounds = 99\ncooldown_rounds = 99\n"
+        "keyword_channel_enabled = false\nrecursive_scanning = false\n"
+        "max_recursion_depth = 99\nlorebook_token_budget = -5\n",
         encoding="utf-8",
     )
 
@@ -97,6 +99,10 @@ def test_runtime_config_clamps_knowledge_retrieval_settings(tmp_path):
     assert config.chunk_parent_max_chars == 16000
     assert config.sticky_rounds == 10
     assert config.cooldown_rounds == 20
+    assert config.keyword_channel_enabled is False
+    assert config.recursive_scanning is False
+    assert config.max_recursion_depth == 10
+    assert config.lorebook_token_budget == 0
 
 
 def test_runtime_config_reads_quoted_dotted_sections(tmp_path):
@@ -156,6 +162,10 @@ def test_shipped_general_config_exposes_knowledge_settings():
     assert config.chunk_parent_max_chars == 2400
     assert config.sticky_rounds == 1
     assert config.cooldown_rounds == 3
+    assert config.keyword_channel_enabled is True
+    assert config.recursive_scanning is True
+    assert config.max_recursion_depth == 3
+    assert config.lorebook_token_budget == 0
 
 
 def test_frontend_parser_unquotes_toml_section_names():

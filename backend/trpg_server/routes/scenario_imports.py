@@ -3,16 +3,21 @@ import json, time
 import logging
 from pathlib import Path
 from flask import Blueprint, Response, current_app, request, session
-from trpg_server.logging_config import log_user_action, user_action_text
+from trpg_server.logging_config import log_access_denied, log_user_action, user_action_text
 from trpg_server.responses import error_response, success_response
 from trpg_server.scenario_import_jobs import public_job_payload, submit_import_job
 from trpg_server.scenario_documents import validate_scenario_upload, ScenarioDocumentError
 from trpg_server.scenario_store import load_scenario_record, save_scenario_record, scenario_descriptor_paths
+from trpg_server.settings import SCENARIOS_DIR
 from trpg_server.agents.knowledge_base import (
     KnowledgeBaseService,
     KnowledgeChunk,
+    build_knowledge_chunks,
     index_knowledge_chunks,
+    list_knowledge_sections,
+    load_knowledge_index,
     persist_knowledge_index,
+    update_knowledge_section,
     write_knowledge_index,
 )
 
@@ -27,6 +32,31 @@ def _job(job_id):
 def _login():
     if not session.get("user_id"): return error_response("Authentication required", 401, "Authentication required")
     return None
+
+def _scenarios_root() -> Path:
+    return Path(current_app.config.get("SCENARIOS_DIR", SCENARIOS_DIR))
+
+def _script_descriptor(script_id):
+    """按剧本 ID 定位描述符与记录，供知识块读写复用。"""
+    root = _scenarios_root()
+    for path in scenario_descriptor_paths(root):
+        try:
+            record = load_scenario_record(path, root)
+        except Exception:
+            continue
+        if str(record.get("id")) == str(script_id):
+            return path, record
+    return None, None
+
+def _can_edit_script(record) -> bool:
+    role = str(session.get("role") or "").upper()
+    return role in {"ADMIN", "OWNER"} or str(record.get("owner_id")) == str(session.get("user_id"))
+
+def _script_chunks(descriptor, record):
+    """优先读取已落盘的知识索引；缺失（尚未发布向量索引）时按剧本模块即时构建。"""
+    version = record.get("scenario_version") or "1.0.0"
+    chunks = load_knowledge_index(descriptor, version)
+    return version, chunks or build_knowledge_chunks(record)
 
 @bp.post("/api/scripts/import")
 def create_import():
@@ -137,3 +167,37 @@ def versions(script_id):
 def script_search(script_id):
     if (e := _login()): return e
     data = request.get_json(silent=True) or {}; return success_response(KnowledgeBaseService(rooms_dir=current_app.config.get("ROOMS_DIR"), scenarios_dir=current_app.config.get("SCENARIOS_DIR"), vector_store=current_app.extensions.get("vector_store"), embedding_provider=current_app.extensions.get("embedding_provider")).search(str(data.get("roomId", "")), str(data.get("query", "")), top_k=data.get("topK", 5)))
+
+@bp.get("/api/scripts/<int:script_id>/knowledge")
+def list_knowledge(script_id):
+    """列出剧本各章节的世界书字段（触发词/常驻/分层等），供管理端编辑。"""
+    if (e := _login()): return e
+    descriptor, record = _script_descriptor(script_id)
+    if not descriptor: return error_response("Scenario not found", 404, "Not found")
+    if not _can_edit_script(record):
+        log_access_denied(logger, user_action_text(session.get("username"), "访问剧本知识块被拒绝"), 用户ID=session.get("user_id"), 剧本ID=script_id)
+        return error_response("Permission denied", 403, "Forbidden")
+    _version, chunks = _script_chunks(descriptor, record)
+    return success_response(list_knowledge_sections(chunks))
+
+@bp.put("/api/scripts/<int:script_id>/knowledge")
+def update_knowledge(script_id):
+    """按章节更新世界书字段并落盘到知识索引（不影响已生成的向量，仅改写元数据）。"""
+    if (e := _login()): return e
+    descriptor, record = _script_descriptor(script_id)
+    if not descriptor: return error_response("Scenario not found", 404, "Not found")
+    if not _can_edit_script(record):
+        log_access_denied(logger, user_action_text(session.get("username"), "修改剧本知识块被拒绝"), 用户ID=session.get("user_id"), 剧本ID=script_id)
+        return error_response("Permission denied", 403, "Forbidden")
+    payload = request.get_json(silent=True) or {}
+    section_key = str(payload.get("sectionKey") or "").strip()
+    values = payload.get("fields")
+    if not section_key or not isinstance(values, dict):
+        return error_response("sectionKey and fields are required", 400, "Invalid payload")
+    version, chunks = _script_chunks(descriptor, record)
+    if not chunks: return error_response("Knowledge base is empty", 404, "Not found")
+    chunks, count = update_knowledge_section(chunks, section_key, values)
+    if not count: return error_response("Knowledge section not found", 404, "Not found")
+    write_knowledge_index(descriptor, version, chunks)
+    log_user_action(logger, user_action_text(session.get("username"), "更新了剧本世界书字段"), 用户ID=session.get("user_id"), 剧本ID=script_id, 章节=section_key)
+    return success_response(list_knowledge_sections(chunks), "Knowledge updated")

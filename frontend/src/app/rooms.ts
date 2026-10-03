@@ -61,6 +61,9 @@ function initRoomManagement(): void {
     document.getElementById("editHouseRules")?.addEventListener("click", () => {
         void openHouseRulesModal();
     });
+    document.getElementById("switchScenario")?.addEventListener("click", () => {
+        void openSwitchScenarioModal();
+    });
     document.getElementById("saveHouseRules")?.addEventListener("click", () => {
         void saveHouseRules();
     });
@@ -655,6 +658,9 @@ function updateRoomDetail(room: Room): void {
     }
     const houseRulesButton = document.getElementById("editHouseRules") as HTMLButtonElement | null;
     if (houseRulesButton) houseRulesButton.hidden = Boolean(room.archived) || !canManageRoom(room);
+    // 「切换剧本」仅管理员/房主可见，且已归档房间不再允许换绑。
+    const switchScenarioButton = document.getElementById("switchScenario") as HTMLButtonElement | null;
+    if (switchScenarioButton) switchScenarioButton.hidden = Boolean(room.archived) || !canManageRoom(room);
     const deleteButton = document.getElementById("deleteSave") as HTMLButtonElement | null;
     if (deleteButton) deleteButton.hidden = Boolean(room.archived);
     const archivedBadge = document.getElementById("roomDetailArchivedBadge") as HTMLElement | null;
@@ -711,6 +717,145 @@ async function archiveCurrentRoom(): Promise<void> {
         showNotification("房间已归档，仍停留在房间内；AI 已关闭，骰娘等工具可继续使用", "success");
     } catch (error) {
         showNotification(`归档失败：${roomErrorMessage(error)}`, "error");
+    }
+}
+
+/**
+ * 管理员/房主强制把房间切换到另一个剧本（或同一剧本的最新版本）。
+ * 高风险：默认会重置剧情进度，因此弹窗内先给出明确的文字风险提示并要求勾选确认。
+ * 若选择的是同一剧本（例如升级到最新版本），可勾选「继承剧情进度」保留线索/物品/任务等。
+ */
+async function openSwitchScenarioModal(): Promise<void> {
+    const room = currentRoom;
+    if (!room?.id) return;
+    let scenarios: Scenario[];
+    try {
+        const response = await TrpgApi.get<ApiResponse<Scenario[]>>("/api/scenarios");
+        if (!response.success || !Array.isArray(response.data)) throw new Error(response.message || response.error || "加载剧本列表失败");
+        // 保留当前剧本：便于切换到同一剧本的最新版本并继承剧情进度。
+        scenarios = response.data;
+    } catch (error) {
+        showNotification(`加载剧本列表失败：${roomErrorMessage(error)}`, "error");
+        return;
+    }
+    if (!scenarios.length) {
+        showNotification("没有可切换的剧本", "error");
+        return;
+    }
+
+    const modal = document.createElement("div");
+    modal.className = "modal fade";
+    modal.id = "roomSwitchScenarioModal";
+    modal.tabIndex = -1;
+    modal.innerHTML = `
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">切换房间剧本</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-danger" role="alert">
+                        <strong><i class="fa fa-exclamation-triangle" aria-hidden="true"></i> 高风险操作，请谨慎确认</strong>
+                        <ul class="mb-0 mt-2 ps-3">
+                            <li>聊天记录会<b>保留</b>，但其中涉及旧剧本的内容可能与新剧本冲突，导致<b>剧本错乱</b>。</li>
+                            <li><b>不勾选</b>「继承剧情进度」时，线索、物品、任务、已触发事件、场景指针、滚动摘要会被<b>全部重置</b>，且无法撤回，切换后需重新点击「开启剧本」。</li>
+                            <li><b>勾选</b>「继承剧情进度」时（建议用于切换到同一剧本的最新版本），将<b>保留</b>现有剧情进度；若旧场景在新剧本中已不存在，场景指针会回退到新剧本的开场。</li>
+                        </ul>
+                    </div>
+                    <label class="form-label" for="roomSwitchScenarioSelect">切换到</label>
+                    <select class="form-select" id="roomSwitchScenarioSelect"></select>
+                    <div class="form-check mt-3">
+                        <input class="form-check-input" type="checkbox" id="roomSwitchScenarioInheritProgress">
+                        <label class="form-check-label" for="roomSwitchScenarioInheritProgress">继承剧情进度（切换到同一剧本的最新版本时建议勾选）</label>
+                    </div>
+                    <div class="form-check mt-2">
+                        <input class="form-check-input" type="checkbox" id="roomSwitchScenarioConfirmRisk">
+                        <label class="form-check-label" for="roomSwitchScenarioConfirmRisk">我已了解上述风险，确认强制切换</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-danger" id="roomSwitchScenarioConfirm" disabled>强制切换</button>
+                </div>
+            </div>
+        </div>`;
+    document.body.appendChild(modal);
+
+    const select = modal.querySelector<HTMLSelectElement>("#roomSwitchScenarioSelect");
+    // 用 DOM API 填充剧本选项，避免标题中的特殊字符被当成 HTML。
+    scenarios.forEach((scenario) => {
+        const isCurrent = String(scenario.id) === String(room.scenario_id);
+        const option = document.createElement("option");
+        option.value = String(scenario.id);
+        // 当前剧本标注为「最新版本」，避免与其它剧本混淆。
+        option.textContent = isCurrent ? `${scenario.title}（当前剧本·最新版本）` : scenario.title;
+        option.dataset.title = scenario.title;
+        option.dataset.current = isCurrent ? "1" : "0";
+        select?.appendChild(option);
+    });
+
+    const confirmButton = modal.querySelector<HTMLButtonElement>("#roomSwitchScenarioConfirm");
+    const riskCheckbox = modal.querySelector<HTMLInputElement>("#roomSwitchScenarioConfirmRisk");
+    const inheritCheckbox = modal.querySelector<HTMLInputElement>("#roomSwitchScenarioInheritProgress");
+    // 选到同一剧本时默认勾选「继承剧情进度」，切到其它剧本时默认取消。
+    const syncDefaultInherit = (): void => {
+        const option = select?.options[select.selectedIndex];
+        if (inheritCheckbox) inheritCheckbox.checked = option?.dataset.current === "1";
+    };
+    const syncConfirmState = (): void => {
+        if (confirmButton) confirmButton.disabled = !(riskCheckbox?.checked && select?.value);
+    };
+    riskCheckbox?.addEventListener("change", syncConfirmState);
+    select?.addEventListener("change", () => {
+        syncDefaultInherit();
+        syncConfirmState();
+    });
+    confirmButton?.addEventListener("click", () => {
+        if (!select?.value || !riskCheckbox?.checked) return;
+        const option = select.options[select.selectedIndex];
+        void switchRoomScenario(
+            modal,
+            Number.parseInt(select.value, 10),
+            option?.dataset.title || "",
+            inheritCheckbox?.checked === true,
+        );
+    });
+
+    const instance = new bootstrap.Modal(modal);
+    modal.addEventListener("hidden.bs.modal", () => modal.remove());
+    syncDefaultInherit();
+    syncConfirmState();
+    instance.show();
+}
+
+async function switchRoomScenario(
+    modal: HTMLElement,
+    scenarioId: number,
+    scenarioTitle: string,
+    preserveProgress: boolean,
+): Promise<void> {
+    const room = currentRoom;
+    if (!room?.id || !Number.isFinite(scenarioId)) return;
+    const confirmButton = modal.querySelector<HTMLButtonElement>("#roomSwitchScenarioConfirm");
+    if (confirmButton) confirmButton.disabled = true;
+    try {
+        const response = await TrpgApi.post<ApiResponse<Room>>(`/api/rooms/${encodeURIComponent(room.id)}/scenario-switch`, {
+            scenario_id: scenarioId,
+            scenario_title: scenarioTitle,
+            preserve_progress: preserveProgress,
+        });
+        if (!response.success || !response.data) throw new Error(response.message || response.error || "切换剧本失败");
+        currentRoom = { ...room, ...response.data, messages: room.messages ?? [] };
+        window.currentRoom = currentRoom;
+        bootstrap.Modal.getInstance(modal)?.hide();
+        updateRoomDetail(currentRoom);
+        await loadRoomsList();
+        const suffix = preserveProgress ? "，剧情进度已继承" : "，请重新开启剧本";
+        showNotification(`已切换到剧本：${currentRoom.scenario_title || scenarioTitle}${suffix}`, "success");
+    } catch (error) {
+        if (confirmButton) confirmButton.disabled = false;
+        showNotification(`切换剧本失败：${roomErrorMessage(error)}`, "error");
     }
 }
 

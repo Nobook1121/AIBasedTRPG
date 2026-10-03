@@ -101,12 +101,12 @@ class ScenarioController {
                 const form = new FormData();
                 form.append("file", file, file.name);
                 form.append("title", title);
-                const job = await this.model.createImportJob(form, (value) => {
+                const started = await this.model.createImportJob(form, (value) => {
                     this.view.updateConversionProgress(0, "active", `${Math.round(value)}% uploaded`);
                 });
-                sessionStorage.setItem("ai-trpg:scenario-import-job", job.id);
-                const finished = await this.model.waitForImportJob(job.id, (progress) => this.view.updateImportJobProgress(progress));
-                const scenario = await this.model.publishImport(finished.script_id, job.id);
+                sessionStorage.setItem("ai-trpg:scenario-import-job", started.jobId);
+                const finished = await this.model.waitForImportJob(started.jobId, (progress) => this.view.updateImportJobProgress(progress));
+                const scenario = await this.model.publishImport(started.scriptId || finished.script_id, started.jobId);
                 sessionStorage.removeItem("ai-trpg:scenario-import-job");
                 this.view.updateConversionProgress(3, "complete", "Vector index ready");
                 this.view.closeConversionProgress();

@@ -172,7 +172,7 @@ interface ScenarioModel {
     convertScript(text: string, title?: string): Promise<ScenarioInput>;
     convertScriptFile(file: File, title?: string): Promise<ScenarioInput>;
     getKnowledgeStats(id: number): Promise<{ scenario_id: number; version: string; vector_count: number; path: string; backend: string }>;
-    createImportJob(formData: FormData, onProgress?: (value: number) => void): Promise<ScenarioImportJob>;
+    createImportJob(formData: FormData, onProgress?: (value: number) => void): Promise<ScenarioImportStart>;
     getImportJob(id: string): Promise<ScenarioImportJob>;
     publishImport(scriptId: number, jobId: string): Promise<Scenario>;
     waitForImportJob(id: string, onProgress?: (job: ScenarioImportJob) => void): Promise<ScenarioImportJob>;
@@ -229,3 +229,27 @@ interface ScenarioView {
 
 type ScenarioImportStatus = "pending" | "parsing" | "chunking" | "extracting" | "merging" | "carding" | "summarizing" | "embedding" | "done" | "failed" | "cancelled" | "published";
 interface ScenarioImportJob { id: string; script_id: number; status: ScenarioImportStatus; progress: number; current_stage: string; stage_progress: number; stage_meta?: Record<string, unknown>; error?: string; preview?: ScenarioInput; }
+// POST /api/scripts/import 的返回：创建任务后用于轮询与发布。
+interface ScenarioImportStart { jobId: string; scriptId: number; }
+
+// 剧本各章节的世界书字段（触发词/常驻/分层等），由 /api/scripts/<id>/knowledge 返回。
+interface KnowledgeSectionInfo {
+    section_key: string;
+    title: string;
+    chunk_ids: string[];
+    preview: string;
+    keywords: string[];
+    secondary_keywords: string[];
+    secondary_logic: string;
+    is_constant: boolean;
+    tier: string;
+    probability: number;
+    group: string;
+    group_weight: number;
+    priority: number;
+    order: number;
+    trigger_chunks: boolean;
+    sticky_rounds: number;
+    cooldown_rounds: number;
+    delay_rounds: number;
+}

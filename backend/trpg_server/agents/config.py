@@ -35,10 +35,16 @@ class AIRuntimeConfig:
     # 子块用于精确召回，父块上限用于命中后回填章节上下文。
     chunk_child_max_chars: int = 800
     chunk_parent_max_chars: int = 2400
-    # 章节粘滞/冷却：最近 sticky_rounds 轮召回过的章节排序加权，
-    # 最近 cooldown_rounds 轮召回过的章节排序降权（只调排序，不截断内容）。
+    # 章节粘滞/冷却的默认时长：关键词激活的条目在 sticky_rounds 轮内强制注入，
+    # 随后进入 cooldown_rounds 轮硬冷却（条目可用自身字段覆盖）。
     sticky_rounds: int = 1
     cooldown_rounds: int = 3
+    # 世界书（lorebook）通道：关键词直命中、递归扫描，以及可选的注入 token 预算。
+    # token 预算 0 表示不限制（默认），仅在为超大剧本显式开启时按排序丢弃低优先级条目。
+    keyword_channel_enabled: bool = True
+    recursive_scanning: bool = True
+    max_recursion_depth: int = 3
+    lorebook_token_budget: int = 0
 
 
 def _toml_int(value: str, fallback: int) -> int:
@@ -89,6 +95,10 @@ def load_ai_runtime_config(config_dir: Path) -> AIRuntimeConfig:
     chunk_parent_max_chars = AIRuntimeConfig.chunk_parent_max_chars
     sticky_rounds = AIRuntimeConfig.sticky_rounds
     cooldown_rounds = AIRuntimeConfig.cooldown_rounds
+    keyword_channel_enabled = AIRuntimeConfig.keyword_channel_enabled
+    recursive_scanning = AIRuntimeConfig.recursive_scanning
+    max_recursion_depth = AIRuntimeConfig.max_recursion_depth
+    lorebook_token_budget = AIRuntimeConfig.lorebook_token_budget
     for raw_line in general_file.read_text(encoding="utf-8").splitlines():
         line = raw_line.split("#", 1)[0].strip()
         if not line:
@@ -126,6 +136,14 @@ def load_ai_runtime_config(config_dir: Path) -> AIRuntimeConfig:
                     sticky_rounds = max(0, min(10, _toml_int(value, AIRuntimeConfig.sticky_rounds)))
                 elif key == "cooldown_rounds":
                     cooldown_rounds = max(0, min(20, _toml_int(value, AIRuntimeConfig.cooldown_rounds)))
+                elif key == "keyword_channel_enabled":
+                    keyword_channel_enabled = value.lower() == "true"
+                elif key == "recursive_scanning":
+                    recursive_scanning = value.lower() == "true"
+                elif key == "max_recursion_depth":
+                    max_recursion_depth = max(0, min(10, _toml_int(value, AIRuntimeConfig.max_recursion_depth)))
+                elif key == "lorebook_token_budget":
+                    lorebook_token_budget = max(0, min(200000, _toml_int(value, AIRuntimeConfig.lorebook_token_budget)))
             elif key == "stream_output":
                 stream_output = value.lower() == "true"
             elif key == "debug_mode":
@@ -159,4 +177,8 @@ def load_ai_runtime_config(config_dir: Path) -> AIRuntimeConfig:
         chunk_parent_max_chars=chunk_parent_max_chars,
         sticky_rounds=sticky_rounds,
         cooldown_rounds=cooldown_rounds,
+        keyword_channel_enabled=keyword_channel_enabled,
+        recursive_scanning=recursive_scanning,
+        max_recursion_depth=max_recursion_depth,
+        lorebook_token_budget=lorebook_token_budget,
     )

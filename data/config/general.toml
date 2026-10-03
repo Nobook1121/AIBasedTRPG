@@ -46,6 +46,10 @@ chunk_child_max_chars = 800
 chunk_parent_max_chars = 2400
 sticky_rounds = 1
 cooldown_rounds = 3
+keyword_channel_enabled = true
+recursive_scanning = true
+max_recursion_depth = 3
+lorebook_token_budget = 0
 
 [character_rules]
 attribute_ratio_percent = 20

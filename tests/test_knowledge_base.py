@@ -1,8 +1,16 @@
 import json
 
 from trpg_server.agents.embedding_provider import HashedTokenEmbedding
-from trpg_server.agents.knowledge_base import KnowledgeBaseService, build_knowledge_chunks, load_knowledge_index, persist_knowledge_index
+from trpg_server.agents.knowledge_base import (
+    KnowledgeBaseService,
+    build_knowledge_chunks,
+    list_knowledge_sections,
+    load_knowledge_index,
+    persist_knowledge_index,
+    update_knowledge_section,
+)
 from trpg_server.agents.vector_store import EmbeddedVectorStore
+from trpg_server.scenario_import_pipeline import derive_keywords, derive_tier, is_constant_section
 from trpg_server.scenario_store import save_scenario_record
 
 
@@ -242,3 +250,319 @@ def test_search_records_round_history_for_sticky_cooldown(tmp_path):
     assert data["scenario"] == "case-1@1"
     assert len(data["rounds"]) == 1
     assert len(data["rounds"][0]) == 2
+
+
+def test_keyword_channel_activates_without_lexical_overlap(tmp_path):
+    service, _room = _sectioned_service(
+        tmp_path,
+        [
+            {"id": "chunk-0001", "module_type": "lore", "content": "花园里长满玫瑰。", "metadata": {"section": "花园", "title": "花园"}},
+            {"id": "chunk-0002", "module_type": "lore", "content": "张三推开了暗门。", "keywords": ["铜钥匙"], "metadata": {"section": "图书馆", "title": "图书馆"}},
+        ],
+    )
+
+    # 查询与正文没有任何词法/向量重叠，只有触发词命中：应直接激活该条，
+    # 且不再退回兜底（兜底会按文档顺序返回 chunk-0001）。
+    result = service.search("room-1", "我掏出铜钥匙", top_k=5)
+
+    assert [item["chunk_id"] for item in result] == ["chunk-0002"]
+
+
+def test_secondary_keywords_gate_activation(tmp_path):
+    service, _room = _sectioned_service(
+        tmp_path,
+        [
+            {
+                "id": "chunk-0001",
+                "module_type": "lore",
+                "content": "AAA",
+                "keywords": ["铜钥匙"],
+                "secondary_keywords": ["夜晚"],
+                "secondary_logic": "and_all",
+                "metadata": {"section": "甲", "title": "甲"},
+            },
+            {"id": "chunk-0002", "module_type": "lore", "content": "BBBB", "metadata": {"section": "乙", "title": "乙"}},
+        ],
+    )
+
+    # 副键门槛（and_all 需同时出现“夜晚”）未满足 → 关键词通道不激活，退回兜底。
+    blocked = service.search("room-1", "铜钥匙", top_k=5)
+    assert [item["chunk_id"] for item in blocked] == ["chunk-0001", "chunk-0002"]
+
+    # 主键 + 副键同时命中 → 关键词通道直接激活，只返回该条。
+    activated = service.search("room-1", "铜钥匙 夜晚", top_k=5)
+    assert [item["chunk_id"] for item in activated] == ["chunk-0001"]
+
+
+def test_sticky_then_cooldown_hard_gate(tmp_path):
+    service, _room = _sectioned_service(
+        tmp_path,
+        [
+            {
+                "id": "chunk-0001",
+                "module_type": "lore",
+                "content": "铜钥匙与暗门",
+                "keywords": ["铜钥匙"],
+                "sticky_rounds": 1,
+                "cooldown_rounds": 1,
+                "metadata": {"section": "甲", "title": "甲"},
+            },
+            {"id": "chunk-0002", "module_type": "lore", "content": "花园里的玫瑰", "metadata": {"section": "乙", "title": "乙"}},
+        ],
+    )
+
+    first = service.search("room-1", "铜钥匙", top_k=5)
+    second = service.search("room-1", "铜钥匙", top_k=5)  # 粘滞期内强制注入
+    third = service.search("room-1", "铜钥匙", top_k=5)  # 进入冷却，被硬门控挡下
+
+    assert [item["chunk_id"] for item in first] == ["chunk-0001"]
+    assert [item["chunk_id"] for item in second] == ["chunk-0001"]
+    # 冷却中的章节被剔除，但空结果会兜底返回冷却之外的章节（导入剧本不能因检索为空而「忘记」剧情）。
+    assert [item["chunk_id"] for item in third] == ["chunk-0002"]
+
+
+def test_constant_entry_is_always_injected(tmp_path):
+    service, _room = _sectioned_service(
+        tmp_path,
+        [
+            {"id": "chunk-0001", "module_type": "lore", "content": "alpha beta", "metadata": {"section": "甲", "title": "甲"}},
+            {
+                "id": "chunk-0002",
+                "module_type": "lore",
+                "content": "本世界由三块大陆构成。",
+                "is_constant": True,
+                "metadata": {"section": "世界观", "title": "世界观"},
+            },
+        ],
+    )
+
+    result = service.search("room-1", "zzzzzz", top_k=2)
+
+    assert "chunk-0002" in [item["chunk_id"] for item in result]
+
+
+def test_probability_zero_drops_entry(tmp_path):
+    service, _room = _sectioned_service(
+        tmp_path,
+        [
+            {
+                "id": "chunk-0001",
+                "module_type": "lore",
+                "content": "铜钥匙",
+                "keywords": ["铜钥匙"],
+                "probability": 0,
+                "metadata": {"section": "甲", "title": "甲"},
+            }
+        ],
+    )
+
+    assert service.search("room-1", "铜钥匙", top_k=5) == []
+
+
+def test_group_competition_keeps_highest_weight(tmp_path):
+    service, _room = _sectioned_service(
+        tmp_path,
+        [
+            {"id": "chunk-0001", "module_type": "lore", "content": "红药水", "keywords": ["药水"], "group": "potion", "group_weight": 10, "metadata": {"section": "甲", "title": "甲"}},
+            {"id": "chunk-0002", "module_type": "lore", "content": "蓝药水", "keywords": ["药水"], "group": "potion", "group_weight": 5, "metadata": {"section": "乙", "title": "乙"}},
+        ],
+    )
+
+    result = service.search("room-1", "药水", top_k=5)
+
+    assert [item["chunk_id"] for item in result] == ["chunk-0001"]
+
+
+def test_recursive_scanning_activates_referenced_entry(tmp_path):
+    modules = [
+        {
+            "id": "chunk-0001",
+            "module_type": "lore",
+            "content": "铜钥匙由老陈保管。",
+            "keywords": ["铜钥匙"],
+            "trigger_chunks": True,
+            "metadata": {"section": "甲", "title": "甲"},
+        },
+        {"id": "chunk-0002", "module_type": "lore", "content": "老陈是图书馆的管家。", "keywords": ["老陈"], "metadata": {"section": "乙", "title": "乙"}},
+    ]
+    service, _room = _sectioned_service(tmp_path / "on", modules)
+    with_recursion = service.search("room-1", "铜钥匙", top_k=5)
+    assert [item["chunk_id"] for item in with_recursion] == ["chunk-0001", "chunk-0002"]
+
+    service_off, _room_off = _sectioned_service(tmp_path / "off", modules)
+    without = service_off.search("room-1", "铜钥匙", top_k=5, recursive_scanning=False)
+    assert [item["chunk_id"] for item in without] == ["chunk-0001"]
+
+
+def test_token_budget_drops_low_priority_but_never_truncates(tmp_path):
+    service, _room = _sectioned_service(
+        tmp_path,
+        [
+            {"id": "chunk-0001", "module_type": "lore", "content": "铜" * 150, "keywords": ["钥匙"], "priority": 200, "metadata": {"section": "甲", "title": "甲"}},
+            {"id": "chunk-0002", "module_type": "lore", "content": "银" * 150, "keywords": ["钥匙"], "priority": 10, "metadata": {"section": "乙", "title": "乙"}},
+        ],
+    )
+
+    unbounded = service.search("room-1", "钥匙", top_k=5)
+    assert len(unbounded) == 2
+    assert all(len(item["text"]) >= 150 for item in unbounded)  # 正文从未被截断
+
+    budgeted = service.search("room-1", "钥匙", top_k=5, token_budget=200)
+    assert [item["chunk_id"] for item in budgeted] == ["chunk-0001"]
+    assert len(budgeted[0]["text"]) >= 150
+
+
+def test_archived_tier_is_excluded(tmp_path):
+    service, _room = _sectioned_service(
+        tmp_path,
+        [
+            {"id": "chunk-0001", "module_type": "lore", "content": "铜钥匙", "keywords": ["铜钥匙"], "tier": "archived", "metadata": {"section": "甲", "title": "甲"}},
+            {"id": "chunk-0002", "module_type": "lore", "content": "玫瑰", "metadata": {"section": "乙", "title": "乙"}},
+        ],
+    )
+
+    result = service.search("room-1", "铜钥匙", top_k=5)
+
+    assert [item["chunk_id"] for item in result] == ["chunk-0002"]
+
+
+def test_lorebook_fields_survive_knowledge_index_roundtrip(tmp_path):
+    descriptor = save_scenario_record(
+        tmp_path / "scenarios",
+        {
+            "id": 42,
+            "scenario_version": "1",
+            "modules": [
+                {
+                    "id": "scene",
+                    "module_type": "scene",
+                    "content": "灯塔",
+                    "keywords": ["灯塔"],
+                    "secondary_keywords": ["夜晚"],
+                    "secondary_logic": "not_any",
+                    "is_constant": True,
+                    "tier": "core",
+                    "probability": 40,
+                    "group": "potion",
+                    "group_weight": 7,
+                    "priority": 3,
+                    "trigger_chunks": True,
+                    "sticky_rounds": 2,
+                    "cooldown_rounds": 4,
+                }
+            ],
+        },
+    )
+    chunk = load_knowledge_index(descriptor, "1")[0]
+
+    assert chunk.keywords == ["灯塔"]
+    assert chunk.secondary_keywords == ["夜晚"]
+    assert chunk.secondary_logic == "not_any"
+    assert chunk.is_constant is True
+    assert chunk.tier == "core"
+    assert chunk.probability == 40
+    assert chunk.group == "potion"
+    assert chunk.group_weight == 7
+    assert chunk.priority == 3
+    assert chunk.trigger_chunks is True
+    assert chunk.sticky_rounds == 2
+    assert chunk.cooldown_rounds == 4
+
+
+def test_derive_keywords_prefers_quoted_repeated_and_latin_terms():
+    text = "「铜钥匙」可以打开暗门。老陈说铜钥匙很关键。老陈把地图交给了你。Melville 是船长。"
+
+    keywords = derive_keywords(text, "第一章 图书馆")
+
+    assert "铜钥匙" in keywords
+    assert "老陈" in keywords
+    assert "Melville" in keywords
+    assert "第一章" not in keywords
+    assert len(keywords) <= 8
+
+
+def test_derive_keywords_rejects_bracket_prose_and_numeric_noise():
+    """括号整句、数字/页码/骰式、目录点线、n-gram 碎片都不应成为触发词。"""
+    text = (
+        "（详见下文）这句话是整句注释。徐福服下了仙药，徐福又提到仙药。"
+        "冯季阳在兵马俑坑里发现了冯季阳的笔记。调查员应当进行检定，SC 0/1。"
+        "孩子与绣花鞋......................."
+    )
+
+    keywords = derive_keywords(text, "本模组根据coc7版规则创作")
+
+    assert "详见下文" not in keywords
+    assert "冯季阳" in keywords
+    assert "冯季" not in keywords and "季阳" not in keywords
+    assert "调查员" not in keywords
+    assert not any(any(ch.isdigit() for ch in item) for item in keywords)
+    assert not any("....." in item for item in keywords)
+    assert len(keywords) <= 8
+    # 跨词边界的 n-gram（内含规则书泛词）不是专名。
+    assert "如果调查" not in derive_keywords("如果调查了地面，如果调查了墙壁。", "标题")
+
+
+def test_constant_and_tier_derivation():
+    assert is_constant_section("世界观设定")
+    assert not is_constant_section("第一章 图书馆")
+    assert derive_tier("真相终局") == "core"
+    assert derive_tier("第一章 图书馆") == "background"
+
+
+def test_list_and_update_knowledge_section_lorebook_fields():
+    chunks = build_knowledge_chunks(
+        {
+            "id": "case-1",
+            "scenario_version": "1",
+            "modules": [
+                {"id": "c1", "module_type": "lore", "content": "甲之一", "metadata": {"section": "甲", "title": "甲章"}},
+                {"id": "c2", "module_type": "lore", "content": "甲之二", "metadata": {"section": "甲", "title": "甲章"}},
+                {"id": "c3", "module_type": "lore", "content": "乙", "metadata": {"section": "乙", "title": "乙章"}},
+            ],
+        }
+    )
+
+    sections = list_knowledge_sections(chunks)
+    assert [item["section_key"] for item in sections] == ["section:甲", "section:乙"]
+    assert sections[0]["chunk_ids"] == ["c1", "c2"]
+    assert sections[0]["title"] == "甲章"
+
+    updated, count = update_knowledge_section(
+        chunks,
+        "section:甲",
+        {
+            "keywords": "铜钥匙, 铜钥匙，暗门",
+            "secondary_keywords": ["夜晚"],
+            "secondary_logic": "and_all",
+            "is_constant": True,
+            "tier": "CORE",
+            "probability": 999,
+            "group": " 钥匙 ",
+            "group_weight": -3,
+            "sticky_rounds": "2",
+            "trigger_chunks": 1,
+        },
+    )
+
+    assert count == 2
+    by_id = {chunk.chunk_id: chunk for chunk in updated}
+    assert by_id["c1"].keywords == ["铜钥匙", "暗门"]  # 逗号/顿号混合分隔并去重
+    assert by_id["c2"].is_constant is True
+    assert by_id["c1"].secondary_logic == "and_all"
+    assert by_id["c1"].tier == "core"  # 大小写归一
+    assert by_id["c1"].probability == 100  # 越界收敛
+    assert by_id["c1"].group == "钥匙"
+    assert by_id["c1"].group_weight == 0
+    assert by_id["c1"].sticky_rounds == 2
+    assert by_id["c1"].trigger_chunks is True
+    # 未命中的章节不受影响
+    assert by_id["c3"].keywords is None
+
+
+def test_update_knowledge_section_ignores_unknown_section():
+    chunks = build_knowledge_chunks({"id": "case-1", "modules": [{"id": "c1", "module_type": "lore", "content": "甲"}]})
+
+    updated, count = update_knowledge_section(chunks, "section:不存在", {"keywords": ["x"]})
+
+    assert count == 0
+    assert updated[0].keywords is None

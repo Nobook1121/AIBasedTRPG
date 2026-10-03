@@ -281,6 +281,10 @@ function initSettingsTabs(): void {
     bindGeneralNumberSetting("chunkParentMaxChars", "ai.knowledge", "chunk_parent_max_chars", 200, 16000);
     bindGeneralNumberSetting("stickyRounds", "ai.knowledge", "sticky_rounds", 0, 10);
     bindGeneralNumberSetting("cooldownRounds", "ai.knowledge", "cooldown_rounds", 0, 20);
+    bindGeneralCheckboxSetting("keywordChannelEnabled", "ai.knowledge", "keyword_channel_enabled");
+    bindGeneralCheckboxSetting("recursiveScanning", "ai.knowledge", "recursive_scanning");
+    bindGeneralNumberSetting("maxRecursionDepth", "ai.knowledge", "max_recursion_depth", 0, 10);
+    bindGeneralNumberSetting("lorebookTokenBudget", "ai.knowledge", "lorebook_token_budget", 0, 200000);
     document.getElementById("savePermissionConfig")?.addEventListener("click", () => {
         void savePermissionConfig();
     });
@@ -614,11 +618,15 @@ function renderPermissionMatrix(config: PermissionConfig): void {
 
 function renderPermissionGroup(group: PermissionGroup, config: PermissionConfig): string {
     const nodes = group.nodes.map((node) => renderPermissionNode(node, config)).join("");
+    // 后端返回的 groups/nodes 只有英文占位文案（label=id、description="Permissions for ..."），
+    // 这里按 id 用 i18n 覆盖，缺失时回退到后端文案。
+    const label = settingsTranslate(`permission.group.${group.id}.label`, group.label);
+    const description = settingsTranslate(`permission.group.${group.id}.description`, group.description || "");
     return `
         <section class="permission-group" data-permission-group="${settingsEscapeHtml(group.id)}">
             <div class="permission-group-header">
-                <h5>${settingsEscapeHtml(group.label)}</h5>
-                <p>${settingsEscapeHtml(group.description || "")}</p>
+                <h5>${settingsEscapeHtml(label)}</h5>
+                <p>${settingsEscapeHtml(description)}</p>
             </div>
             <div class="permission-node-list">${nodes}</div>
         </section>
@@ -630,18 +638,25 @@ function renderPermissionNode(node: PermissionNode, config: PermissionConfig): s
     const roleToggles = config.roles.map((role) => `
         <label class="permission-role-toggle">
             <input type="checkbox" data-permission-node="${settingsEscapeHtml(node.id)}" data-permission-role="${settingsEscapeHtml(role)}" ${allowedRoles.has(role) ? "checked" : ""}>
-            <span>${settingsEscapeHtml(role)}</span>
+            <span>${settingsEscapeHtml(settingsTranslate(`permission.role.${role}.label`, role))}</span>
         </label>
     `).join("");
+    const label = settingsTranslate(`permission.node.${node.id}.label`, node.label);
+    const description = settingsTranslate(`permission.node.${node.id}.description`, node.description || node.id);
     return `
         <article class="permission-node-card">
             <div>
-                <strong>${settingsEscapeHtml(node.label)}</strong>
-                <p>${settingsEscapeHtml(node.description || node.id)}</p>
+                <strong>${settingsEscapeHtml(label)}</strong>
+                <p>${settingsEscapeHtml(description)}</p>
             </div>
             <div class="permission-role-list">${roleToggles}</div>
         </article>
     `;
+}
+
+/** 权限面板文案的 i18n 查询：命中翻译则用之，否则回退到后端提供的原始文案。 */
+function settingsTranslate(key: string, fallback: string): string {
+    return window.TrpgI18n?.t(key, fallback) || fallback;
 }
 
 async function savePermissionConfig(): Promise<void> {

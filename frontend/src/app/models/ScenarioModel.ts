@@ -173,7 +173,7 @@ class ScenarioModel {
         return data.data;
     }
 
-    async createImportJob(formData: FormData, onProgress?: (value: number) => void): Promise<ScenarioImportJob> {
+    async createImportJob(formData: FormData, onProgress?: (value: number) => void): Promise<ScenarioImportStart> {
         const xhr = new XMLHttpRequest();
         xhr.onreadystatechange = () => {
             if (xhr.readyState === XMLHttpRequest.OPENED) {
@@ -182,7 +182,7 @@ class ScenarioModel {
                 if (csrf) xhr.setRequestHeader("X-CSRF-Token", csrf);
             }
         };
-        const result = await new Promise<ScenarioImportJob>((resolve, reject) => { xhr.open("POST", "/api/scripts/import"); xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress?.(e.loaded / e.total * 100); }; xhr.onload = () => { try { const data = JSON.parse(xhr.responseText); if (xhr.status >= 200 && xhr.status < 300 && data.success) resolve(data.data); else reject(new Error(data.message || "导入失败")); } catch { reject(new Error("导入响应无效")); } }; xhr.onerror = () => reject(new Error("导入请求失败")); xhr.send(formData); });
+        const result = await new Promise<{ jobId: string; scriptId: number }>((resolve, reject) => { xhr.open("POST", "/api/scripts/import"); xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress?.(e.loaded / e.total * 100); }; xhr.onload = () => { try { const data = JSON.parse(xhr.responseText); if (xhr.status >= 200 && xhr.status < 300 && data.success && data.data?.jobId) resolve(data.data); else reject(new Error(data.message || "导入失败")); } catch { reject(new Error("导入响应无效")); } }; xhr.onerror = () => reject(new Error("导入请求失败")); xhr.send(formData); });
         return result;
     }
     async getImportJob(id: string): Promise<ScenarioImportJob> { const { data } = await TrpgApi.requestWithResponse<ApiResponse<ScenarioImportJob>>(`/api/scripts/import/${encodeURIComponent(id)}`); if (!data.success || !data.data) throw new Error(data.message || "任务不存在"); return data.data; }

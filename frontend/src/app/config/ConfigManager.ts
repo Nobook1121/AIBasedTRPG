@@ -143,6 +143,10 @@ class ConfigManager {
         configSetInputValue("chunkParentMaxChars", this.get("general", "ai.knowledge", "chunk_parent_max_chars", 2400));
         configSetInputValue("stickyRounds", this.get("general", "ai.knowledge", "sticky_rounds", 1));
         configSetInputValue("cooldownRounds", this.get("general", "ai.knowledge", "cooldown_rounds", 3));
+        configSetCheckboxValue("keywordChannelEnabled", this.get("general", "ai.knowledge", "keyword_channel_enabled", true));
+        configSetCheckboxValue("recursiveScanning", this.get("general", "ai.knowledge", "recursive_scanning", true));
+        configSetInputValue("maxRecursionDepth", this.get("general", "ai.knowledge", "max_recursion_depth", 3));
+        configSetInputValue("lorebookTokenBudget", this.get("general", "ai.knowledge", "lorebook_token_budget", 0));
 
         console.log("常规设置已应用到 UI");
     }

@@ -15,6 +15,7 @@ from trpg_server.role_config import load_roles
 from trpg_server.security import get_user_manager, is_socket_user_online, safe_join
 from trpg_server.settings import CONFIG_DIR, ROOMS_DIR, SCENARIOS_DIR, ROOM_ARCHIVES_DIR, CHARACTERS_DIR, HISTORY_DIR
 from trpg_server.agents.config import load_ai_runtime_config
+from trpg_server.agents.room_state import save_room_state
 from trpg_server.agents.versioning import migrate_room_binding
 from trpg_server.agents.trigger_system import find_trigger_definition, record_trigger, validate_trigger
 from trpg_server.scenario_store import load_scenario_by_id
@@ -1024,6 +1025,108 @@ def migrate_room_scenario(room_id):
         return error_response(str(exc), 400, "Scenario migration rejected")
     write_json_atomic(room_dir / "info.json", updated)
     return success_response(_room_summary(updated), "Room migrated to scenario version")
+
+
+def _first_scene(target: dict) -> dict | None:
+    """取剧本的第一个场景模块，作为换绑后的开场场景指针。"""
+    return next(
+        (m for m in (target or {}).get("modules", [])
+         if isinstance(m, dict) and str(m.get("module_type")) == "scene"),
+        None,
+    )
+
+
+@bp.route("/api/rooms/<room_id>/scenario-switch", methods=["POST"])
+def switch_room_scenario(room_id):
+    """管理员/房主强制把房间切换到另一个剧本（高风险：会重置剧情进度）。
+
+    与 ``scenario-migration``（同一剧本内换版本、尽量保留绑定）不同，本接口是换到
+    一个完全不同的剧本，旧的线索/物品/任务/已触发事件/场景指针/滚动摘要都会失效，
+    因此整体重置为新剧本的开场状态，并要求重新「开启剧本」。
+    """
+    login_error = _require_login()
+    if login_error:
+        return login_error
+    room_dir, info = _find_room(room_id)
+    if not room_dir:
+        return error_response("Room not found", 404, "Room not found")
+    if not _can_manage(info):
+        return _denied(room_id)
+    if info.get("archived"):
+        return error_response("Archived room cannot switch scenario", 409, "Room archived")
+
+    payload = request.get_json(silent=True) or {}
+    target_id = payload.get("scenario_id")
+    if target_id in (None, ""):
+        return error_response("Please choose a scenario", 400, "Scenario is required")
+    # 剧情进度是否继承：换到同一剧本的新版本时应保留进度继续游玩，换到不同剧本时
+    # 通常需要重置。由调用方决定，默认重置（更安全）。
+    preserve_progress = bool(payload.get("preserve_progress"))
+
+    scenarios_dir = current_app.config.get("SCENARIOS_DIR", SCENARIOS_DIR)
+    _, target = load_scenario_by_id(scenarios_dir, target_id)
+    if not target:
+        return error_response("Target scenario not found", 404, "Scenario not found")
+
+    previous_title = info.get("scenario_title")
+    updated = dict(info)
+    updated["scenario_id"] = target_id
+    updated["scenario_version"] = str(target.get("scenario_version") or target.get("version") or "1")
+    updated["scenario_title"] = str(target.get("title") or payload.get("scenario_title") or "").strip() or f"剧本 {target_id}"
+    # 场景指针：继承进度时，只要旧场景在新剧本中仍存在就保留，避免打断当前场景；
+    # 否则回退到新剧本的第一个场景。
+    target_scene_ids = {
+        str(m.get("scene_id") or m.get("id"))
+        for m in target.get("modules", [])
+        if isinstance(m, dict) and str(m.get("module_type")) == "scene"
+    }
+    first_scene = _first_scene(target)
+    first_scene_id = str(first_scene.get("scene_id") or first_scene.get("id")) if first_scene else ""
+    current_scene_id = str(updated.get("active_scene_id") or "")
+    if not (preserve_progress and current_scene_id and current_scene_id in target_scene_ids):
+        if first_scene_id:
+            updated["active_scene_id"] = first_scene_id
+            updated["active_scene_title"] = first_scene.get("title")
+        else:
+            updated.pop("active_scene_id", None)
+            updated.pop("active_scene_title", None)
+    # 重置模式下新剧本必须重新开场：清掉旧剧本的「已开始」标记，避免沿用其开场门控。
+    # 继承模式下保留该标记，视为同一场剧情的延续。
+    if not preserve_progress:
+        updated.pop("scenario_started_at", None)
+        updated.pop("scenario_started_by", None)
+    updated["updated_at"] = _timestamp()
+    write_json_atomic(room_dir / "info.json", updated)
+
+    if preserve_progress:
+        # 继承进度：保留线索/物品/任务/已触发事件/滚动摘要与开场状态，仅同步场景指针。
+        state = read_json(room_dir / "state.json", default={})
+        if not isinstance(state, dict):
+            state = {}
+        if updated.get("active_scene_id"):
+            state["active_scene_id"] = updated["active_scene_id"]
+        save_room_state(room_dir, state)
+    else:
+        # 重置剧情进度：线索/物品/任务/已触发事件/时间线/事件日志/滚动摘要全部清空，
+        # 否则旧剧本的进度会被当作新剧本的状态继续注入，正是「剧本错乱」的来源。
+        # save_room_state 会以默认空状态为底做归一化，因此这里只给出新的场景指针。
+        save_room_state(room_dir, {"active_scene_id": first_scene_id or None})
+        # 知识库检索游标按「剧本@版本」绑定，换剧本后本就会失效；显式删除以清理残留。
+        try:
+            (room_dir / "knowledge_cursor.json").unlink(missing_ok=True)
+        except OSError:
+            logger.debug("Failed to remove knowledge cursor on scenario switch", exc_info=True)
+
+    log_user_action(
+        logger,
+        user_action_text(session.get("username"), "强制切换了房间剧本"),
+        用户ID=session.get("user_id"),
+        房间ID=room_id,
+        房间码=updated.get("room_code"),
+        原剧本=previous_title,
+        新剧本=updated["scenario_title"],
+    )
+    return success_response(_room_summary(updated), "Room scenario switched")
 
 
 @bp.route("/api/rooms/<room_id>/spectate", methods=["GET"])

@@ -719,12 +719,36 @@
                                 <div class="form-group mt-2">
                                     <label for="stickyRounds">章节粘滞轮数</label>
                                     <input type="number" class="form-control" id="stickyRounds" value="1" min="0" max="10">
-                                    <small class="text-muted">最近 N 轮召回过的章节排序加权，让剧情上下文连贯（0-10）。</small>
+                                    <small class="text-muted">关键词激活的章节在随后 N 轮内强制注入，保证上下文连贯（0-10）。</small>
                                 </div>
                                 <div class="form-group mt-2">
                                     <label for="cooldownRounds">章节冷却轮数</label>
                                     <input type="number" class="form-control" id="cooldownRounds" value="3" min="0" max="20">
-                                    <small class="text-muted">最近 N 轮召回过的章节排序降权，避免反复召回同一段（仅调排序，不截断内容）（0-20）。</small>
+                                    <small class="text-muted">命中关键词激活的章节在粘滞期后进入 N 轮硬冷却，期间不再被召回（0-20）。</small>
+                                </div>
+                                <div class="form-group mt-2">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="keywordChannelEnabled" checked>
+                                        <label class="form-check-label" for="keywordChannelEnabled">启用关键词（世界书）直命中通道</label>
+                                    </div>
+                                    <small class="text-muted">查询命中章节触发词时直接激活该章节；无命中才走语义检索。关闭后仅用 BM25 + 向量。</small>
+                                </div>
+                                <div class="form-group mt-2">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="recursiveScanning" checked>
+                                        <label class="form-check-label" for="recursiveScanning">启用递归扫描</label>
+                                    </div>
+                                    <small class="text-muted">用已激活章节的正文继续匹配其它章节的触发词，帮助长剧本串联设定（受深度与步数上限约束）。</small>
+                                </div>
+                                <div class="form-group mt-2">
+                                    <label for="maxRecursionDepth">递归扫描最大深度</label>
+                                    <input type="number" class="form-control" id="maxRecursionDepth" value="3" min="0" max="10">
+                                    <small class="text-muted">递归触发的最大层数（0-10），步数与激活条目数另有硬上限。</small>
+                                </div>
+                                <div class="form-group mt-2">
+                                    <label for="lorebookTokenBudget">剧本注入 token 预算</label>
+                                    <input type="number" class="form-control" id="lorebookTokenBudget" value="0" min="0" max="200000">
+                                    <small class="text-muted">0 表示不限制（默认）。超大剧本可设上限，超出的低优先级章节会被整体丢弃（不截断正文）。</small>
                                 </div>
                             </div>
                             <div class="mb-4">
