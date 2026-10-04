@@ -193,6 +193,7 @@ interface ScenarioViewHandlers {
     onImportScenarioDocument(file: File): Promise<void>;
     onSaveScenario(): Promise<void>;
     onSaveDraft(): Promise<void>;
+    onDiscardDraft(): Promise<void>;
     onPreviewScenario(id: number): void;
     onEditScenario(id: number): void;
     onPlayScenario(id: number): void;
@@ -212,13 +213,13 @@ interface ScenarioView {
     renderScenarioList(scenarios: Scenario[]): void;
     openCreateModal(): Promise<void>;
     openEditModal(scenario: Scenario): void;
-    openDirectImportInfo(scenario: Scenario, vectorCount: number): void;
     fillDraftData(draft: ScenarioInput): void;
     setImportReviewReadOnly(readonly: boolean): void;
     showDraftPrompt(): Promise<"continue" | "discard" | "cancel">;
     closeModal(): void;
     previewScenario(scenario: Scenario, knowledge?: { vector_count?: number; path?: string; backend?: string }): void;
     showImportChoice(): Promise<"edit" | "direct" | "cancel">;
+    showDirectImportMetadata(defaults: { title: string; creator: string }): Promise<{ title: string; author: string; creator: string; playerCount: number; description: string } | null>;
     getFormData(): ScenarioInput;
     showMessage(message: string, isError?: boolean): void;
     showConversionProgress(fileName: string): void;

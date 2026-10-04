@@ -54,9 +54,9 @@ DEFAULT_PORT = 8086
 PORT_RETRY_COUNT = 5
 PORT_RETRY_INTERVAL = 2
 DISCOVERY_PORT = 50000
-DISCOVERY_INTERVAL = 5
 
 def _load_secret_key() -> str:
+    # 优先取环境变量；否则持久化到运行时目录，保证服务重启后已签发的会话仍可校验。
     env_secret = os.environ.get("AI_TRPG_SECRET_KEY")
     if env_secret:
         return env_secret

@@ -934,15 +934,17 @@
 }
 
 .cover-upload-label {
-    display: block;
-    width: 120px;
-    margin: 0 auto;
+    /* 宽度由文字决定（inline-block + width:auto），早先固定 120px 会让较短文案
+       右侧留出一段空白。容器已用 justify-items:start，无需再 margin:0 auto 居中。 */
+    display: inline-block;
+    width: auto;
     padding: 8px 16px;
     background-color: var(--color-primary);
     color: var(--theme-text-inverse);
     border-radius: var(--radius-sm);
     cursor: pointer;
     font-size: var(--theme-font-size-md);
+    text-align: center;
     transition: background-color 0.2s ease;
 }
 

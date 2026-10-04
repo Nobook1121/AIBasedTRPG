@@ -69,6 +69,7 @@ class CheckTool {
         }
         return null;
     }
+    // COC7 难易度：困难取目标值一半，极难取五分之一，常规不变。
     private applyDifficulty(target: number, difficulty: CheckDifficulty): number { return difficulty === "hard" ? Math.floor(target / 2) : difficulty === "extreme" ? Math.floor(target / 5) : target; }
 }
 window.CheckTool = CheckTool;

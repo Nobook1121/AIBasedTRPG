@@ -1,204 +1,210 @@
 # AIBasedTRPG
 
-AIBasedTRPG 是一个基于 Flask 后端与静态 HTML/CSS/JavaScript 前端的 AI TRPG 跑团辅助工具。当前架构保留原有页面、接口路径、JSON 数据格式和全局前端函数，并逐步拆分为更容易测试和维护的模块。
+一个可以自己部署的 **AI 跑团（TRPG）平台**。它把「AI 当 KP/守秘人」和「真人玩家一起玩」合在一起：
+AI 负责推进剧情、裁决检定、扮演 NPC，玩家在同一张房间聊天里掷骰、交流、推进故事。
 
-## 环境准备
+适合这些人：
+
+- 想随时开一局，但凑不齐主持人的跑团玩家。
+- 想把手里的剧本文档变成可对话、可交互模组的 KP。
+- 想在自己的电脑或服务器上搭一个只给朋友用的跑团服务。
+
+> 技术栈：Python（Flask）+ 浏览器前端，单进程即可运行；数据全部落在本地 `data/` 目录，不依赖任何云服务。
+
+---
+
+## 目录
+
+- [这是什么](#这是什么)
+- [特色功能](#特色功能)
+- [快速开始](#快速开始)
+- [怎么玩](#怎么玩)
+- [剧本从哪来](#剧本从哪来)
+- [AI 设置](#ai-设置)
+- [多人与联机](#多人与联机)
+- [部署到局域网或服务器](#部署到局域网或服务器)
+- [常见问题](#常见问题)
+- [开发者](#开发者)
+
+---
+
+## 这是什么
+
+AIBasedTRPG 是一套自托管的跑团工具。它提供：
+
+- 一个 **AI 守秘人（KP）**，能读懂你的剧本、追踪当前场景、按需调用剧本里的线索与触发器。
+- 一个 **多人房间系统**，玩家用房间码加入，聊天记录持久保存，支持回档和自动存档。
+- 一套 **剧本管理**，可以手写剧本、也可以直接把 Word / PDF / Markdown 剧本文档丢进来变成可玩的模组。
+- 一套 **COC7 角色卡与检定系统**，支持房规自定义技能阈值。
+
+它面向「朋友之间开黑」而不是公开平台：账号、权限、剧本、聊天全部在你自己的机器上。
+
+---
+
+## 特色功能
+
+### 给玩家的
+
+- **AI 守秘人全程主持**：AI 会记住当前场景、已发生的剧情和玩家行为，按需检索剧本内容，不会一次性把剧透全倒出来。
+- **COC7 角色卡**：属性、技能、武器、专精一应俱全；技能基础值支持「房规 > 管理员默认 > 规则书默认」三级覆盖。
+- **骰子与检定**：直接在聊天里掷骰、检定，失败/成功/大成功/大失败都有反馈。
+- **剧情不会丢**：房间聊天记录持久保存；可手动打「回档节点」，也可按周期自动存档。
+- **富媒体消息**：头像、图片、视频都能发；图片点开放大预览，视频直接内嵌播放，不跳转、不下载。
+
+### 给 KP / 房主的
+
+- **房间管理**：房间码邀请、成员列表、角色变更实时同步、正在输入提示。
+- **强制切换剧本**：跑团中途可以换剧本。换同一剧本的最新版本时可**继承剧情进度**，换别的剧本则重置。
+- **细粒度权限**：OWNER / ADMIN / USER 三级身份之外，还能按功能节点逐项勾选权限，权限页面已完整中文化。
+- **世界书（知识库）可视化编辑**：按章节查看 AI 实际会读到的内容，手动调整触发词、常驻、分层、概率、粘滞与冷却轮数。
+
+### 剧本与内容
+
+- **两种导入方式**：
+  - **直接导入**：文档自动按标题分节、切块并建立检索索引，导入即可玩。适合已经写好的成熟模组。
+  - **审核导入**：先由 AI 转换成本平台的结构化剧本，你检查修改后再发布。适合格式比较乱的文档。
+- **完整剧本编辑器**：场景卡、结局、时间线、NPC、怪物、道具等模块化编辑，带封面与简介。
+- **触发器资源库**：给剧本挂图片 / 音频 / 视频 / 富文本 / 附件，按场景进入、线索发现、NPC 对话、玩家行动等条件自动推送给玩家，并可设置剧透等级与可见范围。
+- **版本管理**：剧本每次内容修改自动升版本；老房间锁定在原版本继续跑，新房间用最新版，互不影响。只改标题、作者、简介、封面这类基础信息不会产生新版本，也不会重算索引。
+- **规则书知识库**：上传 COC7 规则文本，AI 回答规则问题时能查到你自己的房规与扩展。
+
+### 管理与运维
+
+- **首次部署引导**：浏览器打开首页即出现 5 步向导（配置 AI → 起站名 → 绑定域名 → 创建 Owner → 进入系统），不用手改配置文件。
+- **一键接入主流大模型**：DeepSeek / OpenAI / 阿里云百炼 / SiliconFlow / OpenRouter / LM Studio / 任意 OpenAI 兼容接口，向导内可「测试连接」。
+- **AI 用量看板**：按天统计 token 消耗、缓存命中率、各剧本与房间的成本分布。
+- **中英双语界面**：内置 i18n，可在界面实时切换并记住选择。
+- **服务器控制台命令**：在服务运行窗口直接管理账号权限，例如 `user promote <用户名> ADMIN`。
+
+---
+
+## 快速开始
+
+### 环境要求
+
+- **Python 3.11+**
+- **Node.js 18+**（仅用于构建前端；使用官方 release 压缩包时可跳过）
+
+### 安装
 
 ```powershell
+git clone https://github.com/Nobook1121/AIBasedTRPG
+cd "AIbased TRPG"
+
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-```
 
-本项目还需要本机可用的 `node`，用于从 TypeScript 源码构建浏览器运行脚本。
-
-## 启动
-
-从 GitHub 克隆源码后，先安装依赖并构建前端：
-
-```powershell
 npm install
 npm run build:frontend
 ```
 
-然后启动后端服务：
+> 如果使用的是 release 压缩包，里面已经包含构建好的前端，只需 `pip install -r requirements.txt` 后直接启动即可。
+
+### 启动
 
 ```powershell
 python server.py
 ```
 
-服务默认读取 `data/config/network.json` 中的端口配置，未配置时使用 `8086`。也可以通过命令行传入端口：
+默认端口 **8086**，浏览器访问 <http://127.0.0.1:8086>。也可以指定端口：
 
 ```powershell
 python server.py 8090
 ```
 
-如果目标端口已被占用，服务会尝试寻找附近可用端口，并在日志中输出监听地址，例如 `listening on http://127.0.0.1:8086`、局域网地址和 ZeroTier/Tailscale 等虚拟网卡地址。
+启动日志会列出所有可访问地址（本机、局域网、ZeroTier/Tailscale 等虚拟网卡）。如果默认端口被占用，程序会自动寻找附近可用端口。
 
-## 首次部署引导
+### 首次部署引导
 
-程序内置了首次部署引导页，用于在自托管环境中完成初始化，无需再手工编辑配置文件或使用控制台命令创建账号。
+当系统**还没有任何 OWNER 账号**时，打开首页会自动弹出 5 步向导：
 
-**触发条件**：当系统**还没有任何 OWNER 账号**时，浏览器打开首页会自动弹出全屏分步向导。只要已存在一个 OWNER，向导不再出现，相关写接口也会返回 `403`（防止已部署的实例被他人二次初始化）。
+1. **配置 AI**：选择平台、填 API Key 与模型，点「测试连接」验证，保存后 AI 立即可用。
+2. **为网站取名**：显示在标题栏与侧边栏。
+3. **绑定域名**（可跳过）：仅作展示，真正的 DNS 与 HTTPS 由反向代理负责。
+4. **创建 Owner 账号**：最高权限账号，用来管理网站。
+5. **完成**：点「进入系统」即自动登录。
 
-向导只会出现一次：点击底部的“跳过全部引导”后，服务端会在 `data/config/site.json` 中记录 `setup_dismissed: true`，本浏览器也会记住该选择，之后刷新不再弹出。若想重新显示引导，删除 `site.json` 中的 `setup_dismissed` 字段即可（此时系统仍需尚无 OWNER）。
+创建出第一个 OWNER 之后，向导不再出现；想重新触发需先删除 `data/config/site.json` 中的 `setup_dismissed` 字段。
 
-引导共 5 步：
+---
 
-1. **配置 AI API**：选择平台（DeepSeek / OpenAI / 阿里云百炼 / SiliconFlow / OpenRouter / LM Studio / 自定义），填写兼容 OpenAI 协议的 API 地址、API Key 与模型 ID。可点击“测试连接”验证。完成保存后，程序会把 KP 等角色的 provider 指向该平台，保证引导结束后 AI 立即可用。
-2. **为网站取名**：网站名称会显示在浏览器标题栏与侧边栏，保存在 `data/config/site.json`。
-3. **绑定域名（可跳过）**：这里只记录域名用于展示。真正的 DNS 解析与 HTTPS 需要由反向代理（Nginx / Caddy 等）完成，可随时在部署阶段配置，详见下文「云服务器部署」。
-4. **创建 Owner 账号**：填写用户名（3-32 位）、邮箱和密码（至少 8 位）创建最高权限账号，用于管理网站。
-5. **完成**：点击“进入系统”后自动以 Owner 身份登录，之后即可邀请玩家注册使用。
+## 怎么玩
 
-> 引导接口的写入路径都带有“不存在 OWNER”的安全门闸，只会写入 `data/config/` 下的站点与平台配置，不会覆盖用户数据。
+1. **登录 / 注册**：Owner 登录后可以邀请朋友自己注册账号。
+2. **准备剧本**：手动创建一个，或直接把剧本文档导入（见下一节）。
+3. **开房间**：填房间名、选剧本，创建后拿到房间码。普通玩家默认最多 3 个房间，ADMIN / OWNER 不限。
+4. **叫上朋友**：朋友用房间码加入。进入房间后聊天记录会切换为该房间的持久记录。
+5. **开跑**：AI 自动开场并推进剧情。玩家掷骰、检定、行动；KP 需要时会推送线索、图片或触发器内容。
+6. **随时存档**：打一个「回档节点」就能把当前进度存下来；开启自动保存后还会按周期自动存。
 
-## 验证
+跑团中途想换剧本，房主 / 管理员可以在房间详情里「切换剧本」，并选择是否继承剧情进度。
 
-每次重构或提交前运行：
+---
 
-```powershell
-.\scripts\verify.ps1
-```
+## 剧本从哪来
 
-验证脚本会执行 Python 编译检查、TypeScript typecheck/build、关键 JavaScript 文件 `node --check` 和 `pytest -q`。
+### 方式一：手动创建
 
-## 关键目录
+在剧本页新建，用模块化编辑器搭建场景卡、结局、时间线、NPC、道具等，可设置封面与简介。适用于自己从零写模组。
 
-- `backend/trpg_server/`：Flask app factory、蓝图路由、Socket.IO 事件、日志、安全与 JSON 存储工具。
-- `tests/`：后端单元测试和 API smoke tests。
-- `frontend/src/app/`：浏览器全局脚本的 TypeScript 业务源码，构建后仍按 `/js/...` URL 加载。
-- `frontend/src/types/`：跨前端模块复用的手写类型声明。
-- `frontend/src/react/`、`frontend/src/styles/`、`frontend/src/templates/`、`frontend/src/tools/`：React island、全局样式、HTML 模板和前端工具源码。
-- `dist/public/`：统一的前端构建产物目录，默认不提交到 Git；浏览器运行时仍使用 `/js/...` 和 `/data/tools/...` URL。
-- `data/config/`：TOML、JSON、角色提示词等运行配置数据。
-- `data/scenarios/`：剧本 JSON 数据。
-- `data/runtime/rooms/`：房间、房间消息、回档节点和自动存档数据。
-- `data/runtime/users/`：用户数据与用户 IP 配置。
-- `data/runtime/characters/`：角色卡运行数据；浏览器本地创建的角色卡仍保存在当前浏览器 `localStorage`。
-- `data/assets/avatars/`、`data/assets/scenario_covers/`、`data/assets/aiplatform/` 与 `data/assets/vendor/`：上传头像、剧本封面、AI 平台图标和本地第三方静态资源。
-- `data/runtime/logs/`：运行日志输出目录，运行时自动创建；默认只记录登录、消息、AI 请求和报错等关键事件。
+### 方式二：导入文档
 
-## 配置与安全
+支持 `.doc` / `.docx` / `.pdf` / `.txt` / `.md`（文本型 PDF；扫描件需要 OCR 扩展）。上传时会让你填写剧本名、作者、创建者、推荐人数和简介，然后选择：
 
-生产或长期运行环境应设置 `AI_TRPG_SECRET_KEY`，避免使用默认开发密钥：
+- **直接导入**：自动按标题分节、切块、建立检索索引，导入完成即可游玩。导入后仍可编辑基础信息和触发器资源；只改基础信息不会升版本、也不会重算索引。
+- **审核导入**：AI 先转换成本平台的结构化剧本，你在通用编辑界面里检查修改后再发布。
 
-```powershell
-$env:AI_TRPG_SECRET_KEY = "change-me"
-```
+导入的剧本和其他剧本共用同一个编辑界面，功能完全一致。
 
-涉及用户输入路径的后端代码应使用 `trpg_server.security.safe_join`；写入 JSON 应使用 `trpg_server.json_store.write_json_atomic`，避免路径穿越和半写入文件。源码位于 `backend/trpg_server/`，根目录 `server.py` 会兼容导入该包。
+### 方式三：世界书与触发器资源
 
-同一账号只允许一个有效会话。新的登录会使该账号旧会话失效，旧会话再次访问 API 时会收到 `401 Session expired`。
+- **世界书**：剧本卡片上的「世界书」按钮，可以按章节查看和调整 AI 的检索行为（触发词、常驻条目、分层、优先级、出现概率、粘滞与冷却轮数）。系统会从标题与正文自动派生触发词，你也可以手动改。
+- **触发器资源库**：在剧本编辑页给剧本挂上图片、音频、视频、富文本或附件，设定触发条件与剧透等级，跑团时由 AI 在合适时机自动推送。
 
-### Cookie 与登录状态
+### 方式四：规则书知识库
 
-- 后端使用 HttpOnly Flask session cookie 保存登录会话，前端不会把密码、session token 或可冒充身份的数据写入 cookie。
-- 首次访问页面会询问是否同意可选 cookie。拒绝时仍可登录和使用必要会话 cookie，但不会记录上次用户名和上次房间偏好。
-- 可选 cookie 仅保存 `trpg_last_username`、用户级上次房间等本地偏好。
-- session cookie 默认 `HttpOnly`、`SameSite=Lax`，登录后默认保留 7 天；同一账号在新设备登录会使旧会话失效。
+管理员可在设置页上传 COC7 规则文本（`.txt` / `.md` / `.doc` / `.docx`），AI 回答规则问题时会检索这些内容。
 
-### 用户管理
+---
 
-- 用户名要求 3-32 个字符，可包含字母、数字、下划线、点和连字符。
-- 密码至少 8 个字符。
-- 邮箱必须符合基本邮箱格式。
-- 用户名按大小写不敏感方式查重，防止 `Alice` 和 `alice` 被注册为两个账号。
-- 个人资料更新会复用同一套用户名和邮箱校验。
+## AI 设置
 
-## 房间与回档
+- 在设置页配置 AI 平台：预置 DeepSeek、OpenAI、阿里云百炼、SiliconFlow、OpenRouter、LM Studio，也支持任意 OpenAI 兼容接口。
+- 可以分别指定 KP 及其他角色使用的模型。
+- 可调「最大工具调用轮数」（默认 8）和「AI 请求超时」（默认 300 秒）——AI 需要查剧本、推线索多次时会用到多轮调用。
+- 设置页的 AI 用量看板可按天查看 token 消耗与缓存命中情况。
 
-- 玩家登录后可以创建房间，创建时需要填写房间名并选择剧本。
-- 普通 `USER` 默认最多创建 3 个房间；`ADMIN` 和 `OWNER` 可创建任意数量房间，并可加入任意房间旁观。
-- 房间创建后会生成唯一房间码，其他玩家通过房间码加入。
-- 玩家进入房间后，主页聊天记录会切换为该房间的持久聊天记录；消息保存发送者 ID、用户名和头像，重新进入房间后展示保持一致。
-- 原独立存档系统已并入房间。房间内的“回档节点”会保存当前全部聊天内容，之后可恢复到该节点。
-- 启用自动保存后，程序按常规设置中的自动保存间隔保存当前房间消息。
-- 创建房间、加入房间、房间消息、回档节点等关键房间操作会写入日志。
+---
 
-## 部署与访问
+## 多人与联机
 
-### 本地单机运行
+- 页面与实时聊天走**同一个端口**：HTTP 负责页面与操作，实时同步使用 WebSocket，环境不支持时自动回退到长轮询。
+- 同一账号只允许一个有效会话：在新设备登录会使旧会话失效。
+- 首次访问会询问是否同意可选 cookie。拒绝也能正常登录使用，只是不会记住上次用户名和房间偏好。
+- 玩家、房间、聊天记录、日志都写在本地 `data/` 目录，建议定期备份。
 
-```powershell
-python server.py
-```
+### 三种典型玩法
 
-浏览器访问：
+| 场景 | 做法 |
+| --- | --- |
+| 同一台电脑 | 直接 `python server.py`，浏览器开 <http://127.0.0.1:8086> |
+| 局域网 | 主机启动服务，朋友访问 `http://<主机IP>:8086`，记得放行防火墙端口 |
+| 异地联机 | 用 ZeroTier / Tailscale / WireGuard / frp 等工具组网或穿透，朋友访问虚拟网卡 IP；也可直接部署到云服务器 |
 
-```text
-http://127.0.0.1:8086
-```
+---
 
-如果传入端口：
+## 部署到局域网或服务器
 
-```powershell
-python server.py 8090
-```
+程序本身**不内置穿透、端口映射和 HTTPS**，这些交给专门的工具或反向代理。
 
-则访问：
-
-```text
-http://127.0.0.1:8090
-```
-
-### 局域网访问
-
-主机启动服务后，局域网内好友访问主机 IP 和端口，例如：
-
-```text
-http://192.168.1.23:8086
-```
-
-主机需要允许防火墙放行对应端口。好友访问后应注册/登录自己的账号。涉及写入主机文件的操作，例如上传头像、创建剧本、上传剧本封面、编辑或删除剧本，都由后端进行 session、owner/admin 权限、文件名、路径和大小校验。
-
-### 内网穿透或异地组网
-
-本程序不内置内网穿透、异地组网、端口映射或公网代理能力。用户可以自行使用 frp、ZeroTier、Tailscale、WireGuard、路由器端口映射或其他工具，把主机地址暴露给好友。
-
-使用 ZeroTier、Tailscale 或 WireGuard 这类异地组网时，好友应访问主机在虚拟网卡上的 IP，而不是主机物理局域网 IP。主机启动日志会列出多个 `listening on http://<ip>:<port>` 地址；如果电脑的 ZeroTier 地址是 `192.168.192.31`，端口是 `8086`，手机应访问：
-
-```text
-http://192.168.192.31:8086
-```
-
-如果访问超时，优先检查：
-
-- ZeroTier Central 中电脑和手机是否都已 `Authorized`。
-- 手机 ZeroTier 客户端是否已连接同一个网络。
-- Windows 防火墙是否允许 Python 或本程序端口对 ZeroTier 网络入站访问。
-- 手机是否能 ping 通主机 ZeroTier IP，或能访问同网段其他服务。
-- 启动日志是否包含对应端口的 `listening on http://<ZeroTier IP>:<port>`。
-
-无论使用哪种网络方式，都建议：
-
-- 使用强 `AI_TRPG_SECRET_KEY`。
-- 为每个好友创建独立账号，不共享账号。
-- 不把管理账号给普通玩家使用。
-- 仅暴露本程序端口，不暴露项目目录、远程桌面或系统管理端口。
-- 定期备份 `data/`。其中包含运行配置、剧本、上传头像、剧本封面，以及 `data/runtime/` 下的房间、用户、聊天历史和日志。
-
-联机访问本程序时，页面和 REST API 使用 HTTP；实时聊天同步使用 Socket.IO，底层由 Engine.IO 管理，优先使用 WebSocket，必要时回退到 HTTP long-polling。ZeroTier 只提供虚拟网络通道，本程序本身不实现 ZeroTier 协议。若部署在反向代理和 HTTPS 后面，对外访问会变为 HTTPS，实时通道对应为 WSS。
-
-### 云服务器部署
-
-云服务器上可以直接运行：
-
-```powershell
-python server.py 8086
-```
-
-也可以在 Linux 上使用同等命令：
+### 云服务器
 
 ```bash
 python server.py 8086
 ```
 
-生产环境建议放在 Nginx、Caddy 或其他反向代理后面，由反向代理负责 HTTPS、域名和访问日志。本程序仍监听内网端口，例如 `127.0.0.1:8086` 或服务器内网地址。
-
-绑定域名属于部署阶段的操作：先让域名的 DNS 解析记录指向服务器 IP，再由反向代理配置该域名与证书，本程序本身不处理 DNS 与证书。首次引导中填写的域名只作为展示信息保存在 `data/config/site.json`，可以跳过，之后再配置反代或修改 `site.json` 都不影响使用。
-
-反向代理需要转发 WebSocket，因为聊天同步使用 Socket.IO。Nginx 示例：
+建议放在 Nginx / Caddy 后面，由反向代理负责域名与 HTTPS。反向代理需要转发 WebSocket。Nginx 示例：
 
 ```nginx
 location / {
@@ -213,133 +219,63 @@ location / {
 }
 ```
 
-### 前端开发构建
+### 安全建议
 
-`dist/public/` 是构建产物，源码仓库默认不提交该目录。首次克隆、拉取前端源码更新，或修改 TypeScript 源码后运行：
-
-```powershell
-npm install
-npm run typecheck
-npm run build:frontend
-```
-
-生成的浏览器文件统一输出到 `dist/public/`，其中包含页面、`js/` 和 `data/tools/`。未构建前端时，`python server.py` 可以启动后端，但浏览器页面会缺少页面或脚本而无法正常使用。
-
-## 进一步文档
-
-- [API Overview](docs/api.md)
-- [Development Notes](docs/development.md)
-
-## AI 剧本检索与版本隔离
-
-剧本导入与索引存储位置：正式剧本位于 `data/scenarios/scenario-<id>/scenario.json`，历史版本位于
-`data/scenarios/scenario-<id>/versions/<version>.json`，向量/词法索引位于
-`data/scenarios/scenario-<id>/knowledge-index/<version>.json`。原始文件与发布清单保存在同目录的
-`source/` 和 `imports/`；异步导入任务及中间结果位于 `data/runtime/scenario_imports/<job_id>/`。
-当前文本 PDF 使用 PyMuPDF；扫描 PDF 需要后续 OCR 扩展。可用 `python scripts/reindex-scenarios.py`
-为旧版本重建缺失索引。
-
-### 本地向量、Embedding 与 OCR
+长期运行务必设置自己的密钥，不要用默认开发密钥：
 
 ```powershell
-pip install -r requirements-vector.txt
-pip install -r requirements-ocr.txt
+$env:AI_TRPG_SECRET_KEY = "换成你自己的随机字符串"
 ```
 
-The commands above are optional model/OCR enhancements. The embedded SQLite vector store is already included in the main application and does not require Docker. Install `requirements-vector-qdrant.txt` only when selecting Qdrant.
+此外建议：给每位朋友单独开账号、不共享管理账号、只对外开放程序端口、定期备份 `data/`。
 
-配置 `AI_TRPG_VECTOR_DB_URL`、`AI_TRPG_EMBEDDING_BASE_URL`、
-`AI_TRPG_EMBEDDING_API_KEY`、`AI_TRPG_EMBEDDING_MODEL`、
-`AI_TRPG_EMBEDDING_DIMENSIONS=256`、`AI_TRPG_OCR_ENABLED=1` 和 `AI_TRPG_OCR_LANG=ch`。
-Qdrant 数据持久化到 `data/runtime/vector-db/qdrant/`；未配置服务时自动退回 JSON 词法索引和
-本地哈希向量。扫描 PDF 仅在 OCR 开启且 PaddleOCR 可用时识别。健康检查：`GET /api/vector/health`。
-可复制 `config/vector-embedding-ocr.example.env` 作为配置模板。
+---
 
-当前 AI 运行时使用兼容式的知识卡片检索链：剧本模块会被规范化为带有
-`scenario_id`、`scenario_version`、`scene_id`、`card_type`、`visibility`、
-`spoiler_level`、`unlock_condition` 和 `text` 的卡片。聊天请求通过
-`KnowledgeBaseService.search(room_id, query)` 访问检索服务；服务先按房间绑定的剧本、
-版本、当前场景和剧透等级过滤，再进行确定性的词法排序，因此业务层不会直接访问索引。
-默认实现不新增向量数据库依赖，后续可用相同卡片接口替换为 Chroma、pgvector 或远程向量服务。
+## 常见问题
 
-剧本记录使用永久 `id` 与发布递增的 `scenario_version`。创建房间时会把当前版本写入
-`info.json`，旧房间继续锁定原版本；编辑剧本会生成下一版本，新房间默认使用最新版本。
-所有 Prompt 缓存键、知识库过滤和房间快照都携带版本号。迁移到新版本应由上层提供实体映射，
-并通过 `validate_version_migration` 校验场景、NPC、线索和道具是否仍可对应。
+**打开页面是空白的？**
+前端没有构建。执行 `npm install && npm run build:frontend`，或改用包含构建产物的 release 压缩包。
 
-架构边界：
+**朋友连不上？**
+依次检查：主机防火墙是否放行端口、是否用了正确的 IP（异地组网要用虚拟网卡 IP）、启动日志里是否有对方能访问到的 `listening on ...` 地址。
 
-```text
-房间请求 -> 版本绑定加载 -> 知识卡片过滤/排序 -> 分层 Prompt -> LLM
-    |              |                  |                  |
- state.json   scenario.json     versions/<n>.json    JSON 校验/状态更新
-```
+**AI 不回复或只回复一半？**
+多为模型接口超时。可在设置页调大「AI 请求超时」与「最大工具调用轮数」，并确认 API Key 与模型 ID 正确。
 
-版本相关 API：
+**扫描版 PDF 导入后没有内容？**
+默认只处理文本型 PDF，扫描件需要额外安装 OCR 依赖（见文末「开发者 → 进阶可选项」）。
 
-- `POST /api/rooms/<room_id>/scenario-migration`：提交 `scenario_version`、实体 `mapping`，迁移前校验映射，失败时不写入房间。
-- `POST /api/scenarios/<scenario_id>/archive`：归档剧本版本；有房间引用时删除接口也只归档，不物理删除。
-- `DELETE /api/scenarios/<scenario_id>`：无房间引用时删除，存在引用时自动转为归档。
+**改了剧本标题/封面，为什么版本号没变？**
+这是刻意的：标题、作者、推荐人数、简介、封面属于基础信息，修改它们不会升版本、也不会重算索引；只有改动剧本内容才会生成新版本。
 
-缓存层：provider 前缀缓存用于稳定 Prompt 前缀；无房间请求使用带剧本版本、场景、状态摘要和输入哈希的精确缓存；房间请求使用包含 `room_id`、剧本版本和状态的语义缓存，避免房间间复用。缓存均为进程内 TTL 缓存，重启后清空。
+---
 
-Telemetry 观测：
+## 开发者
 
-1. 确保账号拥有 `settings.ai_models` 权限。
-2. 打开设置页的 AI Token Dashboard，或请求 `GET /api/telemetry/ai/daily`；可选 `?day=YYYY-MM-DD` 查询历史日期。
-3. 后端原始记录位于 `data/runtime/logs/ai_usage.jsonl`。每条记录包含 `prompt_tokens`、`completion_tokens`、`cached_tokens`、`cache_hit_rate`、`prefix_cache_hit`、`scenario_id`、`scenario_version`、`scene_id`、`room_id` 和 `elapsed_ms`。
-4. API 返回 `prefix_cache_hit_rate`、`scenario_distribution` 和 `room_costs`，分别用于前缀命中率、剧本串扰分布和房间 token 成本观测。真实 Provider 是否命中其服务端前缀缓存，以返回的 `cached_tokens` 为准；本地 `prefix_cache_hit` 只表示稳定前缀键已被复用。
+源码结构：
 
-建议验收方式：同一剧本/场景连续发送至少 20 轮后，检查 `prefix_cache_hit_rate > 80`；对比全量注入和按需检索两组请求的 `prompt_tokens`，计算输入 token 降幅；若 `scenario_distribution` 出现非当前剧本 ID，应立即检查房间版本绑定和检索过滤。
+- `backend/trpg_server/`：后端服务（Flask 应用、路由、实时事件、存储与安全工具）。
+- `frontend/src/`：前端源码（TypeScript 业务代码、React 岛、模板、样式、工具）。
+- `dist/public/`：前端构建产物，默认不提交。
+- `data/`：运行数据（配置、剧本、房间、用户、上传资源、日志）。
+- `tests/`：后端测试。
 
-示例房间绑定：
-
-```json
-{"id":"room-1","scenario_id":7,"scenario_version":"3","active_scene_id":"scene-1"}
-```
-
-示例迁移请求：
-
-```json
-{"scenario_version":"4","mapping":{"scene-1":"scene-a","npc-1":"npc-a"},"old_entities":[{"id":"scene-1"},{"id":"npc-1"}]}
-```
-
-结构化 KP 输出只能更新白名单字段，且 `next_scene`、NPC、线索和道具必须存在当前剧本版本的
-索引中；非法实体会被丢弃，不会触发自动重试。房间状态通过 `project_room_state` 投影为当前场景、
-有限事件日志和滚动摘要，完整历史仍保存在房间运行数据中。
-### External ruleset knowledge bases
-
-Administrators can use the settings page's Ruleset Knowledge Base tab to upload `.txt`, `.md`, `.doc`, or `.docx` files for COC7. The service extracts headings, rule topics, formulas, tables, exceptions, and examples into semantic chunks; this chunker is deliberately separate from scenario scene/module chunking. Versioned indexes are stored under `data/runtime/knowledge-bases/` and room bindings keep `ruleset_id` plus `knowledge_version`.
-
-The protected API requires `settings.knowledge_bases`:
-
-- `GET /api/knowledge-bases/rulesets`
-- `POST /api/knowledge-bases/<ruleset_id>/sources`
-- `POST /api/knowledge-bases/<ruleset_id>/reindex`
-- `POST /api/knowledge-bases/<ruleset_id>/enable` or `/archive`
-- `POST /api/rooms/<room_id>/rulesets`
-
-Index failures retain the previous active version. Future COC6 or D&D adapters can implement the same `RulesetAdapter` interface and reuse upload, versioning, permissions, retrieval, prompt, and telemetry infrastructure.
-
-### Embedded vector storage (default)
-
-The default vector backend is an embedded SQLite store implemented with Python's standard library. A fresh checkout can run with only `pip install -r requirements.txt`; Docker and Qdrant are not required. Vectors are persisted in `data/runtime/vector-db/embedded/vectors.sqlite3`, while readable per-scenario backups remain in `data/scenarios/scenario-<id>/knowledge-index/<version>.json`.
-
-Set `AI_TRPG_VECTOR_BACKEND=embedded` to make the choice explicit. Existing JSON indexes can be imported idempotently with:
+常用命令：
 
 ```powershell
-python scripts/migrate-vector-store.py
+npm run typecheck        # 前端类型检查
+npm run build:frontend   # 构建前端
+.\scripts\verify.ps1     # 提交前完整校验（编译检查 + 类型检查 + 构建 + pytest）
 ```
 
-The migration never deletes JSON or Qdrant data. For the optional Qdrant backend, install `requirements-vector-qdrant.txt`, set `AI_TRPG_VECTOR_BACKEND=qdrant` and `AI_TRPG_VECTOR_DB_URL`, then use the same `VectorStore` contract. The embedded mode is intended for single-machine or small LAN deployments (thousands of cards per scenario and tens of thousands overall).
+进阶可选项（都不影响基本运行）：
 
-Docker 不是必需依赖。默认使用内置 SQLite 向量库，数据位于 `data/runtime/vector-db/embedded/`；仅在配置 Qdrant 后端时安装 `requirements-vector-qdrant.txt` 并使用 `data/runtime/vector-db/qdrant/`。Embedding 优先读取 `data/runtime/models/embedding/bge-small-zh-v1.5/` 中的 `BAAI/bge-small-zh-v1.5`，没有本地模型时使用启用 AI 平台的 OpenAI-compatible embedding，最后回退到本地哈希向量。下载模型：`pip install huggingface_hub sentence-transformers`，然后 `huggingface-cli download BAAI/bge-small-zh-v1.5 --local-dir data/runtime/models/embedding/bge-small-zh-v1.5`。PaddleOCR 模型缓存位于 `data/runtime/models/paddleocr/`。
-## 剧本触发器与资源
+- 向量检索默认使用内置 SQLite，无需 Docker；也可选装 Qdrant。
+- 可安装本地 Embedding 模型与 PaddleOCR 提升检索和扫描件识别效果。
+- 详细接口与内部设计见 [API Overview](docs/api.md) 与 [Development Notes](docs/development.md)。
 
-剧本资源严格保存在 `data/scenarios/scenario-<id>/assets/`，描述和触发器定义保存在同一目录的 `scenario.json`，资源索引为 `assets.json`。资源引用包含 `type/path/url/alt/mime/size/hash`，`alt` 必须由编辑者手动填写，系统不会自动分析资源内容。
+---
 
-触发器支持场景进入、事件、线索、NPC 对话、玩家行动和自定义条件。附件可设置 `spoilerLevel`（0-5）、`visibility`、`repeatable`、`priority` 与 `enabled`。房间 `state.json` 新增 `triggeredFiles` 和 `triggerHistory`，状态按房间隔离。
+## 许可
 
-管理 API：`POST/GET /api/scripts/:id/assets`、`PUT/DELETE /api/scripts/:id/assets/:assetId`；`POST/PUT/DELETE /api/scripts/:id/cards/:cardId/attachments[/triggerId]`；`GET/POST /api/scripts/:id/triggers`、`PUT /api/scripts/:id/triggers/:triggerId`；`GET /api/rooms/:id/triggers`。
-
-结构化 KP 输出可包含 `triggered_files: [{"trigger_id": "...", "reason": "..."}]`。后端会校验剧本 ID、版本、场景、解锁条件、剧透级别、可见性和重复触发状态；失败时不会向玩家推送资源，并写入日志。
+本项目以 [Apache License 2.0](LICENSE) 发布。请同时遵守你所用剧本、规则书与 AI 服务各自的授权条款。

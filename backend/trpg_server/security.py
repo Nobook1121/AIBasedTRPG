@@ -111,6 +111,8 @@ def is_socket_user_online(user_id):
 
 
 def _is_session_current(manager, user_id, token):
+    # 模拟登录使用独立 token 前缀，此时只要求当前会话处于 impersonation 模式，
+    # 不走真实用户的单会话约束，避免管理员模拟时踢掉被模拟用户的登录态。
     if token and str(token).startswith(IMPERSONATION_SESSION_PREFIX):
         return bool(session.get("impersonation_mode"))
     if hasattr(manager, "is_session_current"):
@@ -141,6 +143,7 @@ def register_session_guard(app):
             return error_response("Session expired", 401, "Session expired")
         _refresh_session_user_fields(manager)
 
+        # 写操作必须携带与会话一致的 CSRF token，防止跨站请求伪造。
         if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
             csrf_token = session.get(CSRF_SESSION_KEY)
             request_token = request.headers.get("X-CSRF-Token", "")
@@ -148,33 +151,6 @@ def register_session_guard(app):
                 return error_response("CSRF validation failed", 403, "Invalid CSRF token")
 
         return None
-
-
-def require_permission(required_role):
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            if "user_id" not in session:
-                return error_response("Please login first", 401, "Not logged in")
-
-            manager = get_user_manager()
-            if not _is_session_current(
-                manager,
-                session["user_id"],
-                session.get(SESSION_TOKEN_KEY),
-            ):
-                session.clear()
-                return error_response("Session expired", 401, "Session expired")
-            _refresh_session_user_fields(manager)
-
-            if not manager.check_permission(session["user_id"], required_role):
-                return error_response("Permission denied", 403, "Permission denied")
-
-            return func(*args, **kwargs)
-
-        return wrapper
-
-    return decorator
 
 
 def _validate_current_session():

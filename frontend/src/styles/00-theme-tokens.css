@@ -718,6 +718,29 @@ select:focus {
     box-shadow: 0 0 0 0.2rem var(--theme-focus-ring);
 }
 
+/* 复选框 / 开关的选中色与原点颜色。
+   1) Bootstrap 默认把选中背景写死为 --bs-primary（蓝色），必须显式覆盖为主题色。
+   2) Bootstrap 5.3.0 还写了一条 `.form-switch .form-check-input:focus`，把开关的
+      原点 SVG（--bs-form-switch-bg）换成蓝色 #86b7fe。结果未选中的开关一聚焦，
+      原点就从灰变蓝、失焦又变回灰，看起来“颜色变来变去”。这里把聚焦态的原点
+      固定回默认灰、选中态固定为白，使焦点切换时原点颜色不再跳变。
+   :checked:focus 用更高优先级压过上面的 :focus 规则，否则开关获得焦点时会被
+   :focus 的输入背景色盖回。 */
+.form-switch .form-check-input:focus,
+.form-switch .form-check-input:focus-visible {
+    --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='rgba%280, 0, 0, 0.25%29'/%3e%3c/svg%3e");
+}
+
+.form-check-input:checked,
+.form-check-input:checked:focus,
+.form-switch .form-check-input:checked,
+.form-switch .form-check-input:checked:focus,
+.form-switch .form-check-input:checked:focus-visible {
+    background-color: var(--theme-accent-primary);
+    border-color: var(--theme-accent-primary);
+    --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fff'/%3e%3c/svg%3e");
+}
+
 .btn-primary {
     color: var(--theme-text-inverse);
     background-color: var(--theme-accent-primary);

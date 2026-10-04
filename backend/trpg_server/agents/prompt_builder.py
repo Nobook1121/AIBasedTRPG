@@ -71,6 +71,7 @@ def build_prompt_layers(
     retrieval_results: list[dict[str, Any]] | None = None,
     ruleset_results: list[dict[str, Any]] | None = None,
     retrieval_full: bool = False,
+    room_snapshot_message: str | None = None,
 ) -> PromptLayers:
     scenario_static = _scenario_static_content(scenario)
     scene_static = _scene_static_content(scene)
@@ -124,6 +125,10 @@ def build_prompt_layers(
             "content": f"房间动态状态：{_stable_json(room_state if isinstance(room_state, dict) else {})}",
         }
     )
+    # 房间快照（成员、HP/SAN、场景清单）每轮都变，放在动态块的最末尾、历史之前。
+    # 易变内容后移，前面的静态层与检索卡片才能组成跨请求共享的可缓存前缀。
+    if room_snapshot_message:
+        dynamic_messages.append({"role": "system", "content": str(room_snapshot_message)})
     for item in history or []:
         if not isinstance(item, dict):
             continue

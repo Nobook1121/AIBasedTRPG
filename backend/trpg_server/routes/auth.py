@@ -8,7 +8,7 @@ from datetime import timedelta
 from flask import Blueprint, current_app, request, session
 
 from trpg_server.logging_config import log_user_action, user_action_text
-from trpg_server.responses import error_response, success_response
+from trpg_server.responses import error_response, server_error, success_response
 from trpg_server.security import (
     CSRF_SESSION_KEY,
     SESSION_TOKEN_KEY,
@@ -134,7 +134,7 @@ def register():
         return success_response(message=message, status=201)
     except Exception as exc:
         logger.exception("Failed to register user")
-        return error_response("Registration failed", 500, str(exc))
+        return server_error("Registration failed")
 
 
 @bp.route("/api/auth/login", methods=["POST"])
@@ -193,7 +193,7 @@ def login():
         return success_response(_user_payload(user), message)
     except Exception as exc:
         logger.exception("Failed to login user")
-        return error_response("Login failed", 500, str(exc))
+        return server_error("Login failed")
 
 
 @bp.route("/api/auth/logout", methods=["POST"])
@@ -219,7 +219,7 @@ def logout():
             session.clear()
 
         if revoke_error:
-            return error_response("Logout failed", 500, str(revoke_error))
+            return server_error("Logout failed")
 
         log_user_action(
             logger,
@@ -229,7 +229,7 @@ def logout():
         return success_response(message="Logged out successfully")
     except Exception as exc:
         logger.exception("Failed to logout user")
-        return error_response("Logout failed", 500, str(exc))
+        return server_error("Logout failed")
 
 
 @bp.route("/api/auth/status", methods=["GET"])
@@ -258,7 +258,7 @@ def get_auth_status():
         return success_response(payload, "Logged in")
     except Exception as exc:
         logger.exception("Failed to get auth status")
-        return error_response("Failed to get auth status", 500, str(exc))
+        return server_error("Failed to get auth status")
 
 
 @bp.route("/api/auth/impersonation/start", methods=["POST"])
@@ -320,7 +320,7 @@ def start_impersonation():
         return success_response(payload, "Impersonation started")
     except Exception as exc:
         logger.exception("Failed to start impersonation")
-        return error_response("Failed to start impersonation", 500, str(exc))
+        return server_error("Failed to start impersonation")
 
 
 @bp.route("/api/auth/impersonation/stop", methods=["POST"])
@@ -358,7 +358,7 @@ def stop_impersonation():
         return success_response(_user_payload(user), "Impersonation stopped")
     except Exception as exc:
         logger.exception("Failed to stop impersonation")
-        return error_response("Failed to stop impersonation", 500, str(exc))
+        return server_error("Failed to stop impersonation")
 
 
 @bp.route("/api/auth/update", methods=["POST"])
@@ -452,7 +452,7 @@ def update_user():
         if not avatar_persisted:
             _remove_saved_avatar(saved_avatar_file)
         logger.exception("Failed to update user")
-        return error_response(f"Update failed: {exc}", 500, str(exc))
+        return server_error("Update failed")
 
 
 @bp.route("/api/auth/password/change", methods=["POST"])
@@ -525,7 +525,7 @@ def change_password():
         return success_response(message="Password changed")
     except Exception as exc:
         logger.exception("Failed to change password")
-        return error_response("Password change failed", 500, str(exc))
+        return server_error("Password change failed")
 
 
 @bp.route("/api/auth/settings", methods=["GET"])
@@ -534,7 +534,7 @@ def get_auth_settings_route():
         return success_response(public_auth_settings(_auth_settings()), "Auth settings loaded")
     except Exception as exc:
         logger.exception("Failed to get auth settings")
-        return error_response("Failed to get auth settings", 500, str(exc))
+        return server_error("Failed to get auth settings")
 
 
 @bp.route("/api/auth/password/forgot", methods=["POST"])

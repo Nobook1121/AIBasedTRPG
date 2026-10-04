@@ -1429,7 +1429,7 @@ def trigger_room_scenario(room_id):
     if trigger_id in (None, ""):
         return error_response("Please provide trigger id", 400, "No trigger id")
 
-    scenarios_dir = current_app.config.get("SCENARIOS_DIR", ROOMS_DIR.parent / "scenarios")
+    scenarios_dir = _get_scenarios_dir()
     from trpg_server.scenario_store import build_trigger_message, load_scenario_by_id
 
     _, scenario = load_scenario_by_id(scenarios_dir, info.get("scenario_id"), scenario_version=info.get("scenario_version"))

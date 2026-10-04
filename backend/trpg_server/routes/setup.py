@@ -15,10 +15,11 @@ from datetime import timedelta
 import requests
 from flask import Blueprint, current_app, request, session
 
+from trpg_server.ai_capabilities import chat_completions_endpoint
 from trpg_server.ai_platform_config import load_platform_config, save_platform_config
 from trpg_server.json_store import read_json, write_json_atomic
 from trpg_server.logging_config import log_user_action, user_action_text
-from trpg_server.responses import error_response, success_response
+from trpg_server.responses import error_response, server_error, success_response
 from trpg_server.role_config import load_roles
 from trpg_server.security import CSRF_SESSION_KEY, SESSION_TOKEN_KEY, safe_join
 from trpg_server.settings import AI_PLATFORM_SECRET_DIR, CONFIG_DIR, SITE_CONFIG_FILE
@@ -88,7 +89,7 @@ def setup_status():
         )
     except Exception as exc:
         logger.exception("Failed to determine setup status")
-        return error_response("Failed to determine setup status", 500, str(exc))
+        return server_error("Failed to determine setup status")
 
 
 @bp.route("/api/setup/dismiss", methods=["POST"])
@@ -106,7 +107,7 @@ def dismiss_setup():
         return success_response({"setup_dismissed": True})
     except Exception as exc:
         logger.exception("Failed to dismiss setup")
-        return error_response(f"Save failed: {exc}", 500)
+        return server_error("Save failed")
 
 
 @bp.route("/api/setup/site", methods=["POST"])
@@ -134,7 +135,7 @@ def save_site_config():
         return success_response({"name": name, "domain": domain})
     except Exception as exc:
         logger.exception("Failed to save site config")
-        return error_response(f"Save failed: {exc}", 500)
+        return server_error("Save failed")
 
 
 @bp.route("/api/setup/ai", methods=["POST"])
@@ -196,7 +197,7 @@ def save_ai_platform():
         return success_response({"platform": platform, "model": model_id})
     except Exception as exc:
         logger.exception("Failed to save AI platform during setup")
-        return error_response(f"Save failed: {exc}", 500)
+        return server_error("Save failed")
 
 
 @bp.route("/api/setup/ai/test", methods=["POST"])
@@ -226,7 +227,7 @@ def test_ai_platform():
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
         }
-        response = requests.post(base_url, headers=headers, json=payload, timeout=30)
+        response = requests.post(chat_completions_endpoint(base_url), headers=headers, json=payload, timeout=30)
         if response.status_code != 200:
             try:
                 detail = response.json().get("error", {}).get("message", "")
@@ -237,7 +238,7 @@ def test_ai_platform():
         return success_response(message=None, response=response.json())
     except Exception as exc:
         logger.exception("Failed to test AI platform during setup")
-        return error_response(None, 500, str(exc))
+        return server_error()
 
 
 @bp.route("/api/setup/owner", methods=["POST"])
@@ -290,7 +291,7 @@ def create_owner():
         )
     except Exception as exc:
         logger.exception("Failed to create owner account during setup")
-        return error_response("Failed to create owner account", 500, str(exc))
+        return server_error("Failed to create owner account")
 
 
 def _upsert_model(models, model_id: str, model_name: str) -> list:

@@ -195,8 +195,10 @@
 .scenario-cover-field .cover-preview img {
     width: 100%;
     height: auto;
-    aspect-ratio: 2 / 3;
-    object-fit: cover;
+    max-height: 360px;
+    /* 只做等比缩放，绝不裁剪：早先用 aspect-ratio:2/3 + object-fit:cover，会把
+       非 2:3 的封面裁掉上下或左右两侧。contain 保证整张图完整可见。 */
+    object-fit: contain;
 }
 
 .scenario-module-toolbar {

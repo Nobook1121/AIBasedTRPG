@@ -18,39 +18,12 @@ def _find_scenario(scenarios_dir, scenario_id, scenario_version=None):
 def _matches_query(value: Any, query: str) -> bool:
     if not query:
         return True
+    # 序列化为 JSON 后统一大小写匹配，可覆盖嵌套字段中的文本检索。
     return query.casefold() in json.dumps(value, ensure_ascii=False).casefold()
 
 
 def _module_type(module: dict[str, Any]) -> str:
     return str(module.get("module_type") or module.get("type") or "").strip().lower()
-
-
-def _fallback_modules(scenario: dict[str, Any]) -> list[dict[str, Any]]:
-    modules: list[dict[str, Any]] = []
-    for index, item in enumerate(scenario.get("scenes", []) if isinstance(scenario.get("scenes"), list) else []):
-        if isinstance(item, dict):
-            modules.append(
-                {
-                    "id": item.get("module_id") or item.get("id") or f"scene-{index + 1}",
-                    "module_type": "scene",
-                    "title": item.get("title") or f"场景 {index + 1}",
-                    "summary": item.get("marker") or "",
-                    "content": item.get("content") or "",
-                    "triggers": item.get("triggers", []) if isinstance(item.get("triggers", []), list) else [],
-                }
-            )
-    for index, item in enumerate(scenario.get("endings", []) if isinstance(scenario.get("endings"), list) else []):
-        if isinstance(item, dict):
-            modules.append(
-                {
-                    "id": item.get("module_id") or item.get("id") or f"ending-{index + 1}",
-                    "module_type": "ending",
-                    "title": item.get("title") or f"结局 {index + 1}",
-                    "summary": item.get("marker") or "",
-                    "content": item.get("content") or "",
-                }
-            )
-    return modules
 
 
 def _scenario_modules(scenario: dict[str, Any]) -> list[dict[str, Any]]:

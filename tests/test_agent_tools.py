@@ -2,6 +2,7 @@ from trpg_server.agents.profiles import DEFAULT_KP_TOOLS
 from trpg_server.agents.tools import default_tool_registry
 from trpg_server.agents.tools.dice import (
     execute_roll_coc_check,
+    execute_roll_room_check,
     roll_coc_check,
     roll_room_check,
 )
@@ -108,7 +109,8 @@ def test_room_check_reads_skill_from_bound_character_by_username(tmp_path):
 
     assert result["roll"] == 30
     assert result["target"] == 60
-    assert result["threshold"] == 60
+    # threshold 与 target 完全重复，返回值里已去掉，避免回传模型时白占 token。
+    assert "threshold" not in result
     assert result["success"] is True
     assert result["summary"] == "\u4fa6\u5bdf d%: [30] = 30 / 60 \u6210\u529f"
     assert result["visible_message"]["type"] == "dice"
@@ -136,7 +138,7 @@ def test_room_check_applies_difficulty_and_adjustment(tmp_path):
     )
 
     assert result["base_target"] == 60
-    assert result["threshold"] == 40
+    assert result["target"] == 40
     assert result["success"] is True
     assert result["summary"] == "\u56f0\u96be\u4fa6\u5bdf d%: [40] = 40 / 40 \u6210\u529f"
 
@@ -162,7 +164,7 @@ def test_room_check_reads_attribute_alias_from_bound_character(tmp_path):
     )
 
     assert result["base_target"] == 55
-    assert result["threshold"] == 11
+    assert result["target"] == 11
     assert result["success"] is False
     assert result["summary"] == "\u6781\u96be\u654f\u6377 d%: [12] = 12 / 11 \u5931\u8d25"
 
@@ -278,6 +280,91 @@ def test_coc_check_tool_uses_admin_default_thresholds(tmp_path):
 
     assert result["critical_threshold"] == 7
     assert result["fumble_threshold"] == 88
+
+
+def _context_with_check_trigger(tmp_path):
+    """房间成员 + 一个「侦查检定成功」才揭示的场景栏位触发器。"""
+    scenarios_dir = tmp_path / "scenarios"
+    scenarios_dir.mkdir()
+    (scenarios_dir / "10.json").write_text(
+        json.dumps(
+            {
+                "id": 10,
+                "title": "旧宅",
+                "scenes": [
+                    {
+                        "id": 1,
+                        "title": "门厅",
+                        "triggers": [
+                            {
+                                "id": 3,
+                                "display_name": "墙缝里的钥匙",
+                                "keyword": "钥匙",
+                                "condition": "侦查检定成功",
+                                "content": "你在墙缝里摸到一枚铜钥匙。",
+                            }
+                        ],
+                    }
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    room_dir = tmp_path / "rooms" / "room-1"
+    room_dir.mkdir(parents=True)
+    (room_dir / "info.json").write_text(
+        json.dumps(
+            {
+                "id": "room-1",
+                "scenario_id": 10,
+                "members": [
+                    {
+                        "username": "testplayer",
+                        "status": "active",
+                        "character_card": {"name": "调查员", "skills": [{"name": "侦查", "value": 60}]},
+                    }
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    return AgentRequestContext(room_id="room-1", room_dir=room_dir, scenarios_dir=scenarios_dir, agent_id="kp")
+
+
+def test_room_check_reveals_bound_trigger_in_same_round_on_success(tmp_path, monkeypatch):
+    """检定成功时，随检定传入的 trigger_id 应在同一轮内揭示触发器，省掉中间 AI 往返。"""
+    context = _context_with_check_trigger(tmp_path)
+    monkeypatch.setattr("trpg_server.agents.tools.dice.random.randint", lambda low, high: 30)
+
+    result = execute_roll_room_check({"player_name": "testplayer", "name": "侦查", "trigger_id": 3}, context)
+
+    assert result["success"] is True
+    assert result["direct_message"]["type"] == "trigger"
+    assert "铜钥匙" in result["direct_message"]["content"]
+
+
+def test_room_check_withholds_bound_trigger_when_check_fails(tmp_path, monkeypatch):
+    """检定失败时不得揭示触发器内容，只回一条说明，符合 kp.md 的硬要求。"""
+    context = _context_with_check_trigger(tmp_path)
+    monkeypatch.setattr("trpg_server.agents.tools.dice.random.randint", lambda low, high: 90)
+
+    result = execute_roll_room_check({"player_name": "testplayer", "name": "侦查", "trigger_id": 3}, context)
+
+    assert result["success"] is False
+    assert "direct_message" not in result
+    assert result["trigger_note"]
+
+
+def test_room_check_without_trigger_id_keeps_original_behaviour(tmp_path, monkeypatch):
+    context = _context_with_check_trigger(tmp_path)
+    monkeypatch.setattr("trpg_server.agents.tools.dice.random.randint", lambda low, high: 30)
+
+    result = execute_roll_room_check({"player_name": "testplayer", "name": "侦查"}, context)
+
+    assert "direct_message" not in result
+    assert "trigger_note" not in result
 
 
 def test_room_check_returns_error_for_missing_bound_character(tmp_path):

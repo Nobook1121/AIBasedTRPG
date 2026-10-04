@@ -1,7 +1,68 @@
 from trpg_server.agents.context import AgentRequestContext
 from trpg_server.agents.profiles import AgentProfile
-from trpg_server.agents.runtime import run_agent_completion
+from trpg_server.agents.runtime import _extract_usage_counts, run_agent_completion
 from trpg_server.agents.tools.base import AgentTool, ToolRegistry
+
+
+def test_usage_counts_read_provider_specific_cache_fields():
+    """缓存字段各家命名不同：OpenAI 用 prompt_tokens_details.cached_tokens、
+    DeepSeek 用顶层 prompt_cache_hit_tokens、Anthropic 用 cache_read_input_tokens。"""
+    assert _extract_usage_counts({"usage": {"prompt_tokens": 100, "prompt_tokens_details": {"cached_tokens": 0}}}) == (100, None, 0)
+    # 合法的 0 不能被当成"没值"而穿透到后面的字段
+    assert _extract_usage_counts({"usage": {"prompt_tokens": 100, "cached_tokens": 0, "prompt_cache_hit_tokens": 80}}) == (100, None, 0)
+    assert _extract_usage_counts({"usage": {"prompt_tokens": 100, "prompt_cache_hit_tokens": 80}}) == (100, None, 80)
+    # 只有拆分字段时自行还原 prompt_tokens
+    assert _extract_usage_counts({"usage": {"prompt_cache_hit_tokens": 80, "prompt_cache_miss_tokens": 20}}) == (100, None, 80)
+    assert _extract_usage_counts({"usage": {"input_tokens_details": {"cache_read_input_tokens": 64}}}) == (None, None, 64)
+    assert _extract_usage_counts({"usage": {}}) == (None, None, None)
+
+
+def test_runtime_folds_only_stale_refetchable_tool_results():
+    """较早的「可重取」工具结果会被折叠以省 token；检定结果永不折叠。"""
+    from trpg_server.agents.runtime import FOLDED_TOOL_RESULT_NOTICE
+
+    class SequenceRequester:
+        def __init__(self, rounds):
+            self.rounds = rounds
+            self.calls = []
+
+        def __call__(self, payload):
+            self.calls.append(payload)
+            if len(self.calls) <= self.rounds:
+                return {"choices": [{"message": {"role": "assistant", "content": "", "tool_calls": [
+                    {"id": f"call-{len(self.calls)}", "type": "function",
+                     "function": {"name": self.tool_name, "arguments": "{}"}}
+                ]}}]}
+            return {"choices": [{"message": {"role": "assistant", "content": "done"}}]}
+
+    def run(tool_name):
+        requester = SequenceRequester(rounds=3)
+        requester.tool_name = tool_name
+        tool = AgentTool(
+            name=tool_name,
+            description="tool",
+            parameters={"type": "object", "properties": {}},
+            handler=lambda arguments, context: {"payload": "X" * 50},
+        )
+        run_agent_completion(
+            requester=requester,
+            base_payload={"model": "fake-model", "messages": [{"role": "user", "content": "go"}]},
+            profile=AgentProfile(id="kp", name="KP", prompt="prompt", tool_names=[tool_name]),
+            registry=ToolRegistry([tool]),
+            context=AgentRequestContext(room_id="room-1"),
+        )
+        return [message for message in requester.calls[-1]["messages"] if message.get("role") == "tool"]
+
+    refetchable = run("room.get_character_cards")
+    assert len(refetchable) == 3
+    assert refetchable[0]["content"] == FOLDED_TOOL_RESULT_NOTICE
+    assert refetchable[1]["content"] != FOLDED_TOOL_RESULT_NOTICE
+    assert refetchable[2]["content"] != FOLDED_TOOL_RESULT_NOTICE
+
+    # 检定结果必须保持原文，否则 KP 会看不到骰点而瞎编结果
+    checks = run("check.roll_room_check")
+    assert len(checks) == 3
+    assert all(message["content"] != FOLDED_TOOL_RESULT_NOTICE for message in checks)
 
 
 class FakeRequester:
@@ -225,6 +286,8 @@ def test_runtime_returns_tool_result_to_model_and_collects_visible_message():
     assert result.tool_messages == [tool_result["visible_message"]]
     assert '"roll": 17' in requester.calls[1]["messages"][-1]["content"]
     assert "侦查 d%: [17] = 17 / 50 成功" in requester.calls[1]["messages"][-1]["content"]
+    # visible_message 是 UI 载体，已由 tool_messages 承载，不应再回传给模型。
+    assert "visible_message" not in requester.calls[1]["messages"][-1]["content"]
 
 
 def test_runtime_collects_knowledge_usage_from_executed_tool():

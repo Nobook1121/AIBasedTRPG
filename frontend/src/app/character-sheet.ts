@@ -994,10 +994,6 @@ interface Window {
         return merged;
     }
 
-    function calculateSkillBase(skill: COC7Skill, attributes?: COC7Attributes, occupation?: COC7Occupation): number {
-        return resolveEffectiveBase(resolveSkillKey(skill), skill.specialtyKey || "", attributes, occupation);
-    }
-
     /** 技能基础值覆盖表键：无专精为 `skillKey`，有专精为 `skillKey.specialtyKey`。 */
     function skillBaseOverrideKey(skillKey: string, specialtyKey?: string): string {
         const specialty = String(specialtyKey || "").trim();
@@ -1199,12 +1195,6 @@ interface Window {
 
     function currentPlayerId(): string {
         return String(global.currentUser?.user_id ?? "");
-    }
-
-    function currentPlayerLabel(): string {
-        const user = global.currentUser;
-        if (!user) return "";
-        return String(user.username || user.user_id || "");
     }
 
     function isBoundToCurrentPlayer(playerId: string): boolean {
@@ -1752,6 +1742,10 @@ interface Window {
         byId("importCharacter")?.addEventListener("click", () => byId<HTMLInputElement>("importCharacterFile")?.click());
         byId<HTMLInputElement>("importCharacterFile")?.addEventListener("change", importCharacterFiles);
         byId("exportCharacter")?.addEventListener("click", exportActiveCard);
+        // 「角色卡广场」按钮此前没有绑定任何事件，点击无反应；这里切到广场标签页。
+        byId("openCharacterGallery")?.addEventListener("click", () => {
+            window.switchMainTab?.("character-gallery");
+        });
         byId("backToCharacterList")?.addEventListener("click", showCharacterList);
         byId("randomizeCharacterName")?.addEventListener("click", openNameGenerator);
         byId("regenerateName")?.addEventListener("click", regenerateNamePreview);
@@ -2135,12 +2129,6 @@ interface Window {
         }
         refreshSkillTableCalculations();
         syncEditorCreditRating();
-    }
-
-    function findSkillRow(rowId: string): HTMLTableRowElement | null {
-        const body = byId("characterSkillTableBody");
-        if (!body || !rowId) return null;
-        return body.querySelector<HTMLTableRowElement>(`tr[data-skill-row-id="${CSS.escape(rowId)}"]`);
     }
 
     function hydrateWeaponTable(weapons: COC7Weapon[] = []): void {
@@ -3091,18 +3079,6 @@ interface Window {
         }, { occupation: 0, personal: 0 });
     }
 
-    function autoAllocateEditorOccupationSkills(): void {
-        const card = createCharacterCard({
-            occupationId: resolveOccupationIdFromInput(getInputValue("characterOccupation")),
-            occupationName: resolveOccupationNameFromInput(getInputValue("characterOccupation")),
-            creditRating: readEditorCreditRating(),
-            attributes: readAttributes(),
-            skills: readChecklistSkills()
-        });
-        hydrateSkillChecklist(autoAllocateOccupationSkills(card).skills);
-        refreshEditorRuleSummary();
-    }
-
     function resolveEditorPlayerId(existing?: COC7CharacterCard): string {
         const boundDisplayValue = getInputValue("characterBoundPlayer").trim();
         if (isCurrentUserElevated()) {
@@ -3734,22 +3710,6 @@ interface Window {
         }
     }
 
-    function formatSkills(skills: COC7Skill[]): string {
-        return skills.map((skill) => `${skill.name}:${skill.value}:${skill.category}`).join("；");
-    }
-
-    function parseSkills(raw: string): COC7Skill[] {
-        return raw.split(/[;\n；]+/).map((line) => line.trim()).filter(Boolean).map((line) => {
-            const [name, value, category] = line.split(/[:：]/).map((part) => part.trim());
-            return { id: slugify(name || ""), name: name || "未命名技能", base: 0, value: clampNumber(value, 0, 99, 0), category: category || "知识", checked: false };
-        });
-    }
-
-    function mergeManualSkills(base: COC7Skill[], manual: COC7Skill[]): COC7Skill[] {
-        const ids = new Set(base.map((skill) => skill.id));
-        return [...base, ...manual.filter((skill) => !ids.has(skill.id))];
-    }
-
     function formatEquipment(equipment: COC7EquipmentItem[]): string {
         return equipment.map((item) => `${item.name}:${item.quantity}:${item.weight}:${item.notes || ""}`).join("；");
     }
@@ -3883,13 +3843,6 @@ interface Window {
             const experience = row.querySelector<HTMLTextAreaElement>("[data-scenario-experience]")?.value.trim() || "";
             return { name, experience };
         }).filter((item) => item.name || item.experience);
-    }
-
-    function parseRelationships(raw: string): COC7Relationship[] {
-        return raw.split(/[;\n；]+/).map((line) => line.trim()).filter(Boolean).map((line) => {
-            const [name, description] = line.split(/[:：]/).map((part) => part.trim());
-            return { name: name || "未命名关系", description: description || "", player: "" };
-        });
     }
 
     function isRecord(value: unknown): value is Record<string, unknown> {

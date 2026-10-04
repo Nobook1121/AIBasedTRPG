@@ -20,6 +20,12 @@ interface MarkedParser {
 
 declare const marked: MarkedParser;
 
+interface DomPurifySanitizer {
+    sanitize(dirty: string, config?: Record<string, unknown>): string;
+}
+
+declare const DOMPurify: DomPurifySanitizer;
+
 interface SocketLike {
     connected: boolean;
     on(eventName: string, handler: (payload: unknown) => void): void;

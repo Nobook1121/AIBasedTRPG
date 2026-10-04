@@ -111,6 +111,7 @@ class UserDatabase:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         connection = sqlite3.connect(self.path)
         connection.row_factory = sqlite3.Row
+        # SQLite 默认关闭外键约束，需显式开启以保证关联表数据一致性。
         connection.execute("PRAGMA foreign_keys = ON")
         return connection
 

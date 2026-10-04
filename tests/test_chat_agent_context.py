@@ -4,15 +4,11 @@ from types import SimpleNamespace
 from flask import Flask, session
 
 from trpg_server.routes.chat import (
-    _build_messages,
     _build_knowledge_usage,
     _can_start_scenario,
-    _compact_history_entries,
     _compact_history_with_ai,
-    _get_debug_kp_prompt_file,
     _load_debug_kp_prompt,
     _format_user_content,
-    _history_filename,
     _history_needs_compaction,
     _is_compact_command,
     _post_ai_request,
@@ -21,6 +17,13 @@ from trpg_server.routes.chat import (
     _strip_compact_command,
     _mark_scenario_started,
     _profile_for_request,
+)
+from trpg_server.routes.chat import bp as chat_blueprint
+from trpg_server.routes.chat_helpers import (
+    _build_messages,
+    _compact_history_entries,
+    _get_debug_kp_prompt_file,
+    _history_filename,
 )
 from trpg_server.agents.profiles import AgentProfile
 from trpg_server.routes.characters import _runtime_to_test_character, _test_character_to_runtime
@@ -35,6 +38,17 @@ def test_chat_blocks_kp_self_start_until_scenario_started():
     assert 'agent_profile.id == "kp" and room_id and not scenario_start' in source
     assert 'not _start_gate_info.get("scenario_started_at")' in source
     assert "本房间剧本尚未开始" in source
+
+
+def test_chat_blueprint_registers_http_routes():
+    # 拆分 chat.py 时若漏掉 @bp.route 装饰器，路由会静默消失（无测试覆盖），
+    # 因此显式校验三个入口都已注册。
+    app = Flask(__name__)
+    app.register_blueprint(chat_blueprint)
+    rules = {str(rule) for rule in app.url_map.iter_rules()}
+    assert "/api/chat" in rules
+    assert "/api/messages" in rules
+    assert "/api/scenarios/<int:script_id>/messages" in rules
 
 
 def test_history_filename_is_room_scoped_when_room_is_available():
@@ -312,7 +326,8 @@ def test_post_ai_request_logs_full_request_and_response_payload(monkeypatch, cap
     monkeypatch.setattr("trpg_server.routes.chat.requests.post", fake_post)
     caplog.set_level("INFO", logger="trpg_server.routes.chat")
 
-    requester = _post_ai_request("https://example.test/chat", {"Authorization": "Bearer secret"})
+    # 完整请求/响应日志只在 debug 模式下输出（问题 5），因此测试显式开启。
+    requester = _post_ai_request("https://example.test/chat", {"Authorization": "Bearer secret"}, debug=True)
     response = requester({"model": "model-a", "messages": [{"role": "system", "content": "系统提示"}]})
 
     assert response["choices"][0]["message"]["content"] == "完整回复"
@@ -361,7 +376,7 @@ def test_post_ai_request_retries_json_object_when_provider_requires_json(monkeyp
     assert "retry" in "\n".join(record.getMessage() for record in caplog.records).lower()
 
 
-def test_room_message_logs_display_name_without_content(monkeypatch, caplog):
+def test_room_message_logs_display_name_without_content(monkeypatch, caplog, tmp_path):
     room_info = {
         "members": [
             {
@@ -375,6 +390,7 @@ def test_room_message_logs_display_name_without_content(monkeypatch, caplog):
     messages = []
 
     import trpg_server.routes.rooms as rooms_routes
+    from trpg_server import logging_config
 
     def write_messages(room_dir, saved):
         messages[:] = saved
@@ -384,6 +400,10 @@ def test_room_message_logs_display_name_without_content(monkeypatch, caplog):
     monkeypatch.setattr(rooms_routes, "_write_messages", write_messages)
     monkeypatch.setattr(rooms_routes, "_write_room", lambda room_dir, info: None)
     caplog.set_level("INFO", logger="trpg_server.routes.rooms")
+    # 锁定日志语言：指向空的配置目录即回落到默认语言（英文），
+    # 否则会受其他测试残留的配置目录影响。
+    monkeypatch.setattr(logging_config, "_log_config_dir", tmp_path)
+    monkeypatch.setattr(logging_config, "_language_cache", None)
 
     app = Flask(__name__)
     app.secret_key = "test"
@@ -401,10 +421,10 @@ def test_room_message_logs_display_name_without_content(monkeypatch, caplog):
     log_text = "\n".join(record.getMessage() for record in caplog.records)
     # 房间消息日志与其他房间接口一致：只记录操作者与结构化元数据，不记录聊天正文
     assert "alice" in log_text
-    assert "发送了房间消息" in log_text
-    assert "用户ID" in log_text
-    assert "房间ID" in log_text
-    assert "内容长度" in log_text
+    assert "sent a room message" in log_text
+    assert "user ID" in log_text
+    assert "room ID" in log_text
+    assert "content length" in log_text
     assert "hello from player" not in log_text
 
 

@@ -61,6 +61,7 @@ def find_available_port(start_port, max_attempts=PORT_RETRY_COUNT):
 
 def get_local_ip():
     try:
+        # 用 UDP connect 让内核选出默认出口网卡以获取本机对外 IP；UDP 无握手，不会真正发包。
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.connect(("8.8.8.8", 80))
         local_ip = sock.getsockname()[0]

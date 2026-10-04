@@ -1,15 +1,18 @@
 import json
 import logging
 import re
+import shutil
+import time
 
 import requests
 from flask import Blueprint, current_app, request, session
 
-from trpg_server.ai_platform_config import load_platform_config, save_platform_config
+from trpg_server.ai_capabilities import chat_completions_endpoint, probe_responses_api
+from trpg_server.ai_platform_config import load_platform_config, load_public_platform_config, save_platform_config
 from trpg_server.json_store import write_json_atomic
 from trpg_server.logging_config import log_user_action, user_action_text
 from trpg_server.permission_config import load_permission_config, permission_config_path, save_permission_config
-from trpg_server.responses import error_response, success_response
+from trpg_server.responses import error_response, server_error, success_response
 from trpg_server.role_config import enabled_provider_options, load_roles, save_role
 from trpg_server.security import require_permission_node, safe_join
 from trpg_server.settings import AI_PLATFORM_SECRET_DIR, CONFIG_DIR
@@ -151,7 +154,7 @@ def save_config(config_name):
         return success_response(message="Config saved successfully")
     except Exception as exc:
         logger.exception("Failed to save config: %s", config_name)
-        return error_response(f"Save failed: {exc}", 500)
+        return server_error("Save failed")
 
 
 @bp.route("/api/config/permissions", methods=["GET"])
@@ -161,7 +164,7 @@ def get_permission_config():
         return success_response(data=load_permission_config(_get_permission_config_file()))
     except Exception as exc:
         logger.exception("Failed to load permission config")
-        return error_response(f"Load failed: {exc}", 500)
+        return server_error("Load failed")
 
 
 @bp.route("/api/config/permissions", methods=["POST"])
@@ -181,7 +184,45 @@ def save_permissions():
         return success_response(message="Permission config saved successfully", data=config)
     except Exception as exc:
         logger.exception("Failed to save permission config")
-        return error_response(f"Save failed: {exc}", 500)
+        return server_error("Save failed")
+
+
+@bp.route("/api/config/aiplatform", methods=["GET"])
+@require_permission_node("settings.ai_models")
+def list_ai_platform_configs():
+    """列出磁盘上的全部 AI 平台配置（内置 + 自定义）。
+
+    只回传公开配置：``load_public_platform_config`` 会把 ``api_key`` 拆分到独立
+    secret 目录并把它从返回结果里剔除，避免密钥经此接口明文回传。
+    """
+    try:
+        platform_dir = _get_ai_platform_dir()
+        secret_dir = _get_ai_platform_secret_dir()
+        platforms = []
+        # 平台目录里还放着 default-request.json（模型请求模板），它不是平台配置，跳过。
+        for public_path in sorted(platform_dir.glob("*.json")):
+            if public_path.name == "default-request.json":
+                continue
+            try:
+                config = load_public_platform_config(public_path, secret_dir / public_path.name)
+            except (OSError, ValueError, json.JSONDecodeError):
+                logger.exception("Failed to load AI platform config: %s", public_path.name)
+                continue
+            if not isinstance(config, dict):
+                continue
+            config.setdefault("platform", public_path.stem)
+            platforms.append(config)
+
+        log_user_action(
+            logger,
+            user_action_text(session.get("username"), "查看了 AI 平台列表"),
+            用户ID=session.get("user_id"),
+            平台数=len(platforms),
+        )
+        return success_response(data={"platforms": platforms})
+    except Exception as exc:
+        logger.exception("Failed to list AI platform configs")
+        return server_error("Load failed")
 
 
 @bp.route("/api/config/aiplatform/<platform>", methods=["POST"])
@@ -205,7 +246,39 @@ def save_ai_platform_config(platform):
         return success_response(message="Config saved successfully")
     except Exception as exc:
         logger.exception("Failed to save AI platform config: %s", platform)
-        return error_response(f"Save failed: {exc}", 500)
+        return server_error("Save failed")
+
+
+@bp.route("/api/config/aiplatform/<platform>", methods=["DELETE"])
+@require_permission_node("settings.ai_models")
+def delete_ai_platform_config(platform):
+    """删除平台配置、对应 secret 及其模型请求模板目录。"""
+    try:
+        config_path = safe_join(_get_ai_platform_dir(), f"{platform}.json")
+        secret_path = safe_join(_get_ai_platform_secret_dir(), f"{platform}.json")
+        model_dir = safe_join(_get_ai_model_dir(), platform)
+
+        removed = False
+        for path in (config_path, secret_path):
+            if path.exists():
+                path.unlink()
+                removed = True
+        if model_dir.exists() and model_dir.is_dir():
+            shutil.rmtree(model_dir)
+            removed = True
+        if not removed:
+            logger.info("AI platform config already absent: %s", platform)
+
+        log_user_action(
+            logger,
+            user_action_text(session.get("username"), "删除了 AI 平台设置"),
+            用户ID=session.get("user_id"),
+            平台=platform,
+        )
+        return success_response(message="Config deleted successfully")
+    except Exception as exc:
+        logger.exception("Failed to delete AI platform config: %s", platform)
+        return server_error("Delete failed")
 
 
 @bp.route("/api/config/aiplatform/<platform>/test", methods=["POST"])
@@ -223,7 +296,7 @@ def test_ai_platform_api(platform):
 
         config = load_platform_config(config_path, secret_path)
         api_key = config.get("config", {}).get("api_key")
-        base_url = config.get("config", {}).get("base_url")
+        base_url = chat_completions_endpoint(config.get("config", {}).get("base_url"))
         if not base_url:
             return error_response("Base URL is not set", 400)
         if not api_key and platform == "lmstudio":
@@ -257,7 +330,59 @@ def test_ai_platform_api(platform):
         return success_response(message=None, response=response_data)
     except Exception as exc:
         logger.exception("Failed to test AI platform API: %s", platform)
-        return error_response(None, 500, str(exc))
+        return server_error()
+
+
+@bp.route("/api/config/aiplatform/<platform>/detect-responses", methods=["POST"])
+@require_permission_node("settings.ai_models")
+def detect_responses_api_support(platform):
+    """探测该平台是否支持 Responses API（previous_response_id），并把结论写入配置。
+
+    探测结论决定前端开关是否可用：不支持时一律关闭 ``use_previous_response_id``，
+    避免用户开启一条实际不可用的请求路径。
+    """
+    try:
+        config_path = safe_join(_get_ai_platform_dir(), f"{platform}.json")
+        secret_path = safe_join(_get_ai_platform_secret_dir(), f"{platform}.json")
+        if not config_path.exists():
+            return error_response("Platform config file does not exist", 404)
+
+        config = load_platform_config(config_path, secret_path)
+        config_section = config.get("config") if isinstance(config.get("config"), dict) else {}
+        api_key = config_section.get("api_key")
+        base_url = config_section.get("base_url")
+        if not base_url:
+            return error_response("Base URL is not set", 400)
+        if not api_key and platform == "lmstudio":
+            api_key = "lm-studio"
+
+        models = config.get("models") if isinstance(config.get("models"), list) else []
+        model = next((item for item in models if isinstance(item, dict) and item.get("enabled", True)), None)
+        model = model or (models[0] if models and isinstance(models[0], dict) else {})
+        model_id = str(model.get("id") or "")
+
+        result = probe_responses_api(base_url, api_key, model_id)
+        config_section.pop("api_key", None)
+        supported = bool(result.get("supported"))
+        config_section["responses_api_supported"] = supported
+        config_section["responses_api_checked_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+        config_section["responses_api_detail"] = str(result.get("detail") or "")
+        if not supported:
+            config_section["use_previous_response_id"] = False
+        config["config"] = config_section
+        save_platform_config(config_path, secret_path, config)
+
+        log_user_action(
+            logger,
+            user_action_text(session.get("username"), "探测了 AI 平台的 Responses API 支持"),
+            用户ID=session.get("user_id"),
+            平台=platform,
+            支持=supported,
+        )
+        return success_response(message=None, data=result)
+    except Exception as exc:
+        logger.exception("Failed to detect Responses API support: %s", platform)
+        return server_error("Detection failed")
 
 
 @bp.route("/api/config/aimodel/save", methods=["POST"])
@@ -299,7 +424,7 @@ def save_model_request_config():
         return success_response(message="Config saved successfully")
     except Exception as exc:
         logger.exception("Failed to save model request config")
-        return error_response(f"Save failed: {exc}", 500)
+        return server_error("Save failed")
 
 
 @bp.route("/api/config/system-prompt", methods=["GET"])
@@ -312,7 +437,7 @@ def get_system_prompt():
         return success_response(data={"content": prompt_path.read_text(encoding="utf-8")})
     except OSError as exc:
         logger.exception("Failed to load system prompt")
-        return error_response(f"Load failed: {exc}", 500)
+        return server_error("Load failed")
 
 
 @bp.route("/api/config/debug-prompt", methods=["GET"])
@@ -324,7 +449,7 @@ def get_debug_prompt():
         return success_response(data={"content": content})
     except OSError as exc:
         logger.exception("Failed to load debug prompt")
-        return error_response(f"Load failed: {exc}", 500)
+        return server_error("Load failed")
 
 
 @bp.route("/api/config/system-prompt", methods=["POST"])
@@ -353,7 +478,7 @@ def save_system_prompt():
         return success_response(message="System prompt saved successfully")
     except Exception as exc:
         logger.exception("Failed to save system prompt")
-        return error_response(f"Save failed: {exc}", 500)
+        return server_error("Save failed")
 
 
 @bp.route("/api/config/debug-prompt", methods=["POST"])
@@ -381,7 +506,7 @@ def save_debug_prompt():
         return success_response(message="Debug prompt saved successfully")
     except Exception as exc:
         logger.exception("Failed to save debug prompt")
-        return error_response(f"Save failed: {exc}", 500)
+        return server_error("Save failed")
 
 
 @bp.route("/api/config/roles", methods=["GET"])
@@ -393,7 +518,7 @@ def get_role_configs():
         return success_response(data={"roles": roles, "enabled_providers": providers})
     except Exception as exc:
         logger.exception("Failed to load role configs")
-        return error_response(f"Load failed: {exc}", 500)
+        return server_error("Load failed")
 
 
 @bp.route("/api/config/roles/<role_id>", methods=["POST"])
@@ -423,7 +548,7 @@ def save_role_config(role_id):
         return error_response(str(exc), 400)
     except Exception as exc:
         logger.exception("Failed to save role config: %s", role_id)
-        return error_response(f"Save failed: {exc}", 500)
+        return server_error("Save failed")
 
 
 @bp.route("/api/config/aimodel/delete", methods=["POST"])
@@ -466,4 +591,4 @@ def delete_model_request_config():
         return success_response(message="Config deleted successfully")
     except Exception as exc:
         logger.exception("Failed to delete model request config")
-        return error_response(f"Delete failed: {exc}", 500)
+        return server_error("Delete failed")

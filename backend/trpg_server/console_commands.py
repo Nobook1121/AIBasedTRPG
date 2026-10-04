@@ -138,13 +138,20 @@ def start_console_command_loop(
     def _loop() -> None:
         logger.info("Console command loop started. Type 'help' for commands.")
         while True:
-            try:
-                line = input("> ") if stream is None else stream.readline()
-            except (EOFError, OSError):
-                logger.info("Console command loop stopped.")
-                return
-            if line == "":
-                return
+            if stream is None:
+                # 交互式输入时空行只代表「按了回车」，不代表 EOF；只有 EOFError/OSError
+                # 才是输入结束。早期把空行当作结束条件，导致用户按一次回车后控制台循环
+                # 直接退出、看起来「失去响应」。
+                try:
+                    line = input("> ")
+                except (EOFError, OSError):
+                    logger.info("Console command loop stopped.")
+                    return
+            else:
+                line = stream.readline()
+                if line == "":
+                    logger.info("Console command loop stopped.")
+                    return
             command = line.strip()
             # The command itself logs its outcome; the loop must not log it a
             # second time (that produced a duplicate warning + error pair).

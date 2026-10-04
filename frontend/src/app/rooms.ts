@@ -1156,18 +1156,6 @@ async function promoteRoomMember(userId: string): Promise<void> {
     await enterRoom(response.data);
 }
 
-function renderCharacterRecordList(records: CharacterRuntimeRecord[]): string {
-    if (!records.length) return window.TrpgTemplates.render("room-record-empty");
-    const recordsHtml = records.map((record) => window.TrpgTemplates.render("room-record-item", {
-        typeLabel: record.type === "san" ? "San 损失" : "伤害",
-        value: record.value,
-        reason: record.reason || "未知",
-        createdAt: record.created_at || "-",
-        deleteButtonHtml: isElevatedUser() ? window.TrpgTemplates.render("room-record-delete-button", { recordId: record.id }) : "",
-    })).join("");
-    return window.TrpgTemplates.render("room-record-list", { recordsHtml });
-}
-
 async function submitCharacterRecord(): Promise<void> {
     return runRoomAction("submit-character-record", "submitCharacterRecord", async () => {
         await submitCharacterRecordUnlocked();
@@ -1214,16 +1202,6 @@ async function recordCharacterChange(payload: CharacterRecordPayload): Promise<u
     setText("recordToolResult", "记录已保存");
     if (currentRoom?.name === roomName && currentRoom.id) await openRoomDetail(currentRoom.id);
     return data.data || null;
-}
-
-async function deleteCharacterRecord(recordId: string): Promise<void> {
-    if (!currentRoom?.id || !recordId) return;
-    const data = await TrpgApi.del<ApiResponse>(`/api/rooms/${currentRoom.id}/character-records/${recordId}`);
-    if (!data.success) {
-        showNotification(data.message || data.error || "删除记录失败", "error");
-        return;
-    }
-    await openRoomDetail(currentRoom.id);
 }
 
 function updateHomeRoomMeta(): void {
@@ -1484,15 +1462,6 @@ function setRoomButtonBusy(buttonId: string, busy: boolean): void {
 function setDisplay(id: string, value: string): void {
     const element = document.getElementById(id) as HTMLElement | null;
     if (element) element.style.display = value;
-}
-
-function roomEscapeHtml(value: unknown): string {
-    return String(value ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
 }
 
 function roomErrorMessage(error: unknown): string {

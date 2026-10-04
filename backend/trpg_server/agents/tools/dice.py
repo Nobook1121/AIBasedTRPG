@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from trpg_server.agents.tools.base import AgentTool
+from trpg_server.agents.tools.trigger import reveal_trigger_after_check
 from trpg_server.json_store import read_json, write_json_atomic
 from trpg_server.settings import CONFIG_DIR
 
@@ -251,6 +252,27 @@ def _resolve_check_display_name(card: dict[str, Any], check_name: str) -> str:
 def _result_message(summary: str, tool_name: str, **metadata: Any) -> dict[str, Any]:
     return {"type": "dice", "sender_name": "骰娘", "avatar": "/assets/avatars/default_dice.jpg", "content": summary, "metadata": {"tool_name": tool_name, **metadata}}
 
+
+def _attach_trigger_reveal(result: dict[str, Any], arguments: dict[str, Any], context: Any) -> dict[str, Any]:
+    """检定工具的可选能力：同一轮内揭示与该检定绑定的触发器。
+
+    模型确认触发器 id 后，可把它随检定一起传入（``trigger_id``），工具按自己的
+    检定结果决定是否揭示，省掉「先检定、再单独调用触发器工具」中间那次 AI 往返。
+    未传 ``trigger_id`` 时原样返回，既有行为完全不变。
+    """
+    trigger_id = arguments.get("trigger_id")
+    if trigger_id in (None, ""):
+        return result
+    revealed = reveal_trigger_after_check(trigger_id, bool(result.get("success")), context)
+    if isinstance(revealed.get("direct_message"), dict):
+        result["direct_message"] = revealed["direct_message"]
+    if revealed.get("error"):
+        result["trigger_error"] = revealed["error"]
+    elif not revealed.get("triggered"):
+        result["trigger_note"] = revealed.get("message")
+    return result
+
+
 def roll_coc_check(arguments: dict[str, Any], rng: Callable[[int], int] | None = None) -> dict[str, Any]:
     roller = rng or (lambda sides: random.randint(1, sides)); target = _as_int(arguments.get("target"))
     if target < 1 or target > 100: return {"error": "target must be between 1 and 100"}
@@ -270,7 +292,8 @@ def roll_coc_check(arguments: dict[str, Any], rng: Callable[[int], int] | None =
     if candidates: summary += f" {'奖励骰' if bonus_dice else '惩罚骰'}（{', '.join(map(str, candidates))}），取{roll}。"
     if reason: summary += f" 原因：{reason}。"
     return {"skill": skill, "reason": reason, "roll": roll, "rolls": candidates or [roll], "target": target, "difficulty": difficulty, "threshold": threshold, "adjustment": modifier, "bonus_dice": bonus_dice, "penalty_dice": penalty_dice, "success": success, "success_level": level if success else "failure", "raw_success_level": level, "critical": level == "critical", "fumble": level == "fumble", "critical_threshold": critical_threshold, "fumble_threshold": fumble_threshold, "summary": summary, "visible_message": _result_message(summary, "dice.roll_coc_check", check_type="coc")}
-def execute_roll_coc_check(arguments: dict[str, Any], context: Any) -> dict[str, Any]: return roll_coc_check(_merge_context_thresholds(arguments, context))
+def execute_roll_coc_check(arguments: dict[str, Any], context: Any) -> dict[str, Any]:
+    return _attach_trigger_reveal(roll_coc_check(_merge_context_thresholds(arguments, context)), arguments, context)
 
 def roll_room_check(arguments: dict[str, Any], context: Any, rng: Callable[[int], int] | None = None) -> dict[str, Any]:
     player_name = str(arguments.get("player_name") or arguments.get("playerName") or "").strip(); check_name = str(arguments.get("name") or arguments.get("skill") or "").strip()
@@ -302,8 +325,9 @@ def roll_room_check(arguments: dict[str, Any], context: Any, rng: Callable[[int]
     summary = _format_room_check_summary(display_name, difficulty, roll, threshold, success) + _level_suffix(level)
     modifier = str(arguments.get("adjustment", arguments.get("correction")) or "").strip()
     if candidates: summary += f" {'奖励骰' if bonus_dice else '惩罚骰'}（{', '.join(map(str, candidates))}），取{roll}。"
-    return {"player_name": player_name, "character_name": card.get("name"), "name": display_name, "roll": roll, "rolls": candidates or [roll], "base_target": base_target, "target": threshold, "difficulty": difficulty, "difficulty_label": DIFFICULTY_LABELS[difficulty], "adjustment": modifier, "bonus_dice": bonus_dice, "penalty_dice": penalty_dice, "threshold": threshold, "success": success, "success_level": level if success else "failure", "raw_success_level": level, "critical": level == "critical", "fumble": level == "fumble", "critical_threshold": critical_threshold, "fumble_threshold": fumble_threshold, "summary": summary, "visible_message": _result_message(summary, "check.roll_room_check", check_type="room", player_name=player_name, name=display_name)}
-def execute_roll_room_check(arguments: dict[str, Any], context: Any) -> dict[str, Any]: return roll_room_check(arguments, context)
+    return {"player_name": player_name, "character_name": card.get("name"), "name": display_name, "roll": roll, "rolls": candidates or [roll], "base_target": base_target, "target": threshold, "difficulty": difficulty, "difficulty_label": DIFFICULTY_LABELS[difficulty], "adjustment": modifier, "bonus_dice": bonus_dice, "penalty_dice": penalty_dice, "success": success, "success_level": level if success else "failure", "raw_success_level": level, "critical": level == "critical", "fumble": level == "fumble", "critical_threshold": critical_threshold, "fumble_threshold": fumble_threshold, "summary": summary, "visible_message": _result_message(summary, "check.roll_room_check", check_type="room", player_name=player_name, name=display_name)}
+def execute_roll_room_check(arguments: dict[str, Any], context: Any) -> dict[str, Any]:
+    return _attach_trigger_reveal(roll_room_check(arguments, context), arguments, context)
 
 def _roll_sanity_value(expression: Any, roller: Callable[[int], int]) -> tuple[int, list[int]]:
     text = str(expression or "0").strip()
@@ -371,8 +395,8 @@ def roll_dice(arguments: dict[str, Any], rng: Callable[[int], int] | None = None
     return result
 def execute_roll_dice(arguments: dict[str, Any], context: Any) -> dict[str, Any]: return roll_dice(arguments)
 
-ROLL_COC_CHECK_TOOL = AgentTool(name="dice.roll_coc_check", description="Roll a real backend COC7 percentile check. The result reports whether it is a critical success or fumble. Uses the room's configured critical/fumble thresholds unless overridden by arguments.", parameters={"type": "object", "properties": {"character_name": {"type": "string"}, "skill": {"type": "string"}, "target": {"type": "integer", "minimum": 1, "maximum": 100}, "difficulty": {"type": "string"}, "adjustment": {"type": "string"}, "correction": {"type": "string"}, "bonus_dice": {"type": "integer", "minimum": 0, "maximum": 10}, "penalty_dice": {"type": "integer", "minimum": 0, "maximum": 10}, "critical_threshold": {"type": "integer", "minimum": 0, "maximum": 100}, "fumble_threshold": {"type": "integer", "minimum": 0, "maximum": 100}, "reason": {"type": "string"}}, "required": ["skill", "target"]}, handler=execute_roll_coc_check)
-ROLL_ROOM_CHECK_TOOL = AgentTool(name="check.roll_room_check", description="Resolve a current-room player's character card and roll a COC check. The result reports whether it is a critical success or fumble. Uses the room's configured critical/fumble thresholds unless overridden by arguments.", parameters={"type": "object", "properties": {"player_name": {"type": "string"}, "name": {"type": "string"}, "difficulty": {"type": "string"}, "adjustment": {"type": "string"}, "correction": {"type": "string"}, "bonus_dice": {"type": "integer", "minimum": 0, "maximum": 10}, "penalty_dice": {"type": "integer", "minimum": 0, "maximum": 10}, "critical_threshold": {"type": "integer", "minimum": 0, "maximum": 100}, "fumble_threshold": {"type": "integer", "minimum": 0, "maximum": 100}}, "required": ["player_name", "name"]}, handler=execute_roll_room_check)
+ROLL_COC_CHECK_TOOL = AgentTool(name="dice.roll_coc_check", description="Roll a real backend COC7 percentile check. The result reports whether it is a critical success or fumble. Uses the room's configured critical/fumble thresholds unless overridden by arguments.", parameters={"type": "object", "properties": {"character_name": {"type": "string"}, "skill": {"type": "string"}, "target": {"type": "integer", "minimum": 1, "maximum": 100}, "difficulty": {"type": "string"}, "adjustment": {"type": "string"}, "correction": {"type": "string"}, "bonus_dice": {"type": "integer", "minimum": 0, "maximum": 10}, "penalty_dice": {"type": "integer", "minimum": 0, "maximum": 10}, "critical_threshold": {"type": "integer", "minimum": 0, "maximum": 100}, "fumble_threshold": {"type": "integer", "minimum": 0, "maximum": 100}, "reason": {"type": "string"}, "trigger_id": {"type": ["integer", "string"], "description": "Optional. When this check gates a scenario trigger, pass the trigger id so the trigger content is revealed in the same round if the check succeeds. Do not pass it when the trigger condition is not tied to this check."}}, "required": ["skill", "target"]}, handler=execute_roll_coc_check)
+ROLL_ROOM_CHECK_TOOL = AgentTool(name="check.roll_room_check", description="Resolve a current-room player's character card and roll a COC check. The result reports whether it is a critical success or fumble. Uses the room's configured critical/fumble thresholds unless overridden by arguments.", parameters={"type": "object", "properties": {"player_name": {"type": "string"}, "name": {"type": "string"}, "difficulty": {"type": "string"}, "adjustment": {"type": "string"}, "correction": {"type": "string"}, "bonus_dice": {"type": "integer", "minimum": 0, "maximum": 10}, "penalty_dice": {"type": "integer", "minimum": 0, "maximum": 10}, "critical_threshold": {"type": "integer", "minimum": 0, "maximum": 100}, "fumble_threshold": {"type": "integer", "minimum": 0, "maximum": 100}, "trigger_id": {"type": ["integer", "string"], "description": "Optional. When this check gates a scenario trigger, pass the trigger id so the trigger content is revealed in the same round if the check succeeds. Do not pass it when the trigger condition is not tied to this check."}}, "required": ["player_name", "name"]}, handler=execute_roll_room_check)
 ROLL_SANITY_CHECK_TOOL = AgentTool(name="san.roll_sanity_check", description="Roll a player's SAN check and apply success/failure sanity change directly to the room character state.", parameters={"type": "object", "properties": {"player_name": {"type": "string"}, "san_change": {"type": "string", "description": "Success/failure change, e.g. 1d4/1d6 or +1d4/-1d6"}}, "required": ["player_name", "san_change"]}, handler=execute_roll_sanity_check)
 ROLL_SANITY_CHECK_ALIAS_TOOL = AgentTool(name="sanity.roll_sanity_check", description=ROLL_SANITY_CHECK_TOOL.description, parameters=ROLL_SANITY_CHECK_TOOL.parameters, handler=execute_roll_sanity_check)
 ROLL_DICE_TOOL = AgentTool(name="dice.roll", description="Roll generic dice such as 1d100. Set dark=true for a secret roll.", parameters={"type": "object", "properties": {"expression": {"type": "string"}, "dark": {"type": "boolean"}}, "required": ["expression"]}, handler=execute_roll_dice)

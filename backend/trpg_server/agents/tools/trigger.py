@@ -160,6 +160,27 @@ def reveal_scenario_trigger(arguments: dict[str, Any], context: Any) -> dict[str
     }
 
 
+def reveal_trigger_after_check(trigger_id: Any, success: bool, context: Any) -> dict[str, Any]:
+    """在检定完成的同一轮内按检定结果揭示触发器。
+
+    检定工具可选的 ``trigger_id`` 参数会走到这里：复用 :func:`reveal_scenario_trigger`
+    的全部条件/版本/可见性/剧透校验，并强制以工具自身算出的 ``success`` 作为
+    ``condition_met``，模型无法改写判定。检定失败时不显示内容，与 kp.md 一致。
+    """
+    if not success:
+        return {
+            "triggered": False,
+            "trigger_id": str(trigger_id),
+            "message": "check failed; trigger content withheld",
+        }
+    tool_state = getattr(context, "tool_state", None)
+    if isinstance(tool_state, dict):
+        # reveal_scenario_trigger 会校验「前一次检定」的存在与结果；同轮合并时先写入，
+        # 使语义与原先「先检定、再单独调用触发器工具」完全等价。
+        tool_state["last_check"] = {"success": True}
+    return reveal_scenario_trigger({"trigger_id": trigger_id, "condition_met": True}, context)
+
+
 REVEAL_SCENARIO_TRIGGER_TOOL = AgentTool(
     name="trigger.reveal_scenario_trigger",
     description=(

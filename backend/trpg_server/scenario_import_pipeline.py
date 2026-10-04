@@ -282,12 +282,17 @@ class ScenarioImportPipeline:
             self.store.save_intermediate(job_id, "knowledge", [chunk.to_dict() for chunk in knowledge_chunks])
 
             metadata = job.get("metadata") or {}
+            try:
+                player_count = int(str(metadata.get("playerCount") or "").strip() or "1")
+            except ValueError:
+                player_count = 1
             scenario: dict[str, Any] = {
                 "id": job.get("script_id"),
                 "scenario_version": scenario_version,
                 "title": metadata.get("title") or Path(job["source_filename"]).stem,
                 "author": metadata.get("author") or "Imported",
-                "playerCount": 1,
+                "creator_username": metadata.get("creator") or "",
+                "playerCount": max(1, player_count),
                 "notes": metadata.get("description") or "",
                 # 直接导入不生成可编辑场景卡，知识以向量块形式保存。
                 "modules": [],

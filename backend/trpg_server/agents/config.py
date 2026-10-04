@@ -71,6 +71,19 @@ def _unquote_toml_name(raw: str) -> str:
     return text
 
 
+def ai_debug_enabled(config_dir: str | Path | None = None) -> bool:
+    """是否开启 AI 调试模式。
+
+    完整 AI 请求/响应会包含整段提示词与模型输出，只有显式开启调试模式时才写日志，
+    避免正常运行（尤其是大剧本导入）把日志刷满。
+    """
+    if config_dir is None:
+        from trpg_server.settings import CONFIG_DIR
+
+        config_dir = CONFIG_DIR
+    return load_ai_runtime_config(Path(config_dir)).debug_mode
+
+
 def load_ai_runtime_config(config_dir: Path) -> AIRuntimeConfig:
     general_file = Path(config_dir) / "general.toml"
     if not general_file.exists():

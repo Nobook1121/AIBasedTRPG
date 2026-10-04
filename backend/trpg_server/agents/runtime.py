@@ -9,6 +9,62 @@ from trpg_server.agents.tools.base import ToolRegistry
 
 logger = logging.getLogger(__name__)
 
+# 仅供前端展示、不参与模型推理的字段。这些字段会在工具结果回传给模型前被剥离：
+# 它们本身是 UI 载体（骰娘消息、直接消息），塞进 role="tool" 只会让后续每一轮
+# prompt 重复计入同样的内容，白白放大输入 token。
+UI_ONLY_TOOL_RESULT_KEYS = frozenset({"visible_message", "direct_message"})
+
+# 各厂商 usage 的字段结构差异很大（尤其是缓存字段）。首次遇到一种新结构时打一条完整
+# 原文，方便直接确认平台到底有没有上报缓存信息；相同结构不再重复打印，避免刷屏。
+_usage_shapes_logged: set[tuple[str, ...]] = set()
+
+
+def _log_usage_shape(usage: dict[str, Any]) -> None:
+    shape = tuple(sorted(str(key) for key in usage))
+    if not shape or shape in _usage_shapes_logged:
+        return
+    _usage_shapes_logged.add(shape)
+    logger.info("AI usage fields from provider: %s", json.dumps(usage, ensure_ascii=False))
+
+
+# 只有这些工具的结果才允许折叠：它们是大块、且随时可以重新获取的房间/剧本数据。
+# 检定、掷骰、理智、触发器、知识检索、记忆写入等结果会影响叙事判断与状态推进，
+# 永远保留原文——省 token 不能以 KP 忽略检定结果或凭空编造内容为代价。
+FOLDABLE_TOOL_NAMES = frozenset(
+    {
+        "room.get_room_snapshot",
+        "room.get_character_cards",
+        "room.get_scenario_context",
+        "room.get_scenario_module",
+        "room.get_memory",
+    }
+)
+# 最近 N 条工具结果始终保留原文，避免刚拿到的数据马上被折叠掉。
+TOOL_RESULT_KEEP_RECENT = 2
+FOLDED_TOOL_RESULT_NOTICE = (
+    '{"folded": true, "note": "较早的工具结果已折叠以节省上下文，不代表当前状态；'
+    '如需该数据请重新调用该工具。"}'
+)
+
+
+def _fold_stale_tool_results(messages: list[dict[str, Any]]) -> None:
+    """就地折叠较早的「可重取」工具结果，减少后续每一轮的重复输入。
+
+    只处理 ``FOLDABLE_TOOL_NAMES``，并保留最近 ``TOOL_RESULT_KEEP_RECENT`` 条原文；
+    折叠后的内容是一条明确的占位提示，模型据此知道数据已被移除、可重新获取，
+    不会把缺失的数据当成"没有"而编造。
+    """
+    foldable_indexes = [
+        index
+        for index, message in enumerate(messages)
+        if message.get("role") == "tool" and str(message.get("name") or "") in FOLDABLE_TOOL_NAMES
+    ]
+    stale_count = len(foldable_indexes) - TOOL_RESULT_KEEP_RECENT
+    for index in foldable_indexes[: max(0, stale_count)]:
+        message = messages[index]
+        if str(message.get("content") or "") != FOLDED_TOOL_RESULT_NOTICE:
+            message["content"] = FOLDED_TOOL_RESULT_NOTICE
+
 
 @dataclass(frozen=True)
 class AgentCompletionResult:
@@ -46,17 +102,42 @@ def _extract_token_count(response_data: dict[str, Any]) -> int | None:
     return None
 
 
+def _as_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _extract_usage_counts(response_data: dict[str, Any] | None) -> tuple[int | None, int | None, int | None]:
+    """解析单次响应的 (prompt, completion, cached) token。
+
+    各厂商的缓存字段命名不统一，这里逐个探测而不是用 ``or`` 串起来：
+    ``or`` 会把合法的 ``0`` 当成"没有值"而穿透到下一个字段，导致命中数被误读为别的值。
+    """
     usage = (response_data or {}).get("usage") or {}
-    prompt = usage.get("prompt_tokens")
-    completion = usage.get("completion_tokens")
     details = usage.get("prompt_tokens_details") or usage.get("input_tokens_details") or {}
-    cached = usage.get("cached_tokens") or details.get("cached_tokens") or details.get("cache_read_input_tokens")
-    return (
-        int(prompt) if prompt is not None else None,
-        int(completion) if completion is not None else None,
-        int(cached) if cached is not None else None,
-    )
+    prompt = _as_int(usage.get("prompt_tokens"))
+    cached = None
+    for candidate in (
+        details.get("cached_tokens"),
+        usage.get("cached_tokens"),
+        usage.get("prompt_cache_hit_tokens"),  # DeepSeek 及部分兼容端点
+        details.get("cache_read_input_tokens"),  # Anthropic 风格
+        usage.get("cache_read_input_tokens"),
+    ):
+        cached = _as_int(candidate)
+        if cached is not None:
+            break
+    if prompt is None:
+        # 少数端点只给命中/未命中拆分，没有 prompt_tokens，需要自己还原。
+        hit = _as_int(usage.get("prompt_cache_hit_tokens"))
+        miss = _as_int(usage.get("prompt_cache_miss_tokens"))
+        if hit is not None or miss is not None:
+            prompt = (hit or 0) + (miss or 0)
+    return (prompt, _as_int(usage.get("completion_tokens")), cached)
 
 
 def _parse_arguments(raw_arguments: str | dict[str, Any] | None) -> dict[str, Any]:
@@ -183,6 +264,9 @@ def run_agent_completion(
         nonlocal cached_token_count, has_cached_count
         if not isinstance(response_data, dict):
             return
+        usage = response_data.get("usage")
+        if isinstance(usage, dict):
+            _log_usage_shape(usage)
         round_token_count = _extract_token_count(response_data)
         round_prompt, round_completion, round_cached = _extract_usage_counts(response_data)
         if round_prompt is not None:
@@ -201,6 +285,7 @@ def run_agent_completion(
     for _round in range(max_tool_rounds + 1):
         if isinstance(tool_state, dict):
             tool_state["agent_request_rounds"] = _round + 1
+        _fold_stale_tool_results(messages)
         if callable(stage_callback):
             stage_callback("ai_request", "正在请求 AI")
         try:
@@ -303,7 +388,14 @@ def run_agent_completion(
             if isinstance(result, dict) and isinstance(result.get("visible_message"), dict):
                 tool_messages.append(result["visible_message"])
 
-            result_payload, _ = _truncate_tool_result(result, max_tool_result_chars)
+            # UI 载体字段（visible_message / direct_message）已经收集到 tool_messages /
+            # direct_messages 里，回传模型时剥离，避免多轮工具调用重复计入 token。
+            model_result = result
+            if isinstance(result, dict):
+                model_result = {
+                    key: value for key, value in result.items() if key not in UI_ONLY_TOOL_RESULT_KEYS
+                }
+            result_payload, _ = _truncate_tool_result(model_result, max_tool_result_chars)
             messages.append(
                 {
                     "role": "tool",
@@ -328,6 +420,7 @@ def run_agent_completion(
             ),
         },
     ]
+    _fold_stale_tool_results(messages)
     if callable(stage_callback):
         stage_callback("ai_request", "正在请求 AI")
     try:

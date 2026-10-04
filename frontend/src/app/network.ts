@@ -39,6 +39,7 @@ async function initNetworkConfig(): Promise<void> {
         });
     }
 
+    // 网络状态面板每 5 秒静默刷新一次，失败只在控制台记录，不打扰用户。
     setInterval(() => {
         void updateNetworkStatus();
     }, 5000);

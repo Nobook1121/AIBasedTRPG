@@ -293,12 +293,12 @@ async function sendToAI(chatInput: HTMLInputElement, sendButton: HTMLButtonEleme
             },
         });
         if (!response.ok) {
-            throw new Error(data.message || `API 请求失败: ${response.status}`);
+            throw new Error(data.message || chatT("chat.error.api", "API 请求失败: {status}", { status: response.status }));
         }
 
         const processingTime = Math.round((Date.now() - startTime) / 1000);
         const tokenCount = data.token_count ?? null;
-        const messageContent = data.content || data.error || "AI 回复失败: 未知错误";
+        const messageContent = data.content || data.error || chatT("chat.error.unknown", "AI 回复失败: 未知错误");
 
         pendingMessages = pendingMessages.slice(requestMessages.length);
         const toolMessages = data.tool_messages || [];
@@ -375,7 +375,7 @@ async function sendToAI(chatInput: HTMLInputElement, sendButton: HTMLButtonEleme
 
     } catch (error) {
         const processingTime = Math.round((Date.now() - startTime) / 1000);
-        replaceThinkingMessage(thinkingMessageId, `AI 回复失败: ${chatErrorMessage(error)}`, processingTime, null);
+        replaceThinkingMessage(thinkingMessageId, chatT("chat.error.reply", "AI 回复失败: {detail}", { detail: chatErrorMessage(error) }), processingTime, null);
         broadcastAIThinkingEnd(aiRequestId);
         clearPersistedThinkingState(aiRequestId);
         pendingMessages = [];
@@ -668,19 +668,26 @@ function findRoleForMessage(message: string): ChatRoleConfig | undefined {
     return aiRoles.find((role) => (role.wake_words || []).some((wakeWord) => trimmedMessage.startsWith(wakeWord)));
 }
 
-function setAIName(name: string): void {
-    aiName = name;
-    updateAIHint();
-}
+// 消息正文的净化策略：保留 Markdown 排版、图片与视频预览需要的标签，
+// 其余可承载脚本的标签一律剔除，所有 on* 事件属性由净化库默认拦截。
+// 说明：净化只作用于「显示」，消息原文仍原样入库并原样送入 AI，
+// 因此不会改变提示词注入的判定，也不会影响 KP 的正常输出。
+const CHAT_SANITIZE_CONFIG: Record<string, unknown> = {
+    FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "base", "meta", "link"],
+    ADD_ATTR: ["controls", "preload", "poster", "playsinline", "target", "rel", "loading"],
+};
 
 function renderMarkdown(content: string): string {
-    try {
-        const parser = window.marked;
-        if (parser) {
-            parser.setOptions({ breaks: true, gfm: true, headerIds: false, mangle: false });
-            return parser.parse(content);
-        }
+    const parser = window.marked;
+    const purifier = window.DOMPurify;
+    if (!parser || !purifier) {
+        // 渲染或净化组件不可用时降级为纯文本：宁可丢掉排版，也不放行未经净化的 HTML。
+        console.warn("Markdown 渲染或净化组件未就绪，消息以纯文本显示");
         return chatEscapeHtml(content);
+    }
+    try {
+        parser.setOptions({ breaks: true, gfm: true, headerIds: false, mangle: false });
+        return purifier.sanitize(parser.parse(content), CHAT_SANITIZE_CONFIG);
     } catch (error) {
         console.error("Markdown 渲染失败:", error);
         return chatEscapeHtml(content);
@@ -1509,6 +1516,11 @@ function chatEscapeHtml(value: unknown): string {
 
 function chatErrorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
+}
+
+/** 聊天框内的用户可见文案走 i18n；缺失时回退到中文原文。 */
+function chatT(key: string, fallback: string, values: Record<string, string | number> = {}): string {
+    return window.TrpgI18n?.t(key, fallback, values) || fallback;
 }
 
 window.renderChatMessages = renderChatMessages;

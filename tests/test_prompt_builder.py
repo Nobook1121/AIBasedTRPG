@@ -68,3 +68,31 @@ def test_prompt_layers_place_retrieval_after_static_layers():
     assert "brass key" in result.messages[3]["content"]
     assert "room-1" in result.messages[4]["content"]
     assert "scenario:s@2" in result.cache_key
+
+
+def test_prompt_layers_place_volatile_room_snapshot_after_retrieval():
+    """易变内容后移：房间快照排在静态层与检索卡片之后、历史之前，
+    这样静态层 + 检索卡片才能成为跨请求共享的可缓存前缀。"""
+    result = build_prompt_layers(
+        global_rules="GLOBAL",
+        scenario={"id": "s", "scenario_version": "2", "core": "CORE"},
+        scene={"id": "scene-1", "version": "1", "content": "SCENE"},
+        room_state={"room_id": "room-1"},
+        history=[{"role": "assistant", "content": "old"}],
+        user_input="look",
+        retrieval_results=[{"text": "brass key", "spoiler_level": 0}],
+        room_snapshot_message="SNAPSHOT",
+    )
+    contents = [message["content"] for message in result.messages]
+
+    def index_of(predicate):
+        return next(position for position, text in enumerate(contents) if predicate(text))
+
+    retrieval_index = index_of(lambda text: "brass key" in text)
+    snapshot_index = index_of(lambda text: text == "SNAPSHOT")
+    history_index = index_of(lambda text: text == "old")
+
+    assert retrieval_index < snapshot_index < history_index
+    # 静态层不能被易变内容污染，否则前缀缓存永远命中不了
+    assert "SNAPSHOT" not in result.static_prefix
+    assert result.messages[0]["content"] == "GLOBAL"

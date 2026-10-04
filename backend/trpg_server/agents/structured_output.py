@@ -71,19 +71,6 @@ ALLOWED_STATE_FIELDS = {
     "ending_reached",
 }
 
-KP_RESPONSE_SCHEMA = {
-    "type": "object",
-    "required": ["narration", "options", "state_updates", "next_scene", "npc_actions", "triggered_files"],
-    "properties": {
-        "narration": {"type": "string"},
-        "options": {"type": "array", "items": {"type": "string"}},
-        "state_updates": {"type": "object"},
-        "next_scene": {"type": ["string", "null"]},
-    "npc_actions": {"type": "array", "items": {"type": "object"}},
-        "triggered_files": {"type": "array", "items": {"type": "object", "required": ["trigger_id"], "properties": {"trigger_id": {"type": "string"}, "reason": {"type": "string"}}}},
-    },
-}
-
 
 def validate_structured_response(
     response: StructuredKPResponse | None,

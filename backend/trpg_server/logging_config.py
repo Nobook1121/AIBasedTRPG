@@ -29,7 +29,7 @@ SENSITIVE_KEYS = {
     "client_secret",
 }
 MAX_LOG_VALUE_LENGTH = 200
-DEFAULT_LOG_LANGUAGE = "zh-CN"
+DEFAULT_LOG_LANGUAGE = "en-US"
 LEVEL_LABELS = {
     logging.WARNING: "WARN",
     logging.CRITICAL: "FATAL",
@@ -83,6 +83,7 @@ DETAIL_LABELS_EN = {
     "耗时毫秒": "elapsed ms",
     "转换版本": "conversion version",
     "平台": "platform",
+    "平台数": "platform count",
     "模型": "model",
     "端口": "port",
     "局域网发现": "LAN discovery",
@@ -140,6 +141,8 @@ ACTION_LABELS_EN = {
     "更改了网络设置": "changed network settings",
     "更改了穿透设置": "changed penetration settings",
     "更改了 AI 平台设置": "changed AI platform settings",
+    "删除了 AI 平台设置": "deleted AI platform settings",
+    "查看了 AI 平台列表": "viewed the AI platform list",
     "测试了 AI 平台连接": "tested the AI platform connection",
     "更改了 AI 模型请求设置": "changed AI model request settings",
     "更改了系统提示词": "changed the system prompt",
@@ -340,8 +343,17 @@ def _format_log_value(value: Any) -> str:
     return text
 
 
+_logging_configured = False
+
+
 def configure_logging(log_dir: str | Path = "logs", config_dir: str | Path | None = None) -> None:
+    global _logging_configured
     set_log_config_dir(config_dir)
+    # 同一进程内只初始化一次。否则每次 create_app() 都会新建一个日志文件并
+    # 重挂 handler（例如 server.py 为了让「启动开始」尽早输出而先调用一次，
+    # create_app 再调用一次就会产生多余的日志文件）。
+    if _logging_configured:
+        return
     Path(log_dir).mkdir(parents=True, exist_ok=True)
     started_at = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_path = Path(log_dir) / f"ai_trpg_{started_at}.log"
@@ -366,3 +378,4 @@ def configure_logging(log_dir: str | Path = "logs", config_dir: str | Path | Non
     root_logger.addHandler(console_handler)
 
     logging.getLogger("werkzeug").setLevel(logging.WARNING)
+    _logging_configured = True

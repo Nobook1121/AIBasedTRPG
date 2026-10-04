@@ -27,6 +27,7 @@ interface Window {
     testRequestConfigs: Record<string, TestRequestConfig>;
     getTestRequestConfig(modelId: string): TestRequestConfig;
     marked?: MarkedParser;
+    DOMPurify?: DomPurifySanitizer;
     renderChatMessages?: (messages: ChatMessage[]) => void;
     getCurrentChatMessages?: () => ChatMessage[];
     clearChatMessages?: () => void;

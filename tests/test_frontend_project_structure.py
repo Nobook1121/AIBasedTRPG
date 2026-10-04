@@ -109,12 +109,13 @@ def test_tools_tab_exposes_available_command_tools():
 
 def test_scenario_editor_exposes_module_summary_action_and_role_description():
     scenario_view = (ROOT / "frontend/src/app/views/ScenarioView.ts").read_text(encoding="utf-8")
+    scenario_modules = (ROOT / "frontend/src/app/views/scenario-modules.ts").read_text(encoding="utf-8")
     settings_fragment = (ROOT / "frontend/src/index/fragments/03-room-tools-auth-settings.html").read_text(encoding="utf-8")
     platform_ui = (ROOT / "frontend/src/app/platform-ui.ts").read_text(encoding="utf-8")
     styles = (ROOT / "frontend/src/styles/03-tools-settings-platform.css").read_text(encoding="utf-8")
 
-    assert 'data-generate-module-summary' in scenario_view
-    assert 'scenario-module-summary-button' in scenario_view
+    assert 'data-generate-module-summary' in scenario_modules
+    assert 'scenario-module-summary-button' in scenario_modules
     assert '/api/scenarios/module-summary' in scenario_view
     assert 'id="roleConfigList"' in settings_fragment
     assert 'role-description-input' in platform_ui

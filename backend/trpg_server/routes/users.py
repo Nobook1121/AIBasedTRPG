@@ -5,7 +5,7 @@ from flask import Blueprint, current_app, request, session
 
 from trpg_server.json_store import read_json
 from trpg_server.logging_config import log_user_action, user_action_text
-from trpg_server.responses import error_response, success_response
+from trpg_server.responses import error_response, server_error, success_response
 from trpg_server.security import get_user_manager, is_socket_user_online, require_permission_node
 from trpg_server.settings import ROOMS_DIR
 from trpg_server.users.smtp import (
@@ -96,7 +96,7 @@ def get_users():
         return success_response(users, "Users loaded successfully")
     except Exception as exc:
         logger.exception("Failed to list users")
-        return error_response("Failed to load users", 500, str(exc))
+        return server_error("Failed to load users")
 
 
 @bp.route("/api/users/<int:user_id>/role", methods=["PUT"])
@@ -145,7 +145,7 @@ def update_user_role(user_id):
         return success_response(message=message)
     except Exception as exc:
         logger.exception("Failed to update user role: %s", user_id)
-        return error_response("Failed to update user role", 500, str(exc))
+        return server_error("Failed to update user role")
 
 
 @bp.route("/api/user/profile", methods=["GET"])
@@ -158,7 +158,7 @@ def get_current_user_profile():
         return success_response(_profile_payload(user), "Profile loaded successfully")
     except Exception as exc:
         logger.exception("Failed to get user profile")
-        return error_response("Failed to get user profile", 500, str(exc))
+        return server_error("Failed to get user profile")
 
 
 @bp.route("/api/user/profile", methods=["PUT"])
@@ -221,7 +221,7 @@ def update_current_user_profile():
         return success_response(_profile_payload(updated_user), "Profile updated")
     except Exception as exc:
         logger.exception("Failed to update user profile")
-        return error_response("Failed to update user profile", 500, str(exc))
+        return server_error("Failed to update user profile")
 
 
 @bp.route("/api/user/presence", methods=["PUT"])
@@ -269,7 +269,7 @@ def update_current_user_presence():
         return success_response(_profile_payload(updated_user), "Presence updated")
     except Exception as exc:
         logger.exception("Failed to update user presence")
-        return error_response("Failed to update user presence", 500, str(exc))
+        return server_error("Failed to update user presence")
 
 
 @bp.route("/api/users/<int:user_id>/status", methods=["PUT"])
@@ -302,7 +302,7 @@ def update_user_status(user_id):
         return success_response(message=message)
     except Exception as exc:
         logger.exception("Failed to update user status: %s", user_id)
-        return error_response("Failed to update user status", 500, str(exc))
+        return server_error("Failed to update user status")
 
 
 @bp.route("/api/admin/auth/settings", methods=["GET"])
@@ -313,7 +313,7 @@ def get_admin_auth_settings():
         return success_response(admin_auth_settings(settings), "Auth settings loaded")
     except Exception as exc:
         logger.exception("Failed to get admin auth settings")
-        return error_response("Failed to get auth settings", 500, str(exc))
+        return server_error("Failed to get auth settings")
 
 
 @bp.route("/api/admin/auth/settings", methods=["PUT"])
@@ -339,7 +339,7 @@ def update_admin_auth_settings():
         return error_response(str(exc), 400, str(exc))
     except Exception as exc:
         logger.exception("Failed to update admin auth settings")
-        return error_response("Failed to update auth settings", 500, str(exc))
+        return server_error("Failed to update auth settings")
 
 
 @bp.route("/api/user/ip/config", methods=["GET"])
@@ -355,7 +355,7 @@ def get_ip_config():
         return success_response(config, "IP config loaded successfully")
     except Exception as exc:
         logger.exception("Failed to get IP config")
-        return error_response("Failed to get IP config", 500, str(exc))
+        return server_error("Failed to get IP config")
 
 
 @bp.route("/api/user/ip/config", methods=["POST"])
@@ -380,7 +380,7 @@ def update_ip_config():
         return success_response(updated_config, "IP config updated successfully")
     except Exception as exc:
         logger.exception("Failed to update IP config")
-        return error_response("Failed to update IP config", 500, str(exc))
+        return server_error("Failed to update IP config")
 
 
 @bp.route("/api/admin/ip/configs", methods=["GET"])
@@ -392,4 +392,4 @@ def get_all_ip_configs():
         return success_response(configs, "IP configs loaded successfully")
     except Exception as exc:
         logger.exception("Failed to list IP configs")
-        return error_response("Failed to list IP configs", 500, str(exc))
+        return server_error("Failed to list IP configs")

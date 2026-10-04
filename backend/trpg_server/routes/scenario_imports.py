@@ -7,7 +7,7 @@ from trpg_server.logging_config import log_access_denied, log_user_action, user_
 from trpg_server.responses import error_response, success_response
 from trpg_server.scenario_import_jobs import public_job_payload, submit_import_job
 from trpg_server.scenario_documents import validate_scenario_upload, ScenarioDocumentError
-from trpg_server.scenario_store import load_scenario_record, save_scenario_record, scenario_descriptor_paths
+from trpg_server.scenario_store import generate_public_id, load_scenario_record, save_scenario_record, scenario_descriptor_paths
 from trpg_server.settings import SCENARIOS_DIR
 from trpg_server.agents.knowledge_base import (
     KnowledgeBaseService,
@@ -35,6 +35,24 @@ def _login():
 
 def _scenarios_root() -> Path:
     return Path(current_app.config.get("SCENARIOS_DIR", SCENARIOS_DIR))
+
+def _current_timestamp() -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%S") + ".000Z"
+
+def _existing_public_ids(root: Path, *, exclude_id: object = None) -> set[str]:
+    """收集已落盘的剧本编号，供导入发布时生成不重复的 6 位 public_id。"""
+    values: set[str] = set()
+    for path in scenario_descriptor_paths(root):
+        try:
+            record = load_scenario_record(path, root)
+        except Exception:
+            continue
+        if exclude_id is not None and str(record.get("id")) == str(exclude_id):
+            continue
+        public_id = str(record.get("public_id") or "")
+        if public_id:
+            values.add(public_id)
+    return values
 
 def _script_descriptor(script_id):
     """按剧本 ID 定位描述符与记录，供知识块读写复用。"""
@@ -67,7 +85,7 @@ def create_import():
     try: validate_scenario_upload(uploaded.filename or "script.txt", len(raw), current_app.config["SCENARIO_IMPORT_MAX_BYTES"])
     except ScenarioDocumentError as exc: return error_response(str(exc), 400, "Invalid script")
     filename = Path(uploaded.filename or "script.txt").name
-    job = _store().create(owner_id=str(session["user_id"]), filename=filename, metadata={k: request.form.get(k, "") for k in ("title", "author", "description", "public")})
+    job = _store().create(owner_id=str(session["user_id"]), filename=filename, metadata={k: request.form.get(k, "") for k in ("title", "author", "description", "public", "creator", "playerCount")})
     source = Path(_store().root) / job["id"] / "source" / filename; source.parent.mkdir(parents=True, exist_ok=True); source.write_bytes(raw)
     submit_import_job(current_app._get_current_object(), job["id"])
     return success_response({"jobId": job["id"], "scriptId": job["script_id"]}, "Import started", 202)
@@ -124,9 +142,23 @@ def publish_import(script_id):
     if not job or int(job.get("script_id", 0)) != script_id: return error_response("Import job not found", 404, "Not found")
     scenario = job.get("preview") or _store().load_intermediate(job["id"], "preview", {})
     scenario["id"] = script_id; scenario["scenario_version"] = str(job.get("target_version") or "1.0.0"); scenario["owner_id"] = session["user_id"]
-    from trpg_server.settings import SCENARIOS_DIR
-    descriptor = save_scenario_record(SCENARIOS_DIR, scenario)
-    stored = load_scenario_record(descriptor, SCENARIOS_DIR)
+    # 直接导入的剧本要和正常创建的剧本一样拥有 6 位 public_id；否则前端卡片/预览
+    # 会回退显示毫秒时间戳，看起来像「一串数字」。
+    # 编号查重与落盘必须用同一个根目录，否则会往 A 目录查重、往 B 目录写入。
+    root = _scenarios_root()
+    existing_public_ids = _existing_public_ids(root, exclude_id=script_id)
+    public_id = str(scenario.get("public_id") or "")
+    if len(public_id) != 6 or not public_id.isalnum() or public_id in existing_public_ids:
+        scenario["public_id"] = generate_public_id(existing_public_ids)
+    if not scenario.get("creator_username"):
+        scenario["creator_username"] = session.get("username", "")
+    timestamp = _current_timestamp()
+    scenario.setdefault("createdAt", timestamp)
+    scenario["updatedAt"] = timestamp
+    if not scenario.get("cover"):
+        scenario["cover"] = "/assets/scenario_covers/default_cover.png"
+    descriptor = save_scenario_record(root, scenario)
+    stored = load_scenario_record(descriptor, root)
     vector_store = current_app.extensions.get("vector_store")
     provider = current_app.extensions.get("embedding_provider")
     if str(scenario.get("import_mode") or "") == "direct":
@@ -151,22 +183,22 @@ def publish_import(script_id):
         用户ID=session.get("user_id"),
         剧本ID=script_id,
     )
-    return success_response(load_scenario_record(descriptor, SCENARIOS_DIR), "Published", 201)
+    return success_response(load_scenario_record(descriptor, root), "Published", 201)
 
 @bp.get("/api/scripts/<int:script_id>/versions")
 def versions(script_id):
-    from trpg_server.settings import SCENARIOS_DIR
-    descriptor = next((p for p in scenario_descriptor_paths(SCENARIOS_DIR) if str(load_scenario_record(p, SCENARIOS_DIR).get("id")) == str(script_id)), None)
+    root = _scenarios_root()
+    descriptor = next((p for p in scenario_descriptor_paths(root) if str(load_scenario_record(p, root).get("id")) == str(script_id)), None)
     if not descriptor: return error_response("Scenario not found", 404, "Not found")
     values = []
     for p in sorted((descriptor.parent / "versions").glob("*.json")):
-        data = load_scenario_record(p, SCENARIOS_DIR); values.append({"version": p.stem, "created_at": data.get("updatedAt") or data.get("createdAt"), "card_count": len(data.get("modules", []))})
+        data = load_scenario_record(p, root); values.append({"version": p.stem, "created_at": data.get("updatedAt") or data.get("createdAt"), "card_count": len(data.get("modules", []))})
     return success_response(values)
 
 @bp.post("/api/scripts/<int:script_id>/search")
 def script_search(script_id):
     if (e := _login()): return e
-    data = request.get_json(silent=True) or {}; return success_response(KnowledgeBaseService(rooms_dir=current_app.config.get("ROOMS_DIR"), scenarios_dir=current_app.config.get("SCENARIOS_DIR"), vector_store=current_app.extensions.get("vector_store"), embedding_provider=current_app.extensions.get("embedding_provider")).search(str(data.get("roomId", "")), str(data.get("query", "")), top_k=data.get("topK", 5)))
+    data = request.get_json(silent=True) or {}; return success_response(KnowledgeBaseService(rooms_dir=current_app.config.get("ROOMS_DIR"), scenarios_dir=_scenarios_root(), vector_store=current_app.extensions.get("vector_store"), embedding_provider=current_app.extensions.get("embedding_provider")).search(str(data.get("roomId", "")), str(data.get("query", "")), top_k=data.get("topK", 5)))
 
 @bp.get("/api/scripts/<int:script_id>/knowledge")
 def list_knowledge(script_id):

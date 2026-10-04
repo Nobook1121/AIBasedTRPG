@@ -7,6 +7,7 @@ contract later without changing callers.
 
 from __future__ import annotations
 
+import logging
 import re
 import math
 import random
@@ -16,6 +17,24 @@ from typing import Any, Iterable, Mapping
 
 from trpg_server.json_store import read_json, write_json_atomic
 from trpg_server.scenario_store import load_scenario_by_id
+
+logger = logging.getLogger(__name__)
+
+# 检索降级（embedding 失败 / 向量库查询失败）属于持续状态，
+# 只在首次出现时告警，避免每条消息、每轮工具调用都重复刷同一条日志。
+_logged_degradations: set[str] = set()
+
+
+def _log_retrieval_degradation(kind: str, error: Exception) -> None:
+    if kind in _logged_degradations:
+        return
+    _logged_degradations.add(kind)
+    logger.warning(
+        "knowledge retrieval degraded (%s); suppressing further identical warnings: %s",
+        kind,
+        error,
+        exc_info=True,
+    )
 
 
 @dataclass(frozen=True)
@@ -778,7 +797,8 @@ class KnowledgeBaseService:
             try:
                 embedded = self.embedding_provider.embed([str(query)])
                 query_vector = embedded[0] if embedded else None
-            except Exception:
+            except Exception as error:
+                _log_retrieval_degradation("embedding", error)
                 query_vector = None
         if query_vector and self.vector_store is not None:
             try:
@@ -806,7 +826,8 @@ class KnowledgeBaseService:
                     chunk_id = str(payload.get("chunk_id") or payload.get("module_id") or item.get("id") or "")
                     if chunk_id in allowed_ids:
                         store_scores[chunk_id] = max(store_scores.get(chunk_id, 0.0), float(item.get("score") or 0.0))
-            except Exception:
+            except Exception as error:
+                _log_retrieval_degradation("vector_store", error)
                 store_scores = {}
 
         query_tokens = _tokens(str(query or ""))

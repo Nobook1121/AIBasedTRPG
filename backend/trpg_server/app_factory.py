@@ -19,6 +19,7 @@ from trpg_server.settings import SCENARIO_IMPORTS_DIR, SCENARIO_IMPORT_MAX_BYTES
 from trpg_server.settings import VECTOR_DB_URL, VECTOR_DB_PATH, VECTOR_DB_API_KEY, VECTOR_BACKEND, VECTOR_BACKEND_EXPLICIT, EMBEDDED_VECTOR_DB_PATH, SCENARIOS_DIR, EMBEDDING_BASE_URL, EMBEDDING_API_KEY, EMBEDDING_MODEL, EMBEDDING_DIMENSIONS, OCR_ENABLED, OCR_LANG, LOCAL_EMBEDDING_MODEL_PATH, PADDLEOCR_HOME, AI_PLATFORM_SECRET_DIR, CONFIG_DIR
 from trpg_server.agents.vector_store import create_vector_store
 from trpg_server.agents.embedding_provider import select_embedding_provider
+from trpg_server.ai_capabilities import chat_completions_endpoint
 from trpg_server.ai_platform_config import load_platform_config
 from trpg_server.agents.ocr_provider import PaddleOcrProvider
 from trpg_server.scenario_import_jobs import ImportJobStore
@@ -29,6 +30,24 @@ from trpg_server.users.service import UserService
 
 socketio = SocketIO(cors_allowed_origins="*", async_mode="threading")
 logger = logging.getLogger(__name__)
+
+# 安全响应头。CSP 的白名单与前端实际引用的资源保持一致：
+# 脚本来自自身站点、jsDelivr（Bootstrap/marked/DOMPurify）与 cdn.socket.io；
+# 图片/媒体/请求目标放宽到 http(s)，因为 KP 可在消息里引用外链素材，
+# 且 AI 平台的「测试连接」会直连管理员配置的任意地址（含本机 LM Studio）。
+CONTENT_SECURITY_POLICY = "; ".join([
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdn.socket.io",
+    "style-src 'self' 'unsafe-inline' https:",
+    "img-src 'self' data: blob: https: http:",
+    "media-src 'self' data: blob: https: http:",
+    "font-src 'self' data: https:",
+    "connect-src 'self' https: http: wss: ws:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+])
 
 
 def create_app(config=None):
@@ -152,6 +171,14 @@ def create_app(config=None):
             return error_response("Internal server error", 500)
         return error
 
+    @app.after_request
+    def _apply_security_headers(response):
+        response.headers.setdefault("Content-Security-Policy", CONTENT_SECURITY_POLICY)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "same-origin")
+        return response
+
     return app
 
 
@@ -197,7 +224,7 @@ def _configure_scenario_chunk_analyzer(app):
             logger.debug("Skipping invalid AI platform config for chunk analyzer: %s", public_path, exc_info=True)
             continue
         config = candidate.get("config") if isinstance(candidate.get("config"), dict) else {}
-        base_url = str(config.get("base_url") or "").strip()
+        base_url = chat_completions_endpoint(config.get("base_url"))
         api_key = str(config.get("api_key") or "").strip()
         if not candidate.get("enabled") or not base_url or not api_key:
             continue
@@ -251,6 +278,7 @@ def register_blueprints(app):
     from trpg_server.routes.pages import bp as pages_bp
     from trpg_server.routes.rooms import bp as rooms_bp
     from trpg_server.routes.scenarios import bp as scenarios_bp
+    from trpg_server.routes.scenario_summary import bp as scenario_summary_bp
     from trpg_server.routes.setup import bp as setup_bp
     from trpg_server.routes.scenario_imports import bp as scenario_imports_bp
     from trpg_server.routes.vector_health import bp as vector_health_bp
@@ -261,6 +289,7 @@ def register_blueprints(app):
 
     app.register_blueprint(assets_bp)
     app.register_blueprint(scenarios_bp)
+    app.register_blueprint(scenario_summary_bp)
     app.register_blueprint(scenario_imports_bp)
     app.register_blueprint(vector_health_bp)
     app.register_blueprint(characters_bp)

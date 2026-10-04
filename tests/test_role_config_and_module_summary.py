@@ -95,17 +95,17 @@ def test_module_summary_endpoint_returns_clean_summary_and_token_count(tmp_path:
         session["session_token"] = "token"
         session["csrf_token"] = "csrf"
 
-    from trpg_server.routes import scenarios as scenarios_routes
+    from trpg_server.routes import scenario_summary
 
-    monkeypatch.setattr(scenarios_routes, "_can_use_permission", lambda node_id: True)
+    monkeypatch.setattr(scenario_summary, "_can_use_permission", lambda node_id: True)
     monkeypatch.setattr(
-        scenarios_routes,
-        "_summary_role",
+        scenario_summary,
+        "summary_role",
         lambda: {"id": "module_summarizer", "provider": "deepseek", "prompt": "摘要提示词"},
     )
     monkeypatch.setattr(
-        scenarios_routes,
-        "_load_enabled_platform",
+        scenario_summary,
+        "load_enabled_platform",
         lambda provider_id=None: (
             "deepseek",
             {
@@ -134,7 +134,7 @@ def test_module_summary_endpoint_returns_clean_summary_and_token_count(tmp_path:
         captured["timeout"] = timeout
         return DummyResponse()
 
-    monkeypatch.setattr(scenarios_routes.requests, "post", fake_post)
+    monkeypatch.setattr(scenario_summary.requests, "post", fake_post)
 
     response = client.post(
         "/api/scenarios/module-summary",
@@ -149,7 +149,8 @@ def test_module_summary_endpoint_returns_clean_summary_and_token_count(tmp_path:
     payload = response.get_json()
     assert payload["data"]["summary"] == "场景摘要"
     assert payload["data"]["token_count"] == 19
-    assert captured["url"] == "https://example.test/chat"
+    # 只填主机名/前缀时，后端会在发请求前补齐 chat/completions 端点（问题 10）。
+    assert captured["url"] == "https://example.test/chat/v1/chat/completions"
     assert captured["json"]["max_tokens"] == 180
     assert captured["json"]["messages"][1]["content"].startswith("请为下面的剧本模块生成摘要")
 

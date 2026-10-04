@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 _HEADING_RE = re.compile(r"^\s{0,3}(?:#{1,6}\s+|第\s*[一二三四五六七八九十百0-9]+\s*[章节幕场景、:.：]|[0-9]+[、.．]\s*)(.*?)\s*$", re.I)
 _ANGLE_HEADING_RE = re.compile(r"^\s*[<《【].{1,80}[>》】].*$")
 _NAMED_HEADING_RE = re.compile(r"^(?:概要|导入|背景|前言|准备|游戏准备|公开信息|时间线|幕后黑手|角色数据|NPC|人物|怪物|敌人|结局|Ending|True End|Bad End|Crazy End)\s*[：:：]?\s*[A-Za-z0-9一二三四五六七八九十百]*$", re.I)
-_LOCATION_RE = re.compile(r"(?:车厢|房间|场景|地点|驾驶室|终点站|地下室|大厅)", re.I)
+
 _SCENE_WORDS = ("场景", "scene", "地点", "房间", "车厢", "車廂", "驾驶室", "駕駛室", "大厅", "大廳")
 _ENDING_WORDS = ("结局", "ending", "true end", "bad end", "crazy end", "happy end", "normal end")
 _SECTION_TYPES = {
@@ -228,14 +228,17 @@ def convert_with_ai(requester: Callable[[dict[str, Any]], dict[str, Any]], text:
         "temperature": 0,
         "response_format": {"type": "json_object"},
     }
-    # Keep the complete conversion request in the normal application log. The
-    # payload contains no API key, but redact defensively in case a requester
-    # adds authentication metadata in the future.
+    # 完整的转换请求/响应含整段原文与模型输出，只有开启调试模式才写日志；
+    # 正常导入只保留体积与耗时这类摘要行。
+    from trpg_server.agents.config import ai_debug_enabled
     from trpg_server.logging_config import redact_sensitive
+    debug = ai_debug_enabled()
     logger.info("scenario_conversion.ai_request model=%s sections=%d chars=%d", model, len(sections), len(text))
-    logger.info("scenario_conversion.ai_request_full=%s", json.dumps(redact_sensitive(payload), ensure_ascii=False, default=str))
+    if debug:
+        logger.info("scenario_conversion.ai_request_full=%s", json.dumps(redact_sensitive(payload), ensure_ascii=False, default=str))
     response = requester(payload)
-    logger.info("scenario_conversion.ai_response_full=%s", json.dumps(redact_sensitive(response), ensure_ascii=False, default=str))
+    if debug:
+        logger.info("scenario_conversion.ai_response_full=%s", json.dumps(redact_sensitive(response), ensure_ascii=False, default=str))
     try: content = response["choices"][0]["message"]["content"]; ai_payload = json.loads(content)
     except (KeyError, IndexError, TypeError, json.JSONDecodeError) as exc: logger.exception("scenario_conversion.ai_invalid_json"); raise ValueError("AI converter returned invalid JSON") from exc
     if not isinstance(ai_payload, dict) or not isinstance(ai_payload.get("modules"), list): raise ValueError("AI converter response must contain modules")

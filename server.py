@@ -1,5 +1,7 @@
 import logging
+import os
 import subprocess
+import time
 from pathlib import Path
 import socket
 import sys
@@ -9,12 +11,26 @@ import secrets
 import urllib.error
 import urllib.request
 
+# Boot timestamp. Recorded before the heavy dependencies are imported so the
+# time spent importing Flask/Socket.IO and the embedding model is included.
+_BOOT_START = time.perf_counter()
+
 from flask import abort, request
 from werkzeug.serving import make_server
 
 BACKEND_DIR = Path(__file__).resolve().parent / "backend"
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
+
+# Configure logging and print the startup marker before importing app_factory:
+# create_app() loads the embedding model, which takes seconds, so emitting a
+# line first lets the user see output immediately instead of waiting in silence.
+from trpg_server.logging_config import configure_logging
+from trpg_server.settings import CONFIG_DIR, DEFAULT_PORT, LOGS_DIR
+
+configure_logging(LOGS_DIR, CONFIG_DIR)
+logger = logging.getLogger(__name__)
+logger.info("Server starting")
 
 from trpg_server.app_factory import create_app, socketio
 from trpg_server.console_commands import set_shutdown_callback, start_console_command_loop
@@ -25,9 +41,6 @@ from trpg_server.network_discovery import (
     get_network_config,
     is_port_available,
 )
-from trpg_server.settings import DEFAULT_PORT
-
-logger = logging.getLogger(__name__)
 
 app = create_app()
 
@@ -70,6 +83,7 @@ def _serve_http(port: int) -> None:
     http_server = make_server("0.0.0.0", port, app, threaded=True)
     with _http_server_lock:
         _http_server = http_server
+    logger.info("Startup complete, elapsed %.1f ms", (time.perf_counter() - _BOOT_START) * 1000)
     try:
         http_server.serve_forever()
     finally:
@@ -96,6 +110,11 @@ def _request_graceful_shutdown(port: int) -> None:
 
 
 def _iter_frontend_source_paths(root: Path):
+    # frontend/src/app/generated is a build artifact (build-frontend.mjs rewrites
+    # templates.ts on every build). It must not count as a source file: it is
+    # written after dist/public/index.html, so its mtime is always newer than the
+    # output and every start would be flagged as stale, triggering a rebuild loop.
+    generated_dirs = (root / "frontend" / "src" / "app" / "generated",)
     candidates = (
         root / "frontend" / "src",
         root / "frontend" / "src" / "templates",
@@ -109,8 +128,11 @@ def _iter_frontend_source_paths(root: Path):
     for path in candidates:
         if path.is_dir():
             for child in path.rglob("*"):
-                if child.is_file():
-                    yield child
+                if not child.is_file():
+                    continue
+                if any(parent in generated_dirs for parent in child.parents):
+                    continue
+                yield child
         elif path.is_file():
             yield path
 
@@ -130,6 +152,14 @@ def _frontend_build_is_stale(root: Path) -> bool:
 
 
 def ensure_frontend_build():
+    """开发侧可选：源码比构建产物新时自动重建前端。
+
+    仅当设置 ``AI_TRPG_DEV_BUILD=1`` 时启用。发布包默认关闭该开关，直接使用随包
+    附带的 ``dist/`` 构建产物，避免“每次改动代码就自动构建”，也避免在没有 npm
+    的部署环境里启动失败。
+    """
+    if os.environ.get("AI_TRPG_DEV_BUILD", "").strip().lower() not in {"1", "true", "yes"}:
+        return
     root = Path(__file__).resolve().parent
     if not _frontend_build_is_stale(root):
         return

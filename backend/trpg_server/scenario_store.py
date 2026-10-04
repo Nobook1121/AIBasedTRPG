@@ -20,7 +20,6 @@ from trpg_server.agents.trigger_system import normalize_attachment
 SCENARIO_DESCRIPTOR_NAME = "scenario.json"
 SCENARIO_VERSIONS_DIR_NAME = "versions"
 SCENARIO_TRIGGER_DIR_NAME = "trigger-content"
-SCENARIO_TRIGGER_PREVIEW_DIR_NAME = "trigger-previews"
 SCENARIO_PUBLIC_ROUTE_PREFIX = "/assets/scenarios"
 DEFAULT_TRIGGER_SIZE_LIMIT = 5 * 1024 * 1024
 SCENARIO_MODULE_TYPES = {
@@ -102,6 +101,32 @@ def scenario_public_asset_url(asset_path: str | Path) -> str:
     return f"{SCENARIO_PUBLIC_ROUTE_PREFIX}/{relative}"
 
 
+def scenario_draft_path(drafts_dir: Path, owner_id: Any) -> Path:
+    """用户草稿文件路径；用户 ID 中的非法字符统一替换，避免路径穿越。"""
+    owner = re.sub(r"[^A-Za-z0-9_.-]", "_", str(owner_id or "anonymous"))
+    return Path(drafts_dir) / f"{owner}.json"
+
+
+def load_scenario_draft(drafts_dir: Path, owner_id: Any) -> dict[str, Any] | None:
+    """读取用户草稿；不存在时返回 None。"""
+    return read_json(scenario_draft_path(drafts_dir, owner_id))
+
+
+def save_scenario_draft_file(drafts_dir: Path, owner_id: Any, payload: dict[str, Any]) -> dict[str, Any]:
+    """原子写入用户草稿并返回写入内容。"""
+    write_json_atomic(scenario_draft_path(drafts_dir, owner_id), payload)
+    return payload
+
+
+def delete_scenario_draft_file(drafts_dir: Path, owner_id: Any) -> bool:
+    """删除用户草稿；返回是否真的删除了文件。"""
+    path = scenario_draft_path(drafts_dir, owner_id)
+    if not path.exists():
+        return False
+    path.unlink()
+    return True
+
+
 def _coerce_int(value: Any, fallback: int = 0) -> int:
     try:
         return int(value)
@@ -170,7 +195,8 @@ def _module_code_prefix(module_type: str) -> str | None:
     return None
 
 
-def _generate_public_id(existing_ids: set[str]) -> str:
+def generate_public_id(existing_ids: set[str]) -> str:
+    """生成 6 位剧本公开编号；全局唯一的实现，调用方不要各自再写一份。"""
     for _ in range(200):
         value = "".join(secrets.choice(_PUBLIC_ID_ALPHABET) for _ in range(6))
         if value not in existing_ids:
@@ -303,34 +329,6 @@ def normalize_trigger(trigger: dict[str, Any], storage_dir: Path | None = None, 
         normalized["asset_mime"] = asset_mime
     if asset_size:
         normalized["asset_size"] = asset_size
-    return normalized
-
-
-def normalize_scene(scene: dict[str, Any], storage_dir: Path | None = None, include_content: bool = True) -> dict[str, Any] | None:
-    if not isinstance(scene, dict):
-        return None
-
-    raw_scene_id = scene.get("id")
-    scene_id = _coerce_int(raw_scene_id, 0)
-    content = str(scene.get("content") or "").strip()
-    marker = str(scene.get("marker") or "").strip()
-    if scene_id <= 0 and not str(raw_scene_id or "").strip():
-        return None
-
-    normalized = {
-        **scene,
-        "id": scene_id if scene_id > 0 else str(raw_scene_id).strip(),
-        "content": content if include_content else "",
-        "marker": marker,
-    }
-
-    triggers = []
-    for trigger in scene.get("triggers", []) if isinstance(scene.get("triggers"), list) else []:
-        normalized_trigger = normalize_trigger(trigger, storage_dir, include_content=include_content)
-        if normalized_trigger is not None:
-            triggers.append(normalized_trigger)
-    if triggers:
-        normalized["triggers"] = triggers
     return normalized
 
 
@@ -832,8 +830,14 @@ def save_scenario_record(
     version_path = scenario_version_path(descriptor_path, normalized.get("scenario_version") or "1")
     version_path.parent.mkdir(parents=True, exist_ok=True)
     write_json_atomic(version_path, normalized)
-    from trpg_server.agents.knowledge_base import persist_knowledge_index
-    persist_knowledge_index(descriptor_path, normalized)
+    # 仅在知识索引缺失时按 modules 兜底构建一次（首次保存或新版本）。已有索引由
+    # 调用方通过带 embedding 的 _index_scenario_knowledge 维护；这里若重建会写入
+    # 无向量内容，导致「仅修改基础信息」时向量通道失效。直接导入的剧本没有场景
+    # 卡，其知识块由导入管线单独写入，同样不能在此按空 modules 覆盖。
+    if normalized.get("modules") or str(normalized.get("import_mode") or "") != "direct":
+        from trpg_server.agents.knowledge_base import knowledge_index_path, persist_knowledge_index
+        if not knowledge_index_path(descriptor_path, normalized.get("scenario_version") or "1").exists():
+            persist_knowledge_index(descriptor_path, normalized)
     return descriptor_path
 
 

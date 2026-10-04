@@ -27,6 +27,8 @@ class ToolManager {
         return this.tools.check.handleCheckCommand(command);
     }
 
+    // /sc 玩家名 成功变化/失败变化：前端只负责掷 1d100 并与当前 SAN 比较得出成败，
+    // 不在本地改写角色卡，而是输出结算结果，交由 KP Function 同步 SAN。
     handleSanityCommand(command: string): string {
         const parts = command.trim().split(/\s+/).filter(Boolean);
         if (!parts[1] || !parts[2] || !parts[2].includes("/")) return "格式：/sc 玩家名 成功变化/失败变化";
@@ -46,14 +48,6 @@ class ToolManager {
         const commandName = (command.split(" ")[0] || "").toLowerCase();
         const handler = this.commands[commandName];
         return handler ? handler(command) : "\u672a\u77e5\u547d\u4ee4\uff0c\u8bf7\u67e5\u770b\u53ef\u7528\u547d\u4ee4\u5217\u8868";
-    }
-
-    getTools(): { dice: DiceTool; check: CheckTool } {
-        return this.tools;
-    }
-
-    getCommands(): string[] {
-        return Object.keys(this.commands);
     }
 
     recordCharacterChange(payload: Record<string, unknown>): Promise<unknown> {

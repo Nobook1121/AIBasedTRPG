@@ -22,8 +22,6 @@ class ScenarioController {
 
     private async restoreImportJob(): Promise<void> { const id = sessionStorage.getItem("ai-trpg:scenario-import-job"); if (!id) return; try { const job = await this.model.getImportJob(id); if (job.status === "done") this.view.showMessage("文档导入完成，请审核后发布"); } catch { sessionStorage.removeItem("ai-trpg:scenario-import-job"); } }
 
-    private pollImportJob(id: string): void { void this.model.getImportJob(id).catch(() => undefined); }
-
     private bindEventHandlers(): void {
         this.view.setEventHandlers({
             onCreateScenarioClick: () => this.onCreateScenarioClick(),
@@ -31,6 +29,7 @@ class ScenarioController {
             onImportScenarioDocument: (file) => this.onImportScenarioDocumentV2(file),
             onSaveScenario: () => this.onSaveScenario(),
             onSaveDraft: () => this.onSaveDraft(),
+            onDiscardDraft: () => this.onDiscardDraft(),
             onPreviewScenario: (id) => this.onPreviewScenario(id),
             onEditScenario: (id) => this.onEditScenario(id),
             onPlayScenario: (id) => this.onPlayScenario(id),
@@ -94,13 +93,22 @@ class ScenarioController {
         const title = file.name.replace(/\.[^.]+$/, "") || "Imported scenario";
         const choice = await this.view.showImportChoice();
         if (choice === "cancel") return;
+        // 直接导入前先让用户确认剧本基础信息，取消则中止本次导入。
+        const metadata = choice === "direct"
+            ? await this.view.showDirectImportMetadata({ title, creator: window.currentUser?.username || "" })
+            : null;
+        if (choice === "direct" && !metadata) return;
         this.view.showConversionProgress(file.name);
         this.view.updateConversionProgress(0, "active", "Uploading document");
         try {
-            if (choice === "direct") {
+            if (choice === "direct" && metadata) {
                 const form = new FormData();
                 form.append("file", file, file.name);
-                form.append("title", title);
+                form.append("title", metadata.title);
+                form.append("author", metadata.author);
+                form.append("creator", metadata.creator);
+                form.append("playerCount", String(metadata.playerCount));
+                form.append("description", metadata.description);
                 const started = await this.model.createImportJob(form, (value) => {
                     this.view.updateConversionProgress(0, "active", `${Math.round(value)}% uploaded`);
                 });
@@ -188,6 +196,11 @@ class ScenarioController {
         catch (error) { this.view.showMessage(scenarioErrorMessage(error), true); }
     }
 
+    /** 用户在关闭编辑器的草稿确认框中选择「不保留」时删除已有草稿。 */
+    private async onDiscardDraft(): Promise<void> {
+        try { await this.model.discardDraft(); } catch { /* 草稿可能本就不存在，忽略即可 */ }
+    }
+
     private async onSaveScenario(): Promise<void> {
         try {
             const scenarioData = this.view.getFormData();
@@ -241,13 +254,8 @@ class ScenarioController {
             return;
         }
 
-        if (scenario.import_mode === "direct") {
-            // 直接导入的剧本没有场景卡，只提供只读查看并显示向量数量。
-            const stats = await this.model.getKnowledgeStats(id).catch(() => null);
-            this.view.openDirectImportInfo(scenario, stats?.vector_count ?? 0);
-            return;
-        }
-
+        // 直接导入的剧本与其他剧本共用同一个编辑界面（含场景卡、触发器资源库等）；
+        // 区别只在后端：仅修改基础信息时不会升版本、也不会重新嵌入。
         window.setCurrentEditingScenarioId?.(id);
         this.view.openEditModal(scenario);
 

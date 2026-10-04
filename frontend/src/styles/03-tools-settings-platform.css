@@ -796,6 +796,219 @@
     display: flex;
     align-items: center;
     gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+/* AI 平台配置：横向卡片与「添加/编辑平台」弹窗 */
+.platform-section-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.platform-section-header h4 {
+    margin: 0 0 4px;
+}
+
+.platform-section-header p {
+    margin: 0;
+}
+
+.platform-card-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.platform-card-avatar {
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+}
+
+.platform-avatar-img {
+    display: block;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-md);
+    object-fit: cover;
+    background: var(--color-panel-muted);
+}
+
+.platform-avatar-text {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-md);
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.05rem;
+    background: hsl(var(--avatar-hue, 210), 55%, 45%);
+}
+
+.platform-card-info {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.platform-card-info h5 {
+    margin: 0 0 3px;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.platform-card-info p {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: 0.84rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.platform-card-actions {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-left: auto;
+}
+
+.platform-enabled-btn {
+    min-width: 72px;
+    border: 1px solid var(--border-subtle);
+    color: var(--color-text-muted);
+    background: var(--color-panel-muted);
+}
+
+.platform-enabled-btn.is-enabled {
+    border-color: transparent;
+    color: #fff;
+    background: var(--color-success);
+}
+
+.platform-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 32px;
+    padding: 0;
+}
+
+.platform-icon-btn i {
+    font-size: 0.9rem;
+}
+
+/* 弹窗：供应商头像选择器 */
+.platform-vendor-picker {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.platform-vendor-avatar-preview .platform-avatar-img,
+.platform-vendor-avatar-preview .platform-avatar-text {
+    width: 64px;
+    height: 64px;
+    border-radius: var(--radius-md);
+    font-size: 1.5rem;
+}
+
+.platform-vendor-options {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+}
+
+.platform-vendor-option {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px;
+    border: 2px solid transparent;
+    border-radius: var(--radius-md);
+    background: none;
+    cursor: pointer;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.platform-vendor-option:hover {
+    transform: translateY(-1px);
+}
+
+.platform-vendor-option.is-active {
+    border-color: var(--color-primary);
+}
+
+.platform-vendor-avatar,
+.platform-vendor-option .platform-avatar-img {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-sm);
+    font-size: 0.95rem;
+}
+
+.platform-vendor-custom .platform-avatar-text {
+    background: var(--color-panel-muted);
+    color: var(--color-text-muted);
+}
+
+.platform-icon-upload {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--color-primary);
+    font-size: 0.84rem;
+    cursor: pointer;
+}
+
+/* 弹窗：高级选项折叠区 */
+.platform-advanced {
+    margin-top: 16px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--color-panel-muted);
+}
+
+.platform-advanced > summary {
+    padding: 10px 14px;
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.platform-advanced-body {
+    display: grid;
+    gap: 4px;
+    padding: 4px 14px 14px;
+}
+
+.model-default-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--color-text-muted);
+    font-size: 0.78rem;
+    white-space: nowrap;
+}
+
+.model-default-option .form-check-input {
+    margin: 0;
+}
+
+.models-section-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
 }
 
 /* 模态窗口样式 */

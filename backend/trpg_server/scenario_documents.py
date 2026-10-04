@@ -20,7 +20,7 @@ except ImportError:  # pragma: no cover
         fitz = None
 
 
-SUPPORTED_SCENARIO_EXTENSIONS = {".docx", ".pdf", ".txt", ".md", ".markdown", ".text"}
+SUPPORTED_SCENARIO_EXTENSIONS = {".doc", ".docx", ".pdf", ".txt", ".md", ".markdown", ".text"}
 
 
 class ScenarioDocumentError(ValueError):
@@ -55,7 +55,7 @@ class DocumentChunk:
 def validate_scenario_upload(filename: str, size: int, max_bytes: int) -> str:
     suffix = Path(filename or "").suffix.casefold()
     if suffix not in SUPPORTED_SCENARIO_EXTENSIONS:
-        raise ScenarioDocumentError("仅支持 DOCX、PDF、TXT 和 Markdown 文档")
+        raise ScenarioDocumentError("仅支持 DOC、DOCX、PDF、TXT 和 Markdown 文档")
     if size <= 0:
         raise ScenarioDocumentError("文件为空")
     if size > max_bytes:

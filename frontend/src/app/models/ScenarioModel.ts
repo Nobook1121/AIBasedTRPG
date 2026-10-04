@@ -173,6 +173,8 @@ class ScenarioModel {
         return data.data;
     }
 
+    // 使用 XMLHttpRequest 而非 fetch：需要 upload.onprogress 上报上传百分比，
+    // 同时手动补上 CSRF 头（与 api-client 保持一致）。
     async createImportJob(formData: FormData, onProgress?: (value: number) => void): Promise<ScenarioImportStart> {
         const xhr = new XMLHttpRequest();
         xhr.onreadystatechange = () => {
@@ -198,6 +200,8 @@ class ScenarioModel {
         return data.data!;
     }
 
+    // 轮询导入任务直到进入终态（done/failed/cancelled/published）；
+    // 仅 done 视为成功，其余终态抛出任务自身错误。
     async waitForImportJob(id: string, onProgress?: (job: ScenarioImportJob) => void): Promise<ScenarioImportJob> {
         for (;;) {
             const job = await this.getImportJob(id);

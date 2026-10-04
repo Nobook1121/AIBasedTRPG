@@ -1,11 +1,116 @@
-class AIPlatformManager {
+// class 与 types/config.d.ts 中的 interface AIPlatformManager 同名并声明合并：
+// 显式实现该接口后，任何方法签名与接口不一致都会在类型检查阶段报错，
+// 避免「改了接口、忘了改实现」的静默漂移。接口只描述公开方法，私有字段不参与约束。
+
+// 内置供应商模板：既用于「添加平台」时预填默认值，也用于列表排序（顺序即展示顺序）。
+// 平台实际是否展示由后端「列出平台」接口决定，模板不再是写死的加载清单。
+const BUILTIN_PLATFORM_TEMPLATES: AIPlatformTemplate[] = [
+    {
+        id: "aliyun",
+        name: "阿里云百炼",
+        description: "阿里云 AI 大模型服务平台",
+        icon: "/assets/aiplatform/aliyun.png",
+        base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+        base_url_full: true,
+        provider_type: "openai-compatible",
+        models: [
+            { id: "qwen3.5-plus", name: "Qwen3.5-Plus" },
+            { id: "qwen-turbo", name: "Qwen Turbo（经济型）" },
+        ],
+    },
+    {
+        id: "siliconflow",
+        name: "硅基流动",
+        description: "硅基流动 AI 模型服务平台",
+        icon: "/assets/aiplatform/siliconflow.png",
+        base_url: "https://api.siliconflow.cn/v1",
+        base_url_full: false,
+        provider_type: "openai-compatible",
+        models: [{ id: "gpt-4-turbo", name: "GPT-4 Turbo" }],
+    },
+    {
+        id: "deepseek",
+        name: "DeepSeek",
+        description: "深度求索 AI 模型服务平台",
+        icon: "/assets/aiplatform/deepseek.png",
+        base_url: "https://api.deepseek.com/v1",
+        base_url_full: false,
+        provider_type: "openai-compatible",
+        models: [{ id: "deepseek-chat", name: "DeepSeek Chat" }],
+    },
+    {
+        id: "openrouter",
+        name: "OpenRouter",
+        description: "OpenRouter AI 模型服务平台",
+        icon: "/assets/aiplatform/openrouter.png",
+        base_url: "https://openrouter.ai/api/v1",
+        base_url_full: false,
+        provider_type: "openai-compatible",
+        models: [{ id: "openai/gpt-4-turbo", name: "GPT-4 Turbo" }],
+    },
+    {
+        id: "lmstudio",
+        name: "LMStudio",
+        description: "本地运行的 AI 模型服务器，兼容 OpenAI API",
+        icon: "/assets/aiplatform/lmstudio.png",
+        base_url: "http://localhost:1234/v1",
+        base_url_full: false,
+        provider_type: "openai-compatible",
+        models: [{ id: "local-model", name: "本地模型" }],
+    },
+    {
+        id: "openai",
+        name: "OpenAI",
+        description: "OpenAI 官方聊天完成接口",
+        // 无内置头像文件，前端回落到首字文字头像。
+        icon: "",
+        base_url: "https://api.openai.com/v1",
+        base_url_full: false,
+        provider_type: "openai",
+        models: [{ id: "gpt-4o", name: "GPT-4o" }],
+    },
+];
+
+// 内置供应商展示顺序（缺失的内置平台重加后仍排在自定义平台之前）。
+const BUILTIN_PLATFORM_ORDER = BUILTIN_PLATFORM_TEMPLATES.map((template) => template.id);
+
+function getBuiltinPlatformTemplate(platform: string): AIPlatformTemplate | null {
+    return BUILTIN_PLATFORM_TEMPLATES.find((template) => template.id === platform) || null;
+}
+
+// 新模型写入的默认参数，与后端默认请求配置保持一致；用户可在请求模板里覆盖。
+const DEFAULT_MODEL_PARAMS = {
+    context_window: 8192,
+    temperature: 0.7,
+    top_p: 0.95,
+    max_tokens: 4096,
+};
+
+class AIPlatformManager implements AIPlatformManager {
     private readonly platforms: Record<string, AIPlatformConfig> = {};
-    private readonly platformsPath = "config/aiplatform";
 
     async loadPlatforms(): Promise<AIPlatformConfig[]> {
-        const platformIds = ["aliyun", "siliconflow", "deepseek", "openrouter", "lmstudio"];
-        const results = await Promise.all(platformIds.map((platform) => this.loadPlatform(platform)));
-        return results.filter((platform): platform is AIPlatformConfig => platform !== null);
+        // 从后端「列出平台」接口读取磁盘上的全部平台（内置 + 自定义）。
+        // 旧实现写死内置 id 并静态 fetch，导致自定义新增的平台刷新后丢失。
+        const { response, data } = await TrpgApi.requestWithResponse<ApiResponse<{ platforms?: unknown }>>(
+            "/api/config/aiplatform",
+            { method: "GET" },
+        );
+        if (!response.ok || !data?.success || !Array.isArray(data.data?.platforms)) {
+            throw new Error(data?.message || data?.error || "加载平台列表失败");
+        }
+
+        for (const key of Object.keys(this.platforms)) delete this.platforms[key];
+
+        const platforms: AIPlatformConfig[] = [];
+        for (const raw of data.data.platforms) {
+            const normalized = normalizeAIPlatformConfig(raw);
+            if (!normalized) continue;
+            this.platforms[normalized.platform] = normalized;
+            platforms.push(normalized);
+        }
+        platforms.sort(comparePlatformOrder);
+        return platforms;
     }
 
     getPlatform(platform: string): AIPlatformConfig | null {
@@ -14,6 +119,14 @@ class AIPlatformManager {
 
     getAllPlatforms(): AIPlatformConfig[] {
         return Object.values(this.platforms);
+    }
+
+    getBuiltinTemplates(): AIPlatformTemplate[] {
+        // 返回副本，避免调用方修改内置模板常量。
+        return BUILTIN_PLATFORM_TEMPLATES.map((template) => ({
+            ...template,
+            models: template.models.map((model) => ({ ...model })),
+        }));
     }
 
     async setPlatformEnabled(platform: string, enabled: boolean): Promise<boolean> {
@@ -46,6 +159,39 @@ class AIPlatformManager {
         return true;
     }
 
+    async deletePlatform(platform: string): Promise<boolean> {
+        try {
+            const { response, data } = await TrpgApi.requestWithResponse<ApiResponse>(
+                `/api/config/aiplatform/${encodeURIComponent(platform)}`,
+                { method: "DELETE" },
+            );
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || data.error || "删除平台失败");
+            }
+            delete this.platforms[platform];
+            return true;
+        } catch (error) {
+            console.error("删除平台失败:", error);
+            return false;
+        }
+    }
+
+    async detectResponsesApi(platform: string): Promise<{ supported: boolean; status: number | null; detail: string }> {
+        const { response, data } = await TrpgApi.requestWithResponse<ApiResponse & { data?: { supported?: boolean; status?: number | null; detail?: string } }>(
+            `/api/config/aiplatform/${platform}/detect-responses`,
+            { method: "POST", body: {} },
+        );
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || data.error || "探测失败");
+        }
+        const result = data.data || {};
+        return {
+            supported: result.supported === true,
+            status: typeof result.status === "number" ? result.status : null,
+            detail: typeof result.detail === "string" ? result.detail : "",
+        };
+    }
+
     async addModel(
         platform: string,
         model: Pick<AIModelConfig, "id" | "name"> & Partial<Pick<AIModelConfig, "description">>,
@@ -59,12 +205,7 @@ class AIPlatformManager {
                 name: model.name,
                 description: model.description || "",
                 enabled: true,
-                params: {
-                    context_window: 8192,
-                    temperature: 0.7,
-                    top_p: 0.95,
-                    max_tokens: 4096,
-                },
+                params: { ...DEFAULT_MODEL_PARAMS },
             });
 
             await this.generateModelRequestConfig(platform, model.id);
@@ -202,13 +343,15 @@ class AIPlatformManager {
     }
 
     private async loadPlatform(platform: string): Promise<AIPlatformConfig | null> {
+        // 保留该方法以兼容历史调用：直接从磁盘静态路径加载单个平台。
         try {
-            const response = await fetch(`${this.platformsPath}/${platform}.json`);
+            const response = await fetch(`config/aiplatform/${platform}.json`);
             if (!response.ok) throw new Error(`无法加载平台配置: ${platform}`);
             const config = await response.json() as unknown;
-            if (!isAIPlatformConfig(config)) throw new Error(`平台配置格式错误: ${platform}`);
-            this.platforms[platform] = config;
-            return config;
+            const normalized = normalizeAIPlatformConfig(config);
+            if (!normalized) throw new Error(`平台配置格式错误: ${platform}`);
+            this.platforms[normalized.platform] = normalized;
+            return normalized;
         } catch (error) {
             console.error(`加载平台 ${platform} 失败:`, error);
             return null;
@@ -224,26 +367,67 @@ function aiPlatformIsRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null;
 }
 
-function isAIPlatformConfig(value: unknown): value is AIPlatformConfig {
-    if (!aiPlatformIsRecord(value)) return false;
-    return typeof value.platform === "string"
-        && typeof value.name === "string"
-        && typeof value.description === "string"
-        && typeof value.icon === "string"
-        && typeof value.enabled === "boolean"
-        && aiPlatformIsRecord(value.config)
-        && typeof value.config.base_url === "string"
-        && typeof value.config.timeout === "number"
-        && Array.isArray(value.models)
-        && value.models.every(isAIModelConfig);
+// 把后端返回的原始平台配置规整成前端可用的形状：缺失字段（如内置 openai.json 没有 icon）
+// 用内置模板或安全默认值兜底，而不是像旧实现那样整条丢弃。
+function normalizeAIPlatformConfig(value: unknown): AIPlatformConfig | null {
+    if (!aiPlatformIsRecord(value)) return null;
+    const platform = typeof value.platform === "string" ? value.platform.trim() : "";
+    if (!platform) return null;
+
+    const template = getBuiltinPlatformTemplate(platform);
+    const rawConfig = aiPlatformIsRecord(value.config) ? value.config : {};
+    const config = rawConfig as unknown as AIPlatformConfig["config"];
+
+    const baseUrl = typeof rawConfig.base_url === "string" && rawConfig.base_url
+        ? rawConfig.base_url
+        : (template?.base_url || "");
+    config.base_url = baseUrl;
+    config.timeout = typeof rawConfig.timeout === "number" ? rawConfig.timeout : 30;
+    config.provider_type = typeof rawConfig.provider_type === "string" && rawConfig.provider_type
+        ? rawConfig.provider_type
+        : (template?.provider_type || "openai-compatible");
+    config.base_url_full = typeof rawConfig.base_url_full === "boolean"
+        ? rawConfig.base_url_full
+        : (template?.base_url_full ?? baseUrl.endsWith("/chat/completions"));
+
+    const models = (Array.isArray(value.models) ? value.models : [])
+        .map(normalizeAIModelConfig)
+        .filter((model): model is AIModelConfig => model !== null);
+    config.default_model = typeof rawConfig.default_model === "string" && rawConfig.default_model
+        ? rawConfig.default_model
+        : (models.find((model) => model.enabled)?.id || models[0]?.id || "");
+
+    return {
+        platform,
+        name: typeof value.name === "string" && value.name ? value.name : platform,
+        description: typeof value.description === "string" ? value.description : "",
+        icon: typeof value.icon === "string" ? value.icon : "",
+        enabled: value.enabled === true,
+        config,
+        models,
+    };
 }
 
-function isAIModelConfig(value: unknown): value is AIModelConfig {
-    if (!aiPlatformIsRecord(value)) return false;
-    return typeof value.id === "string"
-        && typeof value.name === "string"
-        && typeof value.description === "string"
-        && typeof value.enabled === "boolean";
+function normalizeAIModelConfig(value: unknown): AIModelConfig | null {
+    if (!aiPlatformIsRecord(value) || typeof value.id !== "string" || !value.id) return null;
+    const model: AIModelConfig = {
+        id: value.id,
+        name: typeof value.name === "string" && value.name ? value.name : value.id,
+        description: typeof value.description === "string" ? value.description : "",
+        enabled: value.enabled !== false,
+    };
+    if (aiPlatformIsRecord(value.params)) model.params = value.params;
+    return model;
+}
+
+// 排序：内置供应商按模板顺序排在前，自定义供应商按名称排在后面。
+function comparePlatformOrder(left: AIPlatformConfig, right: AIPlatformConfig): number {
+    const leftIndex = BUILTIN_PLATFORM_ORDER.indexOf(left.platform);
+    const rightIndex = BUILTIN_PLATFORM_ORDER.indexOf(right.platform);
+    const leftRank = leftIndex === -1 ? BUILTIN_PLATFORM_ORDER.length : leftIndex;
+    const rightRank = rightIndex === -1 ? BUILTIN_PLATFORM_ORDER.length : rightIndex;
+    if (leftRank !== rightRank) return leftRank - rightRank;
+    return left.name.localeCompare(right.name);
 }
 
 function extractTotalTokens(result: unknown): number {

@@ -15,7 +15,7 @@ from trpg_server.network_discovery import (
     test_udp_discovery,
 )
 from trpg_server.security import require_permission_node
-from trpg_server.responses import error_response, success_response
+from trpg_server.responses import error_response, server_error, success_response
 from trpg_server.settings import NETWORK_CONFIG_FILE, PENETRATION_CONFIG_FILE
 
 bp = Blueprint("network", __name__)
@@ -37,7 +37,7 @@ def get_network_config_api():
         return success_response(config, "Network config loaded successfully")
     except Exception as exc:
         logger.exception("Failed to get network config")
-        return error_response("Failed to get network config", 500, str(exc))
+        return server_error("Failed to get network config")
 
 
 @bp.route("/api/network/config", methods=["POST"])
@@ -63,7 +63,7 @@ def update_network_config_api():
         return success_response(config_data, "Network config updated successfully")
     except Exception as exc:
         logger.exception("Failed to update network config")
-        return error_response("Failed to update network config", 500, str(exc))
+        return server_error("Failed to update network config")
 
 
 @bp.route("/api/network/status", methods=["GET"])
@@ -91,7 +91,7 @@ def get_network_status():
         return success_response(status, "Network status loaded successfully")
     except Exception as exc:
         logger.exception("Failed to get network status")
-        return error_response("Failed to get network status", 500, str(exc))
+        return server_error("Failed to get network status")
 
 
 @bp.route("/api/network/test", methods=["POST"])
@@ -116,7 +116,7 @@ def test_network_connection():
         )
     except Exception as exc:
         logger.exception("Failed to test network connection")
-        return error_response("Failed to test network connection", 500, str(exc))
+        return server_error("Failed to test network connection")
 
 
 @bp.route("/api/network/penetration/config", methods=["GET"])
@@ -127,7 +127,7 @@ def get_penetration_config_api():
         return success_response(config, "Penetration config loaded successfully")
     except Exception as exc:
         logger.exception("Failed to get penetration config")
-        return error_response("Failed to get penetration config", 500, str(exc))
+        return server_error("Failed to get penetration config")
 
 
 @bp.route("/api/network/penetration/config", methods=["POST"])
@@ -149,7 +149,7 @@ def update_penetration_config_api():
         return success_response(config_data, "Penetration config updated successfully")
     except Exception as exc:
         logger.exception("Failed to update penetration config")
-        return error_response("Failed to update penetration config", 500, str(exc))
+        return server_error("Failed to update penetration config")
 
 
 @bp.route("/api/network/penetration/status", methods=["GET"])
@@ -166,7 +166,7 @@ def get_penetration_status():
         return success_response(status, "Penetration status loaded successfully")
     except Exception as exc:
         logger.exception("Failed to get penetration status")
-        return error_response("Failed to get penetration status", 500, str(exc))
+        return server_error("Failed to get penetration status")
 
 
 def _validate_network_config(config_data):

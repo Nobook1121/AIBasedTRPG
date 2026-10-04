@@ -113,6 +113,8 @@ class DiceTool {
         return Math.floor(Math.random() * sides) + 1;
     }
 
+    // COC7 奖励/惩罚骰：个位骰共用，额外掷出（N+1）个互不相同的十位骰，
+    // 奖励骰取最小值、惩罚骰取最大值作为最终结果。
     rollPercentile(bonusDice = 0, penaltyDice = 0): { result: number; rolls: number[] } {
         if (bonusDice > 0 && penaltyDice > 0) throw new Error("奖励骰和惩罚骰不能同时使用");
         if (!bonusDice && !penaltyDice) return { result: this.rollSingleDice("d100"), rolls: [] };

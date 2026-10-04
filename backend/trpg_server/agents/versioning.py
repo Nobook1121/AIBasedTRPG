@@ -31,7 +31,12 @@ def scenario_content_changed(old: Mapping[str, Any] | None, new: Mapping[str, An
     def stable(value):
         if not isinstance(value, Mapping): return value
         result = copy.deepcopy(dict(value))
-        for key in ("id", "scenario_version", "version", "version_id", "createdAt", "updatedAt", "owner_id", "creator_username", "public_id"):
+        # 基础信息（标题/作者/推荐人数/简介/封面）不属于剧本内容：只修改它们时
+        # 不应触发版本号递增，也不应重新做向量嵌入。
+        for key in (
+            "id", "scenario_version", "version", "version_id", "createdAt", "updatedAt", "owner_id", "creator_username", "public_id",
+            "title", "author", "playerCount", "notes", "cover",
+        ):
             result.pop(key, None)
         return result
     return stable(old or {}) != stable(new or {})
