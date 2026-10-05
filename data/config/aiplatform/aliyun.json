@@ -9,7 +9,11 @@
     "timeout": 20,
     "headers": {
       "Content-Type": "application/json"
-    }
+    },
+    "use_previous_response_id": false,
+    "responses_api_supported": false,
+    "responses_api_checked_at": "2026-10-05 01:26:24",
+    "responses_api_detail": "previous_response_id is not accepted: HTTPSConnectionPool(host='dashscope.aliyuncs.com', port=443): Read timed out. (read timeout=15)"
   },
   "models": [
     {
