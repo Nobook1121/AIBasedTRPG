@@ -25,6 +25,11 @@
   --line:rgba(255,255,255,.09);
   --line-gold:rgba(224,177,94,.22);
   --radius:4px;
+  --mint:#66E2AD;
+  --amber:#D98A5F;
+  --azure:#7FB2EE;
+  /* 分区点缀色：默认金色，各板块可覆盖。四色均取自项目自身的主题色板 */
+  --sec-accent:var(--gold);
   --sans:"Segoe UI","Microsoft YaHei","PingFang SC",Tahoma,Geneva,Verdana,sans-serif;
   /* 拉丁字形走衬线，中日文字形回退到高质量无衬线（避免 SimSun 的细弱观感） */
   --display:"Iowan Old Style","Palatino Linotype","Book Antiqua",Palatino,Georgia,"Microsoft YaHei","PingFang SC","Hiragino Sans GB","Noto Sans SC",sans-serif;
@@ -32,7 +37,12 @@
   --maxw:1080px;
 }
 *{box-sizing:border-box}
-html{scroll-behavior:smooth}
+html{
+  scroll-behavior:smooth;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  text-rendering:optimizeLegibility;
+}
 body{
   margin:0;
   font-family:var(--sans);
@@ -57,19 +67,30 @@ header,main,footer{position:relative;z-index:1}
 a{color:var(--gold);text-decoration:none}
 a:hover{color:var(--ink-strong)}
 .wrap{width:100%;max-width:var(--maxw);margin:0 auto;padding:0 26px}
-h1,h2,h3{font-family:var(--display);color:var(--ink-strong);font-weight:600;margin:0;line-height:1.22;letter-spacing:.005em}
+/* 标题行高放宽到 1.3 并启用均衡折行，中日文标题不再显得拥挤生硬 */
+h1,h2,h3{font-family:var(--display);color:var(--ink-strong);font-weight:600;margin:0;line-height:1.3;letter-spacing:.005em;text-wrap:balance}
 .wrap>*{min-width:0}
 .split>*,.code-wrap>*,.docs>*,.list>*,.steps>*,.who-grid>*,.mock>*{min-width:0}
-section{padding:88px 0;border-top:1px solid var(--line)}
-section:first-of-type{border-top:none}
+section{padding:88px 0;border-top:none;position:relative}
+/* 板块之间改为一根两端淡出的细线，取代整段实线，滚动时不再出现硬色界 */
+section::before,footer::before{
+  content:"";position:absolute;left:0;right:0;top:0;height:1px;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.07) 26%,rgba(255,255,255,.07) 74%,transparent);
+}
+section:first-of-type::before{display:none}
+/* 分区色温：透明 → 着色 → 透明，让每个板块在交界处自然回到底色，避免生硬色阶 */
+.tint-warm{--sec-accent:var(--amber);background:linear-gradient(180deg,transparent 0%,rgba(166,84,60,.115) 32%,rgba(166,84,60,.095) 60%,transparent 100%)}
+.tint-cool{--sec-accent:var(--mint);background:linear-gradient(180deg,transparent 0%,rgba(102,226,173,.075) 32%,rgba(102,226,173,.06) 60%,transparent 100%)}
+.tint-azure{--sec-accent:var(--azure);background:linear-gradient(180deg,transparent 0%,rgba(88,166,255,.095) 32%,rgba(88,166,255,.078) 60%,transparent 100%)}
+.tint-gold{--sec-accent:var(--gold);background:linear-gradient(180deg,transparent 0%,rgba(224,177,94,.075) 32%,rgba(224,177,94,.06) 60%,transparent 100%)}
 .kicker{
   display:block;font-family:var(--mono);font-size:.7rem;letter-spacing:.22em;
-  text-transform:uppercase;color:var(--gold-dim);margin-bottom:16px;
+  text-transform:uppercase;color:var(--sec-accent);margin-bottom:16px;
 }
 .sec-head{max-width:760px;margin-bottom:44px}
 .sec-head h2{font-size:clamp(1.5rem,3.1vw,2.15rem)}
 .sec-head p{color:var(--muted);margin:16px 0 0;font-size:.98rem}
-.hl{font-style:normal;color:var(--gold)}
+.hl{font-style:normal;color:var(--sec-accent)}
 .mono{font-family:var(--mono)}
 
 /* ---------- 按钮：直角、扁平、带箭头 ---------- */
@@ -85,6 +106,8 @@ section:first-of-type{border-top:none}
 .btn-outline{background:transparent;color:var(--ink);border-color:rgba(255,255,255,.24)}
 .btn-outline:hover{color:var(--ink-strong);border-color:var(--gold);background:rgba(224,177,94,.07)}
 .btn .ar{font-family:var(--mono);font-size:.86em;opacity:.85}
+.btn .ico-dl{width:15px;height:15px;flex:none}
+.btn .ver{font-family:var(--mono);font-size:.72em;font-weight:600;letter-spacing:.02em;opacity:.72}
 .btn-sm{padding:7px 13px;font-size:.8rem}
 
 /* ---------- 顶栏 ---------- */
@@ -114,36 +137,14 @@ section:first-of-type{border-top:none}
 .hero-cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:32px}
 .hero-meta{margin:20px 0 0;font-family:var(--mono);font-size:.74rem;color:var(--muted-2);letter-spacing:.02em}
 
-/* ---------- 产品 mock ---------- */
-.mock{display:grid;grid-template-columns:212px 1fr;gap:1px;margin-top:56px;background:var(--line);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
-.mock-side{background:var(--bg-2);padding:22px 18px;display:flex;flex-direction:column;gap:22px}
-.stat-label{font-family:var(--mono);font-size:.62rem;letter-spacing:.16em;text-transform:uppercase;color:var(--gold-dim);margin-bottom:6px}
-.stat-line{font-size:.84rem;color:var(--ink);line-height:1.6}
-.stat-line b{color:var(--ink-strong);font-weight:600}
-.mock-main{background:var(--bg-2);display:flex;flex-direction:column}
-.bar{display:flex;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid var(--line)}
-.bar-title{font-family:var(--mono);font-size:.76rem;color:var(--muted)}
-.bar-round{font-family:var(--mono);font-size:.62rem;letter-spacing:.14em;color:var(--gold-dim);border:1px solid var(--line-gold);border-radius:2px;padding:2px 7px}
-.bar-live{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:.62rem;letter-spacing:.14em;color:var(--teal)}
-.bar-live i{width:6px;height:6px;border-radius:50%;background:var(--teal);display:block}
-.feed{padding:20px 18px;display:flex;flex-direction:column;gap:16px;flex:1}
-.feed-sys{font-family:var(--mono);font-size:.7rem;color:var(--muted-2)}
-.msg{display:flex;gap:11px;align-items:flex-start}
-.who{font-family:var(--mono);font-size:.64rem;letter-spacing:.08em;color:var(--gold-dim);border:1px solid var(--line-gold);border-radius:2px;padding:2px 6px;flex:none;margin-top:3px}
-.who.you{color:var(--teal);border-color:rgba(79,163,155,.4)}
-.say{font-size:.9rem;color:var(--ink);border-left:2px solid var(--line-gold);padding-left:12px}
-.msg.player .say{border-left-color:rgba(79,163,155,.45)}
-.roll{border:1px solid var(--line);border-radius:3px;background:var(--bg-3);padding:10px 14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-family:var(--mono);font-size:.78rem;color:var(--muted)}
-.roll b{color:var(--gold);font-size:.95rem}
-.roll .ok{color:var(--teal)}
-.state{margin:0 18px 20px;border:1px solid var(--line);border-radius:3px;background:rgba(79,163,155,.05);padding:11px 14px;display:flex;gap:20px;flex-wrap:wrap}
-.state div{font-size:.8rem;color:var(--muted)}
-.state span{font-family:var(--mono);font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--teal);display:block;margin-bottom:3px}
-
 /* ---------- 编号清单 ---------- */
 .list{display:grid;grid-template-columns:1fr 1fr;gap:0 54px;border-top:1px solid var(--line)}
 .item{display:flex;gap:18px;padding:24px 0;border-bottom:1px solid var(--line)}
-.item-num{font-family:var(--mono);font-size:.74rem;color:var(--gold-dim);padding-top:4px;flex:none;letter-spacing:.06em}
+.item-num{font-family:var(--mono);font-size:.74rem;color:var(--gold);padding-top:4px;flex:none;letter-spacing:.06em}
+.list .item:nth-child(4n+1) .item-num{color:var(--gold)}
+.list .item:nth-child(4n+2) .item-num{color:var(--mint)}
+.list .item:nth-child(4n+3) .item-num{color:var(--amber)}
+.list .item:nth-child(4n) .item-num{color:var(--azure)}
 .item h3{font-size:1.04rem;margin-bottom:7px}
 .item p{margin:0;color:var(--muted);font-size:.9rem}
 
@@ -151,7 +152,7 @@ section:first-of-type{border-top:none}
 .split{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:start}
 .rules{list-style:none;margin:26px 0 0;padding:0}
 .rules li{position:relative;padding:13px 0 13px 26px;border-top:1px solid var(--line);color:var(--muted);font-size:.92rem}
-.rules li::before{content:"";position:absolute;left:2px;top:24px;width:9px;height:1px;background:var(--gold)}
+.rules li::before{content:"";position:absolute;left:2px;top:24px;width:9px;height:1px;background:var(--sec-accent)}
 .rules li strong{color:var(--ink);font-weight:600}
 .quote-box{border:1px solid var(--line);border-radius:var(--radius);background:var(--bg-2);padding:24px}
 .quote-box .kicker{margin-bottom:12px}
@@ -161,7 +162,11 @@ section:first-of-type{border-top:none}
 .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-top:1px solid var(--line)}
 .step{padding:24px 26px 24px 0;border-bottom:1px solid var(--line)}
 .step + .step{padding-left:26px;border-left:1px solid var(--line)}
-.step-num{font-family:var(--mono);font-size:.74rem;color:var(--gold-dim);letter-spacing:.06em}
+.step-num{font-family:var(--mono);font-size:.74rem;color:var(--gold);letter-spacing:.06em}
+.steps .step:nth-child(1) .step-num{color:var(--gold)}
+.steps .step:nth-child(2) .step-num{color:var(--mint)}
+.steps .step:nth-child(3) .step-num{color:var(--amber)}
+.steps .step:nth-child(4) .step-num{color:var(--azure)}
 .step h3{font-size:1rem;margin:10px 0 8px}
 .step p{margin:0;color:var(--muted);font-size:.88rem}
 
@@ -169,13 +174,21 @@ section:first-of-type{border-top:none}
 .code-wrap{display:grid;grid-template-columns:1.25fr .75fr;gap:26px;align-items:start}
 .code-card{border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:#080C10}
 .code-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--bg-2)}
-.code-bar span{font-family:var(--mono);font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--gold-dim)}
+.code-bar span{font-family:var(--mono);font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--sec-accent)}
 .code-card pre{margin:0;padding:18px 16px;overflow-x:auto;font-family:var(--mono);font-size:.79rem;line-height:1.9;color:#C9D6CE}
 .code-card pre em{color:var(--muted-2);font-style:normal}
+.steps-card{border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:var(--bg-2)}
+.steps-card ol{list-style:none;margin:0;padding:0}
+.steps-card li{display:flex;gap:14px;padding:17px 18px;border-top:1px solid var(--line)}
+.steps-card li:first-child{border-top:0}
+.steps-card .n{font-family:var(--mono);font-size:.72rem;color:var(--sec-accent);flex:none;padding-top:2px}
+.steps-card .d{color:var(--muted);font-size:.9rem;line-height:1.62}
+.steps-card .d b{display:block;font-family:var(--display);color:var(--ink-strong);font-size:.98rem;margin-bottom:5px}
+.steps-card code{font-family:var(--mono);font-size:.82em;color:var(--gold);background:rgba(224,177,94,.09);border:1px solid var(--line-gold);border-radius:2px;padding:1px 5px}
 .log{border:1px solid var(--line);border-radius:var(--radius);background:#080C10;padding:16px;font-family:var(--mono);font-size:.74rem;line-height:1.95;color:var(--muted)}
 .log .t{color:var(--muted-2)}
 .log .i{color:var(--teal)}
-.log-cap{font-family:var(--mono);font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--gold-dim);margin:0 0 10px}
+.log-cap{font-family:var(--mono);font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--sec-accent);margin:0 0 10px}
 .note{color:var(--muted-2);font-size:.84rem;margin-top:18px}
 .note code,td code,.rules code{font-family:var(--mono);font-size:.82em;color:var(--gold);background:rgba(224,177,94,.09);border:1px solid var(--line-gold);border-radius:2px;padding:1px 5px}
 
@@ -208,27 +221,232 @@ section:first-of-type{border-top:none}
 .faq details{border-bottom:1px solid var(--line)}
 .faq summary{cursor:pointer;padding:20px 0;display:flex;justify-content:space-between;align-items:baseline;gap:20px;font-family:var(--display);font-size:1.02rem;color:var(--ink-strong);list-style:none}
 .faq summary::-webkit-details-marker{display:none}
-.faq summary::after{content:"+";font-family:var(--mono);color:var(--gold-dim);font-size:1.1rem;flex:none}
+.faq summary::after{content:"+";font-family:var(--mono);color:var(--sec-accent);font-size:1.1rem;flex:none}
 .faq details[open] summary::after{content:"–"}
 .faq p{margin:0 0 22px;padding-right:44px;color:var(--muted);font-size:.92rem}
 
 /* ---------- 结尾 CTA ---------- */
-.final{border-top:1px solid var(--line);padding:96px 0}
+.final{padding:96px 0}
 .final h2{font-size:clamp(1.6rem,3.4vw,2.35rem);max-width:16em}
 .final p{color:var(--muted);margin:18px 0 0;max-width:40em}
 .final .hero-cta{margin-top:30px}
 
 /* ---------- 页脚 ---------- */
-footer{border-top:1px solid var(--line);padding:40px 0 52px}
+footer{padding:40px 0 52px}
 .footer-inner{display:flex;flex-wrap:wrap;gap:24px;justify-content:space-between;align-items:center}
 .footer-muted{color:var(--muted-2);font-size:.8rem;max-width:46em;margin-top:8px}
 .footer-links{display:flex;flex-wrap:wrap;gap:22px;font-size:.85rem}
 
+/* ---------- 界面预览：左右交替的特色排布 + 滚动渐显 ---------- */
+.shots{display:flex;flex-direction:column;gap:72px}
+.shot{display:grid;grid-template-columns:1.06fr .94fr;gap:48px;align-items:center;margin:0}
+.shot:nth-child(even) .shot-canvas{order:2}
+.shot-canvas{position:relative;overflow:hidden;aspect-ratio:16/10;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg-3);box-shadow:0 26px 64px rgba(0,0,0,.38)}
+/* 真截图默认隐藏，加载成功才淡入盖住示意图；否则一直显示下方的 CSS 示意图 */
+.shot img{position:absolute;inset:0;z-index:2;width:100%;height:100%;object-fit:cover;object-position:top center;opacity:0;transition:opacity .3s ease}
+.shot img.mk-ready{opacity:1}
+.shot figcaption{padding:0;min-width:0}
+.shot .cap-k{display:block;font-family:var(--mono);font-size:.62rem;letter-spacing:.16em;text-transform:uppercase;color:var(--sec-accent);margin-bottom:12px}
+.shot figcaption h3{font-family:var(--display);font-size:clamp(1.18rem,2.1vw,1.6rem);line-height:1.3;color:var(--ink-strong);margin:0 0 14px;text-wrap:balance}
+.shot p{margin:0;color:var(--muted);font-size:.95rem;line-height:1.72}
+.shot p b{color:var(--ink);font-weight:600}
+.shot-points{display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:18px 0 0;padding:0}
+.shot-points li{padding:4px 11px;border:1px solid var(--line);border-radius:999px;font-family:var(--mono);font-size:.68rem;letter-spacing:.04em;color:var(--muted)}
+/* 滚动渐显：仅当 JS 就绪才隐藏，脚本失效时内容保持可见 */
+.rv-ready .sec-head{opacity:0;transform:translateY(24px);transition:opacity .7s cubic-bezier(.2,.7,.3,1),transform .7s cubic-bezier(.2,.7,.3,1)}
+.rv-ready .sec-head.in{opacity:1;transform:none}
+.rv-ready .shot-canvas{opacity:0;transform:translateY(24px);transition:opacity .7s cubic-bezier(.2,.7,.3,1),transform .7s cubic-bezier(.2,.7,.3,1)}
+.rv-ready .shot figcaption>*{opacity:0;transform:translateY(16px);transition:opacity .6s cubic-bezier(.2,.7,.3,1),transform .6s cubic-bezier(.2,.7,.3,1)}
+.rv-ready .shot.in .shot-canvas,.rv-ready .shot.in figcaption>*{opacity:1;transform:none}
+.rv-ready .shot.in figcaption>*:nth-child(2){transition-delay:.10s}
+.rv-ready .shot.in figcaption>*:nth-child(3){transition-delay:.20s}
+.rv-ready .shot.in figcaption>*:nth-child(4){transition-delay:.30s}
+@media (prefers-reduced-motion:reduce){
+  .rv-ready .sec-head,.rv-ready .shot-canvas,.rv-ready .shot figcaption>*{opacity:1;transform:none;transition:none}
+}
+
+/* 示意图：还原程序真实外观（程序默认主题「赛博档案」：深青底 + 薄荷绿强调 + 网格） */
+.shot-mock{
+  /* 就地覆盖调色板为程序主题的真实取值，下面的 .mk-* 规则据此自动换色 */
+  --ink:#c7d8d1;--ink-strong:#dce3ea;--muted:rgba(199,216,209,.62);--muted-2:rgba(199,216,209,.4);
+  --line:rgba(126,232,190,.22);--line-gold:rgba(126,232,190,.4);
+  --gold:#66e2ad;--gold-dim:rgba(102,226,173,.82);--teal:#66e2ad;
+  --bg-3:rgba(9,28,34,.9);
+  position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;overflow:hidden;color:var(--ink);font-size:11px;line-height:1.5;
+  background:radial-gradient(120% 92% at 86% -12%,rgba(37,170,121,.2),transparent 58%),linear-gradient(135deg,#081319,#0b2326 58%,#081319);
+}
+.shot-mock::before{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+  background-image:linear-gradient(rgba(126,232,190,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(126,232,190,.055) 1px,transparent 1px);
+  background-size:22px 22px}
+.shot-mock>*{position:relative;z-index:1}
+.mk-bar{display:flex;flex:none;align-items:center;gap:9px;padding:8px 11px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.014)}
+.mk-dots{display:flex;flex:none;gap:4px}
+.mk-dots i{display:block;width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.15)}
+.mk-bar b{overflow:hidden;font-family:var(--mono);font-size:9px;font-weight:400;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap;text-overflow:ellipsis}
+.mk-tag{flex:none;margin-left:auto;padding:1px 5px;border:1px solid rgba(79,163,155,.38);border-radius:2px;font-family:var(--mono);font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--teal)}
+.mk-body{display:flex;flex:1;min-height:0}
+.mk-side{display:flex;flex:none;flex-direction:column;gap:7px;width:30%;min-width:0;padding:10px;border-right:1px solid var(--line)}
+.mk-side-r{border-right:none;border-left:1px solid var(--line)}
+.mk-main{display:flex;flex:1;flex-direction:column;gap:8px;min-width:0;padding:10px 11px}
+.mk-h{font-family:var(--mono);font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-2)}
+.mk-li{display:flex;align-items:center;justify-content:space-between;gap:6px;min-width:0;padding:2px 0}
+.mk-k{overflow:hidden;color:var(--muted);font-size:10px;white-space:nowrap;text-overflow:ellipsis}
+.mk-v{overflow:hidden;color:var(--ink);font-size:10.5px;white-space:nowrap;text-overflow:ellipsis}
+.mk-chip{flex:none;padding:1px 5px;border:1px solid var(--line);border-radius:2px;font-family:var(--mono);font-size:8px;letter-spacing:.06em;color:var(--muted);white-space:nowrap}
+.mk-chip.mk-gold{color:var(--gold-dim);border-color:var(--line-gold)}
+.mk-ok{font-family:var(--mono);font-size:9px;color:var(--teal)}
+.mk-num{font-family:var(--mono);font-size:9px;color:var(--muted-2)}
+.mk-on{background:rgba(224,177,94,.085);box-shadow:inset 2px 0 0 var(--gold)}
+.mk-in{padding:5px 8px;border:1px solid var(--line);border-radius:2px;background:var(--bg-3);font-size:10px;color:var(--muted-2)}
+.mk-box{padding:7px 9px;border:1px solid var(--line);border-radius:2px;background:var(--bg-3);font-size:10.5px;line-height:1.6;color:var(--muted)}
+.mk-spacer{flex:1}
+.mk-tags{display:flex;flex-wrap:wrap;gap:6px}
+/* 房间聊天 */
+.mk-say{padding-left:9px;border-left:2px solid var(--line-gold);font-size:10.5px;line-height:1.6;color:var(--ink)}
+.mk-msg{display:flex;align-items:flex-start;gap:7px}
+.mk-who{flex:none;margin-top:1px;padding:1px 5px;border:1px solid var(--line-gold);border-radius:2px;font-family:var(--mono);font-size:8px;letter-spacing:.06em;color:var(--gold-dim)}
+.mk-msg.mk-you .mk-say{border-left-color:rgba(79,163,155,.45)}
+.mk-roll{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:6px 9px;border:1px solid var(--line);border-radius:2px;background:var(--bg-3);font-family:var(--mono);font-size:9px;color:var(--muted)}
+.mk-roll b{font-size:10px;color:var(--gold)}
+/* 世界书表格 */
+.mk-tbl{display:grid;grid-template-columns:1.4fr 1.3fr .6fr .5fr .4fr;gap:6px;align-items:center;padding:6px 4px;border-bottom:1px solid var(--line);font-size:10px;color:var(--muted)}
+.mk-tbl span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.mk-tbl-head{padding-bottom:5px;font-family:var(--mono);font-size:8px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-2)}
+.mk-tbl.mk-on{box-shadow:inset 2px 0 0 var(--gold)}
+.mk-sw{position:relative;flex:none;width:22px;height:12px;border:1px solid rgba(79,163,155,.5);border-radius:8px;background:rgba(79,163,155,.3)}
+.mk-sw.on::after{content:"";position:absolute;top:1px;right:1px;width:8px;height:8px;border-radius:50%;background:var(--teal)}
+/* 角色卡 */
+.mk-attrs{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+.mk-attr{padding:5px 6px;border:1px solid var(--line);border-radius:2px;background:var(--bg-3);text-align:center}
+.mk-attr span{display:block;font-family:var(--mono);font-size:8px;letter-spacing:.1em;color:var(--muted-2)}
+.mk-attr b{font-size:14px;color:var(--ink-strong)}
+.mk-strip{display:flex;gap:5px}
+.mk-strip>div{display:flex;flex:1;align-items:baseline;justify-content:space-between;padding:5px 7px;border:1px solid var(--line);border-radius:2px;background:rgba(79,163,155,.05)}
+.mk-strip span{font-family:var(--mono);font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--teal)}
+.mk-strip b{font-size:12px;color:var(--ink-strong)}
+.mk-skill{display:flex;justify-content:space-between;gap:8px;padding:5px 2px;border-bottom:1px solid var(--line);font-size:10.5px}
+.mk-skill span{overflow:hidden;color:var(--muted);white-space:nowrap;text-overflow:ellipsis}
+.mk-skill b{font-family:var(--mono);font-size:10px;color:var(--ink-strong)}
+/* 角色卡编辑器 */
+.mk-edu{display:flex;align-items:center;justify-content:space-between;padding:6px 9px;border:1px solid var(--line-gold);border-radius:2px;background:rgba(224,177,94,.06)}
+.mk-edu b{font-family:var(--mono);font-size:10px;color:var(--gold)}
+.mk-erow{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid var(--line)}
+.mk-erow .mk-v{flex:1}
+.mk-stepper{display:inline-flex;flex:none;align-items:center;border:1px solid var(--line);border-radius:2px;background:var(--bg-3);overflow:hidden}
+.mk-stepper i{width:18px;font-style:normal;font-size:11px;line-height:18px;text-align:center;color:var(--muted)}
+.mk-stepper b{width:30px;border-right:1px solid var(--line);border-left:1px solid var(--line);font-family:var(--mono);font-size:10px;line-height:18px;text-align:center;color:var(--ink)}
+.mk-btn{flex:none;padding:2px 7px;border:1px solid var(--line-gold);border-radius:2px;font-family:var(--mono);font-size:8.5px;letter-spacing:.04em;color:var(--gold);white-space:nowrap}
+/* 规则书知识库 */
+.mk-drop{padding:10px;border:1px dashed rgba(255,255,255,.18);border-radius:2px;background:rgba(255,255,255,.014);text-align:center;font-size:10px;color:var(--muted-2)}
+.mk-drop b{display:block;margin-bottom:3px;font-size:10.5px;font-weight:600;color:var(--ink)}
+.mk-search{display:flex;align-items:center;gap:7px;padding:5px 9px;border:1px solid var(--line);border-radius:2px;background:var(--bg-3);font-size:10px;color:var(--muted-2)}
+.mk-file{display:flex;align-items:center;gap:8px;padding:6px 2px;border-bottom:1px solid var(--line);font-size:10.5px}
+.mk-file .mk-v{flex:1}
+
+/* ---------- 程序真实外观件：左侧导航 / 页头 / 按钮 / 面板 / 表格 / 模态框 / 聊天气泡 ---------- */
+.mk-app{display:flex;flex:1;min-height:0}
+/* 左侧导航：还原程序 Sidebar（AI TRPG / 主页·角色卡·房间·小工具 / 探索发现·剧本·角色卡广场·设置） */
+.mk-nav{display:flex;flex:none;flex-direction:column;gap:2px;width:21%;min-width:0;padding:9px 8px;border-right:1px solid var(--line);background:rgba(5,14,18,.95)}
+.mk-nav-title{padding:0 5px 7px;font-size:11.5px;font-weight:700;color:#dce3ea}
+.mk-nv{overflow:hidden;padding:4px 7px;border-radius:3px;font-size:9.5px;color:rgba(199,216,209,.68);white-space:nowrap;text-overflow:ellipsis}
+.mk-nv.on{background:rgba(102,226,173,.18);color:#d8e6e0;font-weight:600}
+.mk-nv-grp{padding:6px 7px 2px;font-family:var(--mono);font-size:7.5px;letter-spacing:.14em;text-transform:uppercase;color:rgba(199,216,209,.38)}
+/* 页面区与页头 */
+.mk-page{display:flex;flex:1;flex-direction:column;min-width:0}
+.mk-pagehd{flex:none;padding:9px 12px;border-bottom:1px solid var(--line)}
+.mk-kick{margin-bottom:3px;font-family:var(--mono);font-size:7.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--teal)}
+.mk-ptitle{font-size:13px;font-weight:650;color:#dce3ea;line-height:1.25}
+.mk-psub{margin-top:3px;font-size:9px;color:var(--muted)}
+/* 按钮：Bootstrap 观感，主色取程序 accent */
+.mk-b{display:inline-flex;flex:none;align-items:center;gap:4px;padding:3px 8px;border:1px solid var(--line);border-radius:4px;font-size:9px;color:var(--ink);white-space:nowrap}
+.mk-b.p{background:var(--teal);border-color:var(--teal);color:#061714;font-weight:600}
+.mk-b.o{border-color:rgba(102,226,173,.5);color:var(--teal)}
+.mk-b.d{border-color:rgba(255,125,144,.5);color:#ff7d90}
+.mk-acts{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-left:auto}
+/* 面板 / 区块 / 字段 */
+.mk-panel{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:rgba(7,18,24,.6)}
+.mk-panel-hd{display:flex;align-items:baseline;gap:8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.mk-panel-hd h4{margin:0;font-size:10.5px;color:#dce3ea}
+.mk-panel-hd span{font-size:8px;color:var(--muted-2)}
+.mk-fld{display:grid;gap:3px;min-width:0}
+.mk-fld>span{font-size:8px;color:var(--muted)}
+.mk-inp{overflow:hidden;padding:4px 7px;border:1px solid var(--line);border-radius:4px;background:rgba(9,28,34,.9);font-size:9.5px;color:var(--ink);white-space:nowrap;text-overflow:ellipsis}
+.mk-inp.mk-ph2{color:var(--muted-2)}
+.mk-fgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px 10px}
+.mk-fgrid-3{grid-template-columns:repeat(3,1fr)}
+.mk-cover{display:flex;flex:none;align-items:center;justify-content:center;width:56px;height:78px;border:1px solid var(--line);border-radius:4px;background:linear-gradient(160deg,rgba(102,226,173,.16),rgba(9,28,34,.9));font-size:8px;color:var(--muted-2)}
+.mk-skills{grid-template-columns:20px 1.5fr .5fr .5fr .5fr .5fr .6fr .6fr .6fr;font-size:8.5px}
+/* 模态框 */
+.mk-back{position:absolute;inset:0;display:flex;opacity:.45}
+.mk-overlay{position:absolute;inset:0;z-index:2;background:rgba(2,8,10,.72)}
+.mk-modal{position:absolute;z-index:3;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;width:80%;max-height:90%;overflow:hidden;border:1px solid var(--line-gold);border-radius:8px;background:rgba(9,28,34,.98);box-shadow:0 18px 50px rgba(0,0,0,.5)}
+.mk-modal-hd{display:flex;align-items:center;gap:8px;padding:8px 11px;border-bottom:1px solid var(--line);background:rgba(7,18,24,.7)}
+.mk-modal-hd h5{margin:0;font-size:11px;color:#dce3ea}
+.mk-x{margin-left:auto;font-size:11px;color:var(--muted-2)}
+.mk-modal-bd{display:flex;flex-direction:column;gap:8px;min-height:0;padding:10px 11px}
+.mk-modal-ft{display:flex;gap:7px;justify-content:flex-end;padding:8px 11px;border-top:1px solid var(--line);background:rgba(7,18,24,.7)}
+/* 聊天：主区 + 右侧成员栏 */
+.mk-chatbody{display:flex;flex:1;min-height:0}
+.mk-chatmain{display:flex;flex:1;flex-direction:column;min-width:0}
+.mk-chat{display:flex;flex:1;flex-direction:column;gap:8px;min-height:0;padding:10px 12px}
+.mk-mrow{display:flex;align-items:flex-start;gap:7px}
+.mk-mrow.me{flex-direction:row-reverse}
+.mk-av{display:flex;flex:none;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;border:1px solid var(--line);background:rgba(102,226,173,.14);font-size:8px;color:var(--ink-strong)}
+.mk-mcol{display:flex;flex-direction:column;gap:2px;max-width:78%;min-width:0}
+.mk-mrow.me .mk-mcol{align-items:flex-end}
+.mk-mmeta{display:flex;gap:6px;font-size:7.5px;color:var(--muted-2)}
+.mk-bub{padding:5px 8px;border:1px solid var(--line);border-radius:8px;background:rgba(7,18,24,.82);font-size:9.5px;line-height:1.55}
+.mk-bub.kp{background:rgba(19,59,63,.88)}
+.mk-bub.me{background:#66e2ad;border-color:#66e2ad;color:#061714}
+.mk-bub.dice{background:rgba(77,61,29,.92);border-color:rgba(240,195,106,.4);font-family:var(--mono);font-size:9px;color:#f0c36a}
+.mk-typebox{display:flex;flex:none;align-items:center;gap:7px;padding:8px 11px;border-top:1px solid var(--line)}
+.mk-typebox .mk-inp{flex:1}
+.mk-members{display:flex;flex:none;flex-direction:column;gap:5px;width:26%;min-width:0;padding:9px;border-left:1px solid var(--line);background:rgba(7,18,24,.5)}
+.mk-mhead{display:flex;align-items:baseline;justify-content:space-between;gap:6px;padding-bottom:5px;border-bottom:1px solid var(--line);font-size:9px;color:#dce3ea}
+.mk-mhead em{font-style:normal;font-family:var(--mono);font-size:7.5px;color:var(--teal)}
+.mk-mgrp{padding-top:2px;font-family:var(--mono);font-size:7.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2)}
+.mk-mitem{display:flex;align-items:center;gap:6px;min-width:0}
+.mk-mitem .mk-av{width:16px;height:16px;font-size:7px}
+.mk-mname{overflow:hidden;font-size:9.5px;color:var(--ink);white-space:nowrap;text-overflow:ellipsis}
+.mk-mcard{overflow:hidden;font-size:8px;color:var(--muted-2);white-space:nowrap;text-overflow:ellipsis}
+.mk-dot{flex:none;width:5px;height:5px;border-radius:50%;background:var(--teal)}
+/* 角色卡：统计块 */
+.mk-stat{padding:5px 6px;border:1px solid var(--line);border-radius:4px;background:rgba(9,28,34,.9)}
+.mk-stat span{display:block;font-size:7.5px;color:var(--muted-2)}
+.mk-stat b{font-size:11px;color:#dce3ea}
+.mk-stats{display:grid;gap:5px}
+/* 世界书：手风琴条目 */
+.mk-det{border:1px solid var(--line);border-radius:6px;background:rgba(7,18,24,.55)}
+.mk-det+.mk-det{margin-top:5px}
+.mk-sum{display:flex;align-items:center;gap:8px;padding:5px 8px;font-size:9.5px}
+.mk-sum b{font-weight:600;color:#dce3ea}
+.mk-sum em{font-style:normal;margin-left:auto;font-family:var(--mono);font-size:7.5px;color:var(--muted-2)}
+.mk-dbody{display:grid;gap:6px;padding:7px 8px;border-top:1px solid var(--line)}
+.mk-chk{display:inline-flex;align-items:center;gap:4px;font-size:8.5px;color:var(--ink-strong)}
+.mk-chk i{display:block;width:9px;height:9px;border:1px solid var(--line);border-radius:2px;background:rgba(9,28,34,.9)}
+.mk-chk.on i{background:var(--teal);border-color:var(--teal)}
+/* 知识库列表 */
+.mk-li2{display:flex;align-items:center;gap:8px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:rgba(7,18,24,.5);font-size:9.5px}
+.mk-li2 .mk-v{flex:1}
+.mk-badge{flex:none;padding:1px 6px;border:1px solid rgba(102,226,173,.4);border-radius:999px;font-family:var(--mono);font-size:7.5px;color:var(--teal)}
+.mk-alert{padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:rgba(60,62,62,.4);font-size:8.5px;color:var(--muted)}
+/* 覆盖示意图中几处旧硬编码色，统一到程序主题 */
+.mk-tag{border-color:var(--line-gold);color:var(--teal)}
+.mk-sw{border-color:rgba(102,226,173,.5);background:rgba(102,226,173,.3)}
+.mk-sw.on::after{background:var(--teal)}
+.mk-strip>div{background:rgba(102,226,173,.06)}
+.mk-on{background:rgba(102,226,173,.1);box-shadow:inset 2px 0 0 var(--teal)}
+.mk-drop{border-color:rgba(126,232,190,.34);background:rgba(102,226,173,.05)}
+.mk-edu{background:rgba(102,226,173,.07)}
+.mk-roll{border-color:rgba(240,195,106,.4);background:rgba(77,61,29,.92)}
+.mk-roll b{color:#f0c36a}
+
 /* ---------- 响应式 ---------- */
 @media (max-width:940px){
-  .mock{grid-template-columns:1fr}
-  .mock-side{flex-direction:row;flex-wrap:wrap;gap:26px}
   .list,.split,.docs,.code-wrap,.who-grid{grid-template-columns:1fr;gap:0}
+  .shots{gap:46px}
+  .shot{grid-template-columns:1fr;gap:24px}
+  .shot:nth-child(even) .shot-canvas{order:0}
   .split,.docs,.code-wrap{gap:34px}
   .steps{grid-template-columns:1fr 1fr}
   .step + .step{border-left:none;padding-left:0}
@@ -267,6 +485,7 @@ footer{border-top:1px solid var(--line);padding:40px 0 52px}
     </a>
     <nav class="nav">
       <a href="#engine" data-zh="能力" data-en="Capabilities">能力</a>
+      <a href="#shots" data-zh="界面预览" data-en="Screens">界面预览</a>
       <a href="#start" data-zh="快速开始" data-en="Quick start">快速开始</a>
       <a href="#deploy" data-zh="部署" data-en="Deploy">部署</a>
       <a href="#faq" data-zh="常见问题" data-en="FAQ">常见问题</a>
@@ -286,71 +505,27 @@ footer{border-top:1px solid var(--line);padding:40px 0 52px}
       <div class="hero-head">
         <span class="kicker">Open-source · Self-hosted · AI TRPG</span>
         <h1 data-zh="让 AI 坐上 KP 的位置，<span class=&quot;hl&quot;>把故事跑下去</span>。" data-en="Put AI in the Keeper's seat — <span class=&quot;hl&quot;>keep the story going</span>.">让 AI 坐上 KP 的位置，<span class="hl">把故事跑下去</span>。</h1>
-        <p class="hero-sub" data-zh="AIBasedTRPG 是一套开源、自托管的 AI 跑团平台，面向 COC7。它把 AI 守秘人、多人房间、角色卡、世界书、骰子检定与触发器资源连成一场能持续推进的线上跑团——剧本、账号与聊天记录全部落在你自己的机器上。" data-en="AIBasedTRPG is an open-source, self-hosted AI tabletop platform built for COC7. It wires an AI Keeper, multiplayer rooms, character sheets, a world book, dice checks and trigger assets into one ongoing online session — with scenarios, accounts and chat logs all stored on your own machine.">AIBasedTRPG 是一套开源、自托管的 AI 跑团平台，面向 COC7。它把 AI 守秘人、多人房间、角色卡、世界书、骰子检定与触发器资源连成一场能持续推进的线上跑团——剧本、账号与聊天记录全部落在你自己的机器上。</p>
+        <p class="hero-sub" data-zh="面向 COC7 的开源、自托管 AI 跑团平台：AI 守秘人推进剧情，规则书知识库回答规则问题，剧本编辑器把 Word / PDF 模组变成可玩模组，角色卡与内置编辑器管住每一点技能——剧本、账号与聊天记录全部落在你自己的机器上。" data-en="An open-source, self-hosted AI tabletop platform for COC7: an AI Keeper drives the story, a rulebook knowledge base answers rules questions, a scenario editor turns Word / PDF modules into playable ones, and character sheets plus a built-in editor keep every skill point in order — with scenarios, accounts and chat logs all on your own machine.">面向 COC7 的开源、自托管 AI 跑团平台：AI 守秘人推进剧情，规则书知识库回答规则问题，剧本编辑器把 Word / PDF 模组变成可玩模组，角色卡与内置编辑器管住每一点技能——剧本、账号与聊天记录全部落在你自己的机器上。</p>
         <div class="hero-cta">
-          <a class="btn btn-primary btn-lg" href="https://github.com/Nobook1121/AIBasedTRPG/releases" target="_blank" rel="noopener" data-zh="下载 Release" data-en="Download release">下载 Release <span class="ar">→</span></a>
-          <a class="btn btn-outline btn-lg" href="#start" data-zh="5 分钟跑起来" data-en="Running in 5 minutes">5 分钟跑起来 <span class="ar">→</span></a>
+          <a class="btn btn-primary btn-lg" href="https://github.com/Nobook1121/AIBasedTRPG/releases" target="_blank" rel="noopener">
+            <svg class="ico-dl" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v11"/><path d="m7.5 10 4.5 4 4.5-4"/><path d="M5 20h14"/></svg>
+            <span data-zh="下载" data-en="Download">下载</span>
+            <span class="ver">v0.3.4</span>
+          </a>
+          <a class="btn btn-outline btn-lg" href="#start" data-zh="快速开始" data-en="Quick start">快速开始 <span class="ar">→</span></a>
         </div>
         <p class="hero-meta">Apache-2.0 · Python 3.11+ · <span data-zh="默认端口" data-en="Default port">默认端口</span> 8086 · <span data-zh="单进程运行" data-en="Single process">单进程运行</span></p>
-      </div>
-
-      <div class="mock">
-        <div class="mock-side">
-          <div>
-            <div class="stat-label">Check</div>
-            <div class="stat-line" data-zh="1D100 的结果直接写回角色卡，失败 / 成功 / 大成功 / 大失败都有反馈。" data-en="A 1D100 result writes straight back to the sheet — failure, success, hard and extreme outcomes all reported.">1D100 的结果直接写回角色卡，失败 / 成功 / 大成功 / 大失败都有反馈。</div>
-          </div>
-          <div>
-            <div class="stat-label">Memory</div>
-            <div class="stat-line" data-zh="世界书按触发词注入，未命中回退 <b>BM25 + 向量</b>检索，长团自动压缩历史。" data-en="The world book injects by trigger key; misses fall back to <b>BM25 + vector</b> retrieval, and long campaigns auto-compress history.">世界书按触发词注入，未命中回退 <b>BM25 + 向量</b>检索，长团自动压缩历史。</div>
-          </div>
-          <div>
-            <div class="stat-label">Self-hosted</div>
-            <div class="stat-line" data-zh="账号、剧本、房间、日志全部落在 <b>data/</b> 目录，不依赖任何云服务。" data-en="Accounts, scenarios, rooms and logs all live under <b>data/</b>, with no cloud service involved.">账号、剧本、房间、日志全部落在 <b>data/</b> 目录，不依赖任何云服务。</div>
-          </div>
-        </div>
-        <div class="mock-main">
-          <div class="bar">
-            <span class="bar-title" data-zh="渡口之夜 · 房间 #3917" data-en="Night at the Ferry · Room #3917">渡口之夜 · 房间 #3917</span>
-            <span class="bar-round">Round 12</span>
-            <span class="bar-live"><i></i>Online</span>
-          </div>
-          <div class="feed">
-            <div class="feed-sys" data-zh="AI 守秘人已加入房间 · 4 名玩家在场" data-en="AI Keeper joined · 4 players at the table">AI 守秘人已加入房间 · 4 名玩家在场</div>
-            <div class="msg kp">
-              <span class="who">KP</span>
-              <span class="say" data-zh="雨点砸在铁皮上。废弃的渡口只剩一盏忽明忽暗的灯，远处的汽笛声忽近忽远。" data-en="Rain hammers the tin roof. One flickering lamp is all that is left of the abandoned ferry; a horn drifts in and out.">雨点砸在铁皮上。废弃的渡口只剩一盏忽明忽暗的灯，远处的汽笛声忽近忽远。</span>
-            </div>
-            <div class="roll">
-              <span data-zh="侦查检定" data-en="Spot Hidden">侦查检定</span>
-              <span>1D100 → <b>27</b> / 55</span>
-              <span class="ok" data-zh="成功 · 已写回角色卡" data-en="Success · written to sheet">成功 · 已写回角色卡</span>
-            </div>
-            <div class="msg player">
-              <span class="who you" data-zh="你" data-en="You">你</span>
-              <span class="say" data-zh="我蹲下，检查码头边那只泡得发胀的木箱。" data-en="I crouch and check the swollen crate by the pier.">我蹲下，检查码头边那只泡得发胀的木箱。</span>
-            </div>
-            <div class="msg kp">
-              <span class="who">KP</span>
-              <span class="say" data-zh="木箱底板下压着一封泛黄的信，收信人一栏，写着你自己的名字。" data-en="Under the crate's false bottom lies a yellowed letter — the recipient line carries your own name.">木箱底板下压着一封泛黄的信，收信人一栏，写着你自己的名字。</span>
-            </div>
-          </div>
-          <div class="state">
-            <div><span data-zh="场景" data-en="Scene">场景</span><span data-zh="废弃渡口 · 夜" data-en="Abandoned ferry · night">废弃渡口 · 夜</span></div>
-            <div><span data-zh="状态变动" data-en="State change">状态变动</span><span data-zh="获得线索 · 泛黄的信" data-en="Clue gained · yellowed letter">获得线索 · 泛黄的信</span></div>
-          </div>
-        </div>
       </div>
     </div>
   </section>
 
   <!-- ENGINE -->
-  <section id="engine">
+  <section id="engine" class="tint-azure">
     <div class="wrap">
       <div class="sec-head">
-        <span class="kicker">Built for the whole table</span>
-        <h2 data-zh="一套 AI KP 引擎，撑起整张跑团桌。" data-en="One AI Keeper engine, behind the whole table.">一套 AI KP 引擎，撑起整张跑团桌。</h2>
-        <p data-zh="它不是一个只会续写剧情的聊天框。叙事、检定、世界书与角色状态各自分工，跑团过程才推得下去。" data-en="It is not a chat box that merely continues prose. Narrative, checks, the world book and character state each do their own job, so a campaign can actually keep going.">它不是一个只会续写剧情的聊天框。叙事、检定、世界书与角色状态各自分工，跑团过程才推得下去。</p>
+        <span class="kicker">Engine, plus the content tools</span>
+        <h2 data-zh="引擎在后台，<span class=&quot;hl&quot;>剧本、角色卡与知识库</span>在你自己手里。" data-en="The engine runs in the background — <span class=&quot;hl&quot;>scenarios, sheets and the knowledge base</span> stay in your hands.">引擎在后台，<span class="hl">剧本、角色卡与知识库</span>在你自己手里。</h2>
+        <p data-zh="它不是一个只会续写剧情的聊天框。叙事与检定交给引擎，内容交给内置的剧本编辑器、世界书、角色卡编辑器与规则书知识库——两边分开，跑团才推得下去。" data-en="It is not a chat box that merely continues prose. Narration and checks belong to the engine; content belongs to the built-in scenario editor, world book, sheet editor and rulebook knowledge base — keeping them apart is what lets a campaign keep going.">它不是一个只会续写剧情的聊天框。叙事与检定交给引擎，内容交给内置的剧本编辑器、世界书、角色卡编辑器与规则书知识库——两边分开，跑团才推得下去。</p>
       </div>
       <div class="list">
         <div class="item">
@@ -364,7 +539,7 @@ footer{border-top:1px solid var(--line);padding:40px 0 52px}
           <span class="item-num">02</span>
           <div>
             <h3 data-zh="一张实时多人桌" data-en="One live multiplayer table">一张实时多人桌</h3>
-            <p data-zh="房间码邀请、成员列表、角色变更实时同步、正在输入提示。页面与实时聊天走同一个端口，WebSocket 不可用时自动回退长轮询。" data-en="Invite by room code, with live member lists, role changes and typing indicators. Pages and realtime chat share one port, falling back to long-polling when WebSocket is unavailable.">房间码邀请、成员列表、角色变更实时同步、正在输入提示。页面与实时聊天走同一个端口，WebSocket 不可用时自动回退长轮询。</p>
+            <p data-zh="房间码邀请、成员列表、角色变更实时同步、正在输入提示。页面和实时聊天共用同一个端口，网络环境受限时也能保持同步。" data-en="Invite by room code, with live member lists, role changes and typing indicators. Pages and realtime chat share one port and stay in sync even on restrictive networks.">房间码邀请、成员列表、角色变更实时同步、正在输入提示。页面和实时聊天共用同一个端口，网络环境受限时也能保持同步。</p>
           </div>
         </div>
         <div class="item">
@@ -377,22 +552,36 @@ footer{border-top:1px solid var(--line);padding:40px 0 52px}
         <div class="item">
           <span class="item-num">04</span>
           <div>
-            <h3 data-zh="剧本从文档开始" data-en="Scenarios start from your documents">剧本从文档开始</h3>
-            <p data-zh="把 Word / PDF / Markdown 模组丢进来，按标题分节、切块、建索引，导入完成即可游玩；也可以先让 AI 转成结构化剧本，你检查修改后再发布。" data-en="Drop in a Word / PDF / Markdown module and it is sectioned, chunked and indexed, playable the moment it lands. Or let the AI convert it into a structured scenario first and publish after you review.">把 Word / PDF / Markdown 模组丢进来，按标题分节、切块、建索引，导入完成即可游玩；也可以先让 AI 转成结构化剧本，你检查修改后再发布。</p>
+            <h3 data-zh="剧本：文档丢进来就能玩" data-en="Scenarios: a document in, a playable module out">剧本：文档丢进来就能玩</h3>
+            <p data-zh="Word / PDF / Markdown 模组按标题分节语义切块并建索引，导入完成即可开团；也可以先让 AI 转成结构化剧本，你审阅修改后再发布。「直接导入」与「审核导入」两条路径都在。" data-en="Word / PDF / Markdown modules are sectioned by heading, chunked and indexed — playable the moment they land. Or have the AI turn a document into a structured scenario and publish after you review. Both a direct-import and a reviewed-import path ship.">Word / PDF / Markdown 模组按标题分节语义切块并建索引，导入完成即可开团；也可以先让 AI 转成结构化剧本，你审阅修改后再发布。「直接导入」与「审核导入」两条路径都在。</p>
           </div>
         </div>
         <div class="item">
           <span class="item-num">05</span>
           <div>
-            <h3 data-zh="规则不被写死" data-en="Rules are not hard-coded">规则不被写死</h3>
-            <p data-zh="COC7 技能基础值支持「房规 &gt; 管理员默认 &gt; 规则书默认」三级覆盖；检定名对照 <code>character_skills.json</code>（含专精与中文变体）校验，未知名直接拒绝并提示。" data-en="COC7 skill base values follow house rules &gt; admin defaults &gt; the rulebook. Check names are validated against <code>character_skills.json</code> (specialisations and Chinese variants included); unknown names are rejected with a prompt.">COC7 技能基础值支持「房规 &gt; 管理员默认 &gt; 规则书默认」三级覆盖；检定名对照 <code>character_skills.json</code>（含专精与中文变体）校验，未知名直接拒绝并提示。</p>
+            <h3 data-zh="内置剧本编辑器" data-en="A built-in scenario editor">内置剧本编辑器</h3>
+            <p data-zh="场景卡、结局、时间线、NPC、怪物与道具在同一个界面里编排，可配封面与简介。只有改动剧本内容才会生成新版本；改标题、作者、封面这类基础信息既不升版本、也不重算索引。" data-en="Scene cards, endings, timeline, NPCs, monsters and items are arranged in one editor, with cover and synopsis. Only content edits create a new version — changing a title, author or cover neither bumps the version nor rebuilds the index.">场景卡、结局、时间线、NPC、怪物与道具在同一个界面里编排，可配封面与简介。只有改动剧本内容才会生成新版本；改标题、作者、封面这类基础信息既不升版本、也不重算索引。</p>
           </div>
         </div>
         <div class="item">
           <span class="item-num">06</span>
           <div>
-            <h3 data-zh="部署在你手里" data-en="Deployed in your hands">部署在你手里</h3>
-            <p data-zh="单进程运行，不需要 Docker 也能跑。预置 DeepSeek / OpenAI / 阿里云百炼 / SiliconFlow / OpenRouter / LM Studio 六家平台，也支持任意 OpenAI 兼容接口。" data-en="Runs as a single process — no Docker required. Six providers are built in: DeepSeek, OpenAI, Alibaba Bailian, SiliconFlow, OpenRouter and LM Studio, plus any OpenAI-compatible endpoint.">单进程运行，不需要 Docker 也能跑。预置 DeepSeek / OpenAI / 阿里云百炼 / SiliconFlow / OpenRouter / LM Studio 六家平台，也支持任意 OpenAI 兼容接口。</p>
+            <h3 data-zh="COC7 角色卡与检定" data-en="COC7 sheets and checks">COC7 角色卡与检定</h3>
+            <p data-zh="属性、技能、武器、专精与本地化技能名一应俱全；检定名会对照 <code>character_skills.json</code>（含专精与中文变体）校验，未知名直接拒绝并提示。聊天里的 1D100 结果直接写回卡上，失败 / 成功 / 困难 / 极难都有反馈。" data-en="Attributes, skills, weapons, specialisations and localised skill names; check names are validated against <code>character_skills.json</code> (specialisations and Chinese variants included), and unknown names are rejected with a prompt. A 1D100 result in chat writes straight back to the sheet — failure, success, hard and extreme all reported.">属性、技能、武器、专精与本地化技能名一应俱全；检定名会对照 <code>character_skills.json</code>（含专精与中文变体）校验，未知名直接拒绝并提示。聊天里的 1D100 结果直接写回卡上，失败 / 成功 / 困难 / 极难都有反馈。</p>
+          </div>
+        </div>
+        <div class="item">
+          <span class="item-num">07</span>
+          <div>
+            <h3 data-zh="内置角色卡编辑器" data-en="A built-in sheet editor">内置角色卡编辑器</h3>
+            <p data-zh="不用手写 JSON：在页面里直接建卡、改卡、分配技能点。改动技能上限会按最终值裁剪所有点数；带专精的技能在右侧选好专精再切换基础值；技能基础值支持「房规 &gt; 管理员默认 &gt; 规则书默认」三级覆盖。" data-en="No hand-written JSON: create sheets, edit them and allocate skill points right in the page. Changing a skill cap trims every point against the final value; specialisation skills pick a specialisation on the right and then switch their base; base values follow house rules &gt; admin defaults &gt; the rulebook.">不用手写 JSON：在页面里直接建卡、改卡、分配技能点。改动技能上限会按最终值裁剪所有点数；带专精的技能在右侧选好专精再切换基础值；技能基础值支持「房规 &gt; 管理员默认 &gt; 规则书默认」三级覆盖。</p>
+          </div>
+        </div>
+        <div class="item">
+          <span class="item-num">08</span>
+          <div>
+            <h3 data-zh="规则书知识库" data-en="A rulebook knowledge base">规则书知识库</h3>
+            <p data-zh="管理员上传 COC7 规则文本（<code>.txt</code> / <code>.md</code> / <code>.doc</code> / <code>.docx</code>）建成立即生效的检索库。玩家问「这个法术怎么算」时，AI 从你的规则书里找依据再回答，而不是凭记忆编。" data-en="Admins upload COC7 rule text (<code>.txt</code> / <code>.md</code> / <code>.doc</code> / <code>.docx</code>) into a searchable base that takes effect immediately. When a player asks how a spell resolves, the AI answers from your rulebook instead of inventing it.">管理员上传 COC7 规则文本（<code>.txt</code> / <code>.md</code> / <code>.doc</code> / <code>.docx</code>）建成立即生效的检索库。玩家问「这个法术怎么算」时，AI 从你的规则书里找依据再回答，而不是凭记忆编。</p>
           </div>
         </div>
       </div>
@@ -403,11 +592,437 @@ footer{border-top:1px solid var(--line);padding:40px 0 52px}
         <span class="theme-chip"><i style="background:#ece3d1"></i><span data-zh="秘典 · 羊皮纸" data-en="Tome · parchment">秘典 · 羊皮纸</span></span>
         <span class="theme-chip" style="border-style:dashed" data-zh="界面主题可随时切换，并记住你的选择" data-en="Themes switch anytime and remember your choice">界面主题可随时切换，并记住你的选择</span>
       </div>
+      <p class="note" data-zh="单进程运行，不需要 Docker 也能跑。预置 DeepSeek / OpenAI / 阿里云百炼 / SiliconFlow / OpenRouter / LM Studio 六家平台，也支持任意 OpenAI 兼容接口。" data-en="Runs as a single process — no Docker required. Six providers are built in: DeepSeek, OpenAI, Alibaba Bailian, SiliconFlow, OpenRouter and LM Studio, plus any OpenAI-compatible endpoint.">单进程运行，不需要 Docker 也能跑。预置 DeepSeek / OpenAI / 阿里云百炼 / SiliconFlow / OpenRouter / LM Studio 六家平台，也支持任意 OpenAI 兼容接口。</p>
+    </div>
+  </section>
+
+  <!-- SHOTS -->
+  <section id="shots" class="tint-cool">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="kicker">Interface preview</span>
+        <h2 data-zh="六项能力，<span class=&quot;hl&quot;>六张真实界面</span>。" data-en="Six capabilities, <span class=&quot;hl&quot;>six real screens</span>.">六项能力，<span class="hl">六张真实界面</span>。</h2>
+        <p data-zh="房间聊天、剧本编辑器、世界书、COC7 角色卡、角色卡编辑器与规则书知识库，全部照程序的实际界面绘制。" data-en="The room chat, scenario editor, world book, COC7 sheets, the sheet editor and the rulebook knowledge base — all drawn from the app's actual interface.">房间聊天、剧本编辑器、世界书、COC7 角色卡、角色卡编辑器与规则书知识库，全部照程序的实际界面绘制。</p>
+      </div>
+      <div class="shots">
+        <figure class="shot">
+          <div class="shot-canvas">
+            <div class="shot-mock">
+              <div class="mk-app">
+                <nav class="mk-nav">
+                  <div class="mk-nav-title">AI TRPG</div>
+                  <span class="mk-nv on">主页</span>
+                  <span class="mk-nv">角色卡</span>
+                  <span class="mk-nv">房间</span>
+                  <span class="mk-nv">小工具</span>
+                  <span class="mk-nv-grp">探索发现</span>
+                  <span class="mk-nv">剧本</span>
+                  <span class="mk-nv">角色卡广场</span>
+                  <span class="mk-nv">设置</span>
+                </nav>
+                <div class="mk-page">
+                  <div class="mk-chatbody">
+                    <div class="mk-chatmain">
+                      <div class="mk-pagehd">
+                        <div class="mk-ptitle">旧码头 · 夜航</div>
+                        <div class="mk-psub">剧本 · 旧码头的低语</div>
+                      </div>
+                      <div class="mk-chat">
+                        <div class="mk-mrow">
+                          <span class="mk-av">KP</span>
+                          <div class="mk-mcol">
+                            <div class="mk-mmeta"><span>AI 守秘人</span><span>23:41</span></div>
+                            <div class="mk-bub kp">海风裹着咸腥扑上栈桥，木板在脚下发出空洞的回响。远处仓库的灯忽明忽暗——像有人刚离开。</div>
+                          </div>
+                        </div>
+                        <div class="mk-mrow me">
+                          <span class="mk-av">林</span>
+                          <div class="mk-mcol">
+                            <div class="mk-mmeta"><span>林晚</span><span>23:41</span></div>
+                            <div class="mk-bub me">我压低身子，从门缝里往里看。</div>
+                          </div>
+                        </div>
+                        <div class="mk-mrow">
+                          <span class="mk-av">骰</span>
+                          <div class="mk-mcol">
+                            <div class="mk-mmeta"><span>林晚 · 检定</span><span>23:42</span></div>
+                            <div class="mk-bub dice">侦察 d%: [23] = 23 / 55 成功</div>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="mk-typebox">
+                        <span class="mk-b o">📎</span>
+                        <span class="mk-inp mk-ph2">加入房间后可发送消息，使用 @KP 呼叫 AI</span>
+                        <span class="mk-b p">发送</span>
+                      </div>
+                    </div>
+                    <aside class="mk-members">
+                      <div class="mk-mhead"><span>房间成员</span><em>在线玩家 2/3</em></div>
+                      <div class="mk-mgrp">在线 2</div>
+                      <div class="mk-mitem"><span class="mk-av">林</span><div class="mk-mcol" style="flex:1;max-width:none;gap:0"><span class="mk-mname">林晚 <em style="font-style:normal;color:var(--teal)">你</em></span><span class="mk-mcard">林晚 · 记者</span></div><span class="mk-dot"></span></div>
+                      <div class="mk-mitem"><span class="mk-av">周</span><div class="mk-mcol" style="flex:1;max-width:none;gap:0"><span class="mk-mname">周叙</span><span class="mk-mcard">周叙 · 医生</span></div><span class="mk-dot"></span></div>
+                      <div class="mk-mgrp">离线 1</div>
+                      <div class="mk-mitem"><span class="mk-av">陈</span><div class="mk-mcol" style="flex:1;max-width:none;gap:0"><span class="mk-mname">老陈</span><span class="mk-mcard">未绑定角色卡</span></div></div>
+                    </aside>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <img src="assets/shot-room.png" alt="AI Keeper narration and dice checks in the room chat" loading="lazy" />
+          </div>
+          <figcaption>
+            <span class="cap-k">01 — Room · AI Keeper</span>
+            <h3 data-zh="一张聊天，跑完一局" data-en="One chat, one whole session">一张聊天，跑完一局</h3>
+            <p data-zh="AI 守秘人推进叙事，玩家掷骰、检定，结果直接写回角色卡——全在同一张聊天里，右侧还能看到谁在线、绑定了哪张卡。" data-en="The AI Keeper narrates, players roll, and every check writes back to the sheet — all inside one chat, with who is online and which sheet they bound shown alongside.">AI 守秘人推进叙事，玩家掷骰、检定，结果直接写回角色卡——全在同一张聊天里，右侧还能看到谁在线、绑定了哪张卡。</p>
+            <ul class="shot-points">
+              <li data-zh="@KP 呼叫 AI" data-en="@KP to call the AI">@KP 呼叫 AI</li>
+              <li data-zh="1D100 检定" data-en="1D100 checks">1D100 检定</li>
+              <li data-zh="结果写回角色卡" data-en="Results written to the sheet">结果写回角色卡</li>
+            </ul>
+          </figcaption>
+        </figure>
+        <figure class="shot">
+          <div class="shot-canvas">
+            <div class="shot-mock">
+              <div class="mk-back">
+                <nav class="mk-nav">
+                  <div class="mk-nav-title">AI TRPG</div>
+                  <span class="mk-nv">主页</span>
+                  <span class="mk-nv">角色卡</span>
+                  <span class="mk-nv">房间</span>
+                  <span class="mk-nv">小工具</span>
+                  <span class="mk-nv-grp">探索发现</span>
+                  <span class="mk-nv on">剧本</span>
+                  <span class="mk-nv">角色卡广场</span>
+                  <span class="mk-nv">设置</span>
+                </nav>
+                <div class="mk-page">
+                  <div class="mk-pagehd">
+                    <div class="mk-kick">Scenario archive</div>
+                    <div class="mk-ptitle">剧本</div>
+                    <div class="mk-psub">整理跑团剧本、导入外部档案，并快速预览场景、线索与结局。</div>
+                  </div>
+                </div>
+              </div>
+              <div class="mk-overlay"></div>
+              <div class="mk-modal">
+                <div class="mk-modal-hd"><h5>创建剧本</h5><span class="mk-x">✕</span></div>
+                <div class="mk-modal-bd">
+                  <div style="display:flex;gap:9px;min-width:0">
+                    <div class="mk-cover">封面</div>
+                    <div class="mk-fgrid" style="flex:1">
+                      <label class="mk-fld"><span>剧本标题 *</span><span class="mk-inp">旧码头的低语</span></label>
+                      <label class="mk-fld"><span>剧本ID</span><span class="mk-inp mk-ph2">保存后自动生成</span></label>
+                      <label class="mk-fld"><span>剧本版本</span><span class="mk-inp">1.0.0</span></label>
+                      <label class="mk-fld"><span>作者 *</span><span class="mk-inp">林晚</span></label>
+                      <label class="mk-fld"><span>推荐人数 *</span><span class="mk-inp">4</span></label>
+                      <label class="mk-fld"><span>剧本简介</span><span class="mk-inp">雾港夜航，仓库里藏着不该存在的东西。</span></label>
+                    </div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <div><div style="font-size:10px;color:#dce3ea">模块</div><div style="font-size:8px;color:var(--muted-2)">选择模块类型后点击添加即可生成对应编辑卡。</div></div>
+                    <div class="mk-acts"><span class="mk-b p">＋ 添加模块</span><span class="mk-b">场景 ▾</span></div>
+                  </div>
+                  <div class="mk-panel">
+                    <div class="mk-panel-hd"><h4>场景1 · 仓库调查</h4><span>公开 · 发送给 AI</span></div>
+                    <div style="margin-top:6px;font-size:9px;line-height:1.6;color:var(--muted)">你们撬开侧门。潮湿的空气里混着铁锈与某种甜腻的腐味，手电光柱扫过一排排货箱……</div>
+                    <div class="mk-tags" style="margin-top:6px"><span class="mk-chip">触发器 · 仓库</span><span class="mk-chip">NPC · 老陈</span><span class="mk-chip">怪物 · 深潜者</span></div>
+                  </div>
+                </div>
+                <div class="mk-modal-ft"><span class="mk-b">取消</span><span class="mk-b o">重新上传文档</span><span class="mk-b o">保存草稿</span><span class="mk-b p">保存并发布</span></div>
+              </div>
+            </div>
+            <img src="assets/shot-scenario-editor.png" alt="Built-in scenario editor" loading="lazy" />
+          </div>
+          <figcaption>
+            <span class="cap-k">02 — Scenario editor</span>
+            <h3 data-zh="Word / PDF 模组，直接变成可玩剧本" data-en="Word / PDF modules become playable scenarios">Word / PDF 模组，直接变成可玩剧本</h3>
+            <p data-zh="场景卡、结局、时间线、NPC、怪物与道具在同一个编辑器里编排，封面与简介跟着剧本走；写完存草稿或直接发布。" data-en="Scene cards, endings, timeline, NPCs, monsters and items are arranged in one editor, with cover and synopsis attached — then save a draft or publish.">场景卡、结局、时间线、NPC、怪物与道具在同一个编辑器里编排，封面与简介跟着剧本走；写完存草稿或直接发布。</p>
+            <ul class="shot-points">
+              <li data-zh="九类模块" data-en="Nine module types">九类模块</li>
+              <li data-zh="文档直接导入" data-en="Direct document import">文档直接导入</li>
+              <li data-zh="草稿 / 发布" data-en="Draft / publish">草稿 / 发布</li>
+            </ul>
+          </figcaption>
+        </figure>
+        <figure class="shot">
+          <div class="shot-canvas">
+            <div class="shot-mock">
+              <div class="mk-back">
+                <nav class="mk-nav">
+                  <div class="mk-nav-title">AI TRPG</div>
+                  <span class="mk-nv">主页</span>
+                  <span class="mk-nv">角色卡</span>
+                  <span class="mk-nv">房间</span>
+                  <span class="mk-nv">小工具</span>
+                  <span class="mk-nv-grp">探索发现</span>
+                  <span class="mk-nv on">剧本</span>
+                  <span class="mk-nv">角色卡广场</span>
+                  <span class="mk-nv">设置</span>
+                </nav>
+                <div class="mk-page">
+                  <div class="mk-pagehd">
+                    <div class="mk-kick">Scenario archive</div>
+                    <div class="mk-ptitle">剧本</div>
+                  </div>
+                </div>
+              </div>
+              <div class="mk-overlay"></div>
+              <div class="mk-modal">
+                <div class="mk-modal-hd"><h5>知识块（世界书）</h5><span class="mk-x">✕</span></div>
+                <div class="mk-modal-bd">
+                  <div style="font-size:8px;line-height:1.5;color:var(--muted-2)">触发词命中即直接激活该章节（不再依赖语义相似度）；常驻条目每轮注入；archived 章节不参与检索。</div>
+                  <div class="mk-det">
+                    <div class="mk-sum"><b>深潜者</b><em>3 块 · core · 常驻</em></div>
+                    <div class="mk-dbody">
+                      <div style="font-size:8px;line-height:1.5;color:var(--muted)">来自深海的两栖类人种族，崇拜大衮，潜伏在旧码头水域……</div>
+                      <div class="mk-fgrid">
+                        <label class="mk-fld"><span>触发词（逗号分隔）</span><span class="mk-inp">深潜者、大衮、海怪</span></label>
+                        <label class="mk-fld"><span>副键（逗号分隔）</span><span class="mk-inp">旧码头、水域</span></label>
+                        <label class="mk-fld"><span>副键逻辑</span><span class="mk-inp">任一命中</span></label>
+                        <label class="mk-fld"><span>分层</span><span class="mk-inp">core（优先）</span></label>
+                        <label class="mk-fld"><span>概率 %</span><span class="mk-inp">80</span></label>
+                        <label class="mk-fld"><span>粘滞轮</span><span class="mk-inp">2</span></label>
+                        <label class="mk-fld"><span>冷却轮</span><span class="mk-inp">5</span></label>
+                        <label class="mk-fld"><span>优先级</span><span class="mk-inp">10</span></label>
+                      </div>
+                      <div style="display:flex;gap:10px"><span class="mk-chk on"><i></i>常驻注入</span><span class="mk-chk"><i></i>允许递归触发</span></div>
+                      <div><span class="mk-b p">保存本章节</span></div>
+                    </div>
+                  </div>
+                  <div class="mk-det"><div class="mk-sum"><b>旧码头</b><em>12 块 · core</em></div></div>
+                  <div class="mk-det"><div class="mk-sum"><b>黄铜钥匙</b><em>2 块 · background</em></div></div>
+                </div>
+                <div class="mk-modal-ft"><span class="mk-b">关闭</span></div>
+              </div>
+            </div>
+            <img src="assets/shot-worldbook.png" alt="World book entry editor" loading="lazy" />
+          </div>
+          <figcaption>
+            <span class="cap-k">03 — World book</span>
+            <h3 data-zh="决定 AI 此刻能读到什么" data-en="Decides what the AI may read right now">决定 AI 此刻能读到什么</h3>
+            <p data-zh="每条知识块都能调触发词、副键、常驻、概率与粘滞 / 冷却轮数：命中即注入，冷却即剔除，剧本再大也不会串味。" data-en="Every entry tunes its own trigger keys, secondary keys, always-on flag, probability and sticky / cooldown rounds — injected on a hit, dropped on cooldown, so even a huge scenario stays on topic.">每条知识块都能调触发词、副键、常驻、概率与粘滞 / 冷却轮数：命中即注入，冷却即剔除，剧本再大也不会串味。</p>
+            <ul class="shot-points">
+              <li data-zh="触发词激活" data-en="Trigger-key activation">触发词激活</li>
+              <li data-zh="粘滞 / 冷却" data-en="Sticky / cooldown">粘滞 / 冷却</li>
+              <li data-zh="概率与分组竞争" data-en="Probability and group race">概率与分组竞争</li>
+            </ul>
+          </figcaption>
+        </figure>
+        <figure class="shot">
+          <div class="shot-canvas">
+            <div class="shot-mock">
+              <div class="mk-app">
+                <nav class="mk-nav">
+                  <div class="mk-nav-title">AI TRPG</div>
+                  <span class="mk-nv">主页</span>
+                  <span class="mk-nv on">角色卡</span>
+                  <span class="mk-nv">房间</span>
+                  <span class="mk-nv">小工具</span>
+                  <span class="mk-nv-grp">探索发现</span>
+                  <span class="mk-nv">剧本</span>
+                  <span class="mk-nv">角色卡广场</span>
+                  <span class="mk-nv">设置</span>
+                </nav>
+                <div class="mk-page">
+                  <div class="mk-pagehd">
+                    <div class="mk-kick">COC7 investigator node</div>
+                    <div class="mk-ptitle">克苏鲁调查员角色卡</div>
+                    <div class="mk-psub">基于 COC 第七版规则管理属性、技能、装备、伤势与 San 值记录。</div>
+                  </div>
+                  <div class="mk-main" style="gap:7px;padding:9px 12px;overflow:hidden">
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <span class="mk-b">← 返回角色卡列表</span>
+                      <span style="margin-left:auto;font-size:12px;font-weight:650;color:#dce3ea">林晚</span>
+                      <span class="mk-b o">编辑角色卡</span>
+                    </div>
+                    <div>
+                      <div style="display:flex;align-items:baseline;gap:8px"><h4 style="margin:0;font-size:10px;color:#dce3ea">属性</h4><span style="font-size:8px;color:var(--muted-2)">基础总和 560</span></div>
+                      <div class="mk-attrs" style="grid-template-columns:repeat(5,1fr);margin-top:5px">
+                        <div class="mk-attr"><span>力量</span><b>55</b></div>
+                        <div class="mk-attr"><span>敏捷</span><b>70</b></div>
+                        <div class="mk-attr"><span>体型</span><b>65</b></div>
+                        <div class="mk-attr"><span>外貌</span><b>55</b></div>
+                        <div class="mk-attr"><span>体质</span><b>60</b></div>
+                        <div class="mk-attr"><span>智力</span><b>75</b></div>
+                        <div class="mk-attr"><span>意志</span><b>55</b></div>
+                        <div class="mk-attr"><span>教育</span><b>80</b></div>
+                        <div class="mk-attr"><span>幸运</span><b>45</b></div>
+                      </div>
+                    </div>
+                    <div>
+                      <h4 style="margin:0 0 5px;font-size:10px;color:#dce3ea">生命（HP）</h4>
+                      <div class="mk-stats" style="grid-template-columns:repeat(5,1fr)">
+                        <div class="mk-stat"><span>生命值</span><b>12 / 12</b></div>
+                        <div class="mk-stat"><span>理智值</span><b>62 / 62 / 99</b></div>
+                        <div class="mk-stat"><span>魔法值</span><b>11 / 11</b></div>
+                        <div class="mk-stat"><span>幸运</span><b>45</b></div>
+                        <div class="mk-stat"><span>移动速度</span><b>8</b></div>
+                      </div>
+                    </div>
+                    <div style="flex:1;min-height:0">
+                      <h4 style="margin:0 0 4px;font-size:10px;color:#dce3ea">技能</h4>
+                      <div class="mk-tbl mk-tbl-head mk-skills"><span>专职</span><span>技能名称</span><span>基础%</span><span>职业%</span><span>兴趣%</span><span>成长%</span><span>成功率%</span><span>困难50%</span><span>噩梦20%</span></div>
+                      <div class="mk-tbl mk-skills"><span>是</span><span>侦察 Spot Hidden</span><span>25</span><span>30</span><span>0</span><span>0</span><span>55</span><span>27</span><span>11</span></div>
+                      <div class="mk-tbl mk-skills"><span>是</span><span>图书馆使用 Library Use</span><span>20</span><span>30</span><span>0</span><span>0</span><span>50</span><span>25</span><span>10</span></div>
+                      <div class="mk-tbl mk-skills"><span>否</span><span>聆听 Listen</span><span>20</span><span>0</span><span>25</span><span>0</span><span>45</span><span>22</span><span>9</span></div>
+                      <div class="mk-tbl mk-skills"><span>是</span><span>射击 · 手枪</span><span>20</span><span>20</span><span>0</span><span>5</span><span>45</span><span>22</span><span>9</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <img src="assets/shot-sheet.png" alt="COC7 character sheet" loading="lazy" />
+          </div>
+          <figcaption>
+            <span class="cap-k">04 — Character sheet</span>
+            <h3 data-zh="属性、技能、武器与专精，一页看全" data-en="Attributes, skills, weapons and specialisations on one page">属性、技能、武器与专精，一页看全</h3>
+            <p data-zh="9 项属性、三档成功率（普通 / 困难 / 噩梦）、技能上限与武器清单一并呈现，技能名按角色卡自己的本地化名称显示。" data-en="Nine attributes, three success tiers (regular / hard / extreme), skill caps and the weapon list all in view, with skill names shown in the sheet's own localised wording.">9 项属性、三档成功率（普通 / 困难 / 噩梦）、技能上限与武器清单一并呈现，技能名按角色卡自己的本地化名称显示。</p>
+            <ul class="shot-points">
+              <li data-zh="9 项属性" data-en="Nine attributes">9 项属性</li>
+              <li data-zh="困难 / 噩梦值" data-en="Hard / extreme values">困难 / 噩梦值</li>
+              <li data-zh="武器与装备" data-en="Weapons and gear">武器与装备</li>
+            </ul>
+          </figcaption>
+        </figure>
+        <figure class="shot">
+          <div class="shot-canvas">
+            <div class="shot-mock">
+              <div class="mk-back">
+                <nav class="mk-nav">
+                  <div class="mk-nav-title">AI TRPG</div>
+                  <span class="mk-nv">主页</span>
+                  <span class="mk-nv on">角色卡</span>
+                  <span class="mk-nv">房间</span>
+                  <span class="mk-nv">小工具</span>
+                  <span class="mk-nv-grp">探索发现</span>
+                  <span class="mk-nv">剧本</span>
+                  <span class="mk-nv">角色卡广场</span>
+                  <span class="mk-nv">设置</span>
+                </nav>
+                <div class="mk-page">
+                  <div class="mk-pagehd">
+                    <div class="mk-kick">COC7 investigator node</div>
+                    <div class="mk-ptitle">克苏鲁调查员角色卡</div>
+                  </div>
+                </div>
+              </div>
+              <div class="mk-overlay"></div>
+              <div class="mk-modal" style="width:84%">
+                <div class="mk-modal-hd"><h5>创建角色卡</h5><span class="mk-x">✕</span></div>
+                <div class="mk-modal-bd">
+                  <div style="font-size:10px;color:#dce3ea">技能 <span style="font-size:8px;color:var(--muted-2)">Skills</span></div>
+                  <div class="mk-fgrid mk-fgrid-3">
+                    <label class="mk-fld"><span>职业点数</span><span class="mk-inp">40</span><em style="font-style:normal;font-size:7.5px;color:var(--muted-2)">剩余 16</em></label>
+                    <label class="mk-fld"><span>兴趣点数</span><span class="mk-inp">45</span><em style="font-style:normal;font-size:7.5px;color:var(--muted-2)">剩余 16</em></label>
+                    <div style="display:flex;gap:6px;align-items:flex-end"><label class="mk-fld"><span>本职上限</span><span class="mk-inp">90</span></label><label class="mk-fld"><span>其他上限</span><span class="mk-inp">80</span></label></div>
+                  </div>
+                  <div style="display:flex;flex-wrap:wrap;gap:4px">
+                    <span class="mk-chip" style="border-color:var(--teal);background:var(--teal);color:#061714">全部技能</span>
+                    <span class="mk-chip">特殊</span><span class="mk-chip">探索</span><span class="mk-chip">社交</span><span class="mk-chip">战斗</span><span class="mk-chip">医疗</span><span class="mk-chip">运动</span><span class="mk-chip">知识</span><span class="mk-chip">技术</span><span class="mk-chip">操纵</span><span class="mk-chip">其他</span>
+                  </div>
+                  <div>
+                    <div class="mk-tbl mk-tbl-head mk-skills"><span>专职</span><span>技能名称</span><span>基础%</span><span>职业%</span><span>兴趣%</span><span>成长%</span><span>成功率%</span><span>困难50%</span><span>噩梦20%</span></div>
+                    <div class="mk-tbl mk-skills"><span>是</span><span>射击 <em style="font-style:normal;border:1px solid var(--line-gold);border-radius:2px;padding:0 3px;color:var(--teal)">手枪</em></span><span>20</span><span>20</span><span>0</span><span>0</span><span>40</span><span>20</span><span>8</span></div>
+                    <div class="mk-tbl mk-skills"><span>是</span><span>侦察 Spot Hidden</span><span>25</span><span>30</span><span>0</span><span>0</span><span>55</span><span>27</span><span>11</span></div>
+                    <div class="mk-tbl mk-skills"><span>否</span><span>闪避 Dodge</span><span>25</span><span>0</span><span>0</span><span>2</span><span>27</span><span>13</span><span>5</span></div>
+                  </div>
+                </div>
+                <div class="mk-modal-ft"><span class="mk-b">取消</span><span class="mk-b p">保存</span></div>
+              </div>
+            </div>
+            <img src="assets/shot-sheet-editor.png" alt="Built-in character sheet editor" loading="lazy" />
+          </div>
+          <figcaption>
+            <span class="cap-k">05 — Sheet editor</span>
+            <h3 data-zh="建卡改卡，都在页面里完成" data-en="Build and edit sheets right in the page">建卡改卡，都在页面里完成</h3>
+            <p data-zh="职业点数与兴趣点数实时汇总剩余，分类筛选快速定位技能；带专精的技能选好专精，基础值随之切换。" data-en="Occupation and interest pools track the remainder live, category filters jump straight to a skill, and specialisation skills switch their base once a specialisation is picked.">职业点数与兴趣点数实时汇总剩余，分类筛选快速定位技能；带专精的技能选好专精，基础值随之切换。</p>
+            <ul class="shot-points">
+              <li data-zh="点数实时剩余" data-en="Live point remainder">点数实时剩余</li>
+              <li data-zh="分类筛选" data-en="Category filters">分类筛选</li>
+              <li data-zh="专精选择" data-en="Specialisation picker">专精选择</li>
+            </ul>
+          </figcaption>
+        </figure>
+        <figure class="shot">
+          <div class="shot-canvas">
+            <div class="shot-mock">
+              <div class="mk-app">
+                <nav class="mk-nav">
+                  <div class="mk-nav-title">AI TRPG</div>
+                  <span class="mk-nv">主页</span>
+                  <span class="mk-nv">角色卡</span>
+                  <span class="mk-nv">房间</span>
+                  <span class="mk-nv">小工具</span>
+                  <span class="mk-nv-grp">探索发现</span>
+                  <span class="mk-nv">剧本</span>
+                  <span class="mk-nv">角色卡广场</span>
+                  <span class="mk-nv on">设置</span>
+                </nav>
+                <div class="mk-page">
+                  <div class="mk-pagehd">
+                    <div class="mk-kick">Settings · knowledge</div>
+                    <div class="mk-ptitle">设置</div>
+                    <div class="mk-psub">管理员在此配置站点、模型、网络、角色卡规则与知识库。</div>
+                  </div>
+                  <div style="display:flex;flex-wrap:wrap;gap:4px;padding:8px 12px 0">
+                    <span class="mk-chip">常规设置</span>
+                    <span class="mk-chip">模型设置</span>
+                    <span class="mk-chip">网络配置</span>
+                    <span class="mk-chip">角色卡规则</span>
+                    <span class="mk-chip">用户管理</span>
+                    <span class="mk-chip">权限配置</span>
+                    <span class="mk-chip" style="border-color:var(--teal);background:var(--teal);color:#061714">知识库管理</span>
+                    <span class="mk-chip">关于应用</span>
+                  </div>
+                  <div class="mk-main" style="gap:8px;overflow:hidden">
+                    <div class="mk-panel">
+                      <div class="mk-panel-hd"><h4>知识库管理</h4><span>查看剧本与规则知识库状态、位置及向量数量</span></div>
+                      <div style="display:flex;flex-direction:column;gap:6px;padding-top:7px">
+                        <div class="mk-alert">向量检索使用 Embedding 模型；COC7 使用独立索引，未来可接入 COC6、D&amp;D 等规则集。</div>
+                        <div style="display:flex;align-items:center;gap:6px">
+                          <span class="mk-inp" style="flex:none">COC7 ▾</span>
+                          <span class="mk-inp mk-ph2" style="flex:1">选择规则文本 .md / .txt / .pdf</span>
+                          <span class="mk-b p">上传并索引</span>
+                        </div>
+                        <div class="mk-li2"><span class="mk-v">COC7 快速规则.md</span><span class="mk-badge">318 块</span><span class="mk-ok">已索引</span></div>
+                        <div class="mk-li2"><span class="mk-v">守秘人指南.pdf</span><span class="mk-badge">1204 块</span><span class="mk-ok">已索引</span></div>
+                      </div>
+                    </div>
+                    <div class="mk-panel">
+                      <div class="mk-panel-hd"><h4>剧本知识库</h4><span>删除仅清理向量和索引，不会删除剧本</span></div>
+                      <div style="display:flex;flex-direction:column;gap:6px;padding-top:7px">
+                        <div style="display:flex;align-items:center;gap:6px">
+                          <span class="mk-inp mk-ph2" style="flex:1">搜索剧本知识库</span>
+                          <span class="mk-b o">搜索</span>
+                        </div>
+                        <div class="mk-li2"><span class="mk-v">旧码头 · 夜航</span><span class="mk-badge">94 块</span></div>
+                        <div class="mk-li2"><span class="mk-v">黄铜钥匙</span><span class="mk-badge">61 块</span></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <img src="assets/shot-knowledge.png" alt="Rulebook knowledge base" loading="lazy" />
+          </div>
+          <figcaption>
+            <span class="cap-k">06 — Rulebook knowledge base</span>
+            <h3 data-zh="规则问题，用你的规则书回答" data-en="Rules questions answered from your own rulebook">规则问题，用你的规则书回答</h3>
+            <p data-zh="上传 COC7 规则文本后立即可检索，AI 回答规则问题时以它为依据；剧本知识库删除只清向量与索引，不动剧本本身。" data-en="Upload COC7 rule text and it is searchable at once — the AI answers rules questions from it. Deleting a scenario index clears vectors only, never the scenario itself.">上传 COC7 规则文本后立即可检索，AI 回答规则问题时以它为依据；剧本知识库删除只清向量与索引，不动剧本本身。</p>
+            <ul class="shot-points">
+              <li data-zh="上传并索引" data-en="Upload and index">上传并索引</li>
+              <li data-zh="BM25 + 向量" data-en="BM25 + vector">BM25 + 向量</li>
+              <li data-zh="独立规则集索引" data-en="Per-ruleset index">独立规则集索引</li>
+            </ul>
+          </figcaption>
+        </figure>
+      </div>
     </div>
   </section>
 
   <!-- STORY VS STATE -->
-  <section>
+  <section class="tint-warm">
     <div class="wrap split">
       <div>
         <span class="kicker">Story, with consequences</span>
@@ -422,15 +1037,15 @@ footer{border-top:1px solid var(--line);padding:40px 0 52px}
         <p class="note"><a href="https://github.com/Nobook1121/AIBasedTRPG/blob/main/docs/api.md" target="_blank" rel="noopener" data-zh="阅读接口与内部设计 →" data-en="Read the API and design notes →">阅读接口与内部设计 →</a></p>
       </div>
       <div class="quote-box">
-        <span class="kicker">Import modes</span>
-        <p data-zh="「直接导入」的剧本按只读处理：不提供场景栏位编辑，只保留基础信息与触发器资源，避免误改把检索索引弄坏。" data-en="Directly imported scenarios are read-only: no scene-slot editing, only base info and trigger assets — so a stray edit cannot corrupt the retrieval index.">「直接导入」的剧本按只读处理：不提供场景栏位编辑，只保留基础信息与触发器资源，避免误改把检索索引弄坏。</p>
-        <p class="note" style="margin-bottom:0" data-zh="只改标题、作者、封面、简介这类基础信息不会升版本，也不会重算索引；只有改动剧本内容才会生成新版本。" data-en="Editing a title, author, cover or synopsis bumps no version and triggers no re-index; only content edits create a new version.">只改标题、作者、封面、简介这类基础信息不会升版本，也不会重算索引；只有改动剧本内容才会生成新版本。</p>
+        <span class="kicker">Two kinds of memory</span>
+        <p data-zh="「世界书」装的是这个剧本的线索、NPC 与触发器；「规则书知识库」装的是 COC7 规则本身。两者分开检索——剧情线索不会被规则条文挤掉，规则问题也不用你现场翻书。" data-en="The world book holds this scenario's clues, NPCs and triggers; the rulebook knowledge base holds COC7 itself. They are retrieved separately — clues never get crowded out by rule text, and rules questions never send you flipping through a book mid-session.">「世界书」装的是这个剧本的线索、NPC 与触发器；「规则书知识库」装的是 COC7 规则本身。两者分开检索——剧情线索不会被规则条文挤掉，规则问题也不用你现场翻书。</p>
+        <p class="note" style="margin-bottom:0" data-zh="规则文本支持 .txt / .md / .doc / .docx，上传后立即生效；换一份规则书不用重跑剧本。" data-en="Rule text accepts .txt / .md / .doc / .docx and takes effect the moment it is uploaded — swapping rulebooks needs no scenario rebuild.">规则文本支持 .txt / .md / .doc / .docx，上传后立即生效；换一份规则书不用重跑剧本。</p>
       </div>
     </div>
   </section>
 
   <!-- STEPS -->
-  <section>
+  <section class="tint-cool">
     <div class="wrap">
       <div class="sec-head">
         <span class="kicker">From zero to session one</span>
@@ -449,8 +1064,8 @@ footer{border-top:1px solid var(--line);padding:40px 0 52px}
         </div>
         <div class="step">
           <span class="step-num">03 · Prepare</span>
-          <h3 data-zh="准备剧本" data-en="Prepare a scenario">准备剧本</h3>
-          <p data-zh="手写模组，或导入文档。导入后还能在世界书里逐条调触发词、常驻与冷却。" data-en="Write a module, or import a document — then tune trigger keys, always-on entries and cooldowns in the world book.">手写模组，或导入文档。导入后还能在世界书里逐条调触发词、常驻与冷却。</p>
+          <h3 data-zh="准备剧本与角色卡" data-en="Prepare scenarios and sheets">准备剧本与角色卡</h3>
+          <p data-zh="手写模组，或把文档导进来；再在剧本编辑器里调场景卡、在世界书里逐条设触发词，顺手建几张 COC7 角色卡，上传规则书建起知识库。" data-en="Write a module or import a document, tune scene cards in the editor, set trigger keys entry by entry in the world book, roll a few COC7 sheets, and upload a rulebook to build the knowledge base.">手写模组，或把文档导进来；再在剧本编辑器里调场景卡、在世界书里逐条设触发词，顺手建几张 COC7 角色卡，上传规则书建起知识库。</p>
         </div>
         <div class="step">
           <span class="step-num">04 · Play</span>
@@ -462,7 +1077,7 @@ footer{border-top:1px solid var(--line);padding:40px 0 52px}
   </section>
 
   <!-- QUICKSTART -->
-  <section id="start">
+  <section id="start" class="tint-azure">
     <div class="wrap">
       <div class="sec-head">
         <span class="kicker">Python · Three commands</span>
@@ -527,31 +1142,26 @@ python server.py</pre>
   </section>
 
   <!-- DEPLOY -->
-  <section id="deploy">
+  <section id="deploy" class="tint-gold">
     <div class="wrap split">
       <div>
         <span class="kicker">Deploy anywhere</span>
-        <h2 data-zh="域名和 HTTPS，交给反向代理。" data-en="Leave domains and HTTPS to a reverse proxy.">域名和 HTTPS，交给反向代理。</h2>
-        <p class="sec-head" style="margin:16px 0 0;max-width:none" data-zh="程序本身不内置穿透、端口映射与 HTTPS，长期运行交给 Nginx 或 Caddy，记得转发 WebSocket。" data-en="The app bundles no tunnelling, port mapping or HTTPS. For long-running use, put Nginx or Caddy in front — and remember to forward WebSocket.">程序本身不内置穿透、端口映射与 HTTPS，长期运行交给 Nginx 或 Caddy，记得转发 WebSocket。</p>
+        <h2 data-zh="不用云服务器，也能让朋友连上。" data-en="No cloud server needed — friends can still join.">不用云服务器，也能让朋友连上。</h2>
+        <p class="sec-head" style="margin:16px 0 0;max-width:none" data-zh="程序可以配合内网穿透等方式使用：在一台普通电脑上跑起来，把地址分享出去，朋友就能加入。零成本、无需云服务器，也不用先准备域名和证书。" data-en="The app works together with tunnelling tools: run it on an ordinary PC, share the address, and friends can join. Zero cost, no cloud server, and no domain or certificate to prepare first.">程序可以配合内网穿透等方式使用：在一台普通电脑上跑起来，把地址分享出去，朋友就能加入。零成本、无需云服务器，也不用先准备域名和证书。</p>
         <ul class="rules">
-          <li data-zh="同一台电脑：直接 <code>python server.py</code>，浏览器开 <code>127.0.0.1:8086</code>。" data-en="Same machine: run <code>python server.py</code> and open <code>127.0.0.1:8086</code>.">同一台电脑：直接 <code>python server.py</code>，浏览器开 <code>127.0.0.1:8086</code>。</li>
-          <li data-zh="局域网：主机启动服务，朋友访问主机 IP，记得放行防火墙端口。" data-en="LAN: the host runs the server, friends open the host IP, and the firewall must allow the port.">局域网：主机启动服务，朋友访问主机 IP，记得放行防火墙端口。</li>
-          <li data-zh="异地联机：ZeroTier / Tailscale / WireGuard / frp 组网或穿透，也可以直接上云服务器。" data-en="Remote: use ZeroTier / Tailscale / WireGuard / frp, or just deploy to a cloud server.">异地联机：ZeroTier / Tailscale / WireGuard / frp 组网或穿透，也可以直接上云服务器。</li>
-          <li data-zh="上线前务必设置自己的密钥：<code>$env:AI_TRPG_SECRET_KEY</code>，不要用默认开发密钥。" data-en="Before going online, set your own secret: <code>$env:AI_TRPG_SECRET_KEY</code> — never ship the default dev key.">上线前务必设置自己的密钥：<code>$env:AI_TRPG_SECRET_KEY</code>，不要用默认开发密钥。</li>
+          <li data-zh="同一台电脑：运行 <code>python server.py</code>，浏览器打开 <code>127.0.0.1:8086</code>，先自己开一局。" data-en="Same machine: run <code>python server.py</code>, open <code>127.0.0.1:8086</code> and play a round yourself.">同一台电脑：运行 <code>python server.py</code>，浏览器打开 <code>127.0.0.1:8086</code>，先自己开一局。</li>
+          <li data-zh="同一个 Wi-Fi：朋友打开启动日志里的局域网地址就能加入，记得放行防火墙端口。" data-en="Same Wi-Fi: friends open the LAN address printed in the startup log; allow the port through the firewall.">同一个 Wi-Fi：朋友打开启动日志里的局域网地址就能加入，记得放行防火墙端口。</li>
+          <li data-zh="异地联机：用内网穿透把本机地址映射出去，把得到的外网地址发给朋友即可，不必购买云服务器。" data-en="Remote play: expose your machine with a tunnelling tool and send the resulting public address to your friends — no cloud server to buy.">异地联机：用内网穿透把本机地址映射出去，把得到的外网地址发给朋友即可，不必购买云服务器。</li>
+          <li data-zh="长期使用前，先设置自己的密钥：<code>$env:AI_TRPG_SECRET_KEY</code>，不要沿用默认开发密钥。" data-en="Before long-term use, set your own secret: <code>$env:AI_TRPG_SECRET_KEY</code> — never keep the default dev key.">长期使用前，先设置自己的密钥：<code>$env:AI_TRPG_SECRET_KEY</code>，不要沿用默认开发密钥。</li>
         </ul>
       </div>
-      <div class="code-card">
-        <div class="code-bar"><span>Nginx</span></div>
-<pre>location / {
-    proxy_pass http://127.0.0.1:8086;
-    proxy_http_version 1.1;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-}</pre>
+      <div class="steps-card">
+        <div class="code-bar"><span data-zh="三步，零成本联机" data-en="Zero cost in three steps">三步，零成本联机</span></div>
+        <ol>
+          <li><span class="n">01</span><div class="d" data-zh="<b>跑起来</b>在本机运行 <code>python server.py</code>，先自己开一局试试。" data-en="<b>Run it</b>Start <code>python server.py</code> locally and try a round."><b>跑起来</b>在本机运行 <code>python server.py</code>，先自己开一局试试。</div></li>
+          <li><span class="n">02</span><div class="d" data-zh="<b>开穿透</b>用任意内网穿透工具把本机地址映射出去，无需云服务器。" data-en="<b>Expose it</b>Use any tunnelling tool to map your local address out — no cloud server needed."><b>开穿透</b>用任意内网穿透工具把本机地址映射出去，无需云服务器。</div></li>
+          <li><span class="n">03</span><div class="d" data-zh="<b>发地址</b>把得到的外网地址发给朋友，他们打开就能一起玩。" data-en="<b>Share the link</b>Send the public address to your friends — they just open it and play."><b>发地址</b>把得到的外网地址发给朋友，他们打开就能一起玩。</div></li>
+        </ol>
       </div>
     </div>
   </section>
@@ -589,7 +1199,7 @@ python server.py</pre>
   </section>
 
   <!-- DOCS -->
-  <section>
+  <section class="tint-cool">
     <div class="wrap docs">
       <div>
         <span class="kicker">Guides &amp; documentation</span>
@@ -726,6 +1336,70 @@ python server.py</pre>
         fallback();
       }
     });
+  }
+
+  // 「界面预览」：真截图放进来就盖在示意图上；没放（或加载失败）就移除 img，露出下方的 CSS 示意图
+  var shots = document.querySelector(".shots");
+  if (shots) {
+    var dropShotImg = function (img) {
+      if (img && img.parentNode) img.parentNode.removeChild(img);
+    };
+    var revealShotImg = function (img) { img.classList.add("mk-ready"); };
+    var auditShots = function () {
+      var imgs = shots.querySelectorAll("img");
+      for (var i = imgs.length - 1; i >= 0; i--) {
+        if (!imgs[i].complete) continue;
+        if (imgs[i].naturalWidth === 0) dropShotImg(imgs[i]); else revealShotImg(imgs[i]);
+      }
+    };
+    var shotImgs = shots.querySelectorAll("img");
+    for (var s = 0; s < shotImgs.length; s++) {
+      shotImgs[s].addEventListener("load", function () { revealShotImg(this); });
+      shotImgs[s].addEventListener("error", function () { dropShotImg(this); });
+    }
+    auditShots();
+    window.addEventListener("load", auditShots);
+  }
+
+  // 滚动渐显：章节标题与「界面预览」的每一行，进入视口时逐个淡入上移。
+  // 主通道用 IntersectionObserver（依据元素与视口的相交状态触发，不依赖 scroll 事件派发）；
+  // 兜底通道在 scroll/resize/load 上做几何判定。两条通道共用 rvReveal，重复触发无副作用。
+  // 全部点亮后解绑兜底监听；脚本失效则不加 rv-ready，内容保持可见。
+  var rvTargets = document.querySelectorAll(".sec-head, #shots .shot");
+  if (rvTargets.length) {
+    document.documentElement.classList.add("rv-ready");
+    var rvPending = [];
+    for (var r = 0; r < rvTargets.length; r++) rvPending.push(rvTargets[r]);
+    var rvUnbind = function () {
+      window.removeEventListener("scroll", rvScan);
+      window.removeEventListener("resize", rvScan);
+      window.removeEventListener("load", rvScan);
+    };
+    var rvReveal = function (el) {
+      if (el.classList.contains("in")) return;
+      el.classList.add("in");
+      var k = rvPending.indexOf(el);
+      if (k !== -1) rvPending.splice(k, 1);
+      if (!rvPending.length) rvUnbind();
+    };
+    var rvScan = function () {
+      var horizon = window.innerHeight * 0.9;
+      for (var i = rvPending.length - 1; i >= 0; i--) {
+        if (rvPending[i].getBoundingClientRect().top < horizon) rvReveal(rvPending[i]);
+      }
+    };
+    if ("IntersectionObserver" in window) {
+      var rvIO = new IntersectionObserver(function (entries) {
+        for (var e = 0; e < entries.length; e++) {
+          if (entries[e].isIntersecting) rvReveal(entries[e].target);
+        }
+      }, { rootMargin: "0px 0px -10% 0px" });
+      for (var q = 0; q < rvTargets.length; q++) rvIO.observe(rvTargets[q]);
+    }
+    rvScan();
+    window.addEventListener("scroll", rvScan, { passive: true });
+    window.addEventListener("resize", rvScan);
+    window.addEventListener("load", rvScan);
   }
 })();
 </script>
