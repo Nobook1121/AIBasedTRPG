@@ -116,3 +116,6 @@ docs/样本
 /release/*.tgz
 /release/*.sha256
 /release/*.sha512
+
+#ignore wiki
+/docs/AIBasedTRPG.wiki
