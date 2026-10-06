@@ -70,7 +70,7 @@ export function Sidebar() {
             <div className="d-flex flex-column h-100 p-3">
                 <div className="sidebar-header">
                     <h2 className="sidebar-title" data-i18n="app.title">
-                        帷幕 The Veil
+                        帷幕
                     </h2>
                     <button
                         type="button"

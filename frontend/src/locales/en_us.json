@@ -736,7 +736,7 @@
     "occupation.hint.skills": "Occupation Skills"
   },
   "legacy": {
-    "帷幕 The Veil · AI 跑团平台": "The Veil · AI TRPG Platform",
+    "帷幕 · AI 跑团平台": "The Veil · AI TRPG Platform",
     "主页": "Home",
     "角色卡": "Character Sheets",
     "房间": "Rooms",
@@ -758,7 +758,7 @@
     "打开用户设置": "Open user settings",
     "用户头像": "User avatar",
     "未登录": "Not signed in",
-    "欢迎来到帷幕 The Veil · AI 跑团平台，请选择一个剧本开始游戏。": "Welcome to The Veil. Choose a scenario to begin.",
+    "欢迎来到帷幕，请选择一个剧本开始游戏。": "Welcome to The Veil. Choose a scenario to begin.",
     "请选择或创建一个房间开始游戏。": "Choose or create a room to start playing.",
     "加入房间后可发送消息，使用 @KP 呼叫 AI": "Join a room to send messages. Use @KP to call the AI.",
     "发送": "Send",

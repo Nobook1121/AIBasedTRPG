@@ -110,7 +110,7 @@ export function HomeChat() {
                     </header>
 
                     <div className="chat-history" id="chatHistory">
-                        <div className="welcome-text" data-i18n="home.welcome">欢迎来到帷幕 The Veil · AI 跑团平台，请选择一个剧本开始游戏。</div>
+                        <div className="welcome-text" data-i18n="home.welcome">欢迎来到帷幕，请选择一个剧本开始游戏。</div>
                     </div>
 
                     <div id="aiSuggestions" className="chat-suggestions" hidden aria-live="polite" />
