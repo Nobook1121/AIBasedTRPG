@@ -1,15 +1,15 @@
-# AIBasedTRPG
+# 帷幕 The Veil · AI 跑团平台
 
 > 面向 COC7 的开源、自托管 AI 跑团（TRPG）平台：AI 守秘人（KP）推进剧情、裁决检定、扮演 NPC，玩家在同一张房间聊天里掷骰、交流、推进故事；剧本、账号与聊天记录全部留在自己的机器上。
 
-AIBasedTRPG 是一套可以自己部署的 AI 跑团平台，把「AI 当 KP / 守秘人」与「真人玩家同桌」合在一起。它由 Python（Flask）后端与浏览器前端组成，单进程运行，默认端口 8086，数据落在本地 `data/` 目录，不依赖任何云服务。项目以 Apache License 2.0 发布，当前版本 v0.4.3b，运行需要 Python 3.11+（Node.js 18+ 仅在自行构建前端时需要）。
+帷幕（The Veil）是一套可以自己部署的 AI 跑团平台，把「AI 当 KP / 守秘人」与「真人玩家同桌」合在一起。它由 Python（Flask）后端与浏览器前端组成，单进程运行，默认端口 8086，数据落在本地 `data/` 目录，不依赖任何云服务。项目以 Apache License 2.0 发布，当前版本 v0.4.3b，运行需要 Python 3.11+（Node.js 18+ 仅在自行构建前端时需要）。
 
 ## 快速了解
 
 - [项目主页](https://aitrpg.top/)：产品介绍、六项能力的界面预览、四步上手流程与常见问题
-- [源码仓库](https://github.com/Nobook1121/AIBasedTRPG)：完整源代码与 Issue 跟踪
-- [发布版本](https://github.com/Nobook1121/AIBasedTRPG/releases)：最新 v0.4.3b 的下载包
-- [许可证](https://github.com/Nobook1121/AIBasedTRPG/blob/main/LICENSE)：Apache License 2.0
+- [源码仓库](https://github.com/Nobook1121/the-veil)：完整源代码与 Issue 跟踪
+- [发布版本](https://github.com/Nobook1121/the-veil/releases)：最新 v0.4.3b 的下载包
+- [许可证](https://github.com/Nobook1121/the-veil/blob/main/LICENSE)：Apache License 2.0
 
 ## 关键能力
 
@@ -24,14 +24,14 @@ AIBasedTRPG 是一套可以自己部署的 AI 跑团平台，把「AI 当 KP / �
 
 ## 文档
 
-- [文档目录](https://github.com/Nobook1121/AIBasedTRPG/tree/main/docs)
-- [API 文档](https://github.com/Nobook1121/AIBasedTRPG/blob/main/docs/api.md)：全部 HTTP 路由与 Socket.IO 事件
-- [剧本格式](https://github.com/Nobook1121/AIBasedTRPG/blob/main/docs/scenario-format.md)
-- [剧本导入说明](https://github.com/Nobook1121/AIBasedTRPG/blob/main/docs/scenario-import.md)
-- [向量检索说明](https://github.com/Nobook1121/AIBasedTRPG/blob/main/docs/vector-store.md)
-- [控制台命令](https://github.com/Nobook1121/AIBasedTRPG/blob/main/docs/console-commands.md)
-- [角色技能表](https://github.com/Nobook1121/AIBasedTRPG/blob/main/docs/character_skills.md)
+- [文档目录](https://github.com/Nobook1121/the-veil/tree/main/docs)
+- [API 文档](https://github.com/Nobook1121/the-veil/blob/main/docs/api.md)：全部 HTTP 路由与 Socket.IO 事件
+- [剧本格式](https://github.com/Nobook1121/the-veil/blob/main/docs/scenario-format.md)
+- [剧本导入说明](https://github.com/Nobook1121/the-veil/blob/main/docs/scenario-import.md)
+- [向量检索说明](https://github.com/Nobook1121/the-veil/blob/main/docs/vector-store.md)
+- [控制台命令](https://github.com/Nobook1121/the-veil/blob/main/docs/console-commands.md)
+- [角色技能表](https://github.com/Nobook1121/the-veil/blob/main/docs/character_skills.md)
 
 ## 引用说明
 
-引用本站内容时，请以「AIBasedTRPG」为产品名，并链接到 <https://aitrpg.top/>。项目本身开源（Apache-2.0），但使用到的剧本、规则书与 AI 服务各自的授权条款需另行遵守。
+引用本站内容时，请以「帷幕（The Veil）」为产品名，并链接到 <https://aitrpg.top/>。项目本身开源（Apache-2.0），但使用到的剧本、规则书与 AI 服务各自的授权条款需另行遵守。

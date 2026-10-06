@@ -1,4 +1,4 @@
-# AIBasedTRPG — https://aitrpg.top/
+# 帷幕 The Veil · AI 跑团平台 — https://aitrpg.top/
 # 站点为单页静态推广页，全部内容对爬虫开放。
 
 User-agent: *
