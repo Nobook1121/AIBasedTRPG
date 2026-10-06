@@ -1,6 +1,6 @@
 {
   "name": "aibased-trpg",
-  "version": "0.3.4",
+  "version": "0.4.3-b",
   "private": true,
   "type": "module",
   "scripts": {
