@@ -4,12 +4,182 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>AIBasedTRPG · 开源自托管的 AI 跑团平台</title>
-<meta name="description" content="AIBasedTRPG 是一套开源、自托管的 AI 跑团平台，面向 COC7。AI 守秘人推进剧情、裁决检定、扮演 NPC，玩家在同一张房间聊天里掷骰、交流、推进故事。" />
+<meta name="description" content="AIBasedTRPG 是一套开源、自托管的 AI 跑团平台，面向 COC7。AI 守秘人推进剧情、裁决检定、扮演 NPC，玩家在同一张房间聊天里掷骰、交流、推进故事。自带剧本编辑器、世界书、COC7 角色卡编辑器与规则书知识库。" />
+<meta name="keywords" content="AI 跑团,AI TRPG,TRPG,COC7,克苏鲁的呼唤,跑团平台,AI KP,AI 守秘人,AI 主持人,自托管,开源,剧本编辑器,世界书,角色卡,COC7 角色卡,规则书知识库,局域网联机" />
+<meta name="author" content="AIBasedTRPG" />
+<meta name="application-name" content="AIBasedTRPG" />
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />
+<meta name="googlebot" content="index,follow,max-image-preview:large,max-snippet:-1" />
 <meta name="theme-color" content="#0A0E13" />
+<link rel="canonical" href="https://aitrpg.top/" />
+<link rel="alternate" hreflang="zh-CN" href="https://aitrpg.top/" />
+<link rel="alternate" hreflang="x-default" href="https://aitrpg.top/" />
 <meta property="og:type" content="website" />
+<meta property="og:site_name" content="AIBasedTRPG" />
+<meta property="og:locale" content="zh_CN" />
+<meta property="og:locale:alternate" content="en_US" />
+<meta property="og:url" content="https://aitrpg.top/" />
 <meta property="og:title" content="AIBasedTRPG · 开源自托管的 AI 跑团平台" />
-<meta property="og:description" content="AI 坐上 KP 的位置，朋友坐满整张桌子。剧本、账号与聊天记录全部留在你自己的机器上。" />
+<meta property="og:description" content="AI 坐上 KP 的位置，朋友坐满整张桌子。面向 COC7 的开源、自托管 AI 跑团平台，剧本、账号与聊天记录全部留在你自己的机器上。" />
+<meta property="og:image" content="https://aitrpg.top/assets/og-cover.png" />
+<meta property="og:image:type" content="image/png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="AIBasedTRPG — 开源 · 自托管 · AI 跑团平台" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="AIBasedTRPG · 开源自托管的 AI 跑团平台" />
+<meta name="twitter:description" content="AI 坐上 KP 的位置，朋友坐满整张桌子。面向 COC7 的开源、自托管 AI 跑团平台。" />
+<meta name="twitter:image" content="https://aitrpg.top/assets/og-cover.png" />
+<meta name="twitter:image:alt" content="AIBasedTRPG — 开源 · 自托管 · AI 跑团平台" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath d='M24 4 42 15v18L24 44 6 33V15Z' fill='none' stroke='%23E0B15E' stroke-width='3'/%3E%3Cpath d='M24 4v40M6 15l36 18M42 15 6 33' fill='none' stroke='%23E0B15E' stroke-width='1.6' opacity='.5'/%3E%3C/svg%3E" />
+<!-- 结构化数据：帮助搜索引擎与 AI 正确理解、摘录并引用本站内容 -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://aitrpg.top/#website",
+      "url": "https://aitrpg.top/",
+      "name": "AIBasedTRPG",
+      "alternateName": "AI 跑团平台",
+      "description": "面向 COC7 的开源、自托管 AI 跑团平台：AI 守秘人推进剧情、裁决检定、扮演 NPC，玩家在同一张房间聊天里掷骰并推进故事。",
+      "inLanguage": "zh-CN",
+      "publisher": { "@id": "https://aitrpg.top/#organization" }
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://aitrpg.top/#organization",
+      "name": "AIBasedTRPG",
+      "url": "https://aitrpg.top/",
+      "description": "开源、自托管的 AI 跑团（TRPG）平台项目。",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://aitrpg.top/assets/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "sameAs": ["https://github.com/Nobook1121/AIBasedTRPG"]
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://aitrpg.top/#software",
+      "name": "AIBasedTRPG",
+      "alternateName": "AI 跑团平台",
+      "url": "https://aitrpg.top/",
+      "applicationCategory": "GameApplication",
+      "applicationSubCategory": "Tabletop role-playing game platform",
+      "operatingSystem": "Windows, macOS, Linux",
+      "softwareVersion": "0.4.3b",
+      "softwareRequirements": "Python 3.11+；Node.js 18+ 仅在自行构建前端时需要",
+      "license": "https://www.apache.org/licenses/LICENSE-2.0",
+      "isAccessibleForFree": true,
+      "inLanguage": "zh-CN",
+      "downloadUrl": "https://github.com/Nobook1121/AIBasedTRPG/releases",
+      "codeRepository": "https://github.com/Nobook1121/AIBasedTRPG",
+      "programmingLanguage": ["Python", "TypeScript"],
+      "description": "面向 COC7 的开源、自托管 AI 跑团平台：AI 守秘人推进剧情，规则书知识库回答规则问题，剧本编辑器把 Word / PDF 模组变成可玩模组，角色卡与内置编辑器管住每一点技能——剧本、账号与聊天记录全部落在你自己的机器上。",
+      "featureList": [
+        "AI KP：自然语言叙事与结构化状态分开处理，模型讲故事，引擎让检定结果、技能值与角色卡真正落地",
+        "实时多人房间：房间码邀请、成员列表、角色变更实时同步、正在输入提示，页面与实时聊天共用同一个端口",
+        "世界书检索：命中触发词直接激活，未命中回退 BM25 + 向量检索，支持常驻、分层、概率、粘滞与冷却轮数",
+        "剧本导入：Word / PDF / Markdown 模组按标题分节语义切块并建索引，导入完成即可开团，提供「直接导入」与「审核导入」两条路径",
+        "内置剧本编辑器：场景卡、结局、时间线、NPC、怪物与道具在同一界面编排，可配封面与简介，只有改动内容才生成新版本",
+        "COC7 角色卡与检定：属性、技能、武器、专精与本地化技能名，检定名对照 character_skills.json 校验，1D100 结果直接写回卡上",
+        "内置角色卡编辑器：在页面里建卡改卡、分配技能点，技能基础值支持「房规 > 管理员默认 > 规则书默认」三级覆盖",
+        "规则书知识库：上传 COC7 规则文本即刻可检索，AI 回答规则问题时以你的规则书为依据"
+      ],
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "CNY"
+      },
+      "screenshot": "https://aitrpg.top/assets/og-cover.png"
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://aitrpg.top/#faq",
+      "inLanguage": "zh-CN",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "打开页面是空白的？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "前端没有构建。执行 npm install && npm run build:frontend，或者改用已经带构建产物的 release 压缩包。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "朋友连不上？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "依次检查三件事：主机防火墙有没有放行端口、IP 对不对（异地组网要用虚拟网卡 IP）、启动日志里有没有对方能访问到的 listening 地址。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "AI 不回复，或者只回复一半？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "多数是模型接口超时。可以在设置页调大「AI 请求超时」和「最大工具调用轮数」，再确认 API Key 与模型 ID 没写错。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "扫描版 PDF 导进来没有内容？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "默认只处理文本型 PDF。扫描件需要额外装 OCR 依赖（PaddleOCR），见开发文档里的进阶可选项。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "改了剧本标题或封面，版本号为什么没变？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "这是刻意的。标题、作者、推荐人数、简介、封面都属于基础信息，改它们不会升版本、也不会重算索引；只有改动剧本内容才会生成新版本。"
+          }
+        }
+      ]
+    },
+    {
+      "@type": "HowTo",
+      "@id": "https://aitrpg.top/#howto",
+      "name": "四步开始第一场 AI 跑团",
+      "description": "从部署 AIBasedTRPG 到开团的四个步骤。",
+      "inLanguage": "zh-CN",
+      "url": "https://aitrpg.top/#start",
+      "step": [
+        {
+          "@type": "HowToStep",
+          "position": 1,
+          "name": "部署",
+          "text": "克隆仓库或解压 release 包，装好依赖，运行 python server.py 即可启动。"
+        },
+        {
+          "@type": "HowToStep",
+          "position": 2,
+          "name": "配置",
+          "text": "打开首页会弹出 5 步向导：选平台、填 Key、测试连接、创建 Owner，全程不用手改配置文件。"
+        },
+        {
+          "@type": "HowToStep",
+          "position": 3,
+          "name": "准备剧本与角色卡",
+          "text": "手写模组，或把文档导进来；再在剧本编辑器里调场景卡、在世界书里逐条设触发词，建几张 COC7 角色卡，上传规则书建起知识库。"
+        },
+        {
+          "@type": "HowToStep",
+          "position": 4,
+          "name": "开团",
+          "text": "建房、发房间码、朋友加入。AI 开场并推进剧情，玩家掷骰、检定、行动。"
+        }
+      ]
+    }
+  ]
+}
+</script>
 <style>
 :root{
   --bg:#0A0E13;
@@ -31,8 +201,8 @@
   /* 分区点缀色：默认金色，各板块可覆盖。四色均取自项目自身的主题色板 */
   --sec-accent:var(--gold);
   --sans:"Segoe UI","Microsoft YaHei","PingFang SC",Tahoma,Geneva,Verdana,sans-serif;
-  /* 拉丁字形走衬线，中日文字形回退到高质量无衬线（避免 SimSun 的细弱观感） */
-  --display:"Iowan Old Style","Palatino Linotype","Book Antiqua",Palatino,Georgia,"Microsoft YaHei","PingFang SC","Hiragino Sans GB","Noto Sans SC",sans-serif;
+  /* 拉丁与中日文字形统一走衬线：拉丁命中 Palatino/Iowan，中文命中宋体/思源宋体 */
+  --display:"Iowan Old Style","Palatino Linotype","Book Antiqua",Palatino,Georgia,"Songti SC","SimSun","Source Han Serif SC","Noto Serif SC",serif;
   --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
   --maxw:1080px;
 }
@@ -87,6 +257,8 @@ section:first-of-type::before{display:none}
   display:block;font-family:var(--mono);font-size:.7rem;letter-spacing:.22em;
   text-transform:uppercase;color:var(--sec-accent);margin-bottom:16px;
 }
+/* 中文小标签不收窄字距会散得难以成词，单独降级；同时去掉对 CJK 无意义的大写转换 */
+:lang(zh) .kicker,:lang(zh) .cap-k,:lang(zh) .brand-tag{letter-spacing:.06em;text-transform:none}
 .sec-head{max-width:760px;margin-bottom:44px}
 .sec-head h2{font-size:clamp(1.5rem,3.1vw,2.15rem)}
 .sec-head p{color:var(--muted);margin:16px 0 0;font-size:.98rem}
@@ -480,7 +652,7 @@ footer{padding:40px 0 52px}
       </svg>
       <span class="brand-text">
         AIBasedTRPG
-        <span class="brand-tag">Open-source · Self-hosted</span>
+        <span class="brand-tag" data-zh="开源 · 自托管" data-en="Open-source · Self-hosted">开源 · 自托管</span>
       </span>
     </a>
     <nav class="nav">
@@ -503,14 +675,14 @@ footer{padding:40px 0 52px}
   <section class="hero">
     <div class="wrap">
       <div class="hero-head">
-        <span class="kicker">Open-source · Self-hosted · AI TRPG</span>
+        <span class="kicker" data-zh="开源 · 自托管 · AI 跑团" data-en="Open-source · Self-hosted · AI TRPG">开源 · 自托管 · AI 跑团</span>
         <h1 data-zh="让 AI 坐上 KP 的位置，<span class=&quot;hl&quot;>把故事跑下去</span>。" data-en="Put AI in the Keeper's seat — <span class=&quot;hl&quot;>keep the story going</span>.">让 AI 坐上 KP 的位置，<span class="hl">把故事跑下去</span>。</h1>
         <p class="hero-sub" data-zh="面向 COC7 的开源、自托管 AI 跑团平台：AI 守秘人推进剧情，规则书知识库回答规则问题，剧本编辑器把 Word / PDF 模组变成可玩模组，角色卡与内置编辑器管住每一点技能——剧本、账号与聊天记录全部落在你自己的机器上。" data-en="An open-source, self-hosted AI tabletop platform for COC7: an AI Keeper drives the story, a rulebook knowledge base answers rules questions, a scenario editor turns Word / PDF modules into playable ones, and character sheets plus a built-in editor keep every skill point in order — with scenarios, accounts and chat logs all on your own machine.">面向 COC7 的开源、自托管 AI 跑团平台：AI 守秘人推进剧情，规则书知识库回答规则问题，剧本编辑器把 Word / PDF 模组变成可玩模组，角色卡与内置编辑器管住每一点技能——剧本、账号与聊天记录全部落在你自己的机器上。</p>
         <div class="hero-cta">
           <a class="btn btn-primary btn-lg" href="https://github.com/Nobook1121/AIBasedTRPG/releases" target="_blank" rel="noopener">
             <svg class="ico-dl" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v11"/><path d="m7.5 10 4.5 4 4.5-4"/><path d="M5 20h14"/></svg>
             <span data-zh="下载" data-en="Download">下载</span>
-            <span class="ver">v0.3.4</span>
+            <span class="ver">v0.4.3b</span>
           </a>
           <a class="btn btn-outline btn-lg" href="#start" data-zh="快速开始" data-en="Quick start">快速开始 <span class="ar">→</span></a>
         </div>
@@ -523,7 +695,7 @@ footer{padding:40px 0 52px}
   <section id="engine" class="tint-azure">
     <div class="wrap">
       <div class="sec-head">
-        <span class="kicker">Engine, plus the content tools</span>
+        <span class="kicker" data-zh="跑团引擎，连同内容工具" data-en="Engine, plus the content tools">跑团引擎，连同内容工具</span>
         <h2 data-zh="引擎在后台，<span class=&quot;hl&quot;>剧本、角色卡与知识库</span>在你自己手里。" data-en="The engine runs in the background — <span class=&quot;hl&quot;>scenarios, sheets and the knowledge base</span> stay in your hands.">引擎在后台，<span class="hl">剧本、角色卡与知识库</span>在你自己手里。</h2>
         <p data-zh="它不是一个只会续写剧情的聊天框。叙事与检定交给引擎，内容交给内置的剧本编辑器、世界书、角色卡编辑器与规则书知识库——两边分开，跑团才推得下去。" data-en="It is not a chat box that merely continues prose. Narration and checks belong to the engine; content belongs to the built-in scenario editor, world book, sheet editor and rulebook knowledge base — keeping them apart is what lets a campaign keep going.">它不是一个只会续写剧情的聊天框。叙事与检定交给引擎，内容交给内置的剧本编辑器、世界书、角色卡编辑器与规则书知识库——两边分开，跑团才推得下去。</p>
       </div>
@@ -600,7 +772,7 @@ footer{padding:40px 0 52px}
   <section id="shots" class="tint-cool">
     <div class="wrap">
       <div class="sec-head">
-        <span class="kicker">Interface preview</span>
+        <span class="kicker" data-zh="界面预览" data-en="Interface preview">界面预览</span>
         <h2 data-zh="六项能力，<span class=&quot;hl&quot;>六张真实界面</span>。" data-en="Six capabilities, <span class=&quot;hl&quot;>six real screens</span>.">六项能力，<span class="hl">六张真实界面</span>。</h2>
         <p data-zh="房间聊天、剧本编辑器、世界书、COC7 角色卡、角色卡编辑器与规则书知识库，全部照程序的实际界面绘制。" data-en="The room chat, scenario editor, world book, COC7 sheets, the sheet editor and the rulebook knowledge base — all drawn from the app's actual interface.">房间聊天、剧本编辑器、世界书、COC7 角色卡、角色卡编辑器与规则书知识库，全部照程序的实际界面绘制。</p>
       </div>
@@ -671,7 +843,7 @@ footer{padding:40px 0 52px}
             <img src="assets/shot-room.png" alt="AI Keeper narration and dice checks in the room chat" loading="lazy" />
           </div>
           <figcaption>
-            <span class="cap-k">01 — Room · AI Keeper</span>
+            <span class="cap-k" data-zh="01 — 房间 · AI 守密人" data-en="01 — Room · AI Keeper">01 — 房间 · AI 守密人</span>
             <h3 data-zh="一张聊天，跑完一局" data-en="One chat, one whole session">一张聊天，跑完一局</h3>
             <p data-zh="AI 守秘人推进叙事，玩家掷骰、检定，结果直接写回角色卡——全在同一张聊天里，右侧还能看到谁在线、绑定了哪张卡。" data-en="The AI Keeper narrates, players roll, and every check writes back to the sheet — all inside one chat, with who is online and which sheet they bound shown alongside.">AI 守秘人推进叙事，玩家掷骰、检定，结果直接写回角色卡——全在同一张聊天里，右侧还能看到谁在线、绑定了哪张卡。</p>
             <ul class="shot-points">
@@ -735,7 +907,7 @@ footer{padding:40px 0 52px}
             <img src="assets/shot-scenario-editor.png" alt="Built-in scenario editor" loading="lazy" />
           </div>
           <figcaption>
-            <span class="cap-k">02 — Scenario editor</span>
+            <span class="cap-k" data-zh="02 — 剧本编辑器" data-en="02 — Scenario editor">02 — 剧本编辑器</span>
             <h3 data-zh="Word / PDF 模组，直接变成可玩剧本" data-en="Word / PDF modules become playable scenarios">Word / PDF 模组，直接变成可玩剧本</h3>
             <p data-zh="场景卡、结局、时间线、NPC、怪物与道具在同一个编辑器里编排，封面与简介跟着剧本走；写完存草稿或直接发布。" data-en="Scene cards, endings, timeline, NPCs, monsters and items are arranged in one editor, with cover and synopsis attached — then save a draft or publish.">场景卡、结局、时间线、NPC、怪物与道具在同一个编辑器里编排，封面与简介跟着剧本走；写完存草稿或直接发布。</p>
             <ul class="shot-points">
@@ -799,7 +971,7 @@ footer{padding:40px 0 52px}
             <img src="assets/shot-worldbook.png" alt="World book entry editor" loading="lazy" />
           </div>
           <figcaption>
-            <span class="cap-k">03 — World book</span>
+            <span class="cap-k" data-zh="03 — 世界书" data-en="03 — World book">03 — 世界书</span>
             <h3 data-zh="决定 AI 此刻能读到什么" data-en="Decides what the AI may read right now">决定 AI 此刻能读到什么</h3>
             <p data-zh="每条知识块都能调触发词、副键、常驻、概率与粘滞 / 冷却轮数：命中即注入，冷却即剔除，剧本再大也不会串味。" data-en="Every entry tunes its own trigger keys, secondary keys, always-on flag, probability and sticky / cooldown rounds — injected on a hit, dropped on cooldown, so even a huge scenario stays on topic.">每条知识块都能调触发词、副键、常驻、概率与粘滞 / 冷却轮数：命中即注入，冷却即剔除，剧本再大也不会串味。</p>
             <ul class="shot-points">
@@ -875,7 +1047,7 @@ footer{padding:40px 0 52px}
             <img src="assets/shot-sheet.png" alt="COC7 character sheet" loading="lazy" />
           </div>
           <figcaption>
-            <span class="cap-k">04 — Character sheet</span>
+            <span class="cap-k" data-zh="04 — 角色卡" data-en="04 — Character sheet">04 — 角色卡</span>
             <h3 data-zh="属性、技能、武器与专精，一页看全" data-en="Attributes, skills, weapons and specialisations on one page">属性、技能、武器与专精，一页看全</h3>
             <p data-zh="9 项属性、三档成功率（普通 / 困难 / 噩梦）、技能上限与武器清单一并呈现，技能名按角色卡自己的本地化名称显示。" data-en="Nine attributes, three success tiers (regular / hard / extreme), skill caps and the weapon list all in view, with skill names shown in the sheet's own localised wording.">9 项属性、三档成功率（普通 / 困难 / 噩梦）、技能上限与武器清单一并呈现，技能名按角色卡自己的本地化名称显示。</p>
             <ul class="shot-points">
@@ -934,7 +1106,7 @@ footer{padding:40px 0 52px}
             <img src="assets/shot-sheet-editor.png" alt="Built-in character sheet editor" loading="lazy" />
           </div>
           <figcaption>
-            <span class="cap-k">05 — Sheet editor</span>
+            <span class="cap-k" data-zh="05 — 角色卡编辑器" data-en="05 — Sheet editor">05 — 角色卡编辑器</span>
             <h3 data-zh="建卡改卡，都在页面里完成" data-en="Build and edit sheets right in the page">建卡改卡，都在页面里完成</h3>
             <p data-zh="职业点数与兴趣点数实时汇总剩余，分类筛选快速定位技能；带专精的技能选好专精，基础值随之切换。" data-en="Occupation and interest pools track the remainder live, category filters jump straight to a skill, and specialisation skills switch their base once a specialisation is picked.">职业点数与兴趣点数实时汇总剩余，分类筛选快速定位技能；带专精的技能选好专精，基础值随之切换。</p>
             <ul class="shot-points">
@@ -1007,7 +1179,7 @@ footer{padding:40px 0 52px}
             <img src="assets/shot-knowledge.png" alt="Rulebook knowledge base" loading="lazy" />
           </div>
           <figcaption>
-            <span class="cap-k">06 — Rulebook knowledge base</span>
+            <span class="cap-k" data-zh="06 — 规则书知识库" data-en="06 — Rulebook knowledge base">06 — 规则书知识库</span>
             <h3 data-zh="规则问题，用你的规则书回答" data-en="Rules questions answered from your own rulebook">规则问题，用你的规则书回答</h3>
             <p data-zh="上传 COC7 规则文本后立即可检索，AI 回答规则问题时以它为依据；剧本知识库删除只清向量与索引，不动剧本本身。" data-en="Upload COC7 rule text and it is searchable at once — the AI answers rules questions from it. Deleting a scenario index clears vectors only, never the scenario itself.">上传 COC7 规则文本后立即可检索，AI 回答规则问题时以它为依据；剧本知识库删除只清向量与索引，不动剧本本身。</p>
             <ul class="shot-points">
@@ -1025,7 +1197,7 @@ footer{padding:40px 0 52px}
   <section class="tint-warm">
     <div class="wrap split">
       <div>
-        <span class="kicker">Story, with consequences</span>
+        <span class="kicker" data-zh="叙事，与后果" data-en="Story, with consequences">叙事，与后果</span>
         <h2 data-zh="叙事可以自由，状态必须可信。" data-en="Narration can be free. State must be trustworthy.">叙事可以自由，状态必须可信。</h2>
         <p class="sec-head" style="margin:16px 0 0;max-width:none" data-zh="玩家看到的是干净的叙事，背后每一次检定、技能变动与存档都由引擎处理。" data-en="Players see clean narration; behind it, every check, skill change and save is handled by the engine.">玩家看到的是干净的叙事，背后每一次检定、技能变动与存档都由引擎处理。</p>
         <ul class="rules">
@@ -1037,7 +1209,7 @@ footer{padding:40px 0 52px}
         <p class="note"><a href="https://github.com/Nobook1121/AIBasedTRPG/blob/main/docs/api.md" target="_blank" rel="noopener" data-zh="阅读接口与内部设计 →" data-en="Read the API and design notes →">阅读接口与内部设计 →</a></p>
       </div>
       <div class="quote-box">
-        <span class="kicker">Two kinds of memory</span>
+        <span class="kicker" data-zh="两种记忆" data-en="Two kinds of memory">两种记忆</span>
         <p data-zh="「世界书」装的是这个剧本的线索、NPC 与触发器；「规则书知识库」装的是 COC7 规则本身。两者分开检索——剧情线索不会被规则条文挤掉，规则问题也不用你现场翻书。" data-en="The world book holds this scenario's clues, NPCs and triggers; the rulebook knowledge base holds COC7 itself. They are retrieved separately — clues never get crowded out by rule text, and rules questions never send you flipping through a book mid-session.">「世界书」装的是这个剧本的线索、NPC 与触发器；「规则书知识库」装的是 COC7 规则本身。两者分开检索——剧情线索不会被规则条文挤掉，规则问题也不用你现场翻书。</p>
         <p class="note" style="margin-bottom:0" data-zh="规则文本支持 .txt / .md / .doc / .docx，上传后立即生效；换一份规则书不用重跑剧本。" data-en="Rule text accepts .txt / .md / .doc / .docx and takes effect the moment it is uploaded — swapping rulebooks needs no scenario rebuild.">规则文本支持 .txt / .md / .doc / .docx，上传后立即生效；换一份规则书不用重跑剧本。</p>
       </div>
@@ -1048,27 +1220,27 @@ footer{padding:40px 0 52px}
   <section class="tint-cool">
     <div class="wrap">
       <div class="sec-head">
-        <span class="kicker">From zero to session one</span>
+        <span class="kicker" data-zh="从零到第一场" data-en="From zero to session one">从零到第一场</span>
         <h2 data-zh="四步，开始第一场 AI 跑团。" data-en="Four steps to your first AI session.">四步，开始第一场 AI 跑团。</h2>
       </div>
       <div class="steps">
         <div class="step">
-          <span class="step-num">01 · Deploy</span>
+          <span class="step-num" data-zh="01 · 部署" data-en="01 · Deploy">01 · 部署</span>
           <h3 data-zh="部署" data-en="Deploy">部署</h3>
           <p data-zh="克隆仓库或解压 release 包，装好依赖，<code>python server.py</code> 即起。" data-en="Clone the repo or unzip a release, install dependencies, run <code>python server.py</code>.">克隆仓库或解压 release 包，装好依赖，<code>python server.py</code> 即起。</p>
         </div>
         <div class="step">
-          <span class="step-num">02 · Configure</span>
+          <span class="step-num" data-zh="02 · 配置" data-en="02 · Configure">02 · 配置</span>
           <h3 data-zh="配置" data-en="Configure">配置</h3>
           <p data-zh="打开首页会弹出 5 步向导：选平台、填 Key、测试连接、创建 Owner，全程不用手改配置文件。" data-en="The home page walks you through five steps: pick a provider, paste a key, test the connection, create the Owner. No config files by hand.">打开首页会弹出 5 步向导：选平台、填 Key、测试连接、创建 Owner，全程不用手改配置文件。</p>
         </div>
         <div class="step">
-          <span class="step-num">03 · Prepare</span>
+          <span class="step-num" data-zh="03 · 准备" data-en="03 · Prepare">03 · 准备</span>
           <h3 data-zh="准备剧本与角色卡" data-en="Prepare scenarios and sheets">准备剧本与角色卡</h3>
           <p data-zh="手写模组，或把文档导进来；再在剧本编辑器里调场景卡、在世界书里逐条设触发词，顺手建几张 COC7 角色卡，上传规则书建起知识库。" data-en="Write a module or import a document, tune scene cards in the editor, set trigger keys entry by entry in the world book, roll a few COC7 sheets, and upload a rulebook to build the knowledge base.">手写模组，或把文档导进来；再在剧本编辑器里调场景卡、在世界书里逐条设触发词，顺手建几张 COC7 角色卡，上传规则书建起知识库。</p>
         </div>
         <div class="step">
-          <span class="step-num">04 · Play</span>
+          <span class="step-num" data-zh="04 · 开团" data-en="04 · Play">04 · 开团</span>
           <h3 data-zh="开团" data-en="Play">开团</h3>
           <p data-zh="建房、发房间码、朋友加入。AI 开场并推进剧情，玩家掷骰、检定、行动。" data-en="Create a room, share the code, and let friends in. The AI opens the scene and drives it; players roll, check and act.">建房、发房间码、朋友加入。AI 开场并推进剧情，玩家掷骰、检定、行动。</p>
         </div>
@@ -1080,7 +1252,7 @@ footer{padding:40px 0 52px}
   <section id="start" class="tint-azure">
     <div class="wrap">
       <div class="sec-head">
-        <span class="kicker">Python · Three commands</span>
+        <span class="kicker" data-zh="Python · 三条命令" data-en="Python · Three commands">Python · 三条命令</span>
         <h2 data-zh="跑起来只需要一个终端。" data-en="All you need is one terminal.">跑起来只需要一个终端。</h2>
         <p data-zh="需要 Python 3.11+；Node.js 18+ 只在你自己构建前端时才会用到。" data-en="Requires Python 3.11+; Node.js 18+ is only needed if you build the frontend yourself.">需要 Python 3.11+；Node.js 18+ 只在你自己构建前端时才会用到。</p>
       </div>
@@ -1121,7 +1293,7 @@ python server.py</pre>
   <section>
     <div class="wrap">
       <div class="sec-head">
-        <span class="kicker">Who it is for</span>
+        <span class="kicker" data-zh="适合谁" data-en="Who it is for">适合谁</span>
         <h2 data-zh="这套东西是给谁的。" data-en="Who this is actually for.">这套东西是给谁的。</h2>
       </div>
       <div class="who-grid">
@@ -1145,7 +1317,7 @@ python server.py</pre>
   <section id="deploy" class="tint-gold">
     <div class="wrap split">
       <div>
-        <span class="kicker">Deploy anywhere</span>
+        <span class="kicker" data-zh="随处部署" data-en="Deploy anywhere">随处部署</span>
         <h2 data-zh="不用云服务器，也能让朋友连上。" data-en="No cloud server needed — friends can still join.">不用云服务器，也能让朋友连上。</h2>
         <p class="sec-head" style="margin:16px 0 0;max-width:none" data-zh="程序可以配合内网穿透等方式使用：在一台普通电脑上跑起来，把地址分享出去，朋友就能加入。零成本、无需云服务器，也不用先准备域名和证书。" data-en="The app works together with tunnelling tools: run it on an ordinary PC, share the address, and friends can join. Zero cost, no cloud server, and no domain or certificate to prepare first.">程序可以配合内网穿透等方式使用：在一台普通电脑上跑起来，把地址分享出去，朋友就能加入。零成本、无需云服务器，也不用先准备域名和证书。</p>
         <ul class="rules">
@@ -1170,7 +1342,7 @@ python server.py</pre>
   <section id="faq">
     <div class="wrap">
       <div class="sec-head">
-        <span class="kicker">Questions</span>
+        <span class="kicker" data-zh="常见问题" data-en="Questions">常见问题</span>
         <h2 data-zh="上手前可能想知道。" data-en="What you might want to know first.">上手前可能想知道。</h2>
       </div>
       <div class="faq">
@@ -1202,7 +1374,7 @@ python server.py</pre>
   <section class="tint-cool">
     <div class="wrap docs">
       <div>
-        <span class="kicker">Guides &amp; documentation</span>
+        <span class="kicker" data-zh="指南与文档" data-en="Guides &amp; documentation">指南与文档</span>
         <h2 data-zh="需要帮助？从这里开始。" data-en="Need help? Start here.">需要帮助？从这里开始。</h2>
         <p class="sec-head" style="margin:16px 0 0;max-width:none" data-zh="接口设计、剧本格式、控制台命令与内部结构都在文档里；文档随版本一起更新。" data-en="API design, scenario format, console commands and internals all live in the docs, updated alongside each release.">接口设计、剧本格式、控制台命令与内部结构都在文档里；文档随版本一起更新。</p>
         <div class="hero-cta">
@@ -1230,7 +1402,7 @@ python server.py</pre>
   <!-- FINAL -->
   <section class="final">
     <div class="wrap">
-      <span class="kicker">Your table · Your rules · Your Keeper</span>
+      <span class="kicker" data-zh="你的桌 · 你的规则 · 你的守密人" data-en="Your table · Your rules · Your Keeper">你的桌 · 你的规则 · 你的守密人</span>
       <h2 data-zh="下一场冒险，从你自己的服务器开始。" data-en="Your next campaign starts on your own server.">下一场冒险，从你自己的服务器开始。</h2>
       <p data-zh="开源、自托管、单进程就能跑。下载 Release，把朋友叫上桌。" data-en="Open source, self-hosted, single process. Download a release and call your friends to the table.">开源、自托管、单进程就能跑。下载 Release，把朋友叫上桌。</p>
       <div class="hero-cta">
