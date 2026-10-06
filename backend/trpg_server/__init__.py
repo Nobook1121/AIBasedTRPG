@@ -1,1 +1,1 @@
-"""Server package for the AI-based TRPG application."""
+"""Server package for The Veil (帷幕), a self-hosted AI TRPG platform."""

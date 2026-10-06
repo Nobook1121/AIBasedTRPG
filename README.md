@@ -1,4 +1,4 @@
-# AIBasedTRPG
+# 帷幕 The Veil · AI 跑团平台
 
 一个可以自己部署的 **AI 跑团（TRPG）平台**。它把「AI 当 KP/守秘人」和「真人玩家一起玩」合在一起：
 AI 负责推进剧情、裁决检定、扮演 NPC，玩家在同一张房间聊天里掷骰、交流、推进故事。
@@ -30,7 +30,7 @@ AI 负责推进剧情、裁决检定、扮演 NPC，玩家在同一张房间聊�
 
 ## 这是什么
 
-AIBasedTRPG 是一套自托管的跑团工具。它提供：
+帷幕（The Veil）是一套自托管的 AI 跑团平台。它提供：
 
 - 一个 **AI 守秘人（KP）**，能读懂你的剧本、追踪当前场景、按需调用剧本里的线索与触发器。
 - 一个 **多人房间系统**，玩家用房间码加入，聊天记录持久保存，支持回档和自动存档。
@@ -87,12 +87,12 @@ AIBasedTRPG 是一套自托管的跑团工具。它提供：
 
 ### 安装
 
-```powershell
-git clone https://github.com/Nobook1121/AIBasedTRPG
-cd "AIbased TRPG"
+```bat
+git clone https://github.com/Nobook1121/the-veil
+cd the-veil
 
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+.venv\Scripts\activate.bat
 pip install -r requirements.txt
 
 npm install
@@ -103,13 +103,22 @@ npm run build:frontend
 
 ### 启动
 
-```powershell
+Windows 下**双击 `start.cmd`** 即可，不受 PowerShell 执行策略限制；脚本会自动优先使用 `.venv` 里的 Python、设置好 UTF-8 输出，并在找不到 Python 时给出提示。也可以在命令行里传端口：
+
+```bat
+start.cmd
+start.cmd 8090
+```
+
+其他系统或想手动启动时：
+
+```bash
 python server.py
 ```
 
 默认端口 **8086**，浏览器访问 <http://127.0.0.1:8086>。也可以指定端口：
 
-```powershell
+```bash
 python server.py 8090
 ```
 

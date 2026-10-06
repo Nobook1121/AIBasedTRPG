@@ -1,1 +1,1 @@
-"""Route blueprints for the AI-based TRPG server."""
+"""Route blueprints for The Veil server."""

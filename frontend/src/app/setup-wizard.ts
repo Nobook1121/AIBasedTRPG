@@ -8,7 +8,7 @@ namespace SetupWizard {
 
     const TOTAL_STEPS = 5;
     const SKIPPABLE_STEPS = [1, 3];
-    const DEFAULT_SITE_NAME = "AI TRPG";
+    const DEFAULT_SITE_NAME = "帷幕 The Veil";
     const DISMISS_STORAGE_KEY = "trpg_setup_dismissed";
     let currentStep = 1;
     let brandingName = "";
